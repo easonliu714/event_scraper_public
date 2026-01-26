@@ -30,9 +30,10 @@ OUTPUT_DIR = Path("docs")
 OUTPUT_FILE = OUTPUT_DIR / "data.json"
 LINE_TOKEN = os.environ.get("LINE_TOKEN")
 
+# 模擬真實 Chrome 瀏覽器的 User-Agent
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 ]
 
 # =========================
@@ -41,16 +42,19 @@ USER_AGENTS = [
 def get_headers(referer=None):
     headers = {
         'User-Agent': random.choice(USER_AGENTS),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-        # [V44 修正] 移除 'br' 以避免 BeClass 的 brotli 解碼錯誤
-        'Accept-Encoding': 'gzip, deflate', 
+        'Accept-Encoding': 'gzip, deflate',
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
         'Cache-Control': 'max-age=0',
+        'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"'
     }
     if referer: headers['Referer'] = referer
     return headers
@@ -75,15 +79,13 @@ def get_event_category_from_title(title):
         if any(keyword in title_lower for keyword in keywords): return category
     return "其他"
 
-async def fetch_text(session, url, headers=None, timeout_sec=20):
+async def fetch_text(session, url, headers=None, timeout_sec=25):
     if not headers: headers = get_headers()
     try:
         async with session.get(url, headers=headers, ssl=False, timeout=timeout_sec) as resp:
             if resp.status != 200:
                 logger.warning(f"❌ HTTP {resp.status} - {url}")
                 return None
-            
-            # 自動處理編碼
             content_type = resp.headers.get('Content-Type', '').lower()
             if 'charset' in content_type:
                 return await resp.text()
@@ -98,7 +100,7 @@ async def fetch_text(session, url, headers=None, timeout_sec=20):
         return None
 
 # =========================
-# 🧠 智慧標題提取助手
+# 🧠 終極標題提取助手
 # =========================
 def extract_smart_title(link_tag):
     title = link_tag.get('title')
@@ -119,12 +121,23 @@ def extract_smart_title(link_tag):
 
 def create_event_obj(title, url, platform, img_url=None):
     if title:
-        noise = ['立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 'More', 'None', '活動介紹', 'Traffic']
+        # [V46] 標題淨化升級
+        # 1. 移除 Accupass 的 banner 前綴
+        title = re.sub(r'^(event-)?banner-', '', title, flags=re.I)
+        
+        # 2. 移除常見雜訊
+        noise = ['立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 'More', 'None', '活動介紹', 'Traffic', '更多詳情', '其他活動', '開放時間', '交通資訊']
         for n in noise: title = title.replace(n, "")
+        
+        # 3. 移除日期
         title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
         title = re.sub(r'\s+', ' ', title).strip()
+        
+        # 4. 移除純符號 (如 » )
+        title = re.sub(r'^[»\s]+|[»\s]+$', '', title)
     
-    if not title or len(title) < 2: return None
+    # [V46] 嚴格檢查無效標題
+    if not title or len(title) < 2 or title in ['詳內文', '更多資訊']: return None
 
     return {
         'title': title,
@@ -137,7 +150,7 @@ def create_event_obj(title, url, platform, img_url=None):
     }
 
 # =========================
-# 🕷️ 平台爬蟲 (V44)
+# 🕷️ 平台爬蟲 (V46: 全面優化)
 # =========================
 
 async def fetch_kktix(session):
@@ -265,16 +278,22 @@ async def fetch_udn(session):
     return events
 
 async def fetch_fami(session):
-    logger.info("🚀 啟動 FamiTicket...")
-    html = await fetch_text(session, "https://www.famiticket.com.tw/Home")
+    logger.info("🚀 啟動 FamiTicket (V46)...")
+    # [V46 修正] 改抓取 Search 頁面，結構較穩定
+    html = await fetch_text(session, "https://www.famiticket.com.tw/Home/Activity/Search/242")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select("a[href*='Content/Home/Activity']")
+    # V46: 廣域搜索 Activity 連結
+    links = soup.find_all('a', href=re.compile(r'Activity', re.I))
     events = []
     seen = set()
     for link in links:
+        href = link.get('href')
         full_url = urljoin("https://www.famiticket.com.tw", link.get('href'))
         if full_url in seen: continue
+        # 排除非內容頁
+        if "Info" not in full_url and "Search" not in full_url: continue
+        
         title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "FamiTicket", None)
         if ev: events.append(ev); seen.add(full_url)
@@ -334,7 +353,7 @@ async def fetch_eventgo(session):
     return events
 
 async def fetch_beclass(session):
-    logger.info("🚀 啟動 BeClass (Fix)...")
+    logger.info("🚀 啟動 BeClass...")
     html = await fetch_text(session, "https://www.beclass.com/default.php?name=ShowList&op=recent")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -369,9 +388,8 @@ async def fetch_indievox(session):
     return events
 
 async def fetch_ibon(session):
-    logger.info("🚀 啟動 ibon...")
-    # 嘗試抓取首頁，ibon 結構較複雜，改用廣域搜尋
-    html = await fetch_text(session, "https://ticket.ibon.com.tw/")
+    logger.info("🚀 啟動 ibon (V46)...")
+    html = await fetch_text(session, "https://ticket.ibon.com.tw/Activity/Index")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     all_links = soup.find_all('a', href=True)
@@ -379,7 +397,6 @@ async def fetch_ibon(session):
     seen = set()
     for link in all_links:
         href = link.get('href')
-        # 不分大小寫檢查
         if "activity" not in href.lower(): continue
         
         full_url = urljoin("https://ticket.ibon.com.tw", href)
@@ -392,11 +409,11 @@ async def fetch_ibon(session):
     return events
 
 async def fetch_huashan(session):
-    logger.info("🚀 啟動 華山...")
+    logger.info("🚀 啟動 華山 (V46)...")
+    # [V46] 更新 Headers 模擬真實瀏覽器
     html = await fetch_text(session, "https://www.huashan1914.com/w/huashan1914/exhibition")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    # [V34 復刻] 
     links = soup.select("a[href*='exhibition_']")
     events = []
     seen = set()
@@ -570,7 +587,7 @@ async def save_data_and_notify(new_events):
         await send_line_notify(msg)
 
 async def main():
-    logger.info("🔥 爬蟲程式開始執行 (V44 Final Fix)...")
+    logger.info("🔥 爬蟲程式開始執行 (V46 Masterpiece)...")
     connector = aiohttp.TCPConnector(ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [
