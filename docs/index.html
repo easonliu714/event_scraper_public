@@ -1,236 +1,397 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>台灣活動情報雷達 📡</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1a1a1a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    
-    <style>
-        :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #3b82f6; --chip-bg: #2a2a2a; }
-        body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 60px; }
-        
-        /* 佈局優化 */
-        header { position: sticky; top: 0; z-index: 100; background: rgba(18,18,18,0.95); backdrop-filter: blur(10px); padding: 12px 16px; border-bottom: 1px solid #333; }
-        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        h1 { margin: 0; font-size: 1.2rem; }
-        .search-box { width: 100%; padding: 12px; border-radius: 12px; background: #2a2a2a; border: 1px solid #333; color: #fff; font-size: 1rem; }
-        
-        /* 過濾區塊 - 三段式 */
-        .filter-section { padding: 16px; background: #181818; border-bottom: 1px solid #333; }
-        .filter-block { margin-bottom: 16px; }
-        .block-title { font-size: 0.85rem; color: #888; margin-bottom: 8px; display: flex; justify-content: space-between; }
-        .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-        .chip { padding: 6px 12px; background: var(--chip-bg); border-radius: 8px; font-size: 0.9rem; cursor: pointer; border: 1px solid #333; transition: 0.2s; display: flex; gap: 6px; }
-        .chip span { opacity: 0.6; font-size: 0.8em; }
-        .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-        .chip.active span { opacity: 1; color: #fff; }
-        
-        /* 特別樣式 */
-        .chip[data-type="status"].active { background: #10b981; border-color: #10b981; } /* 狀態用綠色 */
-        
-        /* 列表 */
-        #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-        .card { background: var(--card); border-radius: 12px; padding: 12px; display: flex; gap: 12px; border: 1px solid #333; }
-        .card-img { width: 90px; height: 90px; border-radius: 8px; background: #333; object-fit: cover; }
-        .card-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
-        .badges { display: flex; flex-wrap: wrap; gap: 4px; font-size: 0.75rem; }
-        .badge { padding: 2px 6px; border-radius: 4px; background: #333; color: #ccc; }
-        .badge.new { background: #ef4444; color: #fff; }
-        .badge.fav { background: #f59e0b; color: #fff; }
-        
-        /* 分頁控制 */
-        .pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin: 20px 0; }
-        .page-btn { padding: 8px 16px; background: #333; border: none; color: #fff; border-radius: 8px; cursor: pointer; }
-        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        /* Modal (保持不變，略) */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: none; justify-content: center; align-items: end; }
-        .modal-overlay.open { display: flex; }
-        .modal { background: #222; width: 100%; max-width: 600px; padding: 24px; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
-    </style>
-</head>
-<body>
+# -*- coding: utf-8 -*-
+import asyncio
+import aiohttp
+import random
+import json
+import re
+import time
+import logging
+import os
+from datetime import datetime
+from urllib.parse import urljoin
+from pathlib import Path
+from bs4 import BeautifulSoup
 
-<header>
-    <div class="top-bar">
-        <h1>📡 活動雷達</h1>
-        <button onclick="openSettings()" style="background:none; border:none; font-size:1.5rem;">⚙️</button>
-    </div>
-    <input type="text" id="search" class="search-box" placeholder="搜尋關鍵字..." oninput="resetPageAndRender()">
-</header>
+# =========================
+# 🛠️ 設定區
+# =========================
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - [%(levelname)s] - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
-<div class="filter-section">
-    <div class="filter-block">
-        <div class="block-title">🏛️ 平台篩選 (聯集 OR)</div>
-        <div id="platform-chips" class="chips"></div>
-    </div>
-    
-    <div class="filter-block">
-        <div class="block-title">✨ 狀態篩選 (交集 AND)</div>
-        <div class="chips">
-            <div class="chip" data-type="status" data-val="isNew" onclick="toggleFilter('status', 'isNew')">🆕 新進活動</div>
-            <div class="chip" data-type="status" data-val="isFav" onclick="toggleFilter('status', 'isFav')">⭐ 關注關鍵字</div>
-        </div>
-    </div>
+OUTPUT_DIR = Path("docs")
+OUTPUT_FILE = OUTPUT_DIR / "data.json"
 
-    <div class="filter-block">
-        <div class="block-title">🏷️ 類別篩選 (聯集 OR)</div>
-        <div id="type-chips" class="chips"></div>
-    </div>
-</div>
+# LINE Notify Token (從 GitHub Secrets 讀取)
+LINE_TOKEN = os.environ.get("LINE_TOKEN")
 
-<div id="event-list"></div>
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+]
 
-<div class="pagination">
-    <button class="page-btn" onclick="changePage(-1)" id="prev-btn">◀ 上一頁</button>
-    <span id="page-info">第 1 / 1 頁</span>
-    <button class="page-btn" onclick="changePage(1)" id="next-btn">下一頁 ▶</button>
-</div>
+# 詳細頁網址白名單 (確保只抓取內容頁)
+DETAIL_URL_WHITELIST = {
+    "拓元售票": re.compile(r"^https?://(www\.)?tixcraft\.com/activity/detail/[A-Za-z0-9_-]+", re.I),
+    "KKTIX": re.compile(r"^https?://[a-z0-9-]+\.kktix\.cc/events/[A-Za-z0-9-_]+", re.I),
+    "OPENTIX": re.compile(r"^https?://(www\.)?opentix\.life/event/\d+", re.I),
+    "年代售票": re.compile(r"^https?://(www\.)?ticket\.com\.tw/application/UTK02/UTK0201_\.aspx\?PRODUCT_ID=[A-Z0-9]+", re.I),
+    "UDN售票網": re.compile(r"^https?://(www\.)?tickets\.udnfunlife\.com/application/UTK02/UTK0201_\.aspx\?PRODUCT_ID=[A-Z0-9]+", re.I),
+    "TixFun售票網": re.compile(r"^https?://(www\.)?tixfun\.com/UTK0201_\?PRODUCT_ID=[A-Z0-9]+", re.I),
+    "寬宏": re.compile(r"^https?://(www\.)?kham\.com\.tw/application/UTK02/UTK0201_\.aspx\?PRODUCT_ID=[A-Z0-9]+", re.I),
+    "Event Go": re.compile(r"^https?://eventgo\.bnextmedia\.com\.tw/event/detail[^\s]*$", re.I),
+    "iNDIEVOX": re.compile(r"^https?://(www\.)?indievox\.com/activity/detail/[0-9_]+", re.I),
+    "ibon": re.compile(r"^https?://ticket\.ibon\.com\.tw/ActivityDetail/.*", re.I),
+    "華山1914": re.compile(r"^https?://(www\.)?huashan1914\.com/w/huashan1914/exhibition.*", re.I),
+    "松山文創": re.compile(r"^https?://(www\.)?songshanculturalpark\.org/exhibition.*", re.I),
+    "KidsClub": re.compile(r"^https?://(www\.)?kidsclub\.com\.tw/.*", re.I),
+    "StrollTimes": re.compile(r"^https?://strolltimes\.com/.*", re.I),
+    "台北世貿": re.compile(r"^https?://(www\.)?twtc\.com\.tw/.*", re.I),
+    "中正紀念堂": re.compile(r"^https?://(www\.)?cksmh\.gov\.tw/activitybee_.*", re.I),
+}
 
-<script>
-    let allEvents = [];
-    let filteredEvents = [];
-    let currentPage = 1;
-    const PAGE_SIZE = 50;
-    
-    // 狀態
-    const filters = {
-        platforms: new Set(), // OR
-        status: new Set(),    // AND
-        types: new Set()      // OR
-    };
-
-    let myKeywords = JSON.parse(localStorage.getItem('myKeywords') || '[]');
-    let readEvents = JSON.parse(localStorage.getItem('readEvents') || '[]');
-
-    async function init() {
-        const res = await fetch(`data.json?t=${Date.now()}`);
-        allEvents = await res.json();
-        // 排序
-        allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
-        
-        renderChips();
-        applyFilters(); // 初始渲染
+# =========================
+# 🧩 輔助工具函式
+# =========================
+def get_headers(referer=None):
+    headers = {
+        'User-Agent': random.choice(USER_AGENTS),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
     }
+    if referer: headers['Referer'] = referer
+    return headers
 
-    function renderChips() {
-        // Render Platforms
-        const pStats = {};
-        allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
-        document.getElementById('platform-chips').innerHTML = Object.entries(pStats)
-            .sort((a,b) => b[1]-a[1])
-            .map(([k,v]) => `<div class="chip" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`)
-            .join('');
+def safe_get_text(element, default="詳內文"):
+    if element and hasattr(element, 'get_text'):
+        text = element.get_text(strip=True)
+        return text if text else default
+    return default
 
-        // Render Types
-        const tStats = {};
-        allEvents.forEach(e => tStats[e.type] = (tStats[e.type]||0)+1);
-        document.getElementById('type-chips').innerHTML = Object.entries(tStats)
-            .sort((a,b) => b[1]-a[1])
-            .map(([k,v]) => `<div class="chip" onclick="toggleFilter('types', '${k}', this)">${k} <span>${v}</span></div>`)
-            .join('');
+def get_event_category_from_title(title):
+    if not title: return "其他"
+    title_lower = title.lower()
+    category_mapping = {
+        "音樂會/演唱會": ["音樂會", "演唱會", "獨奏會", "合唱", "交響", "管樂", "國樂", "弦樂", "鋼琴", "提琴", "巡演", "fan concert", "fancon", "音樂節", "爵士", "演奏", "歌手", "樂團", "tour", "live", "concert", "solo", "recital", "電音派對", "藝人見面會", "音樂祭"],
+        "音樂劇/歌劇": ["音樂劇", "歌劇", "musical", "opera"],
+        "戲劇表演": ["戲劇", "舞台劇", "劇團", "劇場", "喜劇", "公演", "掌中戲", "歌仔戲", "豫劇", "話劇", "相聲", "布袋戲", "京劇", "崑劇", "藝文活動"],
+        "舞蹈表演": ["舞蹈", "舞作", "舞團", "芭蕾", "舞劇", "現代舞", "民族舞", "踢踏舞", "zumba"],
+        "展覽/博覽": ["展覽", "特展", "博物館", "美術館", "藝術展", "畫展", "攝影展", "文物展", "科學展", "博覽會", "動漫", "展出"],
+        "親子活動": ["親子", "兒童", "寶寶", "家庭", "小朋友", "童話", "卡通", "動畫", "體驗", "營隊", "冬令營", "夏令營"],
+        "電影放映": ["電影", "影展", "數位修復", "放映", "首映", "紀錄片", "動畫電影"],
+        "體育賽事": ["棒球", "籃球", "錦標賽", "運動會", "足球", "羽球", "網球", "馬拉松", "路跑", "游泳", "體操", "championship", "遊戲競賽"],
+        "講座/工作坊": ["工作坊", "課程", "導讀", "沙龍", "講座", "體驗", "研習", "培訓", "論壇", "研討會", "座談", "workshop", "職場工作術", "資訊科技", "AI", "Python", "競賽", "創作", "纏繞"],
+        "娛樂表演": ["脫口秀", "魔術", "雜技", "馬戲", "特技", "魔幻", "綜藝", "娛樂", "秀場", "表演秀", "社群活動", "派對", "市集"],
+        "其他": ["旅遊", "美食", "公益"]
     }
+    for category, keywords in category_mapping.items():
+        if any(keyword in title_lower for keyword in keywords):
+            return category
+    return "其他"
 
-    function toggleFilter(category, value, el) {
-        if (el) el.classList.toggle('active');
-        else document.querySelector(`.chip[data-val="${value}"]`).classList.toggle('active');
+async def fetch_text(session, url, headers=None, timeout_sec=15):
+    if not headers: headers = get_headers()
+    try:
+        async with session.get(url, headers=headers, ssl=False, timeout=timeout_sec) as resp:
+            if resp.status != 200:
+                logger.warning(f"❌ HTTP {resp.status} - {url}")
+                return None
+            return await resp.text()
+    except Exception as e:
+        logger.error(f"💥 請求異常: {url} - {e}")
+        return None
 
-        if (filters[category].has(value)) filters[category].delete(value);
-        else filters[category].add(value);
-        
-        resetPageAndRender();
-    }
+# =========================
+# ★ 核心修正：深度標題解析與過濾 ★
+# =========================
+def filter_links_for_platform(links, base_url, platform_name):
+    events = []
+    seen_urls = set()
+    wl = DETAIL_URL_WHITELIST.get(platform_name)
 
-    function resetPageAndRender() {
-        currentPage = 1;
-        applyFilters();
-    }
+    for link in links:
+        href = link.get('href', '')
+        if not href: continue
+        full_url = urljoin(base_url, href).split('#')[0]
 
-    function applyFilters() {
-        const query = document.getElementById('search').value.toLowerCase();
-        
-        filteredEvents = allEvents.filter(e => {
-            const isFav = myKeywords.some(k => e.title.includes(k));
-            const isNew = !readEvents.includes(e.url);
+        # 平台特殊排除
+        if platform_name == "Event Go" and not full_url.startswith("https://eventgo.bnextmedia.com.tw/event/detail"): continue
             
-            // 1. 搜尋
-            if (query && !e.title.toLowerCase().includes(query)) return false;
+        if full_url in seen_urls: continue
+        if wl and not wl.match(full_url): continue
 
-            // 2. 平台 (OR) - 若有選，則必須包含
-            if (filters.platforms.size > 0 && !filters.platforms.has(e.platform)) return false;
-
-            // 3. 類別 (OR)
-            if (filters.types.size > 0 && !filters.types.has(e.type)) return false;
-
-            // 4. 狀態 (AND) - 這是關鍵修改
-            if (filters.status.has('isNew') && !isNew) return false;
-            if (filters.status.has('isFav') && !isFav) return false;
-
-            return true;
-        });
-
-        renderList();
-        renderPagination();
-    }
-
-    function renderList() {
-        const start = (currentPage - 1) * PAGE_SIZE;
-        const pageData = filteredEvents.slice(start, start + PAGE_SIZE);
+        # --- 深度標題解析 ---
+        title = link.get('title')
         
-        const list = document.getElementById('event-list');
-        if(pageData.length === 0) {
-            list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>';
-            return;
-        }
+        # 策略 1: 如果 title 屬性無效，嘗試找內部標題標籤 (h2-h6)
+        if not title or title.strip() in ['詳內文', '詳細資訊', '購票', 'Read More', 'More']:
+            header_tag = link.find(['h2', 'h3', 'h4', 'h5', 'h6'])
+            if header_tag: title = header_tag.get_text(strip=True)
+            
+            # 策略 2: 搜尋常見 class
+            if not title:
+                class_tag = link.find(class_=re.compile(r'(title|name|subject|header)', re.I))
+                if class_tag: title = class_tag.get_text(strip=True)
 
-        list.innerHTML = pageData.map(e => {
-            const isFav = myKeywords.some(k => e.title.includes(k));
-            const isNew = !readEvents.includes(e.url);
-            return `
-                <div class="card ${!isNew ? 'read' : ''}" onclick="window.open('${e.url}', '_blank'); markRead('${e.url}')">
-                    ${e.img_url ? `<img src="${e.img_url}" class="card-img" loading="lazy">` : ''}
-                    <div class="card-info">
-                        <div class="badges">
-                            <span class="badge" style="color:#60a5fa">${e.platform}</span>
-                            ${isNew ? '<span class="badge new">NEW</span>' : ''}
-                            ${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}
-                            <span class="badge">${e.type}</span>
-                        </div>
-                        <div style="font-weight:500; font-size:1rem;">${e.title}</div>
-                        <div style="font-size:0.8rem; color:#888;">${e.date}</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
+            # 策略 3: 圖片 alt/title
+            if not title:
+                img = link.find('img')
+                if img: title = img.get('alt') or img.get('title')
+            
+            # 策略 4: 最後手段 - 獲取所有文字，但要過濾掉雜訊
+            if not title:
+                title = link.get_text(" ", strip=True)
 
-    function renderPagination() {
-        const totalPages = Math.ceil(filteredEvents.length / PAGE_SIZE) || 1;
-        document.getElementById('page-info').textContent = `第 ${currentPage} / ${totalPages} 頁 (共 ${filteredEvents.length} 筆)`;
-        document.getElementById('prev-btn').disabled = currentPage === 1;
-        document.getElementById('next-btn').disabled = currentPage === totalPages;
-    }
+        # 清理標題
+        if title:
+            # 移除常見無意義字詞
+            noise_words = ['立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 'More']
+            for noise in noise_words:
+                title = title.replace(noise, "")
+            # 移除日期格式 (例如 2026/01/01 或 2026-01-01)
+            title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
+            title = re.sub(r'\s+', ' ', title).strip()
 
-    function changePage(delta) {
-        currentPage += delta;
-        renderList();
-        renderPagination();
-        window.scrollTo(0, 0); // 換頁後回到頂部
-    }
+        # 過濾太短或仍是無效的標題
+        if not title or len(title) < 3:
+            continue
 
-    function markRead(url) {
-        if(!readEvents.includes(url)) {
-            readEvents.push(url);
-            localStorage.setItem('readEvents', JSON.stringify(readEvents));
-            // 這裡可以選擇不重新渲染，以免列表跳動，或者僅更新樣式
-        }
-    }
+        img_url = None
+        img_tag = link.find('img')
+        if img_tag: img_url = img_tag.get('src')
+        if img_url and not img_url.startswith('http'):
+            img_url = urljoin(base_url, img_url)
 
-    // 初始化
-    init();
-</script>
-</body>
-</html>
+        events.append({
+            'title': title,
+            'url': full_url,
+            'platform': platform_name,
+            'img_url': img_url,
+            'date': "詳內文",
+            'type': get_event_category_from_title(title),
+            'scraped_at': datetime.now().isoformat()
+        })
+        seen_urls.add(full_url)
+
+    logger.info(f"[{platform_name}] 解析完成: {len(events)} 筆")
+    return events
+
+# =========================
+# 🕷️ 各平台爬蟲函式 (19 平台)
+# =========================
+
+async def fetch_kktix_events_list(session):
+    logger.info("🚀 啟動 KKTIX...")
+    base_url = "https://kktix.com/events"
+    categories = [f"{base_url}?category_id={i}" for i in [2, 6, 4, 3, 8]] + ["https://kktix.com/"]
+    all_events = []
+    seen = set()
+    for url in categories:
+        await asyncio.sleep(random.uniform(1, 2))
+        html = await fetch_text(session, url, headers=get_headers('https://kktix.com/'))
+        if not html: continue
+        soup = BeautifulSoup(html, "html.parser")
+        links = soup.select('a[href*="/events/"], .event-item a, .event-card a')
+        events = filter_links_for_platform(links, "https://kktix.com/", "KKTIX")
+        for e in events:
+            if e['url'] not in seen: all_events.append(e); seen.add(e['url'])
+    return all_events
+
+async def fetch_accupass_events_list(session):
+    logger.info("🚀 啟動 ACCUPASS...")
+    base_url = "https://www.accupass.com/search"
+    target_urls = [f"{base_url}?q={k}" for k in ["音樂", "藝文", "學習", "科技"]] + ["https://www.accupass.com/?area=north"]
+    all_events = []
+    seen = set()
+    for url in target_urls:
+        await asyncio.sleep(random.uniform(2, 4))
+        html = await fetch_text(session, url, headers=get_headers('https://www.accupass.com/'))
+        if not html: continue
+        soup = BeautifulSoup(html, "html.parser")
+        # ACCUPASS 不使用通用 filter，因為結構較複雜，需手動強化標題
+        candidates = soup.find_all('a', href=re.compile(r'^/event/([A-Za-z0-9]+)'))
+        for link in candidates:
+            href = link.get('href')
+            if not href or 'javascript' in href: continue
+            full_url = urljoin("https://www.accupass.com", href).split('?')[0]
+            if full_url in seen: continue
+            
+            # ACCUPASS 標題強化
+            title = safe_get_text(link.find('h3'))
+            if not title: title = safe_get_text(link.find(class_=re.compile(r'title', re.I)))
+            if not title: title = safe_get_text(link)
+            
+            if len(title) < 2: continue
+            
+            img_tag = link.find('img')
+            img_url = img_tag.get('src') if img_tag else None
+            
+            all_events.append({
+                "title": title, "url": full_url, "platform": "ACCUPASS", "date": "詳內文", "img_url": img_url,
+                "type": get_event_category_from_title(title), "scraped_at": datetime.now().isoformat()
+            })
+            seen.add(full_url)
+    logger.info(f"[ACCUPASS] 抓取 {len(all_events)} 筆")
+    return all_events
+
+# 通用抓取 Helper
+async def generic_fetch(session, name, base_url, urls, selector, delay=1):
+    logger.info(f"🚀 啟動 {name}...")
+    if isinstance(urls, str): urls = [urls]
+    all_events = []
+    seen = set()
+    for url in urls:
+        await asyncio.sleep(delay)
+        html = await fetch_text(session, url)
+        if not html: continue
+        soup = BeautifulSoup(html, "html.parser")
+        links = soup.select(selector)
+        events = filter_links_for_platform(links, base_url, name)
+        for e in events:
+            if e['url'] not in seen:
+                all_events.append(e)
+                seen.add(e['url'])
+    return all_events
+
+async def fetch_tixcraft_events_list(s): 
+    return await generic_fetch(s, "拓元售票", "https://tixcraft.com", ["https://tixcraft.com/activity", "https://tixcraft.com/activity/list/select_type/all"], 'a[href*="/activity/detail/"]')
+
+async def fetch_kham_events_list(s):
+    urls = [f"https://kham.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY={i}" for i in [205,231,116,129]]
+    # 寬宏需要分別抓取並標記分類，但為了簡化，先用通用 filter，分類由標題自動判斷
+    return await generic_fetch(s, "寬宏", "https://kham.com.tw", urls, 'a[href*="UTK0201"]')
+
+async def fetch_opentix_events_list(s): 
+    return await generic_fetch(s, "OPENTIX", "https://www.opentix.life", "https://www.opentix.life/event", 'a[href*="/event/"]')
+
+async def fetch_udn_events_list(s): 
+    return await generic_fetch(s, "UDN售票網", "https://tickets.udnfunlife.com", ["https://tickets.udnfunlife.com/application/UTK01/UTK0101_03.aspx?Category=77&kdid=cateList", "https://tickets.udnfunlife.com/application/UTK01/UTK0101_03.aspx?Category=231&kdid=cateList"], 'a[href*="UTK0201"]')
+
+async def fetch_famiticket_events_list(s): 
+    return await generic_fetch(s, "FamiTicket", "https://www.famiticket.com.tw", "https://www.famiticket.com.tw/Home", "a[href*='Content/Home/Activity']")
+
+async def fetch_era_events_list(s): 
+    return await generic_fetch(s, "年代售票", "https://ticket.com.tw", "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77", 'a[href*="UTK0201"]')
+
+async def fetch_tixfun_events_list(s): 
+    return await generic_fetch(s, "TixFun售票網", "https://tixfun.com", "https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77", 'a[href*="UTK0201"]')
+
+async def fetch_eventgo_events_list(s): 
+    return await generic_fetch(s, "Event Go", "https://eventgo.bnextmedia.com.tw", "https://eventgo.bnextmedia.com.tw/", 'a[href*="/event/detail"]')
+
+async def fetch_beclass_events_list(s): 
+    return await generic_fetch(s, "BeClass", "https://www.beclass.com", "https://www.beclass.com/default.php?name=ShowList&op=recent", "a[href*='rid=']")
+
+async def fetch_indievox_events_list(s): 
+    return await generic_fetch(s, "iNDIEVOX", "https://www.indievox.com", "https://www.indievox.com/activity/list", 'a[href*="/activity/detail"]')
+
+async def fetch_ibon_events_list(s): 
+    return await generic_fetch(s, "ibon", "https://ticket.ibon.com.tw", "https://ticket.ibon.com.tw/Activity/Index", 'a[href*="ActivityDetail"]')
+
+async def fetch_huashan_events_list(s): 
+    # 華山結構較特殊，確保只抓卡片內的連結
+    return await generic_fetch(s, "華山1914", "https://www.huashan1914.com", "https://www.huashan1914.com/w/huashan1914/exhibition", '.card-body a')
+
+async def fetch_songshan_events_list(s): 
+    return await generic_fetch(s, "松山文創", "https://www.songshanculturalpark.org", "https://www.songshanculturalpark.org/exhibition", '.exhibition-list a')
+
+async def fetch_stroll_events_list(s): 
+    # StrollTimes 使用 h3 內的連結最準確
+    return await generic_fetch(s, "StrollTimes", "https://strolltimes.com", "https://strolltimes.com/", 'h3.post-title a')
+
+async def fetch_kidsclub_events_list(s): 
+    return await generic_fetch(s, "KidsClub", "https://kidsclub.com.tw", "https://kidsclub.com.tw/", 'a[href*="/product/"], a[href*="/courses/"]')
+
+async def fetch_wtc_events_list(s): 
+    return await generic_fetch(s, "台北世貿", "https://www.twtc.com.tw", "https://www.twtc.com.tw/exhibition_list.aspx", 'a[href*="exhibition_detail"]')
+
+async def fetch_cksmh_events_list(s): 
+    # 中正紀念堂網址更新
+    return await generic_fetch(s, "中正紀念堂", "https://www.cksmh.gov.tw", "https://www.cksmh.gov.tw/activitybee_list.aspx?n=105", 'a[href*="activitybee_"]')
+
+
+# =========================
+# 💾 存檔 & LINE 通知
+# =========================
+async def send_line_notify(message):
+    if not LINE_TOKEN: return
+    async with aiohttp.ClientSession() as session:
+        await session.post("https://notify-api.line.me/api/notify", headers={"Authorization": f"Bearer {LINE_TOKEN}"}, data={"message": message})
+
+def load_existing_data():
+    if not OUTPUT_FILE.exists(): return []
+    try:
+        with open(OUTPUT_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except: return []
+
+async def save_data_and_notify(new_events):
+    existing_events = load_existing_data()
+    existing_map = {e['url']: e for e in existing_events}
+    
+    added_events = []
+    updated_count = 0
+    
+    for event in new_events:
+        url = event['url']
+        if url not in existing_map:
+            existing_map[url] = event
+            added_events.append(event)
+        else:
+            # 更新現有資料 (例如標題變更或圖片更新)
+            existing_map[url].update(event)
+            updated_count += 1
+    
+    # 存檔
+    final_list = list(existing_map.values())
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+        json.dump(final_list, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"📊 資料庫更新完畢 | 總筆數: {len(final_list)} | 🆕 新增: {len(added_events)} | 🔄 更新: {updated_count}")
+
+    # LINE 通知邏輯 (僅通知新增的)
+    if added_events and LINE_TOKEN:
+        logger.info(f"📨 準備發送 LINE 通知 ({len(added_events)} 筆)...")
+        msg = f"\n🔥 發現 {len(added_events)} 個新活動！\n"
+        # 為了避免洗版，只取前 5 筆 + 摘要
+        for e in added_events[:5]:
+            msg += f"\n📌 {e['title'][:30]}\n🔗 {e['url']}\n"
+        if len(added_events) > 5:
+            msg += f"\n...還有 {len(added_events)-5} 筆，請上網頁查看！"
+        
+        await send_line_notify(msg)
+
+async def main():
+    logger.info("🔥 爬蟲程式開始執行 (V35 Ultimate)...")
+    connector = aiohttp.TCPConnector(ssl=False)
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = [
+            fetch_kktix_events_list(session), fetch_accupass_events_list(session),
+            fetch_tixcraft_events_list(session), fetch_kham_events_list(session),
+            fetch_opentix_events_list(session), fetch_udn_events_list(session),
+            fetch_famiticket_events_list(session), fetch_era_events_list(session),
+            fetch_tixfun_events_list(session), fetch_eventgo_events_list(session),
+            fetch_beclass_events_list(session), fetch_indievox_events_list(session),
+            fetch_ibon_events_list(session), fetch_huashan_events_list(session),
+            fetch_songshan_events_list(session), fetch_stroll_events_list(session),
+            fetch_kidsclub_events_list(session), fetch_wtc_events_list(session),
+            fetch_cksmh_events_list(session)
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        all_new_events = []
+        for res in results:
+            if isinstance(res, list):
+                all_new_events.extend(res)
+            else:
+                logger.error(f"❌ 任務失敗: {res}")
+
+        logger.info(f"🔍 本輪爬取匯總: 共抓取到 {len(all_new_events)} 筆有效資料")
+        await save_data_and_notify(all_new_events)
+
+if __name__ == "__main__":
+    asyncio.run(main())
