@@ -6,9 +6,11 @@
     <title>台灣活動情報雷達 🇹🇼</title>
     <meta name="description" content="自動彙整全台各大售票網與活動平台的最新情報">
     
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1a1a">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📡</text></svg>">
-    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <style>
         :root {
@@ -83,6 +85,7 @@
         .btn { padding: 12px; border-radius: 12px; font-weight: bold; text-align: center; text-decoration: none; cursor: pointer; border: none; font-size: 1rem; }
         .btn-primary { background: var(--accent); color: #fff; }
         .btn-secondary { background: #333; color: var(--text-main); }
+        .btn-notify { background: #2d3748; color: #e2e8f0; border: 1px solid #4a5568; margin-top: 10px; width: 100%; }
 
         /* 設定視窗 */
         .settings-panel { padding: 16px; background: #222; border-radius: 12px; margin-bottom: 20px; }
@@ -172,6 +175,14 @@
             <p style="font-size:0.8rem; color:#888;">設定關鍵字後，符合的活動將標示星號並優先顯示。</p>
         </div>
 
+        <div class="settings-panel">
+             <div class="input-group">
+                <label>🔔 本機通知 (實驗性)</label>
+                <p style="font-size:0.8rem; color:#888;">開啟後，當有符合「關注關鍵字」的新活動時，瀏覽器會跳出通知。</p>
+                <button id="notify-perm-btn" class="btn btn-notify" onclick="requestNotifyPermission()">🔕 點擊開啟通知權限</button>
+            </div>
+        </div>
+
         <div class="modal-actions">
             <button class="btn btn-primary" style="grid-column: span 2;" onclick="saveSettings()">儲存設定</button>
         </div>
@@ -184,6 +195,7 @@
     let showImages = localStorage.getItem('showImages') === 'true';
     let readEvents = JSON.parse(localStorage.getItem('readEvents') || '[]');
     let myKeywords = JSON.parse(localStorage.getItem('myKeywords') || '[]');
+    let lastCheckTime = localStorage.getItem('lastCheckTime') || new Date().toISOString();
     
     // DOM 元素
     const listEl = document.getElementById('event-list');
@@ -192,6 +204,7 @@
     const totalCountEl = document.getElementById('total-count');
     const detailModal = document.getElementById('detail-modal');
     const settingsModal = document.getElementById('settings-modal');
+    const notifyBtn = document.getElementById('notify-perm-btn');
 
     // === 初始化 ===
     async function init() {
@@ -211,6 +224,7 @@
         document.getElementById('img-toggle-btn').onclick = toggleImages;
         document.getElementById('settings-btn').onclick = () => {
             renderKeywords();
+            checkNotifyPermissionState();
             settingsModal.classList.add('open');
         };
 
@@ -223,6 +237,10 @@
             allEvents.sort((a, b) => new Date(b.scraped_at) - new Date(a.scraped_at));
             
             updateTimeEl.textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
+            
+            // 檢查通知
+            checkNewEventsForNotify();
+
             renderList();
         } catch (e) {
             listEl.innerHTML = `<div class="loading">❌ 資料載入失敗，請稍後重試。</div>`;
@@ -230,6 +248,60 @@
         }
         
         updateImgBtnState();
+    }
+
+    // === 通知邏輯 ===
+    function checkNotifyPermissionState() {
+        if (!("Notification" in window)) {
+            notifyBtn.textContent = "❌ 此瀏覽器不支援通知";
+            notifyBtn.disabled = true;
+            return;
+        }
+        if (Notification.permission === "granted") {
+            notifyBtn.textContent = "✅ 已開啟通知";
+            notifyBtn.style.background = "#064e3b";
+        } else if (Notification.permission === "denied") {
+            notifyBtn.textContent = "🚫 通知已被封鎖 (請至瀏覽器設定開啟)";
+        } else {
+            notifyBtn.textContent = "🔕 點擊開啟通知權限";
+        }
+    }
+
+    function requestNotifyPermission() {
+        if (!("Notification" in window)) return;
+        Notification.requestPermission().then(permission => {
+            checkNotifyPermissionState();
+            if (permission === "granted") {
+                new Notification("活動雷達", { body: "🔔 通知已啟用！有符合關鍵字的新活動會通知你。" });
+            }
+        });
+    }
+
+    function checkNewEventsForNotify() {
+        if (Notification.permission !== "granted") return;
+        
+        // 找出：比上次檢查時間新 AND 符合關鍵字 的活動
+        const newMatches = allEvents.filter(ev => {
+            return new Date(ev.scraped_at) > new Date(lastCheckTime) && isFavorite(ev.title);
+        });
+
+        if (newMatches.length > 0) {
+            const title = newMatches[0].title;
+            const body = newMatches.length > 1 
+                ? `發現 ${newMatches.length} 個關注的新活動！例如：${title}` 
+                : `發現關注活動：${title}`;
+            
+            // 發送通知
+            new Notification("活動雷達發現新情報！", {
+                body: body,
+                icon: "https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f4e1.png"
+            });
+        }
+
+        // 更新檢查時間 (取最新的一筆時間)
+        if (allEvents.length > 0) {
+            localStorage.setItem('lastCheckTime', allEvents[0].scraped_at);
+        }
     }
 
     // === 核心渲染邏輯 ===
