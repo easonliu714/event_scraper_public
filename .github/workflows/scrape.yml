@@ -1,0 +1,40 @@
+name: Event Scraper Cron
+
+on:
+  schedule:
+    # 每 2 小時執行一次 (UTC 時間，對應台灣時間約偶數點)
+    - cron: '15 */2 * * *'
+  workflow_dispatch: # 允許手動按按鈕觸發
+
+permissions:
+  contents: write # 允許 Action 寫入資料庫 (data.json)
+
+jobs:
+  scrape-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Scraper
+        run: python scraper.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "GitHub Action Bot"
+          git config --global user.email "action@github.com"
+          git add docs/data.json
+          # 如果有變動才 Commit，沒變動則不報錯
+          git commit -m "🚀 Auto-update event data: $(date +'%Y-%m-%d %H:%M')" || exit 0
+          git push
