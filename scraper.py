@@ -47,11 +47,6 @@ def get_headers(referer=None):
     if referer: headers['Referer'] = referer
     return headers
 
-def safe_get_text(element):
-    if element and hasattr(element, 'get_text'):
-        return element.get_text(strip=True)
-    return ""
-
 def get_event_category_from_title(title):
     if not title: return "其他"
     title_lower = title.lower()
@@ -79,7 +74,6 @@ async def fetch_text(session, url, headers=None, timeout_sec=20):
             if resp.status != 200:
                 logger.warning(f"❌ HTTP {resp.status} - {url}")
                 return None
-            # 自動偵測編碼
             content_type = resp.headers.get('Content-Type', '').lower()
             if 'charset' in content_type:
                 return await resp.text()
@@ -93,16 +87,38 @@ async def fetch_text(session, url, headers=None, timeout_sec=20):
         logger.error(f"💥 請求異常: {url} - {e}")
         return None
 
-# 通用活動物件產生器
+# =========================
+# 🧠 智慧標題提取助手 (Smart Title Helper)
+# =========================
+def extract_smart_title(link_tag):
+    """嘗試多種方式提取標題，解決圖片連結無文字的問題"""
+    title = link_tag.get('title')
+    
+    if not title:
+        # 尋找內部標題標籤
+        header = link_tag.find(['h3', 'h4', 'h5', 'h6', 'span', 'div'], class_=re.compile(r'(title|name|subject|header|caption)', re.I))
+        if header: title = header.get_text(strip=True)
+
+    if not title:
+        # 尋找圖片 Alt/Title
+        img = link_tag.find('img')
+        if img: title = img.get('alt') or img.get('title')
+
+    if not title:
+        # 最後手段：純文字
+        title = link_tag.get_text(" ", strip=True)
+
+    return title
+
+# 通用物件產生器
 def create_event_obj(title, url, platform, img_url=None):
-    # 標題清理
     if title:
-        noise = ['立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 'More']
+        noise = ['立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 'More', 'None']
         for n in noise: title = title.replace(n, "")
         title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
         title = re.sub(r'\s+', ' ', title).strip()
     
-    if not title or len(title) < 2 or title in ['詳內文', '更多資訊']: return None
+    if not title or len(title) < 3: return None
 
     return {
         'title': title,
@@ -115,37 +131,29 @@ def create_event_obj(title, url, platform, img_url=None):
     }
 
 # =========================
-# 🕷️ 獨立平台爬蟲 (V34 邏輯移植)
+# 🕷️ 獨立平台爬蟲 (V39 整合修復)
 # =========================
 
 async def fetch_kktix(session):
     logger.info("🚀 啟動 KKTIX...")
-    base = "https://kktix.com/events"
-    urls = [f"{base}?category_id={i}" for i in [2,6,4,3,8]] + ["https://kktix.com/"]
+    urls = [f"https://kktix.com/events?category_id={i}" for i in [2,6,4,3,8]] + ["https://kktix.com/"]
     events = []
     seen = set()
-    
     for url in urls:
         await asyncio.sleep(1)
         html = await fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
-        
-        # V34: select multiple selectors
         links = soup.select('a[href*="/events/"], .event-item a, .event-card a')
         for link in links:
             href = link.get('href')
             if not href: continue
             full_url = urljoin("https://kktix.com", href).split('?')[0]
             if full_url in seen: continue
-            
-            title = link.get('title') or safe_get_text(link.find(class_='name')) or safe_get_text(link)
+            title = extract_smart_title(link)
             img = link.find('img')
-            
             ev = create_event_obj(title, full_url, "KKTIX", img.get('src') if img else None)
-            if ev: 
-                events.append(ev)
-                seen.add(full_url)
+            if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[KKTIX] 抓取 {len(events)} 筆")
     return events
 
@@ -154,27 +162,20 @@ async def fetch_accupass(session):
     urls = [f"https://www.accupass.com/search?q={k}" for k in ["音樂", "藝文", "學習", "科技", "展覽"]] + ["https://www.accupass.com/?area=north"]
     events = []
     seen = set()
-    
     for url in urls:
         await asyncio.sleep(2)
         html = await fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
-        # V34: Regex find_all
         candidates = soup.find_all('a', href=re.compile(r'^/event/([A-Za-z0-9]+)'))
-        
         for link in candidates:
             href = link.get('href')
             full_url = urljoin("https://www.accupass.com", href).split('?')[0]
             if full_url in seen: continue
-            
-            title = safe_get_text(link.find('h3')) or safe_get_text(link.find(class_=re.compile('title', re.I))) or safe_get_text(link)
+            title = extract_smart_title(link)
             img = link.find('img')
-            
             ev = create_event_obj(title, full_url, "ACCUPASS", img.get('src') if img else None)
-            if ev:
-                events.append(ev)
-                seen.add(full_url)
+            if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[ACCUPASS] 抓取 {len(events)} 筆")
     return events
 
@@ -183,55 +184,38 @@ async def fetch_tixcraft(session):
     urls = ["https://tixcraft.com/activity", "https://tixcraft.com/activity/list/select_type/all"]
     events = []
     seen = set()
-    
     for url in urls:
         await asyncio.sleep(1)
         html = await fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="/activity/detail/"]')
-        
         for link in links:
             full_url = urljoin("https://tixcraft.com", link.get('href'))
             if full_url in seen: continue
-            
-            title = link.get('title')
-            if not title:
-                img = link.find('img')
-                if img: title = img.get('alt')
-            if not title: title = safe_get_text(link)
-            
-            ev = create_event_obj(title, full_url, "拓元售票", None) # 拓元列表圖不好抓，先略過
-            if ev:
-                events.append(ev)
-                seen.add(full_url)
+            title = extract_smart_title(link)
+            ev = create_event_obj(title, full_url, "拓元售票", None)
+            if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[拓元] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_kham(session):
-    logger.info("🚀 啟動 寬宏...")
-    # V34: Explicit categories
+    logger.info("🚀 啟動 寬宏 (Fix)...")
     urls = [f"https://kham.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY={i}" for i in [205,231,116,129]]
     events = []
     seen = set()
-    
     for url in urls:
         await asyncio.sleep(1)
         html = await fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
-        # V34: UTK0201 selector
-        links = soup.select('a[href*="UTK0201"]')
-        
+        links = soup.select('a[href*="UTK0201_"]') # UTK 通用特徵
         for link in links:
             full_url = urljoin("https://kham.com.tw", link.get('href'))
             if full_url in seen: continue
-            
-            title = safe_get_text(link)
+            title = extract_smart_title(link)
             ev = create_event_obj(title, full_url, "寬宏", None)
-            if ev:
-                events.append(ev)
-                seen.add(full_url)
+            if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[寬宏] 抓取 {len(events)} 筆")
     return events
 
@@ -243,44 +227,34 @@ async def fetch_opentix(session):
     links = soup.select('a[href*="/event/"]')
     events = []
     seen = set()
-    
     for link in links:
         full_url = urljoin("https://www.opentix.life", link.get('href'))
         if full_url in seen: continue
-        
-        title = safe_get_text(link.find(class_=re.compile('title', re.I))) or safe_get_text(link)
+        title = extract_smart_title(link)
         img = link.find('img')
-        
         ev = create_event_obj(title, full_url, "OPENTIX", img.get('src') if img else None)
-        if ev:
-            events.append(ev)
-            seen.add(full_url)
+        if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[OPENTIX] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_udn(session):
-    logger.info("🚀 啟動 UDN...")
+    logger.info("🚀 啟動 UDN (Fix)...")
     urls = ["https://tickets.udnfunlife.com/application/UTK01/UTK0101_03.aspx?Category=77&kdid=cateList","https://tickets.udnfunlife.com/application/UTK01/UTK0101_03.aspx?Category=231&kdid=cateList"]
     events = []
     seen = set()
-    
     for url in urls:
         await asyncio.sleep(1)
         html = await fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
-        links = soup.select('a[href*="UTK0201"]')
-        
+        links = soup.select('a[href*="UTK0201_"]')
         for link in links:
             full_url = urljoin("https://tickets.udnfunlife.com", link.get('href'))
             if full_url in seen: continue
-            
-            # V34 Logic: Clean 'NT$'
-            title = safe_get_text(link).split("NT$")[0].strip()
+            title_raw = extract_smart_title(link)
+            title = title_raw.split("NT$")[0].strip() if title_raw else ""
             ev = create_event_obj(title, full_url, "UDN售票網", None)
-            if ev:
-                events.append(ev)
-                seen.add(full_url)
+            if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[UDN] 抓取 {len(events)} 筆")
     return events
 
@@ -289,64 +263,51 @@ async def fetch_fami(session):
     html = await fetch_text(session, "https://www.famiticket.com.tw/Home")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    # V34: Specific selector
     links = soup.select("a[href*='Content/Home/Activity']")
     events = []
     seen = set()
-    
     for link in links:
         full_url = urljoin("https://www.famiticket.com.tw", link.get('href'))
         if full_url in seen: continue
-        
         title = link.get('title')
         if not title:
-            img = link.find('img')
-            if img: title = img.get('alt')
-        if not title:
-            # 嘗試找 card-text
             desc = link.find(class_='card-text') or link.find(class_='caption')
             if desc: title = safe_get_text(desc)
-        
+        if not title: title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "FamiTicket", None)
-        if ev:
-            events.append(ev)
-            seen.add(full_url)
+        if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[FamiTicket] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_era(session):
-    logger.info("🚀 啟動 年代...")
-    # V34: Category 77
+    logger.info("🚀 啟動 年代 (Fix)...")
     html = await fetch_text(session, "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select('a[href*="UTK0201"]')
+    links = soup.select('a[href*="UTK0201_"]')
     events = []
     seen = set()
-    
     for link in links:
         full_url = urljoin("https://ticket.com.tw", link.get('href'))
         if full_url in seen: continue
-        title = safe_get_text(link)
+        title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "年代售票", None)
-        if ev:
-            events.append(ev)
-            seen.add(full_url)
+        if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[年代] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_tixfun(session):
-    logger.info("🚀 啟動 TixFun...")
+    logger.info("🚀 啟動 TixFun (Fix)...")
     html = await fetch_text(session, "https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select('a[href*="UTK0201"]')
+    links = soup.select('a[href*="UTK0201_"]')
     events = []
     seen = set()
     for link in links:
         full_url = urljoin("https://tixfun.com", link.get('href'))
         if full_url in seen: continue
-        title = safe_get_text(link)
+        title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "TixFun售票網", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[TixFun] 抓取 {len(events)} 筆")
@@ -363,7 +324,7 @@ async def fetch_eventgo(session):
     for link in links:
         full_url = urljoin("https://eventgo.bnextmedia.com.tw", link.get('href'))
         if full_url in seen: continue
-        title = safe_get_text(link.find('h3')) or safe_get_text(link.find(class_='title'))
+        title = extract_smart_title(link)
         img = link.find('img')
         ev = create_event_obj(title, full_url, "Event Go", img.get('src') if img else None)
         if ev: events.append(ev); seen.add(full_url)
@@ -406,22 +367,20 @@ async def fetch_indievox(session):
     return events
 
 async def fetch_ibon(session):
-    logger.info("🚀 啟動 ibon...")
+    logger.info("🚀 啟動 ibon (Fix)...")
     html = await fetch_text(session, "https://ticket.ibon.com.tw/Activity/Index")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    # V37 改良: 直接抓 href
-    links = soup.find_all('a', href=re.compile(r'ActivityDetail'))
+    # 廣域搜索
+    all_links = soup.find_all('a', href=True)
     events = []
     seen = set()
-    for link in links:
-        full_url = urljoin("https://ticket.ibon.com.tw", link.get('href'))
+    for link in all_links:
+        href = link.get('href')
+        if "ActivityDetail" not in href: continue
+        full_url = urljoin("https://ticket.ibon.com.tw", href)
         if full_url in seen: continue
-        # ibon 標題通常在 onclick 或內部 div
-        title = link.get('title')
-        if not title: title = safe_get_text(link.find(class_='virtual-title'))
-        if not title: title = safe_get_text(link)
-        
+        title = extract_smart_title(link)
         img = link.find('img')
         ev = create_event_obj(title, full_url, "ibon", img.get('src') if img else None)
         if ev: events.append(ev); seen.add(full_url)
@@ -439,7 +398,7 @@ async def fetch_huashan(session):
     for link in links:
         full_url = urljoin("https://www.huashan1914.com", link.get('href'))
         if full_url in seen: continue
-        title = safe_get_text(link.find('h3')) or safe_get_text(link)
+        title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "華山1914", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[華山] 抓取 {len(events)} 筆")
@@ -456,7 +415,7 @@ async def fetch_songshan(session):
     for link in links:
         full_url = urljoin("https://www.songshanculturalpark.org", link.get('href'))
         if full_url in seen: continue
-        title = safe_get_text(link.find('h3')) or safe_get_text(link)
+        title = extract_smart_title(link)
         img = link.find('img')
         ev = create_event_obj(title, full_url, "松山文創", img.get('src') if img else None)
         if ev: events.append(ev); seen.add(full_url)
@@ -464,35 +423,39 @@ async def fetch_songshan(session):
     return events
 
 async def fetch_stroll(session):
-    logger.info("🚀 啟動 StrollTimes...")
+    logger.info("🚀 啟動 StrollTimes (Fix)...")
     html = await fetch_text(session, "https://strolltimes.com/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select('h3.post-title a')
+    main_area = soup.find('main') or soup
+    links = main_area.find_all('a', href=True)
     events = []
     seen = set()
     for link in links:
-        full_url = link.get('href')
+        href = link.get('href')
+        if len(href) < 10 or 'category' in href or 'tag' in href: continue
+        full_url = href
         if full_url in seen: continue
-        title = safe_get_text(link)
+        title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "StrollTimes", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[StrollTimes] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_kidsclub(session):
-    logger.info("🚀 啟動 KidsClub...")
+    logger.info("🚀 啟動 KidsClub (Fix)...")
     html = await fetch_text(session, "https://www.kidsclub.com.tw/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    # V37: 寬鬆 href
-    links = soup.find_all('a', href=re.compile(r'product|courses'))
+    all_links = soup.find_all('a', href=True)
     events = []
     seen = set()
-    for link in links:
-        full_url = urljoin("https://www.kidsclub.com.tw", link.get('href'))
+    for link in all_links:
+        href = link.get('href')
+        if not re.search(r'(product|courses)', href): continue
+        full_url = urljoin("https://www.kidsclub.com.tw", href)
         if full_url in seen: continue
-        title = link.get('title') or safe_get_text(link.find(class_='woocommerce-loop-product__title'))
+        title = extract_smart_title(link)
         img = link.find('img')
         ev = create_event_obj(title, full_url, "KidsClub", img.get('src') if img else None)
         if ev: events.append(ev); seen.add(full_url)
@@ -500,25 +463,25 @@ async def fetch_kidsclub(session):
     return events
 
 async def fetch_wtc(session):
-    logger.info("🚀 啟動 台北世貿...")
+    logger.info("🚀 啟動 台北世貿 (Fix)...")
     html = await fetch_text(session, "https://www.twtc.com.tw/exhibition_list.aspx")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select('a[href*="exhibition_detail"]')
+    links = soup.find_all('a', href=re.compile(r'exhibition_detail', re.I))
     events = []
     seen = set()
     for link in links:
         full_url = urljoin("https://www.twtc.com.tw", link.get('href'))
         if full_url in seen: continue
-        title = safe_get_text(link)
+        title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "台北世貿", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[台北世貿] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_cksmh(session):
-    logger.info("🚀 啟動 中正紀念堂...")
-    # [修正] V37 中正紀念堂網址
+    logger.info("🚀 啟動 中正紀念堂 (Fix)...")
+    # 更新網址
     html = await fetch_text(session, "https://www.cksmh.gov.tw/activitybee_list.aspx?n=105")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -528,7 +491,7 @@ async def fetch_cksmh(session):
     for link in links:
         full_url = urljoin("https://www.cksmh.gov.tw", link.get('href'))
         if full_url in seen: continue
-        title = link.get('title') or safe_get_text(link)
+        title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "中正紀念堂", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[中正紀念堂] 抓取 {len(events)} 筆")
@@ -582,7 +545,7 @@ async def save_data_and_notify(new_events):
         await send_line_notify(msg)
 
 async def main():
-    logger.info("🔥 爬蟲程式開始執行 (V38 Native Port)...")
+    logger.info("🔥 爬蟲程式開始執行 (V39 Integrated)...")
     connector = aiohttp.TCPConnector(ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [
