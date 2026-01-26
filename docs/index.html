@@ -12,28 +12,27 @@
         :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #3b82f6; --chip-bg: #2a2a2a; }
         body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 60px; }
         
-        /* 佈局優化 */
         header { position: sticky; top: 0; z-index: 100; background: rgba(18,18,18,0.95); backdrop-filter: blur(10px); padding: 12px 16px; border-bottom: 1px solid #333; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         h1 { margin: 0; font-size: 1.2rem; }
         .search-box { width: 100%; padding: 12px; border-radius: 12px; background: #2a2a2a; border: 1px solid #333; color: #fff; font-size: 1rem; }
         
-        /* 過濾區塊 - 三段式 */
         .filter-section { padding: 16px; background: #181818; border-bottom: 1px solid #333; }
         .filter-block { margin-bottom: 16px; }
-        .block-title { font-size: 0.85rem; color: #888; margin-bottom: 8px; display: flex; justify-content: space-between; }
+        .block-title { font-size: 0.85rem; color: #888; margin-bottom: 8px; }
         .chips { display: flex; flex-wrap: wrap; gap: 8px; }
         .chip { padding: 6px 12px; background: var(--chip-bg); border-radius: 8px; font-size: 0.9rem; cursor: pointer; border: 1px solid #333; transition: 0.2s; display: flex; gap: 6px; }
         .chip span { opacity: 0.6; font-size: 0.8em; }
         .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .chip.active span { opacity: 1; color: #fff; }
+        .chip[data-type="status"].active { background: #10b981; border-color: #10b981; }
         
-        /* 特別樣式 */
-        .chip[data-type="status"].active { background: #10b981; border-color: #10b981; } /* 狀態用綠色 */
+        /* 列表統計條 */
+        .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 列表 */
         #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
         .card { background: var(--card); border-radius: 12px; padding: 12px; display: flex; gap: 12px; border: 1px solid #333; }
+        .card.read { opacity: 0.6; }
         .card-img { width: 90px; height: 90px; border-radius: 8px; background: #333; object-fit: cover; }
         .card-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
         .badges { display: flex; flex-wrap: wrap; gap: 4px; font-size: 0.75rem; }
@@ -41,15 +40,19 @@
         .badge.new { background: #ef4444; color: #fff; }
         .badge.fav { background: #f59e0b; color: #fff; }
         
-        /* 分頁控制 */
         .pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin: 20px 0; }
         .page-btn { padding: 8px 16px; background: #333; border: none; color: #fff; border-radius: 8px; cursor: pointer; }
         .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        /* Modal (保持不變，略) */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: none; justify-content: center; align-items: end; }
         .modal-overlay.open { display: flex; }
         .modal { background: #222; width: 100%; max-width: 600px; padding: 24px; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
+        
+        /* 設定與通知 Modal */
+        .settings-panel { padding: 16px; background: #2a2a2a; border-radius: 12px; margin-bottom: 16px; }
+        .keyword-input { width: 100%; padding: 10px; border-radius: 8px; background: #121212; border: 1px solid #444; color: #fff; margin-bottom: 8px; }
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { background: #444; padding: 4px 10px; border-radius: 16px; font-size: 0.85rem; display: flex; gap: 6px; }
     </style>
 </head>
 <body>
@@ -70,16 +73,19 @@
     
     <div class="filter-block">
         <div class="block-title">✨ 狀態篩選 (交集 AND)</div>
-        <div class="chips">
-            <div class="chip" data-type="status" data-val="isNew" onclick="toggleFilter('status', 'isNew')">🆕 新進活動</div>
-            <div class="chip" data-type="status" data-val="isFav" onclick="toggleFilter('status', 'isFav')">⭐ 關注關鍵字</div>
-        </div>
+        <div class="chips" id="status-chips">
+            </div>
     </div>
 
     <div class="filter-block">
         <div class="block-title">🏷️ 類別篩選 (聯集 OR)</div>
         <div id="type-chips" class="chips"></div>
     </div>
+</div>
+
+<div class="list-header">
+    <span id="result-count">顯示 0 筆活動</span>
+    <span id="update-time" style="font-size:0.8em">更新於: ...</span>
 </div>
 
 <div id="event-list"></div>
@@ -90,34 +96,63 @@
     <button class="page-btn" onclick="changePage(1)" id="next-btn">下一頁 ▶</button>
 </div>
 
+<div class="modal-overlay" id="detail-modal" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <img id="m-img" style="width:100%; max-height:250px; object-fit:cover; border-radius:12px; margin-bottom:16px; display:none;">
+        <h2 id="m-title" style="margin-bottom:10px;"></h2>
+        <p id="m-platform" style="color:#60a5fa; margin-bottom:5px;"></p>
+        <p id="m-category" style="color:#ccc; font-size:0.9rem; margin-bottom:15px;"></p>
+        <a id="m-link" href="#" target="_blank" style="display:block; padding:12px; background:#3b82f6; color:#fff; text-align:center; border-radius:8px; text-decoration:none;">前往官網</a>
+    </div>
+</div>
+
+<div class="modal-overlay" id="settings-modal" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <h2>⚙️ 設定</h2>
+        <div class="settings-panel">
+            <label>⭐ 關注關鍵字 (按 Enter 新增)</label>
+            <input type="text" id="keyword-input" class="keyword-input">
+            <div id="keywords-tags" class="tags-container"></div>
+        </div>
+        <div class="settings-panel">
+            <button onclick="requestNotifyPermission()" style="width:100%; padding:10px; background:#333; color:#fff; border:none; border-radius:8px;">🔔 檢查通知權限</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let allEvents = [];
     let filteredEvents = [];
     let currentPage = 1;
     const PAGE_SIZE = 50;
     
-    // 狀態
     const filters = {
-        platforms: new Set(), // OR
-        status: new Set(),    // AND
-        types: new Set()      // OR
+        platforms: new Set(),
+        status: new Set(),
+        types: new Set()
     };
 
     let myKeywords = JSON.parse(localStorage.getItem('myKeywords') || '[]');
     let readEvents = JSON.parse(localStorage.getItem('readEvents') || '[]');
 
     async function init() {
-        const res = await fetch(`data.json?t=${Date.now()}`);
-        allEvents = await res.json();
-        // 排序
-        allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
-        
-        renderChips();
-        applyFilters(); // 初始渲染
+        try {
+            const res = await fetch(`data.json?t=${Date.now()}`);
+            allEvents = await res.json();
+            allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
+            
+            document.getElementById('update-time').textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
+            
+            renderChips();
+            applyFilters();
+        } catch(e) {
+            console.error(e);
+            document.getElementById('event-list').innerHTML = '<div style="text-align:center; padding:40px;">❌ 資料載入失敗</div>';
+        }
     }
 
     function renderChips() {
-        // Render Platforms
+        // Platform Chips
         const pStats = {};
         allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
         document.getElementById('platform-chips').innerHTML = Object.entries(pStats)
@@ -125,22 +160,37 @@
             .map(([k,v]) => `<div class="chip" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`)
             .join('');
 
-        // Render Types
+        // Type Chips
         const tStats = {};
         allEvents.forEach(e => tStats[e.type] = (tStats[e.type]||0)+1);
         document.getElementById('type-chips').innerHTML = Object.entries(tStats)
             .sort((a,b) => b[1]-a[1])
             .map(([k,v]) => `<div class="chip" onclick="toggleFilter('types', '${k}', this)">${k} <span>${v}</span></div>`)
             .join('');
+
+        // Status Chips (Dynamic Count)
+        updateStatusCounts();
+    }
+
+    function updateStatusCounts() {
+        const newCount = allEvents.filter(e => !readEvents.includes(e.url)).length;
+        const favCount = allEvents.filter(e => myKeywords.some(k => e.title.includes(k))).length;
+        
+        const container = document.getElementById('status-chips');
+        // 保存目前的 active 狀態
+        const isNewActive = filters.status.has('isNew') ? 'active' : '';
+        const isFavActive = filters.status.has('isFav') ? 'active' : '';
+
+        container.innerHTML = `
+            <div class="chip ${isNewActive}" data-type="status" onclick="toggleFilter('status', 'isNew', this)">🆕 新進活動 <span>${newCount}</span></div>
+            <div class="chip ${isFavActive}" data-type="status" onclick="toggleFilter('status', 'isFav', this)">⭐ 關注關鍵字 <span>${favCount}</span></div>
+        `;
     }
 
     function toggleFilter(category, value, el) {
-        if (el) el.classList.toggle('active');
-        else document.querySelector(`.chip[data-val="${value}"]`).classList.toggle('active');
-
+        el.classList.toggle('active');
         if (filters[category].has(value)) filters[category].delete(value);
         else filters[category].add(value);
-        
         resetPageAndRender();
     }
 
@@ -156,22 +206,17 @@
             const isFav = myKeywords.some(k => e.title.includes(k));
             const isNew = !readEvents.includes(e.url);
             
-            // 1. 搜尋
             if (query && !e.title.toLowerCase().includes(query)) return false;
-
-            // 2. 平台 (OR) - 若有選，則必須包含
             if (filters.platforms.size > 0 && !filters.platforms.has(e.platform)) return false;
-
-            // 3. 類別 (OR)
             if (filters.types.size > 0 && !filters.types.has(e.type)) return false;
-
-            // 4. 狀態 (AND) - 這是關鍵修改
+            
             if (filters.status.has('isNew') && !isNew) return false;
             if (filters.status.has('isFav') && !isFav) return false;
 
             return true;
         });
 
+        document.getElementById('result-count').textContent = `顯示 ${filteredEvents.length} 筆活動 (共 ${allEvents.length} 筆)`;
         renderList();
         renderPagination();
     }
@@ -179,8 +224,8 @@
     function renderList() {
         const start = (currentPage - 1) * PAGE_SIZE;
         const pageData = filteredEvents.slice(start, start + PAGE_SIZE);
-        
         const list = document.getElementById('event-list');
+        
         if(pageData.length === 0) {
             list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>';
             return;
@@ -190,7 +235,7 @@
             const isFav = myKeywords.some(k => e.title.includes(k));
             const isNew = !readEvents.includes(e.url);
             return `
-                <div class="card ${!isNew ? 'read' : ''}" onclick="window.open('${e.url}', '_blank'); markRead('${e.url}')">
+                <div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
                     ${e.img_url ? `<img src="${e.img_url}" class="card-img" loading="lazy">` : ''}
                     <div class="card-info">
                         <div class="badges">
@@ -209,7 +254,7 @@
 
     function renderPagination() {
         const totalPages = Math.ceil(filteredEvents.length / PAGE_SIZE) || 1;
-        document.getElementById('page-info').textContent = `第 ${currentPage} / ${totalPages} 頁 (共 ${filteredEvents.length} 筆)`;
+        document.getElementById('page-info').textContent = `第 ${currentPage} / ${totalPages} 頁`;
         document.getElementById('prev-btn').disabled = currentPage === 1;
         document.getElementById('next-btn').disabled = currentPage === totalPages;
     }
@@ -218,18 +263,73 @@
         currentPage += delta;
         renderList();
         renderPagination();
-        window.scrollTo(0, 0); // 換頁後回到頂部
+        window.scrollTo(0, 0);
     }
 
-    function markRead(url) {
+    function openDetail(url) {
+        const ev = allEvents.find(e => e.url === url);
+        if(!ev) return;
+        
         if(!readEvents.includes(url)) {
             readEvents.push(url);
             localStorage.setItem('readEvents', JSON.stringify(readEvents));
-            // 這裡可以選擇不重新渲染，以免列表跳動，或者僅更新樣式
+            updateStatusCounts(); // 更新計數
         }
+        
+        document.getElementById('m-title').textContent = ev.title;
+        document.getElementById('m-platform').textContent = ev.platform;
+        document.getElementById('m-category').textContent = ev.type;
+        document.getElementById('m-link').href = ev.url;
+        
+        const img = document.getElementById('m-img');
+        if(ev.img_url) { img.src = ev.img_url; img.style.display = 'block'; }
+        else { img.style.display = 'none'; }
+        
+        document.getElementById('detail-modal').classList.add('open');
+        renderList();
     }
 
-    // 初始化
+    function closeModal() {
+        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+    }
+
+    // 設定與通知功能 (略，保持原有邏輯即可，或從上個版本複製)
+    function openSettings() {
+        renderKeywords();
+        document.getElementById('settings-modal').classList.add('open');
+    }
+    
+    function renderKeywords() {
+        const container = document.getElementById('keywords-tags');
+        container.innerHTML = myKeywords.map((k, i) => `<div class="tag">${k} <span onclick="removeKeyword(${i})" style="cursor:pointer; color:#f87171">×</span></div>`).join('');
+    }
+    
+    function removeKeyword(i) {
+        myKeywords.splice(i, 1);
+        renderKeywords();
+        localStorage.setItem('myKeywords', JSON.stringify(myKeywords));
+        applyFilters();
+        updateStatusCounts();
+    }
+
+    document.getElementById('keyword-input').onkeypress = (e) => {
+        if(e.key === 'Enter') {
+            const val = e.target.value.trim();
+            if(val && !myKeywords.includes(val)) {
+                myKeywords.push(val);
+                e.target.value = '';
+                renderKeywords();
+                localStorage.setItem('myKeywords', JSON.stringify(myKeywords));
+                applyFilters();
+                updateStatusCounts();
+            }
+        }
+    };
+
+    function requestNotifyPermission() {
+        Notification.requestPermission().then(p => alert(p === "granted" ? "✅ 通知已開啟" : "🚫 通知被拒絕"));
+    }
+
     init();
 </script>
 </body>
