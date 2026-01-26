@@ -2,8 +2,8 @@ name: Event Scraper Cron
 
 on:
   schedule:
-    # 每 1 小時執行一次 (UTC 時間，對應台灣時間約偶數點)
-    - cron: '15 */1 * * *'
+    # 每 2 小時執行一次 (UTC 時間，對應台灣時間約偶數點)
+    - cron: '15 */2 * * *'
   workflow_dispatch: # 允許手動按按鈕觸發
 
 permissions:
