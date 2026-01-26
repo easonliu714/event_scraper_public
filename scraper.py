@@ -121,36 +121,40 @@ def filter_links_for_platform(links, base_url, platform_name):
         if not href: continue
         full_url = urljoin(base_url, href).split('#')[0]
 
-        if platform_name == "Event Go" and not full_url.startswith("https://eventgo.bnextmedia.com.tw/event/detail"): continue
-            
         if full_url in seen_urls: continue
         if wl and not wl.match(full_url): continue
 
-        # 標題優化邏輯
+        # --- 強化版標題解析邏輯 ---
         title = None
-        if platform_name == "UDN售票網":
-            title_text = safe_get_text(link, '')
-            if "NT$" in title_text: 
-                title_text = title_text.split("NT$")[0].strip()
-            title = title_text
-        else:
-            title = link.get('title')
-            if not title: # 嘗試從 alt 抓取
-                img = link.find('img')
-                if img: title = img.get('alt')
-            if not title: # 嘗試從 aria-label 抓取
-                title = link.get('aria-label')
-            if not title:
-                title = safe_get_text(link)
-
+        
+        # 1. 優先從 title 屬性獲取
+        title = link.get('title')
+        
+        # 2. 獲取內部圖片的 alt
+        if not title or title.strip() in ['詳內文', '詳細資訊', '購票']:
+            img = link.find('img')
+            if img: title = img.get('alt') or img.get('title')
+            
+        # 3. 獲取所有內部文字並清理
+        if not title or title.strip() in ['詳內文', '詳細資訊', '購票']:
+            # 合併內部所有 span, div 的文字，並過濾掉純數字(票價)或短詞
+            title = link.get_text(" ", strip=True)
+            
+        # 4. 終極清理：移除雜訊
         if title:
+            # 移除常見的輔助文字
+            noise = ['立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束']
+            for n in noise:
+                title = title.replace(n, "")
+            # 移除日期格式 (例如 2026/01/01)
+            title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
             title = title.strip()
-            title = re.sub(r'\s+', ' ', title) # 移除多餘空白
-            # 移除常見垃圾字詞
-            title = title.replace("詳細資訊", "").replace("立即購票", "").replace("More", "").strip()
 
-        if not title or len(title) < 3: continue
+        # 如果還是抓不到，或者抓到太短的東西，則放棄該連結
+        if not title or len(title) < 4:
+            continue
 
+        # 圖片抓取
         img_url = None
         img_tag = link.find('img')
         if img_tag: img_url = img_tag.get('src')
@@ -168,7 +172,7 @@ def filter_links_for_platform(links, base_url, platform_name):
         })
         seen_urls.add(full_url)
 
-    logger.info(f"[{platform_name}] 解析完成: 找到 {len(events)} 筆")
+    logger.info(f"[{platform_name}] 強化解析完成: 找到 {len(events)} 筆")
     return events
 
 # =========================
