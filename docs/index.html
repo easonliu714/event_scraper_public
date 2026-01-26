@@ -10,8 +10,18 @@
     
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #3b82f6; --chip-bg: #2a2a2a; }
-        body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 60px; }
+        body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 60px; overscroll-behavior-y: contain; }
         
+        /* 下拉更新指示器 */
+        #pull-to-refresh {
+            position: fixed; top: -50px; left: 0; width: 100%; height: 50px;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--accent); font-size: 1.2rem; transition: top 0.2s; z-index: 200;
+        }
+        #pull-to-refresh.visible { top: 60px; } /* header height */
+        .spinner { animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
         header { position: sticky; top: 0; z-index: 100; background: rgba(18,18,18,0.95); backdrop-filter: blur(10px); padding: 12px 16px; border-bottom: 1px solid #333; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         h1 { margin: 0; font-size: 1.2rem; }
@@ -27,10 +37,9 @@
         .chip.active span { opacity: 1; color: #fff; }
         .chip[data-type="status"].active { background: #10b981; border-color: #10b981; }
         
-        /* 列表統計條 */
         .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
         
-        #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 300px; }
         .card { background: var(--card); border-radius: 12px; padding: 12px; display: flex; gap: 12px; border: 1px solid #333; }
         .card.read { opacity: 0.6; }
         .card-img { width: 90px; height: 90px; border-radius: 8px; background: #333; object-fit: cover; }
@@ -48,7 +57,6 @@
         .modal-overlay.open { display: flex; }
         .modal { background: #222; width: 100%; max-width: 600px; padding: 24px; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
         
-        /* 設定與通知 Modal */
         .settings-panel { padding: 16px; background: #2a2a2a; border-radius: 12px; margin-bottom: 16px; }
         .keyword-input { width: 100%; padding: 10px; border-radius: 8px; background: #121212; border: 1px solid #444; color: #fff; margin-bottom: 8px; }
         .tags-container { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -56,6 +64,11 @@
     </style>
 </head>
 <body>
+
+<div id="pull-to-refresh">
+    <span id="ptr-icon">⬇️ 下拉更新</span>
+    <span id="ptr-spinner" class="spinner">🔄</span>
+</div>
 
 <header>
     <div class="top-bar">
@@ -70,13 +83,10 @@
         <div class="block-title">🏛️ 平台篩選 (聯集 OR)</div>
         <div id="platform-chips" class="chips"></div>
     </div>
-    
     <div class="filter-block">
         <div class="block-title">✨ 狀態篩選 (交集 AND)</div>
-        <div class="chips" id="status-chips">
-            </div>
+        <div class="chips" id="status-chips"></div>
     </div>
-
     <div class="filter-block">
         <div class="block-title">🏷️ 類別篩選 (聯集 OR)</div>
         <div id="type-chips" class="chips"></div>
@@ -126,23 +136,50 @@
     let currentPage = 1;
     const PAGE_SIZE = 50;
     
-    const filters = {
-        platforms: new Set(),
-        status: new Set(),
-        types: new Set()
-    };
-
+    const filters = { platforms: new Set(), status: new Set(), types: new Set() };
     let myKeywords = JSON.parse(localStorage.getItem('myKeywords') || '[]');
     let readEvents = JSON.parse(localStorage.getItem('readEvents') || '[]');
 
+    // 下拉更新邏輯
+    let touchStartY = 0;
+    const ptrEl = document.getElementById('pull-to-refresh');
+    const ptrIcon = document.getElementById('ptr-icon');
+    const ptrSpinner = document.getElementById('ptr-spinner');
+
+    window.addEventListener('touchstart', e => {
+        if (window.scrollY === 0) touchStartY = e.touches[0].clientY;
+    });
+
+    window.addEventListener('touchmove', e => {
+        const touchY = e.touches[0].clientY;
+        if (window.scrollY === 0 && touchY > touchStartY) {
+            const pullDistance = touchY - touchStartY;
+            if (pullDistance > 60) {
+                ptrEl.style.top = '60px'; // 顯示下拉圖示
+                ptrIcon.style.display = 'block';
+                ptrSpinner.style.display = 'none';
+            }
+        }
+    });
+
+    window.addEventListener('touchend', async e => {
+        if (ptrEl.style.top === '60px') {
+            ptrIcon.style.display = 'none';
+            ptrSpinner.style.display = 'block'; // 轉圈圈
+            await init(); // 重新讀取資料
+            setTimeout(() => {
+                ptrEl.style.top = '-50px'; // 隱藏
+            }, 500);
+        }
+    });
+
     async function init() {
         try {
-            const res = await fetch(`data.json?t=${Date.now()}`);
+            const res = await fetch(`data.json?t=${Date.now()}`); // 強制不快取
             allEvents = await res.json();
             allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
             
             document.getElementById('update-time').textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
-            
             renderChips();
             applyFilters();
         } catch(e) {
@@ -152,36 +189,21 @@
     }
 
     function renderChips() {
-        // Platform Chips
-        const pStats = {};
-        allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
-        document.getElementById('platform-chips').innerHTML = Object.entries(pStats)
-            .sort((a,b) => b[1]-a[1])
-            .map(([k,v]) => `<div class="chip" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`)
-            .join('');
+        const pStats = {}; allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
+        document.getElementById('platform-chips').innerHTML = Object.entries(pStats).sort((a,b) => b[1]-a[1]).map(([k,v]) => `<div class="chip" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`).join('');
 
-        // Type Chips
-        const tStats = {};
-        allEvents.forEach(e => tStats[e.type] = (tStats[e.type]||0)+1);
-        document.getElementById('type-chips').innerHTML = Object.entries(tStats)
-            .sort((a,b) => b[1]-a[1])
-            .map(([k,v]) => `<div class="chip" onclick="toggleFilter('types', '${k}', this)">${k} <span>${v}</span></div>`)
-            .join('');
+        const tStats = {}; allEvents.forEach(e => tStats[e.type] = (tStats[e.type]||0)+1);
+        document.getElementById('type-chips').innerHTML = Object.entries(tStats).sort((a,b) => b[1]-a[1]).map(([k,v]) => `<div class="chip" onclick="toggleFilter('types', '${k}', this)">${k} <span>${v}</span></div>`).join('');
 
-        // Status Chips (Dynamic Count)
         updateStatusCounts();
     }
 
     function updateStatusCounts() {
         const newCount = allEvents.filter(e => !readEvents.includes(e.url)).length;
         const favCount = allEvents.filter(e => myKeywords.some(k => e.title.includes(k))).length;
-        
-        const container = document.getElementById('status-chips');
-        // 保存目前的 active 狀態
         const isNewActive = filters.status.has('isNew') ? 'active' : '';
         const isFavActive = filters.status.has('isFav') ? 'active' : '';
-
-        container.innerHTML = `
+        document.getElementById('status-chips').innerHTML = `
             <div class="chip ${isNewActive}" data-type="status" onclick="toggleFilter('status', 'isNew', this)">🆕 新進活動 <span>${newCount}</span></div>
             <div class="chip ${isFavActive}" data-type="status" onclick="toggleFilter('status', 'isFav', this)">⭐ 關注關鍵字 <span>${favCount}</span></div>
         `;
@@ -194,28 +216,20 @@
         resetPageAndRender();
     }
 
-    function resetPageAndRender() {
-        currentPage = 1;
-        applyFilters();
-    }
+    function resetPageAndRender() { currentPage = 1; applyFilters(); }
 
     function applyFilters() {
         const query = document.getElementById('search').value.toLowerCase();
-        
         filteredEvents = allEvents.filter(e => {
             const isFav = myKeywords.some(k => e.title.includes(k));
             const isNew = !readEvents.includes(e.url);
-            
             if (query && !e.title.toLowerCase().includes(query)) return false;
             if (filters.platforms.size > 0 && !filters.platforms.has(e.platform)) return false;
             if (filters.types.size > 0 && !filters.types.has(e.type)) return false;
-            
             if (filters.status.has('isNew') && !isNew) return false;
             if (filters.status.has('isFav') && !isFav) return false;
-
             return true;
         });
-
         document.getElementById('result-count').textContent = `顯示 ${filteredEvents.length} 筆活動 (共 ${allEvents.length} 筆)`;
         renderList();
         renderPagination();
@@ -225,30 +239,17 @@
         const start = (currentPage - 1) * PAGE_SIZE;
         const pageData = filteredEvents.slice(start, start + PAGE_SIZE);
         const list = document.getElementById('event-list');
-        
-        if(pageData.length === 0) {
-            list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>';
-            return;
-        }
-
+        if(pageData.length === 0) { list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>'; return; }
         list.innerHTML = pageData.map(e => {
             const isFav = myKeywords.some(k => e.title.includes(k));
             const isNew = !readEvents.includes(e.url);
-            return `
-                <div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
+            return `<div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
                     ${e.img_url ? `<img src="${e.img_url}" class="card-img" loading="lazy">` : ''}
                     <div class="card-info">
-                        <div class="badges">
-                            <span class="badge" style="color:#60a5fa">${e.platform}</span>
-                            ${isNew ? '<span class="badge new">NEW</span>' : ''}
-                            ${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}
-                            <span class="badge">${e.type}</span>
-                        </div>
+                        <div class="badges"><span class="badge" style="color:#60a5fa">${e.platform}</span>${isNew ? '<span class="badge new">NEW</span>' : ''}${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}<span class="badge">${e.type}</span></div>
                         <div style="font-weight:500; font-size:1rem;">${e.title}</div>
                         <div style="font-size:0.8rem; color:#888;">${e.date}</div>
-                    </div>
-                </div>
-            `;
+                    </div></div>`;
         }).join('');
     }
 
@@ -259,76 +260,28 @@
         document.getElementById('next-btn').disabled = currentPage === totalPages;
     }
 
-    function changePage(delta) {
-        currentPage += delta;
-        renderList();
-        renderPagination();
-        window.scrollTo(0, 0);
-    }
+    function changePage(delta) { currentPage += delta; renderList(); renderPagination(); window.scrollTo(0, 0); }
 
     function openDetail(url) {
         const ev = allEvents.find(e => e.url === url);
         if(!ev) return;
-        
-        if(!readEvents.includes(url)) {
-            readEvents.push(url);
-            localStorage.setItem('readEvents', JSON.stringify(readEvents));
-            updateStatusCounts(); // 更新計數
-        }
-        
+        if(!readEvents.includes(url)) { readEvents.push(url); localStorage.setItem('readEvents', JSON.stringify(readEvents)); updateStatusCounts(); }
         document.getElementById('m-title').textContent = ev.title;
         document.getElementById('m-platform').textContent = ev.platform;
         document.getElementById('m-category').textContent = ev.type;
         document.getElementById('m-link').href = ev.url;
-        
         const img = document.getElementById('m-img');
-        if(ev.img_url) { img.src = ev.img_url; img.style.display = 'block'; }
-        else { img.style.display = 'none'; }
-        
+        if(ev.img_url) { img.src = ev.img_url; img.style.display = 'block'; } else { img.style.display = 'none'; }
         document.getElementById('detail-modal').classList.add('open');
         renderList();
     }
 
-    function closeModal() {
-        document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
-    }
-
-    // 設定與通知功能 (略，保持原有邏輯即可，或從上個版本複製)
-    function openSettings() {
-        renderKeywords();
-        document.getElementById('settings-modal').classList.add('open');
-    }
-    
-    function renderKeywords() {
-        const container = document.getElementById('keywords-tags');
-        container.innerHTML = myKeywords.map((k, i) => `<div class="tag">${k} <span onclick="removeKeyword(${i})" style="cursor:pointer; color:#f87171">×</span></div>`).join('');
-    }
-    
-    function removeKeyword(i) {
-        myKeywords.splice(i, 1);
-        renderKeywords();
-        localStorage.setItem('myKeywords', JSON.stringify(myKeywords));
-        applyFilters();
-        updateStatusCounts();
-    }
-
-    document.getElementById('keyword-input').onkeypress = (e) => {
-        if(e.key === 'Enter') {
-            const val = e.target.value.trim();
-            if(val && !myKeywords.includes(val)) {
-                myKeywords.push(val);
-                e.target.value = '';
-                renderKeywords();
-                localStorage.setItem('myKeywords', JSON.stringify(myKeywords));
-                applyFilters();
-                updateStatusCounts();
-            }
-        }
-    };
-
-    function requestNotifyPermission() {
-        Notification.requestPermission().then(p => alert(p === "granted" ? "✅ 通知已開啟" : "🚫 通知被拒絕"));
-    }
+    function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
+    function openSettings() { renderKeywords(); document.getElementById('settings-modal').classList.add('open'); }
+    function renderKeywords() { document.getElementById('keywords-tags').innerHTML = myKeywords.map((k, i) => `<div class="tag">${k} <span onclick="removeKeyword(${i})" style="cursor:pointer; color:#f87171">×</span></div>`).join(''); }
+    function removeKeyword(i) { myKeywords.splice(i, 1); renderKeywords(); localStorage.setItem('myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); }
+    document.getElementById('keyword-input').onkeypress = (e) => { if(e.key === 'Enter') { const val = e.target.value.trim(); if(val && !myKeywords.includes(val)) { myKeywords.push(val); e.target.value = ''; renderKeywords(); localStorage.setItem('myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); } } };
+    function requestNotifyPermission() { Notification.requestPermission().then(p => alert(p === "granted" ? "✅ 通知已開啟" : "🚫 通知被拒絕")); }
 
     init();
 </script>
