@@ -123,7 +123,18 @@
 
 <div class="modal-overlay" id="settings-modal" onclick="closeModal()">
     <div class="modal" onclick="event.stopPropagation()">
-        <h2>⚙️ 設定我的最愛</h2>
+        <h2>⚙️ 設定</h2>
+        
+        <div class="settings-panel">
+            <div class="block-title">🔔 通知設定</div>
+            <button onclick="requestNotifyPermission()" style="width:100%; padding:10px; background:#333; color:#fff; border:none; border-radius:8px; margin-top:8px;">
+                檢查通知權限
+            </button>
+            <p id="notify-status" style="font-size:0.8rem; color:#888; margin-top:8px; text-align:center;">
+                狀態: 未知
+            </p>
+        </div>
+
         <div class="settings-panel">
             <label>⭐ 關注關鍵字 (按 Enter 新增)</label>
             <input type="text" id="keyword-input" class="keyword-input">
@@ -165,6 +176,7 @@
     });
 
     async function init() {
+        checkNotifyStatus();
         try {
             const res = await fetch(`data.json?t=${Date.now()}`);
             allEvents = await res.json();
@@ -278,10 +290,23 @@
     }
 
     function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
-    function openSettings() { renderKeywords(); document.getElementById('settings-modal').classList.add('open'); }
+    function openSettings() { renderKeywords(); checkNotifyStatus(); document.getElementById('settings-modal').classList.add('open'); }
     function renderKeywords() { document.getElementById('keywords-tags').innerHTML = myKeywords.map((k, i) => `<div class="tag">${k} <span onclick="removeKeyword(${i})" style="cursor:pointer; color:#f87171">×</span></div>`).join(''); }
     function removeKeyword(i) { myKeywords.splice(i, 1); renderKeywords(); localStorage.setItem('myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); }
     document.getElementById('keyword-input').onkeypress = (e) => { if(e.key === 'Enter') { const val = e.target.value.trim(); if(val && !myKeywords.includes(val)) { myKeywords.push(val); e.target.value = ''; renderKeywords(); localStorage.setItem('myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); } } };
+    
+    function requestNotifyPermission() { 
+        Notification.requestPermission().then(p => {
+            alert(p === "granted" ? "✅ 通知已開啟" : "🚫 通知被拒絕");
+            checkNotifyStatus();
+        }); 
+    }
+    
+    function checkNotifyStatus() {
+        const p = Notification.permission;
+        const statusMap = { 'default': '未詢問', 'granted': '✅ 已開啟', 'denied': '🚫 已封鎖' };
+        document.getElementById('notify-status').textContent = `狀態: ${statusMap[p] || p}`;
+    }
 
     init();
 </script>
