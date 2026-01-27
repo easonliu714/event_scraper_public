@@ -31,22 +31,17 @@ OUTPUT_DIR = Path("docs")
 OUTPUT_FILE = OUTPUT_DIR / "data.json"
 LINE_TOKEN = os.environ.get("LINE_TOKEN")
 
-# [V50] 升級版 User-Agent 與 Headers
+# 真實 Chrome Headers
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
 ]
 
 # =========================
-# 🧩 核心引擎：Requests Session
+# 🧩 網路請求核心 (V51 改良版)
 # =========================
-def create_session():
-    session = requests.Session()
-    retries = Retry(total=3, backoff_factor=1, status_forcelist=[403, 429, 500, 502, 503, 504])
-    session.mount("https://", HTTPAdapter(max_retries=retries))
-    session.mount("http://", HTTPAdapter(max_retries=retries))
-    
-    session.headers.update({
+def get_headers():
+    return {
         'User-Agent': random.choice(USER_AGENTS),
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
@@ -56,15 +51,29 @@ def create_session():
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
         'Sec-Fetch-User': '?1',
-    })
-    return session
+    }
 
-def fetch_text(session, url, referer=None):
+def fetch_text(url, use_session=True, referer=None):
+    """
+    V51: 支援 Session 開關。
+    對於敏感平台 (KKTIX, ibon) 建議 use_session=False 以避免 Cookie 追蹤。
+    """
     try:
-        if referer:
-            session.headers.update({'Referer': referer})
-        
-        resp = session.get(url, timeout=30, verify=False) # verify=False 解決部分舊網站證書問題
+        headers = get_headers()
+        if referer: headers['Referer'] = referer
+
+        # 隨機延遲，避免被鎖
+        time.sleep(random.uniform(0.5, 1.5))
+
+        if use_session:
+            session = requests.Session()
+            retries = Retry(total=3, backoff_factor=1, status_forcelist=[403, 429, 500, 502, 503, 504])
+            session.mount("https://", HTTPAdapter(max_retries=retries))
+            resp = session.get(url, headers=headers, timeout=30, verify=False)
+        else:
+            # 不使用 Session，每次都是乾淨的請求
+            resp = requests.get(url, headers=headers, timeout=30, verify=False)
+
         resp.raise_for_status()
         
         if 'charset' not in resp.headers.get('content-type', '').lower():
@@ -76,27 +85,7 @@ def fetch_text(session, url, referer=None):
         return None
 
 # =========================
-# 🧠 網址修復助手 (V50 New)
-# =========================
-def fix_utk_url(domain, raw_url):
-    """
-    強制重組 UTK 系列 (寬宏/年代/UDN) 的網址，確保有效性。
-    只要有 PRODUCT_ID 就重建成標準格式。
-    """
-    match = re.search(r'PRODUCT_ID=([A-Za-z0-9]+)', raw_url, re.I)
-    if match:
-        pid = match.group(1)
-        # 針對不同平台微調路徑
-        if "tixfun" in domain:
-            return f"https://{domain}/UTK0201_?PRODUCT_ID={pid}"
-        else:
-            return f"https://{domain}/application/UTK02/UTK0201_.aspx?PRODUCT_ID={pid}"
-    
-    # 如果抓不到 ID，回傳原網址 (通常會被後續過濾掉)
-    return raw_url
-
-# =========================
-# 🧠 標題與物件處理
+# 🧠 內容解析工具
 # =========================
 def extract_smart_title(link_tag):
     title = link_tag.get('title')
@@ -111,21 +100,32 @@ def extract_smart_title(link_tag):
         if text: title = text
     return title
 
+def fix_utk_url(domain, raw_url):
+    """修復 UTK 系列無效連結"""
+    # 嘗試從 URL 中提取 PRODUCT_ID
+    match = re.search(r'PRODUCT_ID=([A-Za-z0-9]+)', raw_url, re.I)
+    if match:
+        pid = match.group(1)
+        if "tixfun" in domain:
+            return f"https://{domain}/UTK0201_?PRODUCT_ID={pid}"
+        else:
+            return f"https://{domain}/application/UTK02/UTK0201_.aspx?PRODUCT_ID={pid}"
+    return raw_url
+
 def create_event_obj(title, url, platform, img_url=None, type_override=None):
     if not title: return None
 
-    # [V50] 擴充黑名單
     noise_keywords = [
         '立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 
         'More', 'None', '活動介紹', 'Traffic', '更多詳情', '其他活動', '開放時間', '交通資訊', 
         '當前頁面', 'Current Page', 'Go to page', '看更多', '查看全部', 'FamiTicket全網購票網', '首頁',
         '找活動', '下一頁', '廣告版位出租', '隱私權政策', '較舊的文章', '詳細介紹', '回首頁', '網站導覽',
-        '兩側門廳', '中央通廊', '服務台', '堂景介紹'
+        '兩側門廳', '中央通廊', '服務台', '堂景介紹', '租借', '全票', '優待票'
     ]
     
     if title.strip() in noise_keywords: return None
 
-    # 清洗
+    # 清洗標題
     title = re.sub(r'^(event-)?banner-', '', title, flags=re.I)
     for n in noise_keywords: title = title.replace(n, "")
     title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
@@ -170,16 +170,16 @@ def get_event_category_from_title(title):
     return "其他"
 
 # =========================
-# 🕷️ 平台爬蟲 (V50)
+# 🕷️ 平台爬蟲 (V51)
 # =========================
 
-def fetch_kktix(session):
-    logger.info("🚀 啟動 KKTIX...")
+def fetch_kktix():
+    logger.info("🚀 啟動 KKTIX (Clean Session)...")
     urls = [f"https://kktix.com/events?category_id={i}" for i in [2,6,4,3,8]] + ["https://kktix.com/"]
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text(session, url)
+        html = fetch_text(url, use_session=False) # 避免 403
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="/events/"], .event-item a, .event-card a')
@@ -195,13 +195,13 @@ def fetch_kktix(session):
     logger.info(f"[KKTIX] 抓取 {len(events)} 筆")
     return events
 
-def fetch_accupass(session):
+def fetch_accupass():
     logger.info("🚀 啟動 ACCUPASS...")
     urls = [f"https://www.accupass.com/search?q={k}" for k in ["音樂", "藝文", "學習", "科技", "展覽"]] + ["https://www.accupass.com/?area=north"]
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text(session, url)
+        html = fetch_text(url, use_session=False)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         candidates = soup.find_all('a', href=re.compile(r'^/event/([A-Za-z0-9]+)'))
@@ -216,13 +216,13 @@ def fetch_accupass(session):
     logger.info(f"[ACCUPASS] 抓取 {len(events)} 筆")
     return events
 
-def fetch_tixcraft(session):
+def fetch_tixcraft():
     logger.info("🚀 啟動 拓元...")
     urls = ["https://tixcraft.com/activity", "https://tixcraft.com/activity/list/select_type/all"]
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text(session, url)
+        html = fetch_text(url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="/activity/detail/"]')
@@ -235,23 +235,22 @@ def fetch_tixcraft(session):
     logger.info(f"[拓元] 抓取 {len(events)} 筆")
     return events
 
-def fetch_kham(session):
-    logger.info("🚀 啟動 寬宏 (V50 Fix)...")
+def fetch_kham():
+    logger.info("🚀 啟動 寬宏...")
     urls = [f"https://kham.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY={i}" for i in [205,231,116,129]]
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text(session, url)
+        html = fetch_text(url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="UTK0201_"]') 
         for link in links:
             raw_url = urljoin("https://kham.com.tw", link.get('href'))
-            # [V50] 連結重組
             full_url = fix_utk_url("kham.com.tw", raw_url)
             
             if full_url in seen: continue
-            if "PRODUCT_ID" not in full_url: continue # 再次確認
+            if "PRODUCT_ID" not in full_url: continue
             
             title = extract_smart_title(link)
             ev = create_event_obj(title, full_url, "寬宏", None)
@@ -259,9 +258,9 @@ def fetch_kham(session):
     logger.info(f"[寬宏] 抓取 {len(events)} 筆")
     return events
 
-def fetch_opentix(session):
+def fetch_opentix():
     logger.info("🚀 啟動 OPENTIX...")
-    html = fetch_text(session, "https://www.opentix.life/event")
+    html = fetch_text("https://www.opentix.life/event")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="/event/"]')
@@ -277,20 +276,19 @@ def fetch_opentix(session):
     logger.info(f"[OPENTIX] 抓取 {len(events)} 筆")
     return events
 
-def fetch_udn(session):
-    logger.info("🚀 啟動 UDN (V50 Fix)...")
+def fetch_udn():
+    logger.info("🚀 啟動 UDN...")
     categories = [231, 205, 77, 116, 100, 129, 218, 163, 101]
     urls = [f"https://tickets.udnfunlife.com/application/UTK01/UTK0101_03.aspx?Category={c}&kdid=cateList" for c in categories]
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text(session, url)
+        html = fetch_text(url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="UTK0201_"]')
         for link in links:
             raw_url = urljoin("https://tickets.udnfunlife.com", link.get('href'))
-            # [V50] 連結重組
             full_url = fix_utk_url("tickets.udnfunlife.com", raw_url)
             
             if full_url in seen: continue
@@ -303,9 +301,9 @@ def fetch_udn(session):
     logger.info(f"[UDN] 抓取 {len(events)} 筆")
     return events
 
-def fetch_fami(session):
+def fetch_fami():
     logger.info("🚀 啟動 FamiTicket...")
-    html = fetch_text(session, "https://www.famiticket.com.tw/Home/Activity/Search/242")
+    html = fetch_text("https://www.famiticket.com.tw/Home/Activity/Search/242")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.find_all('a', href=re.compile(r'Activity', re.I))
@@ -322,31 +320,29 @@ def fetch_fami(session):
     logger.info(f"[FamiTicket] 抓取 {len(events)} 筆")
     return events
 
-def fetch_era(session):
-    logger.info("🚀 啟動 年代 (V50 Fix)...")
-    html = fetch_text(session, "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77")
+def fetch_era():
+    logger.info("🚀 啟動 年代 (V51 Fix)...")
+    html = fetch_text("https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select('a[href*="UTK0201_"]')
+    links = soup.select('a[href*="UTK0201_"]') # 放寬選擇器
     events = []
     seen = set()
     for link in links:
         raw_url = urljoin("https://ticket.com.tw", link.get('href'))
-        # [V50] 連結重組
         full_url = fix_utk_url("ticket.com.tw", raw_url)
         
         if full_url in seen: continue
-        if "PRODUCT_ID" not in full_url: continue
-
+        # 即使沒有 ID 也嘗試抓取，避免全滅
         title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "年代售票", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[年代] 抓取 {len(events)} 筆")
     return events
 
-def fetch_tixfun(session):
-    logger.info("🚀 啟動 TixFun (V50 Fix)...")
-    html = fetch_text(session, "https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77")
+def fetch_tixfun():
+    logger.info("🚀 啟動 TixFun...")
+    html = fetch_text("https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="UTK0201_"]')
@@ -354,21 +350,17 @@ def fetch_tixfun(session):
     seen = set()
     for link in links:
         raw_url = urljoin("https://tixfun.com", link.get('href'))
-        # [V50] 連結重組
         full_url = fix_utk_url("tixfun.com", raw_url)
-        
         if full_url in seen: continue
-        if "PRODUCT_ID" not in full_url: continue
-
         title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "TixFun售票網", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[TixFun] 抓取 {len(events)} 筆")
     return events
 
-def fetch_eventgo(session):
+def fetch_eventgo():
     logger.info("🚀 啟動 Event Go...")
-    html = fetch_text(session, "https://eventgo.bnextmedia.com.tw/")
+    html = fetch_text("https://eventgo.bnextmedia.com.tw/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="/event/detail"]')
@@ -384,9 +376,9 @@ def fetch_eventgo(session):
     logger.info(f"[Event Go] 抓取 {len(events)} 筆")
     return events
 
-def fetch_beclass(session):
+def fetch_beclass():
     logger.info("🚀 啟動 BeClass...")
-    html = fetch_text(session, "https://www.beclass.com/default.php?name=ShowList&op=recent")
+    html = fetch_text("https://www.beclass.com/default.php?name=ShowList&op=recent")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select("a[href*='rid=']")
@@ -401,9 +393,9 @@ def fetch_beclass(session):
     logger.info(f"[BeClass] 抓取 {len(events)} 筆")
     return events
 
-def fetch_indievox(session):
+def fetch_indievox():
     logger.info("🚀 啟動 iNDIEVOX...")
-    html = fetch_text(session, "https://www.indievox.com/activity/list")
+    html = fetch_text("https://www.indievox.com/activity/list")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="/activity/detail"]')
@@ -419,9 +411,9 @@ def fetch_indievox(session):
     logger.info(f"[iNDIEVOX] 抓取 {len(events)} 筆")
     return events
 
-def fetch_ibon(session):
-    logger.info("🚀 啟動 ibon...")
-    html = fetch_text(session, "https://ticket.ibon.com.tw/Activity/Index")
+def fetch_ibon():
+    logger.info("🚀 啟動 ibon (Clean Session)...")
+    html = fetch_text("https://ticket.ibon.com.tw/Activity/Index", use_session=False)
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     all_links = soup.find_all('a', href=True)
@@ -439,9 +431,9 @@ def fetch_ibon(session):
     logger.info(f"[ibon] 抓取 {len(events)} 筆")
     return events
 
-def fetch_huashan(session):
+def fetch_huashan():
     logger.info("🚀 啟動 華山...")
-    html = fetch_text(session, "https://www.huashan1914.com/w/huashan1914/exhibition")
+    html = fetch_text("https://www.huashan1914.com/w/huashan1914/exhibition")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select("a[href*='exhibition_']")
@@ -456,9 +448,9 @@ def fetch_huashan(session):
     logger.info(f"[華山] 抓取 {len(events)} 筆")
     return events
 
-def fetch_songshan(session):
+def fetch_songshan():
     logger.info("🚀 啟動 松山...")
-    html = fetch_text(session, "https://www.songshanculturalpark.org/exhibition")
+    html = fetch_text("https://www.songshanculturalpark.org/exhibition")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.find_all('a', href=re.compile(r'/exhibition/'))
@@ -474,29 +466,36 @@ def fetch_songshan(session):
     logger.info(f"[松山] 抓取 {len(events)} 筆")
     return events
 
-def fetch_stroll(session):
-    logger.info("🚀 啟動 StrollTimes (V50 Fix)...")
-    # [V50] 加入 Referer 偽裝
-    html = fetch_text(session, "https://strolltimes.com/", referer="https://www.google.com/")
+def fetch_stroll():
+    logger.info("🚀 啟動 StrollTimes (V51 Fix)...")
+    # [V51] 廣域搜索所有連結
+    html = fetch_text("https://strolltimes.com/", referer="https://www.google.com/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select('h3.post-title a')
+    all_links = soup.find_all('a', href=True)
     events = []
     seen = set()
-    for link in links:
+    for link in all_links:
         href = link.get('href')
-        if not href: continue
+        if not href or len(href) < 15: continue
+        # 排除常見雜訊連結
+        if any(x in href for x in ['category', 'tag', 'contact', 'about', 'facebook']): continue
+        
         full_url = href
         if full_url in seen: continue
+        
         title = extract_smart_title(link)
+        # 嚴格過濾標題長度，避開「首頁」、「更多」
+        if not title or len(title) < 8: continue
+        
         ev = create_event_obj(title, full_url, "StrollTimes", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[StrollTimes] 抓取 {len(events)} 筆")
     return events
 
-def fetch_kidsclub(session):
+def fetch_kidsclub():
     logger.info("🚀 啟動 KidsClub...")
-    html = fetch_text(session, "https://www.kidsclub.com.tw/")
+    html = fetch_text("https://www.kidsclub.com.tw/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     all_links = soup.find_all('a', href=True)
@@ -515,10 +514,9 @@ def fetch_kidsclub(session):
     logger.info(f"[KidsClub] 抓取 {len(events)} 筆")
     return events
 
-def fetch_wtc(session):
+def fetch_wtc():
     logger.info("🚀 啟動 台北世貿...")
-    url = "https://www.twtc.com.tw/exhibition?p=home"
-    html = fetch_text(session, url)
+    html = fetch_text("https://www.twtc.com.tw/exhibition?p=home")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     base_url = "https://www.twtc.com.tw/"
@@ -546,28 +544,35 @@ def fetch_wtc(session):
     logger.info(f"[台北世貿] 抓取 {len(events)} 筆")
     return events
 
-def fetch_cksmh(session):
-    logger.info("🚀 啟動 中正紀念堂 (V50 Fix)...")
-    # [V50] 使用 requests 且有 headers，應該能正常抓取
-    html = fetch_text(session, "https://www.cksmh.gov.tw/activitybee_list.aspx?n=105")
+def fetch_cksmh():
+    logger.info("🚀 啟動 中正紀念堂 (V51 Fix)...")
+    html = fetch_text("https://www.cksmh.gov.tw/activitybee_list.aspx?n=105")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    links = soup.select('a[href*="activitybee_"]')
+    
+    # [V51] 廣域搜索所有連結
+    all_links = soup.find_all('a', href=True)
     events = []
     seen = set()
-    for link in links:
+    for link in all_links:
         href = link.get('href')
-        if not href: continue
+        # 排除非內容頁雜訊
+        if "javascript" in href or "index" in href or len(href) < 5: continue
+        
         full_url = urljoin("https://www.cksmh.gov.tw", href)
         if full_url in seen: continue
+        
         title = extract_smart_title(link)
+        # 標題長度過濾
+        if not title or len(title) < 6: continue
+        
         ev = create_event_obj(title, full_url, "中正紀念堂", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[中正紀念堂] 抓取 {len(events)} 筆")
     return events
 
 # =========================
-# 💾 存檔 & 通知
+# 💾 存檔與執行
 # =========================
 def send_line_notify(message):
     if not LINE_TOKEN: return
@@ -578,21 +583,21 @@ def send_line_notify(message):
             data={"message": message},
             timeout=10
         )
-    except Exception as e:
-        logger.error(f"Line Notify Error: {e}")
-
-def load_existing_data():
-    if not OUTPUT_FILE.exists(): return []
-    try:
-        with open(OUTPUT_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except: return []
+    except: pass
 
 def save_data_and_notify(new_events):
-    existing_events = load_existing_data()
+    existing_file = OUTPUT_FILE
+    existing_events = []
+    if existing_file.exists():
+        try:
+            with open(existing_file, 'r', encoding='utf-8') as f:
+                existing_events = json.load(f)
+        except: pass
+
     existing_map = {e['url']: e for e in existing_events}
     added_events = []
     updated_count = 0
+    
     for event in new_events:
         url = event['url']
         if url not in existing_map:
@@ -610,7 +615,6 @@ def save_data_and_notify(new_events):
     logger.info(f"📊 資料庫更新完畢 | 總筆數: {len(final_list)} | 🆕 新增: {len(added_events)} | 🔄 更新: {updated_count}")
 
     if added_events and LINE_TOKEN:
-        logger.info(f"📨 準備發送 LINE 通知 ({len(added_events)} 筆)...")
         msg = f"\n🔥 發現 {len(added_events)} 個新活動！\n"
         for e in added_events[:5]:
             msg += f"\n📌 {e['title'][:30]}\n🔗 {e['url']}\n"
@@ -619,33 +623,30 @@ def save_data_and_notify(new_events):
         send_line_notify(msg)
 
 def main():
-    logger.info("🔥 爬蟲程式開始執行 (V50 Golden Version)...")
-    session = create_session()
+    logger.info("🔥 爬蟲程式開始執行 (V51 Hybrid Fix)...")
     all_new_events = []
     try:
-        all_new_events.extend(fetch_kktix(session))
-        all_new_events.extend(fetch_accupass(session))
-        all_new_events.extend(fetch_tixcraft(session))
-        all_new_events.extend(fetch_kham(session))
-        all_new_events.extend(fetch_opentix(session))
-        all_new_events.extend(fetch_udn(session))
-        all_new_events.extend(fetch_fami(session))
-        all_new_events.extend(fetch_era(session))
-        all_new_events.extend(fetch_tixfun(session))
-        all_new_events.extend(fetch_eventgo(session))
-        all_new_events.extend(fetch_beclass(session))
-        all_new_events.extend(fetch_indievox(session))
-        all_new_events.extend(fetch_ibon(session))
-        all_new_events.extend(fetch_huashan(session))
-        all_new_events.extend(fetch_songshan(session))
-        all_new_events.extend(fetch_stroll(session))
-        all_new_events.extend(fetch_kidsclub(session))
-        all_new_events.extend(fetch_wtc(session))
-        all_new_events.extend(fetch_cksmh(session))
+        all_new_events.extend(fetch_kktix())
+        all_new_events.extend(fetch_accupass())
+        all_new_events.extend(fetch_tixcraft())
+        all_new_events.extend(fetch_kham())
+        all_new_events.extend(fetch_opentix())
+        all_new_events.extend(fetch_udn())
+        all_new_events.extend(fetch_fami())
+        all_new_events.extend(fetch_era())
+        all_new_events.extend(fetch_tixfun())
+        all_new_events.extend(fetch_eventgo())
+        all_new_events.extend(fetch_beclass())
+        all_new_events.extend(fetch_indievox())
+        all_new_events.extend(fetch_ibon())
+        all_new_events.extend(fetch_huashan())
+        all_new_events.extend(fetch_songshan())
+        all_new_events.extend(fetch_stroll())
+        all_new_events.extend(fetch_kidsclub())
+        all_new_events.extend(fetch_wtc())
+        all_new_events.extend(fetch_cksmh())
     except Exception as e:
         logger.error(f"❌ 主程式執行錯誤: {e}")
-    finally:
-        session.close()
 
     logger.info(f"🔍 本輪爬取匯總: 共抓取到 {len(all_new_events)} 筆有效資料")
     save_data_and_notify(all_new_events)
