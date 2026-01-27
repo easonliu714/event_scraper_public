@@ -12,19 +12,22 @@
         :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #3b82f6; --chip-bg: #2a2a2a; }
         body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 60px; overscroll-behavior-y: contain; }
         
-        /* 下拉更新指示器 */
         #pull-to-refresh {
             position: fixed; top: -50px; left: 0; width: 100%; height: 50px;
             display: flex; justify-content: center; align-items: center;
             color: var(--accent); font-size: 1.2rem; transition: top 0.2s; z-index: 200;
         }
-        #pull-to-refresh.visible { top: 60px; } /* header height */
+        #pull-to-refresh.visible { top: 60px; }
         .spinner { animation: spin 1s linear infinite; display: none; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
         header { position: sticky; top: 0; z-index: 100; background: rgba(18,18,18,0.95); backdrop-filter: blur(10px); padding: 12px 16px; border-bottom: 1px solid #333; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         h1 { margin: 0; font-size: 1.2rem; }
+        .header-actions { display: flex; gap: 12px; }
+        .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #aaa; transition: 0.2s; }
+        .action-btn:hover { color: #fff; }
+
         .search-box { width: 100%; padding: 12px; border-radius: 12px; background: #2a2a2a; border: 1px solid #333; color: #fff; font-size: 1rem; }
         
         .filter-section { padding: 16px; background: #181818; border-bottom: 1px solid #333; }
@@ -35,7 +38,6 @@
         .chip span { opacity: 0.6; font-size: 0.8em; }
         .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .chip.active span { opacity: 1; color: #fff; }
-        .chip[data-type="status"].active { background: #10b981; border-color: #10b981; }
         
         .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
         
@@ -73,22 +75,25 @@
 <header>
     <div class="top-bar">
         <h1>📡 活動雷達</h1>
-        <button onclick="openSettings()" style="background:none; border:none; font-size:1.5rem;">⚙️</button>
+        <div class="header-actions">
+            <button class="action-btn" onclick="markAllRead()" title="全部設為已讀">✅</button>
+            <button class="action-btn" onclick="openSettings()" title="設定">⚙️</button>
+        </div>
     </div>
     <input type="text" id="search" class="search-box" placeholder="搜尋關鍵字..." oninput="resetPageAndRender()">
 </header>
 
 <div class="filter-section">
     <div class="filter-block">
-        <div class="block-title">🏛️ 平台篩選 (聯集 OR)</div>
+        <div class="block-title">🏛️ 平台篩選</div>
         <div id="platform-chips" class="chips"></div>
     </div>
     <div class="filter-block">
-        <div class="block-title">✨ 狀態篩選 (交集 AND)</div>
+        <div class="block-title">✨ 狀態篩選</div>
         <div class="chips" id="status-chips"></div>
     </div>
     <div class="filter-block">
-        <div class="block-title">🏷️ 類別篩選 (聯集 OR)</div>
+        <div class="block-title">🏷️ 類別篩選</div>
         <div id="type-chips" class="chips"></div>
     </div>
 </div>
@@ -118,14 +123,11 @@
 
 <div class="modal-overlay" id="settings-modal" onclick="closeModal()">
     <div class="modal" onclick="event.stopPropagation()">
-        <h2>⚙️ 設定</h2>
+        <h2>⚙️ 設定我的最愛</h2>
         <div class="settings-panel">
             <label>⭐ 關注關鍵字 (按 Enter 新增)</label>
             <input type="text" id="keyword-input" class="keyword-input">
             <div id="keywords-tags" class="tags-container"></div>
-        </div>
-        <div class="settings-panel">
-            <button onclick="requestNotifyPermission()" style="width:100%; padding:10px; background:#333; color:#fff; border:none; border-radius:8px;">🔔 檢查通知權限</button>
         </div>
     </div>
 </div>
@@ -146,36 +148,25 @@
     const ptrIcon = document.getElementById('ptr-icon');
     const ptrSpinner = document.getElementById('ptr-spinner');
 
-    window.addEventListener('touchstart', e => {
-        if (window.scrollY === 0) touchStartY = e.touches[0].clientY;
-    });
-
+    window.addEventListener('touchstart', e => { if (window.scrollY === 0) touchStartY = e.touches[0].clientY; });
     window.addEventListener('touchmove', e => {
-        const touchY = e.touches[0].clientY;
-        if (window.scrollY === 0 && touchY > touchStartY) {
-            const pullDistance = touchY - touchStartY;
-            if (pullDistance > 60) {
-                ptrEl.style.top = '60px'; // 顯示下拉圖示
-                ptrIcon.style.display = 'block';
-                ptrSpinner.style.display = 'none';
+        if (window.scrollY === 0 && e.touches[0].clientY > touchStartY) {
+            if (e.touches[0].clientY - touchStartY > 60) {
+                ptrEl.style.top = '60px'; ptrIcon.style.display = 'block'; ptrSpinner.style.display = 'none';
             }
         }
     });
-
     window.addEventListener('touchend', async e => {
         if (ptrEl.style.top === '60px') {
-            ptrIcon.style.display = 'none';
-            ptrSpinner.style.display = 'block'; // 轉圈圈
-            await init(); // 重新讀取資料
-            setTimeout(() => {
-                ptrEl.style.top = '-50px'; // 隱藏
-            }, 500);
+            ptrIcon.style.display = 'none'; ptrSpinner.style.display = 'block';
+            await init();
+            setTimeout(() => { ptrEl.style.top = '-50px'; }, 500);
         }
     });
 
     async function init() {
         try {
-            const res = await fetch(`data.json?t=${Date.now()}`); // 強制不快取
+            const res = await fetch(`data.json?t=${Date.now()}`);
             allEvents = await res.json();
             allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
             
@@ -186,6 +177,16 @@
             console.error(e);
             document.getElementById('event-list').innerHTML = '<div style="text-align:center; padding:40px;">❌ 資料載入失敗</div>';
         }
+    }
+
+    function markAllRead() {
+        if(!confirm("確定要將所有活動設為已讀嗎？")) return;
+        const currentUrls = allEvents.map(e => e.url);
+        const uniqueReads = new Set([...readEvents, ...currentUrls]);
+        readEvents = Array.from(uniqueReads);
+        localStorage.setItem('readEvents', JSON.stringify(readEvents));
+        updateStatusCounts();
+        renderList();
     }
 
     function renderChips() {
@@ -204,8 +205,8 @@
         const isNewActive = filters.status.has('isNew') ? 'active' : '';
         const isFavActive = filters.status.has('isFav') ? 'active' : '';
         document.getElementById('status-chips').innerHTML = `
-            <div class="chip ${isNewActive}" data-type="status" onclick="toggleFilter('status', 'isNew', this)">🆕 新進活動 <span>${newCount}</span></div>
-            <div class="chip ${isFavActive}" data-type="status" onclick="toggleFilter('status', 'isFav', this)">⭐ 關注關鍵字 <span>${favCount}</span></div>
+            <div class="chip ${isNewActive}" onclick="toggleFilter('status', 'isNew', this)">🆕 新進活動 <span>${newCount}</span></div>
+            <div class="chip ${isFavActive}" onclick="toggleFilter('status', 'isFav', this)">⭐ 關注關鍵字 <span>${favCount}</span></div>
         `;
     }
 
@@ -281,7 +282,6 @@
     function renderKeywords() { document.getElementById('keywords-tags').innerHTML = myKeywords.map((k, i) => `<div class="tag">${k} <span onclick="removeKeyword(${i})" style="cursor:pointer; color:#f87171">×</span></div>`).join(''); }
     function removeKeyword(i) { myKeywords.splice(i, 1); renderKeywords(); localStorage.setItem('myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); }
     document.getElementById('keyword-input').onkeypress = (e) => { if(e.key === 'Enter') { const val = e.target.value.trim(); if(val && !myKeywords.includes(val)) { myKeywords.push(val); e.target.value = ''; renderKeywords(); localStorage.setItem('myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); } } };
-    function requestNotifyPermission() { Notification.requestPermission().then(p => alert(p === "granted" ? "✅ 通知已開啟" : "🚫 通知被拒絕")); }
 
     init();
 </script>
