@@ -18,7 +18,6 @@ from bs4 import BeautifulSoup
 # =========================
 # 🛠️ 設定區
 # =========================
-VERSION = "V61 (Hybrid Fix)"
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - [%(levelname)s] - %(message)s',
@@ -35,16 +34,16 @@ OUTPUT_FILE = OUTPUT_DIR / "data.json"
 LINE_TOKEN = os.environ.get("LINE_TOKEN")
 
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
 ]
 
 # =========================
 # 🧩 雙引擎核心
 # =========================
 
-# 1. Requests Session (主引擎)
 def create_session():
+    """建立 Requests Session"""
     session = requests.Session()
     retries = Retry(total=3, backoff_factor=1, status_forcelist=[403, 429, 500, 502, 503])
     session.mount("https://", HTTPAdapter(max_retries=retries))
@@ -64,20 +63,22 @@ def create_session():
 
 def fetch_text_requests(session, url, referer=None, encoding=None):
     try:
-        # [V61] KKTIX 需要 Referer 與較長延遲
-        if "kktix" in url:
-            session.headers.update({'Referer': 'https://kktix.com/'})
-            time.sleep(random.uniform(3, 5))
+        # 隨機延遲
+        time.sleep(random.uniform(2, 4))
+        
+        # [V62] KKTIX 移除 Referer，其他平台保留
+        if referer and "kktix" not in url:
+            session.headers.update({'Referer': referer})
         else:
-            time.sleep(random.uniform(1, 2))
-            if referer: session.headers.update({'Referer': referer})
+            session.headers.pop('Referer', None)
 
         resp = session.get(url, timeout=30, verify=False)
         resp.raise_for_status()
         
+        # [V62] 年代修正：不強制 Big5，改用自動偵測 (apparent_encoding 通常比 header 準)
         if encoding:
             resp.encoding = encoding
-        elif 'charset' not in resp.headers.get('content-type', '').lower():
+        else:
             resp.encoding = resp.apparent_encoding
             
         return resp.text
@@ -85,8 +86,8 @@ def fetch_text_requests(session, url, referer=None, encoding=None):
         logger.error(f"💥 Requests 失敗: {url} - {e}")
         return None
 
-# 2. Aiohttp (副引擎 - 專治 StrollTimes)
 async def fetch_text_aiohttp(url):
+    """Aiohttp 專用於 StrollTimes"""
     headers = {
         'User-Agent': random.choice(USER_AGENTS),
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -133,19 +134,23 @@ def extract_smart_title(link_tag):
 def create_event_obj(title, url, platform, img_url=None, type_override=None):
     if not title: return None
 
+    # [V62] 黑名單大補強 (針對 StrollTimes, KidsClub, Fami)
     noise_keywords = [
         '立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 
         'More', 'None', '活動介紹', 'Traffic', '更多詳情', '其他活動', '開放時間', '交通資訊', 
         '當前頁面', 'Current Page', 'Go to page', '看更多', '查看全部', 'FamiTicket全網購票網', '首頁',
         '找活動', '下一頁', '廣告版位出租', '隱私權政策', '較舊的文章', '詳細介紹', '回首頁', '網站導覽',
         '兩側門廳', '中央通廊', '服務台', '堂景介紹', '租借', '全票', '優待票', '建立活動', 'Facebook', 'Instagram',
-        'Uncategorized', '親子運動', '展覽活動', '科學益智', '藝術創作', '5-6歲', '7-8歲', '9-10歲', '11-12歲'
+        '聯絡我們', '關於我們', '全台週末活動', 'VIVE EAGLE', 'Uncategorized', '親子運動', '展覽活動', 
+        '科學益智', '藝術創作', '5-6歲', '7-8歲', '9-10歲', '11-12歲', '兒童營隊'
     ]
     
     if title.strip() in noise_keywords: return None
 
     title = re.sub(r'^(event-)?banner-', '', title, flags=re.I)
     for n in noise_keywords: title = title.replace(n, "")
+    
+    # 移除年份日期
     title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
     title = re.sub(r'^[»\s]+|[»\s]+$', '', title).strip()
 
@@ -181,11 +186,11 @@ def get_event_category_from_title(title):
     return "其他"
 
 # =========================
-# 🕷️ 平台爬蟲 (Requests Group)
+# 🕷️ 平台爬蟲 (Requests)
 # =========================
 
 def fetch_kktix(session):
-    logger.info("🚀 啟動 KKTIX (Session + Referer)...")
+    logger.info("🚀 啟動 KKTIX (V62 No-Referer)...")
     urls = [f"https://kktix.com/events?category_id={i}" for i in [2,6,4,3,8]] + ["https://kktix.com/"]
     events = []
     seen = set()
@@ -319,10 +324,8 @@ def fetch_fami(session):
         href = link.get('href')
         full_url = urljoin("https://www.famiticket.com.tw", link.get('href'))
         if full_url in seen: continue
-        # [V61] 排除 Search 列表頁
         if "Info" not in full_url and "Search" not in full_url: continue
         if "Search" in full_url: continue 
-        
         title = safe_get_text(link)
         ev = create_event_obj(title, full_url, "FamiTicket", None)
         if ev: events.append(ev); seen.add(full_url)
@@ -330,11 +333,11 @@ def fetch_fami(session):
     return events
 
 def fetch_era(session):
-    logger.info("🚀 啟動 年代 (V61 Big5)...")
-    html = fetch_text_requests(session, "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77", encoding='big5')
+    logger.info("🚀 啟動 年代 (V62 Auto Encoding)...")
+    # [V62] 不強制指定 Big5，讓 requests 自動偵測
+    html = fetch_text_requests(session, "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    # [V61] 廣域搜索避免選擇器問題
     links = soup.find_all('a', href=re.compile(r'UTK0201', re.I))
     events = []
     seen = set()
@@ -423,7 +426,7 @@ def fetch_ibon(session):
     return events
 
 def fetch_huashan(session):
-    logger.info("🚀 啟動 華山 (V61 Broad)...")
+    logger.info("🚀 啟動 華山 (V62 Broad)...")
     html = fetch_text_requests(session, "https://www.huashan1914.com/w/huashan1914/exhibition")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -459,7 +462,7 @@ def fetch_songshan(session):
     return events
 
 def fetch_kidsclub(session):
-    logger.info("🚀 啟動 KidsClub (V61 Clean)...")
+    logger.info("🚀 啟動 KidsClub (V62 Fix)...")
     html = fetch_text_requests(session, "https://www.kidsclub.com.tw/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -468,9 +471,9 @@ def fetch_kidsclub(session):
     seen = set()
     for link in all_links:
         href = link.get('href')
-        # [V61] 嚴格排除類別頁
-        if "/courses/category/" in href or "/courses/uncategorized/" in href: continue
+        # [V62] 更嚴格的類別排除
         if "product-category" in href or "tag" in href: continue
+        if "/courses/category/" in href or "/courses/uncategorized/" in href: continue
         if not re.search(r'(product|courses)', href): continue
         
         full_url = urljoin("https://www.kidsclub.com.tw", href)
@@ -506,16 +509,17 @@ def fetch_wtc(session):
     return events
 
 def fetch_cksmh(session):
-    logger.info("🚀 啟動 中正紀念堂 (V61 Broad)...")
+    logger.info("🚀 啟動 中正紀念堂 (V62 Broad)...")
     html = fetch_text_requests(session, "https://www.cksmh.gov.tw/activitybee_list.aspx?n=105")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    # [V61] 廣域搜索
+    # [V62] 廣域搜索
     links = soup.find_all('a', href=re.compile(r'activitybee', re.I))
     events = []
     seen = set()
     for link in links:
         href = link.get('href')
+        if not href: continue
         full_url = urljoin("https://www.cksmh.gov.tw", href)
         if full_url in seen: continue
         title = extract_smart_title(link)
@@ -525,7 +529,7 @@ def fetch_cksmh(session):
     return events
 
 # =========================
-# 🕷️ Aiohttp Group (專治 StrollTimes, iNDIEVOX)
+# 🕷️ Aiohttp Group
 # =========================
 
 async def fetch_indievox_aio():
@@ -551,19 +555,19 @@ async def fetch_stroll_aio():
     html = await fetch_text_aiohttp("https://strolltimes.com/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
+    # [V62] Case-insensitive + Title Blacklist applied in create_event_obj
     all_links = soup.find_all('a', href=True)
     events = []
     seen = set()
     for link in all_links:
         href = link.get('href')
         if not href or len(href) < 15: continue
-        if any(x in href for x in ['category', 'tag', 'contact', 'about', 'facebook']): continue
+        # [V62] 不分大小寫過濾 contact, about
+        if any(x in href.lower() for x in ['category', 'tag', 'contact', 'about', 'facebook']): continue
         
         full_url = href
         if full_url in seen: continue
-        
         title = extract_smart_title(link)
-        if not title or len(title) < 8: continue
         
         ev = create_event_obj(title, full_url, "StrollTimes", None)
         if ev: events.append(ev); seen.add(full_url)
@@ -600,9 +604,8 @@ def save_data_and_notify(new_events):
         send_line_notify(msg)
 
 async def main_async():
-    logger.info(f"🔥 爬蟲程式開始執行 {VERSION}...")
+    logger.info(f"🔥 爬蟲程式開始執行 V62 (Refined Polish)...")
     
-    # 1. Requests Group
     session = create_session()
     sync_events = []
     try:
@@ -628,7 +631,6 @@ async def main_async():
     finally:
         session.close()
 
-    # 2. Aiohttp Group
     async_events = []
     try:
         async_events.extend(await fetch_indievox_aio())
@@ -636,7 +638,6 @@ async def main_async():
     except Exception as e:
         logger.error(f"❌ 非同步任務錯誤: {e}")
 
-    # Merge
     all_events = sync_events + async_events
     logger.info(f"🔍 本輪爬取匯總: 共抓取到 {len(all_events)} 筆有效資料")
     save_data_and_notify(all_events)
