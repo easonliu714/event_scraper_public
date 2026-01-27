@@ -31,31 +31,21 @@ OUTPUT_DIR = Path("docs")
 OUTPUT_FILE = OUTPUT_DIR / "data.json"
 LINE_TOKEN = os.environ.get("LINE_TOKEN")
 
-# [V49] 模擬真實 Chrome (與 show_news_v34 一致)
+# [V50] 升級版 User-Agent 與 Headers
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
 ]
 
 # =========================
-# 🧩 核心引擎：Requests Session (V49 重大變更)
+# 🧩 核心引擎：Requests Session
 # =========================
 def create_session():
-    """建立一個帶有重試機制與偽裝 Headers 的 Session"""
     session = requests.Session()
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[403, 429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retries))
+    session.mount("http://", HTTPAdapter(max_retries=retries))
     
-    # 設定重試策略 (模擬 show_news_v34)
-    retries = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[403, 429, 500, 502, 503, 504],
-        allowed_methods=["HEAD", "GET", "OPTIONS"]
-    )
-    adapter = HTTPAdapter(max_retries=retries)
-    session.mount("https://", adapter)
-    session.mount("http://", adapter)
-    
-    # 設定通用 Headers
     session.headers.update({
         'User-Agent': random.choice(USER_AGENTS),
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
@@ -69,13 +59,14 @@ def create_session():
     })
     return session
 
-def fetch_text(session, url):
+def fetch_text(session, url, referer=None):
     try:
-        # [V49] 使用 requests.get，並設定 verify=False 以兼容舊政府網站
-        resp = session.get(url, timeout=30, verify=False)
+        if referer:
+            session.headers.update({'Referer': referer})
+        
+        resp = session.get(url, timeout=30, verify=False) # verify=False 解決部分舊網站證書問題
         resp.raise_for_status()
         
-        # 強制編碼偵測
         if 'charset' not in resp.headers.get('content-type', '').lower():
             resp.encoding = resp.apparent_encoding
             
@@ -85,55 +76,67 @@ def fetch_text(session, url):
         return None
 
 # =========================
+# 🧠 網址修復助手 (V50 New)
+# =========================
+def fix_utk_url(domain, raw_url):
+    """
+    強制重組 UTK 系列 (寬宏/年代/UDN) 的網址，確保有效性。
+    只要有 PRODUCT_ID 就重建成標準格式。
+    """
+    match = re.search(r'PRODUCT_ID=([A-Za-z0-9]+)', raw_url, re.I)
+    if match:
+        pid = match.group(1)
+        # 針對不同平台微調路徑
+        if "tixfun" in domain:
+            return f"https://{domain}/UTK0201_?PRODUCT_ID={pid}"
+        else:
+            return f"https://{domain}/application/UTK02/UTK0201_.aspx?PRODUCT_ID={pid}"
+    
+    # 如果抓不到 ID，回傳原網址 (通常會被後續過濾掉)
+    return raw_url
+
+# =========================
 # 🧠 標題與物件處理
 # =========================
 def extract_smart_title(link_tag):
     title = link_tag.get('title')
-    
     if not title:
         header = link_tag.find(['h3', 'h4', 'h5', 'h6', 'span', 'div'], class_=re.compile(r'(title|name|subject|header|caption)', re.I))
         if header: title = header.get_text(strip=True)
-
     if not title:
         img = link_tag.find('img')
         if img: title = img.get('alt') or img.get('title')
-
     if not title:
         text = link_tag.get_text(" ", strip=True)
         if text: title = text
-
     return title
 
 def create_event_obj(title, url, platform, img_url=None, type_override=None):
     if not title: return None
 
-    # [V49] 嚴格黑名單 (包含按鈕文字、網站功能字)
+    # [V50] 擴充黑名單
     noise_keywords = [
         '立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 
         'More', 'None', '活動介紹', 'Traffic', '更多詳情', '其他活動', '開放時間', '交通資訊', 
         '當前頁面', 'Current Page', 'Go to page', '看更多', '查看全部', 'FamiTicket全網購票網', '首頁',
-        '找活動', '下一頁', '廣告版位出租', '隱私權政策', '較舊的文章', '詳細介紹', '回首頁', '網站導覽'
+        '找活動', '下一頁', '廣告版位出租', '隱私權政策', '較舊的文章', '詳細介紹', '回首頁', '網站導覽',
+        '兩側門廳', '中央通廊', '服務台', '堂景介紹'
     ]
     
-    # 1. 絕對過濾：如果標題等於黑名單，直接丟棄
     if title.strip() in noise_keywords: return None
 
-    # 2. 清洗雜訊
+    # 清洗
     title = re.sub(r'^(event-)?banner-', '', title, flags=re.I)
-    for n in noise_keywords:
-        title = title.replace(n, "")
-    
+    for n in noise_keywords: title = title.replace(n, "")
     title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
     title = re.sub(r'^[»\s]+|[»\s]+$', '', title).strip()
 
-    # 3. 再次檢查長度與純數字
     if re.match(r'^\d+$', title) or len(title) < 3: return None
 
-    # 4. 時區處理 (UTC+8)
+    # 時區 UTC+8
     tw_tz = timezone(timedelta(hours=8))
     scraped_time = datetime.now(tw_tz).isoformat()
 
-    # 5. 類別判斷
     event_type = type_override if type_override else get_event_category_from_title(title)
 
     return {
@@ -167,7 +170,7 @@ def get_event_category_from_title(title):
     return "其他"
 
 # =========================
-# 🕷️ 平台爬蟲 (V49: Requests Engine)
+# 🕷️ 平台爬蟲 (V50)
 # =========================
 
 def fetch_kktix(session):
@@ -233,7 +236,7 @@ def fetch_tixcraft(session):
     return events
 
 def fetch_kham(session):
-    logger.info("🚀 啟動 寬宏 (V49 Strict)...")
+    logger.info("🚀 啟動 寬宏 (V50 Fix)...")
     urls = [f"https://kham.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY={i}" for i in [205,231,116,129]]
     events = []
     seen = set()
@@ -243,11 +246,12 @@ def fetch_kham(session):
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="UTK0201_"]') 
         for link in links:
-            full_url = urljoin("https://kham.com.tw", link.get('href'))
-            if full_url in seen: continue
+            raw_url = urljoin("https://kham.com.tw", link.get('href'))
+            # [V50] 連結重組
+            full_url = fix_utk_url("kham.com.tw", raw_url)
             
-            # [V49] 嚴格檢查：必須包含 PRODUCT_ID 才是詳情頁
-            if "PRODUCT_ID" not in full_url: continue
+            if full_url in seen: continue
+            if "PRODUCT_ID" not in full_url: continue # 再次確認
             
             title = extract_smart_title(link)
             ev = create_event_obj(title, full_url, "寬宏", None)
@@ -274,11 +278,9 @@ def fetch_opentix(session):
     return events
 
 def fetch_udn(session):
-    logger.info("🚀 啟動 UDN (V49 Strict)...")
-    # 補齊所有類別
+    logger.info("🚀 啟動 UDN (V50 Fix)...")
     categories = [231, 205, 77, 116, 100, 129, 218, 163, 101]
     urls = [f"https://tickets.udnfunlife.com/application/UTK01/UTK0101_03.aspx?Category={c}&kdid=cateList" for c in categories]
-    
     events = []
     seen = set()
     for url in urls:
@@ -287,10 +289,11 @@ def fetch_udn(session):
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="UTK0201_"]')
         for link in links:
-            full_url = urljoin("https://tickets.udnfunlife.com", link.get('href'))
-            if full_url in seen: continue
+            raw_url = urljoin("https://tickets.udnfunlife.com", link.get('href'))
+            # [V50] 連結重組
+            full_url = fix_utk_url("tickets.udnfunlife.com", raw_url)
             
-            # [V49] 嚴格檢查：必須包含 PRODUCT_ID
+            if full_url in seen: continue
             if "PRODUCT_ID" not in full_url: continue
 
             title_raw = extract_smart_title(link)
@@ -313,7 +316,6 @@ def fetch_fami(session):
         full_url = urljoin("https://www.famiticket.com.tw", link.get('href'))
         if full_url in seen: continue
         if "Info" not in full_url and "Search" not in full_url: continue
-        
         title = extract_smart_title(link)
         ev = create_event_obj(title, full_url, "FamiTicket", None)
         if ev: events.append(ev); seen.add(full_url)
@@ -321,7 +323,7 @@ def fetch_fami(session):
     return events
 
 def fetch_era(session):
-    logger.info("🚀 啟動 年代 (V49 Strict)...")
+    logger.info("🚀 啟動 年代 (V50 Fix)...")
     html = fetch_text(session, "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -329,10 +331,11 @@ def fetch_era(session):
     events = []
     seen = set()
     for link in links:
-        full_url = urljoin("https://ticket.com.tw", link.get('href'))
-        if full_url in seen: continue
+        raw_url = urljoin("https://ticket.com.tw", link.get('href'))
+        # [V50] 連結重組
+        full_url = fix_utk_url("ticket.com.tw", raw_url)
         
-        # [V49] 嚴格檢查
+        if full_url in seen: continue
         if "PRODUCT_ID" not in full_url: continue
 
         title = extract_smart_title(link)
@@ -342,7 +345,7 @@ def fetch_era(session):
     return events
 
 def fetch_tixfun(session):
-    logger.info("🚀 啟動 TixFun (V49 Strict)...")
+    logger.info("🚀 啟動 TixFun (V50 Fix)...")
     html = fetch_text(session, "https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -350,10 +353,11 @@ def fetch_tixfun(session):
     events = []
     seen = set()
     for link in links:
-        full_url = urljoin("https://tixfun.com", link.get('href'))
-        if full_url in seen: continue
+        raw_url = urljoin("https://tixfun.com", link.get('href'))
+        # [V50] 連結重組
+        full_url = fix_utk_url("tixfun.com", raw_url)
         
-        # [V49] 嚴格檢查
+        if full_url in seen: continue
         if "PRODUCT_ID" not in full_url: continue
 
         title = extract_smart_title(link)
@@ -426,7 +430,6 @@ def fetch_ibon(session):
     for link in all_links:
         href = link.get('href')
         if "activity" not in href.lower(): continue
-        
         full_url = urljoin("https://ticket.ibon.com.tw", href)
         if full_url in seen: continue
         title = extract_smart_title(link)
@@ -472,14 +475,12 @@ def fetch_songshan(session):
     return events
 
 def fetch_stroll(session):
-    logger.info("🚀 啟動 StrollTimes (V49 Requests)...")
-    html = fetch_text(session, "https://strolltimes.com/")
+    logger.info("🚀 啟動 StrollTimes (V50 Fix)...")
+    # [V50] 加入 Referer 偽裝
+    html = fetch_text(session, "https://strolltimes.com/", referer="https://www.google.com/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    
-    # [V49] 使用 requests 後，應該可以正確抓到 HTML，使用精確選擇器
     links = soup.select('h3.post-title a')
-    
     events = []
     seen = set()
     for link in links:
@@ -505,7 +506,6 @@ def fetch_kidsclub(session):
         href = link.get('href')
         if "product-category" in href: continue
         if not re.search(r'(product|courses)', href): continue
-        
         full_url = urljoin("https://www.kidsclub.com.tw", href)
         if full_url in seen: continue
         title = extract_smart_title(link)
@@ -524,14 +524,11 @@ def fetch_wtc(session):
     base_url = "https://www.twtc.com.tw/"
     events = []
     seen = set()
-    
     rows = soup.select("tr")
     for row in rows:
         link = row.select_one("a[href*='detail'], a[href*='id=']")
         if not link: continue
         href = link['href']
-        
-        # 表格掃描邏輯
         raw_title = link.get_text(strip=True)
         if not raw_title or raw_title.lower() in ['more', 'top', '詳細內容']:
             candidates = []
@@ -541,7 +538,6 @@ def fetch_wtc(session):
                     candidates.append(txt)
             if candidates:
                 raw_title = max(candidates, key=len)
-        
         if not raw_title: continue
         full_url = urljoin(base_url, href)
         if full_url in seen: continue
@@ -551,14 +547,12 @@ def fetch_wtc(session):
     return events
 
 def fetch_cksmh(session):
-    logger.info("🚀 啟動 中正紀念堂 (V49 Requests)...")
-    # [V49] 使用 requests 後，這個網址應該要能動了
+    logger.info("🚀 啟動 中正紀念堂 (V50 Fix)...")
+    # [V50] 使用 requests 且有 headers，應該能正常抓取
     html = fetch_text(session, "https://www.cksmh.gov.tw/activitybee_list.aspx?n=105")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    
     links = soup.select('a[href*="activitybee_"]')
-    
     events = []
     seen = set()
     for link in links:
@@ -597,10 +591,8 @@ def load_existing_data():
 def save_data_and_notify(new_events):
     existing_events = load_existing_data()
     existing_map = {e['url']: e for e in existing_events}
-    
     added_events = []
     updated_count = 0
-    
     for event in new_events:
         url = event['url']
         if url not in existing_map:
@@ -627,14 +619,9 @@ def save_data_and_notify(new_events):
         send_line_notify(msg)
 
 def main():
-    logger.info("🔥 爬蟲程式開始執行 (V49 Requests Engine)...")
-    
-    # 建立一個共用的 Session
+    logger.info("🔥 爬蟲程式開始執行 (V50 Golden Version)...")
     session = create_session()
-    
     all_new_events = []
-    
-    # 依序執行各平台爬蟲
     try:
         all_new_events.extend(fetch_kktix(session))
         all_new_events.extend(fetch_accupass(session))
