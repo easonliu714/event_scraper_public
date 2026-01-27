@@ -601,4 +601,50 @@ def save_data_and_notify(new_events):
     
     final_list = list(existing_map.values())
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    with open(OUTPUT_FILE, 'w', encoding
+    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
+        json.dump(final_list, f, ensure_ascii=False, indent=2)
+    
+    logger.info(f"📊 資料庫更新完畢 | 總筆數: {len(final_list)} | 🆕 新增: {len(added_events)} | 🔄 更新: {updated_count}")
+
+    if added_events and LINE_TOKEN:
+        msg = f"\n🔥 發現 {len(added_events)} 個新活動！\n"
+        for e in added_events[:5]:
+            msg += f"\n📌 {e['title'][:30]}\n🔗 {e['url']}\n"
+        if len(added_events) > 5:
+            msg += f"\n...還有 {len(added_events)-5} 筆，請上網頁查看！"
+        send_line_notify(msg)
+
+def main():
+    logger.info("🔥 爬蟲程式開始執行 (V52 Hybrid Fix)...")
+    session = create_session()
+    all_new_events = []
+    try:
+        all_new_events.extend(fetch_kktix(session))
+        all_new_events.extend(fetch_accupass(session))
+        all_new_events.extend(fetch_tixcraft(session))
+        all_new_events.extend(fetch_kham(session))
+        all_new_events.extend(fetch_opentix(session))
+        all_new_events.extend(fetch_udn(session))
+        all_new_events.extend(fetch_fami(session))
+        all_new_events.extend(fetch_era(session))
+        all_new_events.extend(fetch_tixfun(session))
+        all_new_events.extend(fetch_eventgo(session))
+        all_new_events.extend(fetch_beclass(session))
+        all_new_events.extend(fetch_indievox(session))
+        all_new_events.extend(fetch_ibon(session))
+        all_new_events.extend(fetch_huashan(session))
+        all_new_events.extend(fetch_songshan(session))
+        all_new_events.extend(fetch_stroll(session))
+        all_new_events.extend(fetch_kidsclub(session))
+        all_new_events.extend(fetch_wtc(session))
+        all_new_events.extend(fetch_cksmh(session))
+    except Exception as e:
+        logger.error(f"❌ 主程式執行錯誤: {e}")
+    finally:
+        session.close()
+
+    logger.info(f"🔍 本輪爬取匯總: 共抓取到 {len(all_new_events)} 筆有效資料")
+    save_data_and_notify(all_new_events)
+
+if __name__ == "__main__":
+    main()
