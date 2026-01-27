@@ -7,7 +7,7 @@ import re
 import time
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta # [V47] 新增時區處理
 from urllib.parse import urljoin
 from pathlib import Path
 from bs4 import BeautifulSoup
@@ -30,7 +30,7 @@ OUTPUT_DIR = Path("docs")
 OUTPUT_FILE = OUTPUT_DIR / "data.json"
 LINE_TOKEN = os.environ.get("LINE_TOKEN")
 
-# 模擬真實 Chrome 瀏覽器的 User-Agent
+# 模擬真實 Chrome 瀏覽器
 USER_AGENTS = [
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -42,7 +42,7 @@ USER_AGENTS = [
 def get_headers(referer=None):
     headers = {
         'User-Agent': random.choice(USER_AGENTS),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
         'Accept-Encoding': 'gzip, deflate',
         'Connection': 'keep-alive',
@@ -50,11 +50,7 @@ def get_headers(referer=None):
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
         'Cache-Control': 'max-age=0',
-        'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"'
     }
     if referer: headers['Referer'] = referer
     return headers
@@ -63,7 +59,7 @@ def get_event_category_from_title(title):
     if not title: return "其他"
     title_lower = title.lower()
     category_mapping = {
-        "音樂會/演唱會": ["音樂會", "演唱會", "獨奏會", "合唱", "交響", "管樂", "國樂", "弦樂", "鋼琴", "提琴", "巡演", "fan concert", "fancon", "音樂節", "爵士", "演奏", "歌手", "樂團", "tour", "live", "concert", "solo", "recital", "電音派對", "藝人見面會", "音樂祭"],
+        "音樂會/演唱會": ["音樂會", "演唱會", "獨奏會", "合唱", "交響", "管樂", "國樂", "弦樂", "鋼琴", "提琴", "巡演", "fan concert", "fancon", "音樂節", "爵士", "演奏", "歌手", "樂團", "tour", "live", "concert", "solo", "recital", "電音派對", "藝人見面會", "音樂祭", "Voice", "聲優"],
         "音樂劇/歌劇": ["音樂劇", "歌劇", "musical", "opera"],
         "戲劇表演": ["戲劇", "舞台劇", "劇團", "劇場", "喜劇", "公演", "掌中戲", "歌仔戲", "豫劇", "話劇", "相聲", "布袋戲", "京劇", "崑劇", "藝文活動"],
         "舞蹈表演": ["舞蹈", "舞作", "舞團", "芭蕾", "舞劇", "現代舞", "民族舞", "踢踏舞", "zumba"],
@@ -100,7 +96,7 @@ async def fetch_text(session, url, headers=None, timeout_sec=25):
         return None
 
 # =========================
-# 🧠 終極標題提取助手
+# 🧠 標題提取與物件建立 (V47 優化)
 # =========================
 def extract_smart_title(link_tag):
     title = link_tag.get('title')
@@ -119,25 +115,41 @@ def extract_smart_title(link_tag):
 
     return title
 
-def create_event_obj(title, url, platform, img_url=None):
-    if title:
-        # [V46] 標題淨化升級
-        # 1. 移除 Accupass 的 banner 前綴
-        title = re.sub(r'^(event-)?banner-', '', title, flags=re.I)
-        
-        # 2. 移除常見雜訊
-        noise = ['立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 'More', 'None', '活動介紹', 'Traffic', '更多詳情', '其他活動', '開放時間', '交通資訊']
-        for n in noise: title = title.replace(n, "")
-        
-        # 3. 移除日期
-        title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
-        title = re.sub(r'\s+', ' ', title).strip()
-        
-        # 4. 移除純符號 (如 » )
-        title = re.sub(r'^[»\s]+|[»\s]+$', '', title)
+def create_event_obj(title, url, platform, img_url=None, type_override=None):
+    """
+    建立活動物件，並進行嚴格的資料清洗
+    """
+    if not title: return None
+
+    # [V47] 1. 移除常見雜訊與無效標題
+    # 包含：圖片檔名、網站功能字、日期、價格等
+    title = re.sub(r'^(event-)?banner-', '', title, flags=re.I) # Accupass banner
     
-    # [V46] 嚴格檢查無效標題
-    if not title or len(title) < 2 or title in ['詳內文', '更多資訊']: return None
+    noise_keywords = [
+        '立即購票', '詳細內容', 'Read More', '活動詳情', '查看更多', '已結束', '報名', '詳細資訊', '購票', 
+        'More', 'None', '活動介紹', 'Traffic', '更多詳情', '其他活動', '開放時間', '交通資訊', 
+        '當前頁面', 'Current Page', 'Go to page', '看更多', '查看全部', 'FamiTicket全網購票網', '首頁'
+    ]
+    for n in noise_keywords:
+        title = title.replace(n, "")
+    
+    # 移除日期格式 (如 2026/01/01)
+    title = re.sub(r'\d{4}[-/]\d{1,2}[-/]\d{1,2}', '', title)
+    # 移除純符號 (如 » )
+    title = re.sub(r'^[»\s]+|[»\s]+$', '', title).strip()
+
+    # [V47] 2. 嚴格過濾：如果是純數字 (如 iNDIEVOX 的 id)，則視為無效
+    if re.match(r'^\d+$', title): return None
+
+    # 長度檢查
+    if len(title) < 2: return None
+
+    # [V47] 3. 時間處理：強制轉為台灣時間 (UTC+8)
+    tw_tz = timezone(timedelta(hours=8))
+    scraped_time = datetime.now(tw_tz).isoformat()
+
+    # [V47] 4. 類別判斷
+    event_type = type_override if type_override else get_event_category_from_title(title)
 
     return {
         'title': title,
@@ -145,12 +157,12 @@ def create_event_obj(title, url, platform, img_url=None):
         'platform': platform,
         'img_url': img_url,
         'date': "詳內文",
-        'type': get_event_category_from_title(title),
-        'scraped_at': datetime.now().isoformat()
+        'type': event_type,
+        'scraped_at': scraped_time
     }
 
 # =========================
-# 🕷️ 平台爬蟲 (V46: 全面優化)
+# 🕷️ 平台爬蟲
 # =========================
 
 async def fetch_kktix(session):
@@ -278,12 +290,11 @@ async def fetch_udn(session):
     return events
 
 async def fetch_fami(session):
-    logger.info("🚀 啟動 FamiTicket (V46)...")
-    # [V46 修正] 改抓取 Search 頁面，結構較穩定
+    logger.info("🚀 啟動 FamiTicket...")
+    # [V46] 抓取 Search 頁面
     html = await fetch_text(session, "https://www.famiticket.com.tw/Home/Activity/Search/242")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    # V46: 廣域搜索 Activity 連結
     links = soup.find_all('a', href=re.compile(r'Activity', re.I))
     events = []
     seen = set()
@@ -291,7 +302,6 @@ async def fetch_fami(session):
         href = link.get('href')
         full_url = urljoin("https://www.famiticket.com.tw", link.get('href'))
         if full_url in seen: continue
-        # 排除非內容頁
         if "Info" not in full_url and "Search" not in full_url: continue
         
         title = extract_smart_title(link)
@@ -363,14 +373,14 @@ async def fetch_beclass(session):
     for link in links:
         full_url = urljoin("https://www.beclass.com", link.get('href'))
         if full_url in seen: continue
-        title = safe_get_text(link)
+        title = link.get_text(strip=True) # BeClass 比較單純
         ev = create_event_obj(title, full_url, "BeClass", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[BeClass] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_indievox(session):
-    logger.info("🚀 啟動 iNDIEVOX...")
+    logger.info("🚀 啟動 iNDIEVOX (V47)...")
     html = await fetch_text(session, "https://www.indievox.com/activity/list")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -382,13 +392,14 @@ async def fetch_indievox(session):
         if full_url in seen: continue
         title = extract_smart_title(link)
         img = link.find('img')
-        ev = create_event_obj(title, full_url, "iNDIEVOX", img.get('src') if img else None)
+        # [V47] 強制指定類別為 音樂會/演唱會
+        ev = create_event_obj(title, full_url, "iNDIEVOX", img.get('src') if img else None, type_override="音樂會/演唱會")
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[iNDIEVOX] 抓取 {len(events)} 筆")
     return events
 
 async def fetch_ibon(session):
-    logger.info("🚀 啟動 ibon (V46)...")
+    logger.info("🚀 啟動 ibon...")
     html = await fetch_text(session, "https://ticket.ibon.com.tw/Activity/Index")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
@@ -409,7 +420,7 @@ async def fetch_ibon(session):
     return events
 
 async def fetch_huashan(session):
-    logger.info("🚀 啟動 華山 (V46)...")
+    logger.info("🚀 啟動 華山...")
     # [V46] 更新 Headers 模擬真實瀏覽器
     html = await fetch_text(session, "https://www.huashan1914.com/w/huashan1914/exhibition")
     if not html: return []
@@ -587,7 +598,7 @@ async def save_data_and_notify(new_events):
         await send_line_notify(msg)
 
 async def main():
-    logger.info("🔥 爬蟲程式開始執行 (V46 Masterpiece)...")
+    logger.info("🔥 爬蟲程式開始執行 (V47 Final Polish)...")
     connector = aiohttp.TCPConnector(ssl=False)
     async with aiohttp.ClientSession(connector=connector) as session:
         tasks = [
