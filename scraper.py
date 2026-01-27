@@ -2,8 +2,6 @@
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-import asyncio
-import aiohttp
 import random
 import json
 import re
@@ -39,13 +37,12 @@ USER_AGENTS = [
 ]
 
 # =========================
-# 🧩 雙引擎核心
+# 🧩 網路請求核心
 # =========================
-
-# 1. Requests Engine (適用於舊網站、需要 Session 的網站)
 def create_session():
+    """建立帶有重試與偽裝的 Session"""
     session = requests.Session()
-    retries = Retry(total=3, backoff_factor=2, status_forcelist=[403, 429, 500, 502, 503])
+    retries = Retry(total=3, backoff_factor=1, status_forcelist=[403, 429, 500, 502, 503])
     session.mount("https://", HTTPAdapter(max_retries=retries))
     
     session.headers.update({
@@ -53,41 +50,36 @@ def create_session():
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
         'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
         'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
     })
     return session
 
-def fetch_text_requests(session, url, encoding=None):
+def fetch_text(session, url, referer=None, encoding=None):
     try:
-        time.sleep(random.uniform(2, 4)) # 增加延遲
+        # 隨機延遲
+        time.sleep(random.uniform(1.5, 3))
+        
+        if referer:
+            session.headers.update({'Referer': referer})
+        else:
+            # 移除舊的 Referer 以免誤用
+            session.headers.pop('Referer', None)
+
         resp = session.get(url, timeout=30, verify=False)
         resp.raise_for_status()
+        
         if encoding:
             resp.encoding = encoding
         elif 'charset' not in resp.headers.get('content-type', '').lower():
             resp.encoding = resp.apparent_encoding
+            
         return resp.text
     except Exception as e:
-        logger.error(f"💥 Requests 失敗: {url} - {e}")
-        return None
-
-# 2. Aiohttp Engine (適用於 V45 成功的平台：iNDIEVOX, StrollTimes)
-async def fetch_text_aiohttp(url):
-    headers = {
-        'User-Agent': random.choice(USER_AGENTS),
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, ssl=False, timeout=30) as resp:
-                if resp.status != 200: return None
-                return await resp.text()
-    except Exception as e:
-        logger.error(f"💥 Aiohttp 失敗: {url} - {e}")
+        logger.error(f"💥 請求失敗: {url} - {e}")
         return None
 
 # =========================
@@ -107,6 +99,20 @@ def safe_get_text(element):
     if element: return element.get_text(strip=True)
     return ""
 
+def extract_smart_title(link_tag):
+    """[V58] 補回遺失的關鍵函式"""
+    title = link_tag.get('title')
+    if not title:
+        header = link_tag.find(['h3', 'h4', 'h5', 'h6', 'span', 'div'], class_=re.compile(r'(title|name|subject|header|caption)', re.I))
+        if header: title = header.get_text(strip=True)
+    if not title:
+        img = link_tag.find('img')
+        if img: title = img.get('alt') or img.get('title')
+    if not title:
+        text = link_tag.get_text(" ", strip=True)
+        if text: title = text
+    return title
+
 def create_event_obj(title, url, platform, img_url=None, type_override=None):
     if not title: return None
 
@@ -115,7 +121,7 @@ def create_event_obj(title, url, platform, img_url=None, type_override=None):
         'More', 'None', '活動介紹', 'Traffic', '更多詳情', '其他活動', '開放時間', '交通資訊', 
         '當前頁面', 'Current Page', 'Go to page', '看更多', '查看全部', 'FamiTicket全網購票網', '首頁',
         '找活動', '下一頁', '廣告版位出租', '隱私權政策', '較舊的文章', '詳細介紹', '回首頁', '網站導覽',
-        '兩側門廳', '中央通廊', '服務台', '堂景介紹', '租借', '全票', '優待票', '建立活動', 'Facebook'
+        '兩側門廳', '中央通廊', '服務台', '堂景介紹', '租借', '全票', '優待票', '建立活動', 'Facebook', 'Instagram'
     ]
     
     if title.strip() in noise_keywords: return None
@@ -157,16 +163,16 @@ def get_event_category_from_title(title):
     return "其他"
 
 # =========================
-# 🕷️ 平台爬蟲
+# 🕷️ 平台爬蟲 (V58: 整合修復)
 # =========================
 
 def fetch_kktix(session):
-    logger.info("🚀 啟動 KKTIX (Requests Session)...")
+    logger.info("🚀 啟動 KKTIX...")
     urls = [f"https://kktix.com/events?category_id={i}" for i in [2,6,4,3,8]] + ["https://kktix.com/"]
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text_requests(session, url)
+        html = fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="/events/"], .event-item a, .event-card a')
@@ -188,7 +194,7 @@ def fetch_accupass(session):
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text_requests(session, url)
+        html = fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         candidates = soup.find_all('a', href=re.compile(r'^/event/([A-Za-z0-9]+)'))
@@ -209,7 +215,7 @@ def fetch_tixcraft(session):
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text_requests(session, url)
+        html = fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="/activity/detail/"]')
@@ -228,7 +234,7 @@ def fetch_kham(session):
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text_requests(session, url)
+        html = fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="UTK0201_"]') 
@@ -245,7 +251,7 @@ def fetch_kham(session):
 
 def fetch_opentix(session):
     logger.info("🚀 啟動 OPENTIX...")
-    html = fetch_text_requests(session, "https://www.opentix.life/event")
+    html = fetch_text(session, "https://www.opentix.life/event")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="/event/"]')
@@ -268,7 +274,7 @@ def fetch_udn(session):
     events = []
     seen = set()
     for url in urls:
-        html = fetch_text_requests(session, url)
+        html = fetch_text(session, url)
         if not html: continue
         soup = BeautifulSoup(html, "html.parser")
         links = soup.select('a[href*="UTK0201_"]')
@@ -285,7 +291,7 @@ def fetch_udn(session):
 
 def fetch_fami(session):
     logger.info("🚀 啟動 FamiTicket...")
-    html = fetch_text_requests(session, "https://www.famiticket.com.tw/Home/Activity/Search/242")
+    html = fetch_text(session, "https://www.famiticket.com.tw/Home/Activity/Search/242")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.find_all('a', href=re.compile(r'Activity', re.I))
@@ -295,7 +301,7 @@ def fetch_fami(session):
         href = link.get('href')
         full_url = urljoin("https://www.famiticket.com.tw", link.get('href'))
         if full_url in seen: continue
-        if "Info" not in full_url and "Search" not in full_url: continue # [V57] 排除列表頁
+        if "Info" not in full_url and "Search" not in full_url: continue
         title = safe_get_text(link)
         ev = create_event_obj(title, full_url, "FamiTicket", None)
         if ev: events.append(ev); seen.add(full_url)
@@ -304,7 +310,7 @@ def fetch_fami(session):
 
 def fetch_era(session):
     logger.info("🚀 啟動 年代 (Big5)...")
-    html = fetch_text_requests(session, "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77", encoding='big5')
+    html = fetch_text(session, "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77", encoding='big5')
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="UTK0201_"]')
@@ -323,7 +329,7 @@ def fetch_era(session):
 
 def fetch_tixfun(session):
     logger.info("🚀 啟動 TixFun...")
-    html = fetch_text_requests(session, "https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77")
+    html = fetch_text(session, "https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="UTK0201_"]')
@@ -342,7 +348,7 @@ def fetch_tixfun(session):
 
 def fetch_eventgo(session):
     logger.info("🚀 啟動 Event Go...")
-    html = fetch_text_requests(session, "https://eventgo.bnextmedia.com.tw/")
+    html = fetch_text(session, "https://eventgo.bnextmedia.com.tw/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="/event/detail"]')
@@ -360,7 +366,7 @@ def fetch_eventgo(session):
 
 def fetch_beclass(session):
     logger.info("🚀 啟動 BeClass...")
-    html = fetch_text_requests(session, "https://www.beclass.com/default.php?name=ShowList&op=recent")
+    html = fetch_text(session, "https://www.beclass.com/default.php?name=ShowList&op=recent")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select("a[href*='rid=']")
@@ -375,10 +381,9 @@ def fetch_beclass(session):
     logger.info(f"[BeClass] 抓取 {len(events)} 筆")
     return events
 
-# [V57] 使用 Aiohttp (V45 Logic)
-async def fetch_indievox_aio():
-    logger.info("🚀 啟動 iNDIEVOX (Aiohttp V45 Logic)...")
-    html = await fetch_text_aiohttp("https://www.indievox.com/activity/list")
+def fetch_indievox(session):
+    logger.info("🚀 啟動 iNDIEVOX...")
+    html = fetch_text(session, "https://www.indievox.com/activity/list")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="/activity/detail"]')
@@ -387,7 +392,7 @@ async def fetch_indievox_aio():
     for link in links:
         full_url = urljoin("https://www.indievox.com", link.get('href'))
         if full_url in seen: continue
-        title = link.get('title') or safe_get_text(link.find('h5'))
+        title = extract_smart_title(link)
         img = link.find('img')
         ev = create_event_obj(title, full_url, "iNDIEVOX", img.get('src') if img else None, type_override="音樂會/演唱會")
         if ev: events.append(ev); seen.add(full_url)
@@ -395,8 +400,8 @@ async def fetch_indievox_aio():
     return events
 
 def fetch_ibon(session):
-    logger.info("🚀 啟動 ibon (Requests)...")
-    html = fetch_text_requests(session, "https://ticket.ibon.com.tw/Activity/Index")
+    logger.info("🚀 啟動 ibon...")
+    html = fetch_text(session, "https://ticket.ibon.com.tw/Activity/Index")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     all_links = soup.find_all('a', href=True)
@@ -416,7 +421,7 @@ def fetch_ibon(session):
 
 def fetch_huashan(session):
     logger.info("🚀 啟動 華山...")
-    html = fetch_text_requests(session, "https://www.huashan1914.com/w/huashan1914/exhibition")
+    html = fetch_text(session, "https://www.huashan1914.com/w/huashan1914/exhibition")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select("a[href*='exhibition_']")
@@ -433,7 +438,7 @@ def fetch_huashan(session):
 
 def fetch_songshan(session):
     logger.info("🚀 啟動 松山...")
-    html = fetch_text_requests(session, "https://www.songshanculturalpark.org/exhibition")
+    html = fetch_text(session, "https://www.songshanculturalpark.org/exhibition")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.find_all('a', href=re.compile(r'/exhibition/'))
@@ -449,26 +454,21 @@ def fetch_songshan(session):
     logger.info(f"[松山] 抓取 {len(events)} 筆")
     return events
 
-# [V57] 使用 Aiohttp (V45 Logic)
-async def fetch_stroll_aio():
-    logger.info("🚀 啟動 StrollTimes (Aiohttp V45 Logic)...")
-    html = await fetch_text_aiohttp("https://strolltimes.com/")
+def fetch_stroll(session):
+    logger.info("🚀 啟動 StrollTimes (V52 Logic)...")
+    # [V58] 復刻 V52 的 Referer 與選擇器
+    html = fetch_text(session, "https://strolltimes.com/", referer="https://www.google.com/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
-    all_links = soup.find_all('a', href=True)
+    links = soup.select('h3.post-title a')
     events = []
     seen = set()
-    for link in all_links:
+    for link in links:
         href = link.get('href')
-        if not href or len(href) < 15: continue
-        if any(x in href for x in ['category', 'tag', 'contact', 'about', 'facebook']): continue
-        
+        if not href: continue
         full_url = href
         if full_url in seen: continue
-        
         title = extract_smart_title(link)
-        if not title or len(title) < 8: continue
-        
         ev = create_event_obj(title, full_url, "StrollTimes", None)
         if ev: events.append(ev); seen.add(full_url)
     logger.info(f"[StrollTimes] 抓取 {len(events)} 筆")
@@ -476,7 +476,7 @@ async def fetch_stroll_aio():
 
 def fetch_kidsclub(session):
     logger.info("🚀 啟動 KidsClub...")
-    html = fetch_text_requests(session, "https://www.kidsclub.com.tw/")
+    html = fetch_text(session, "https://www.kidsclub.com.tw/")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select("a[href*='/product/'], a[href*='/courses/']")
@@ -484,9 +484,8 @@ def fetch_kidsclub(session):
     seen = set()
     for link in links:
         href = link.get('href')
-        # [V57] 排除 category
+        # [V58] 排除 category
         if not href or "product-category" in href or "tag" in href: continue
-        
         full_url = urljoin("https://www.kidsclub.com.tw", href)
         if full_url in seen: continue
         title = link.get('title') or safe_get_text(link)
@@ -499,7 +498,7 @@ def fetch_kidsclub(session):
 def fetch_wtc(session):
     logger.info("🚀 啟動 台北世貿...")
     url = "https://www.twtc.com.tw/exhibition?p=home"
-    html = fetch_text_requests(session, url)
+    html = fetch_text(session, url)
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     base_url = "https://www.twtc.com.tw/"
@@ -512,7 +511,6 @@ def fetch_wtc(session):
         href = link['href']
         raw_title = link.get_text(strip=True)
         if not raw_title or len(raw_title) < 5: continue
-        
         full_url = urljoin(base_url, href)
         if full_url in seen: continue
         ev = create_event_obj(raw_title, full_url, "台北世貿", None)
@@ -522,7 +520,7 @@ def fetch_wtc(session):
 
 def fetch_cksmh(session):
     logger.info("🚀 啟動 中正紀念堂...")
-    html = fetch_text_requests(session, "https://www.cksmh.gov.tw/activitybee_list.aspx?n=105")
+    html = fetch_text(session, "https://www.cksmh.gov.tw/activitybee_list.aspx?n=105")
     if not html: return []
     soup = BeautifulSoup(html, "html.parser")
     links = soup.select('a[href*="activitybee_"]')
@@ -540,7 +538,7 @@ def fetch_cksmh(session):
     return events
 
 # =========================
-# 💾 存檔與執行
+# 💾 存檔與執行 (覆蓋模式)
 # =========================
 def send_line_notify(message):
     if not LINE_TOKEN: return
@@ -568,47 +566,37 @@ def save_data_and_notify(new_events):
             msg += f"\n...還有 {len(new_events)-5} 筆，請上網頁查看！"
         send_line_notify(msg)
 
-async def main_async():
-    logger.info("🔥 爬蟲程式開始執行 (V57 Hybrid Tactics)...")
-    
-    # 1. 執行同步任務 (Requests)
+def main():
+    logger.info("🔥 爬蟲程式開始執行 (V58 Stability Fix)...")
     session = create_session()
-    sync_events = []
+    all_new_events = []
     try:
-        sync_events.extend(fetch_kktix(session))
-        sync_events.extend(fetch_accupass(session))
-        sync_events.extend(fetch_tixcraft(session))
-        sync_events.extend(fetch_kham(session))
-        sync_events.extend(fetch_opentix(session))
-        sync_events.extend(fetch_udn(session))
-        sync_events.extend(fetch_fami(session))
-        sync_events.extend(fetch_era(session))
-        sync_events.extend(fetch_tixfun(session))
-        sync_events.extend(fetch_eventgo(session))
-        sync_events.extend(fetch_beclass(session))
-        sync_events.extend(fetch_ibon(session))
-        sync_events.extend(fetch_huashan(session))
-        sync_events.extend(fetch_songshan(session))
-        sync_events.extend(fetch_kidsclub(session))
-        sync_events.extend(fetch_wtc(session))
-        sync_events.extend(fetch_cksmh(session))
+        all_new_events.extend(fetch_kktix(session))
+        all_new_events.extend(fetch_accupass(session))
+        all_new_events.extend(fetch_tixcraft(session))
+        all_new_events.extend(fetch_kham(session))
+        all_new_events.extend(fetch_opentix(session))
+        all_new_events.extend(fetch_udn(session))
+        all_new_events.extend(fetch_fami(session))
+        all_new_events.extend(fetch_era(session))
+        all_new_events.extend(fetch_tixfun(session))
+        all_new_events.extend(fetch_eventgo(session))
+        all_new_events.extend(fetch_beclass(session))
+        all_new_events.extend(fetch_indievox(session))
+        all_new_events.extend(fetch_ibon(session))
+        all_new_events.extend(fetch_huashan(session))
+        all_new_events.extend(fetch_songshan(session))
+        all_new_events.extend(fetch_stroll(session))
+        all_new_events.extend(fetch_kidsclub(session))
+        all_new_events.extend(fetch_wtc(session))
+        all_new_events.extend(fetch_cksmh(session))
     except Exception as e:
-        logger.error(f"❌ 同步任務錯誤: {e}")
+        logger.error(f"❌ 主程式執行錯誤: {e}")
     finally:
         session.close()
 
-    # 2. 執行非同步任務 (Aiohttp)
-    async_events = []
-    try:
-        async_events.extend(await fetch_indievox_aio())
-        async_events.extend(await fetch_stroll_aio())
-    except Exception as e:
-        logger.error(f"❌ 非同步任務錯誤: {e}")
-
-    # 合併
-    all_events = sync_events + async_events
-    logger.info(f"🔍 本輪爬取匯總: 共抓取到 {len(all_events)} 筆有效資料")
-    save_data_and_notify(all_events)
+    logger.info(f"🔍 本輪爬取匯總: 共抓取到 {len(all_new_events)} 筆有效資料")
+    save_data_and_notify(all_new_events)
 
 if __name__ == "__main__":
-    asyncio.run(main_async())
+    main()
