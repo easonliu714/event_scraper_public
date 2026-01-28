@@ -1,8 +1,9 @@
 name: Event Scraper Cron
 
 on:
-  push:  # <---【新增】每次推送程式碼時觸發
-  schedule:
+  #[修改］僅保留手動推送更新，完全由手機端Termux推送data.json更新網頁
+  #push:  # <---【新增】每次推送程式碼時觸發
+  #schedule:
     # 每 2 小時執行一次 (UTC 時間，對應台灣時間約偶數點)
     - cron: '15 */2 * * *'
   workflow_dispatch: # 允許手動按按鈕觸發
