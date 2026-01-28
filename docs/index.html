@@ -114,10 +114,26 @@
 <div class="modal-overlay" id="detail-modal" onclick="closeModal()">
     <div class="modal" onclick="event.stopPropagation()">
         <img id="m-img" style="width:100%; max-height:250px; object-fit:cover; border-radius:12px; margin-bottom:16px; display:none;">
-        <h2 id="m-title" style="margin-bottom:10px;"></h2>
-        <p id="m-platform" style="color:#60a5fa; margin-bottom:5px;"></p>
-        <p id="m-category" style="color:#ccc; font-size:0.9rem; margin-bottom:15px;"></p>
-        <a id="m-link" href="#" target="_blank" style="display:block; padding:12px; background:#3b82f6; color:#fff; text-align:center; border-radius:8px; text-decoration:none;">前往官網</a>
+        
+        <div style="margin-bottom:8px;">
+            <span id="m-platform" class="badge" style="background:#333; color:#60a5fa; padding:4px 8px; border-radius:4px; font-size:0.8rem;"></span>
+            <span id="m-type" class="badge" style="background:#333; color:#ccc; padding:4px 8px; border-radius:4px; font-size:0.8rem;"></span>
+        </div>
+
+        <h2 id="m-title" style="margin-bottom:15px; line-height: 1.4;"></h2>
+        
+        <div style="background: #2a2a2a; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.95rem;">
+            <div style="margin-bottom: 6px;">📅 <b>日期：</b><span id="m-date" style="color:#ddd"></span></div>
+            <div style="margin-bottom: 6px;">📍 <b>地點：</b><span id="m-location" style="color:#ddd"></span></div>
+            <div>💰 <b>票價：</b><span id="m-price" style="color:#ddd"></span></div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h4 style="margin: 0 0 8px 0; color: #888; font-size: 0.9rem;">📝 活動簡介</h4>
+            <p id="m-desc" style="color: #ccc; font-size: 0.95rem; line-height: 1.6; white-space: pre-line; max-height: 300px; overflow-y: auto;"></p>
+        </div>
+
+        <a id="m-link" href="#" target="_blank" style="display:block; padding:12px; background:#3b82f6; color:#fff; text-align:center; border-radius:8px; text-decoration:none; font-weight:bold;">前往官網查看詳情</a>
     </div>
 </div>
 
@@ -275,16 +291,41 @@
 
     function changePage(delta) { currentPage += delta; renderList(); renderPagination(); window.scrollTo(0, 0); }
 
+    // [修改] 更新後的 openDetail 函式，支援顯示詳細資料
     function openDetail(url) {
         const ev = allEvents.find(e => e.url === url);
         if(!ev) return;
-        if(!readEvents.includes(url)) { readEvents.push(url); localStorage.setItem('readEvents', JSON.stringify(readEvents)); updateStatusCounts(); }
+        
+        if(!readEvents.includes(url)) { 
+            readEvents.push(url); 
+            localStorage.setItem('readEvents', JSON.stringify(readEvents)); 
+            updateStatusCounts(); 
+        }
+
+        // 填入標題與平台資訊
         document.getElementById('m-title').textContent = ev.title;
         document.getElementById('m-platform').textContent = ev.platform;
-        document.getElementById('m-category').textContent = ev.type;
+        document.getElementById('m-type').textContent = ev.type; // 對應新的 id="m-type"
         document.getElementById('m-link').href = ev.url;
+        
+        // [新增] 填入詳細資料 (若資料為空則顯示預設值)
+        document.getElementById('m-date').textContent = ev.date || '詳內文';
+        document.getElementById('m-location').textContent = ev.location || '詳內文';
+        document.getElementById('m-price').textContent = ev.price || '詳內文';
+        
+        // 處理簡介：若無簡介則顯示提示
+        const desc = ev.description ? ev.description : '暫無詳細簡介，請點擊下方按鈕前往官網查看。';
+        document.getElementById('m-desc').textContent = desc;
+
+        // 處理圖片
         const img = document.getElementById('m-img');
-        if(ev.img_url) { img.src = ev.img_url; img.style.display = 'block'; } else { img.style.display = 'none'; }
+        if(ev.img_url) { 
+            img.src = ev.img_url; 
+            img.style.display = 'block'; 
+        } else { 
+            img.style.display = 'none'; 
+        }
+
         document.getElementById('detail-modal').classList.add('open');
         renderList();
     }
