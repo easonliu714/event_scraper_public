@@ -39,7 +39,11 @@
         .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .chip.active span { opacity: 1; color: #fff; }
         
-        .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; }
+        /* [修改] list-header 樣式微調，適應多行內容 */
+        .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; }
+        .list-info-row { display: flex; justify-content: space-between; align-items: center; }
+        /* [新增] 免責聲明樣式 */
+        .disclaimer { font-size: 0.75rem; color: #666; margin-top: 6px; padding-top: 6px; border-top: 1px solid #333; text-align: right; }
         
         #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 300px; }
         .card { background: var(--card); border-radius: 12px; padding: 12px; display: flex; gap: 12px; border: 1px solid #333; }
@@ -99,8 +103,11 @@
 </div>
 
 <div class="list-header">
-    <span id="result-count">顯示 0 筆活動</span>
-    <span id="update-time" style="font-size:0.8em">更新於: ...</span>
+    <div class="list-info-row">
+        <span id="result-count">顯示 0 筆活動</span>
+        <span id="update-time" style="font-size:0.8em">更新於: ...</span>
+    </div>
+    <div class="disclaimer">⚠️ 活動列表僅供參考，活動內容以各平台資訊為準。</div>
 </div>
 
 <div id="event-list"></div>
@@ -148,6 +155,9 @@
             </button>
             <p id="notify-status" style="font-size:0.8rem; color:#888; margin-top:8px; text-align:center;">
                 狀態: 未知
+            </p>
+            <p style="font-size:0.75rem; color:#666; margin-top:4px; line-height:1.4;">
+                ⚠️ PWA 限制：網頁必須在開啟狀態下(或下拉刷新時)才能觸發通知。若需要背景推送，請確認 Termux 背景執行狀態。
             </p>
         </div>
 
@@ -198,12 +208,38 @@
             allEvents = await res.json();
             allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
             
+            // [修改] 增加通知觸發邏輯
+            const latestTime = allEvents[0]?.scraped_at;
+            const lastKnownTime = localStorage.getItem('lastDataTime');
+            
+            // 如果資料有更新 (或者第一次載入)
+            if (latestTime && latestTime !== lastKnownTime) {
+                localStorage.setItem('lastDataTime', latestTime);
+                checkAndNotifyNewFavs();
+            }
+
             document.getElementById('update-time').textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
             renderChips();
             applyFilters();
         } catch(e) {
             console.error(e);
             document.getElementById('event-list').innerHTML = '<div style="text-align:center; padding:40px;">❌ 資料載入失敗</div>';
+        }
+    }
+
+    // [新增] 檢查並發送通知
+    function checkAndNotifyNewFavs() {
+        if (Notification.permission !== "granted") return;
+        
+        // 找出：是新活動 (未讀) 且 符合關注關鍵字 的項目
+        const newFavs = allEvents.filter(e => !readEvents.includes(e.url) && checkIsFav(e.title));
+        
+        if (newFavs.length > 0) {
+            new Notification("📡 活動雷達：發現關注活動！", {
+                body: `發現 ${newFavs.length} 筆新的關注活動（${newFavs[0].title}...），點擊查看！`,
+                icon: 'icons/icon-192.png', // 確保 manifest 有這個路徑，沒有也沒關係
+                tag: 'fav-event-alert'
+            });
         }
     }
 
@@ -217,7 +253,6 @@
         renderList();
     }
 
-    // 檢查關鍵字邏輯 (已修正為不區分大小寫)
     function checkIsFav(title) {
         if (!title) return false;
         const t = title.toLowerCase();
@@ -236,7 +271,6 @@
 
     function updateStatusCounts() {
         const newCount = allEvents.filter(e => !readEvents.includes(e.url)).length;
-        // [修正] 使用 checkIsFav (不區分大小寫)
         const favCount = allEvents.filter(e => checkIsFav(e.title)).length;
         
         const isNewActive = filters.status.has('isNew') ? 'active' : '';
@@ -259,7 +293,6 @@
     function applyFilters() {
         const query = document.getElementById('search').value.toLowerCase();
         filteredEvents = allEvents.filter(e => {
-            // [修正] 使用 checkIsFav (不區分大小寫)
             const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
             
@@ -281,7 +314,6 @@
         const list = document.getElementById('event-list');
         if(pageData.length === 0) { list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>'; return; }
         list.innerHTML = pageData.map(e => {
-            // [修正] 使用 checkIsFav (不區分大小寫)
             const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
             return `<div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
