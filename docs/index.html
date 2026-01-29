@@ -217,6 +217,13 @@
         renderList();
     }
 
+    // 檢查關鍵字邏輯 (已修正為不區分大小寫)
+    function checkIsFav(title) {
+        if (!title) return false;
+        const t = title.toLowerCase();
+        return myKeywords.some(k => t.includes(k.toLowerCase()));
+    }
+
     function renderChips() {
         const pStats = {}; allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
         document.getElementById('platform-chips').innerHTML = Object.entries(pStats).sort((a,b) => b[1]-a[1]).map(([k,v]) => `<div class="chip" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`).join('');
@@ -229,7 +236,9 @@
 
     function updateStatusCounts() {
         const newCount = allEvents.filter(e => !readEvents.includes(e.url)).length;
-        const favCount = allEvents.filter(e => myKeywords.some(k => e.title.includes(k))).length;
+        // [修正] 使用 checkIsFav (不區分大小寫)
+        const favCount = allEvents.filter(e => checkIsFav(e.title)).length;
+        
         const isNewActive = filters.status.has('isNew') ? 'active' : '';
         const isFavActive = filters.status.has('isFav') ? 'active' : '';
         document.getElementById('status-chips').innerHTML = `
@@ -250,8 +259,10 @@
     function applyFilters() {
         const query = document.getElementById('search').value.toLowerCase();
         filteredEvents = allEvents.filter(e => {
-            const isFav = myKeywords.some(k => e.title.includes(k));
+            // [修正] 使用 checkIsFav (不區分大小寫)
+            const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
+            
             if (query && !e.title.toLowerCase().includes(query)) return false;
             if (filters.platforms.size > 0 && !filters.platforms.has(e.platform)) return false;
             if (filters.types.size > 0 && !filters.types.has(e.type)) return false;
@@ -270,14 +281,15 @@
         const list = document.getElementById('event-list');
         if(pageData.length === 0) { list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>'; return; }
         list.innerHTML = pageData.map(e => {
-            const isFav = myKeywords.some(k => e.title.includes(k));
+            // [修正] 使用 checkIsFav (不區分大小寫)
+            const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
             return `<div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
                     ${e.img_url ? `<img src="${e.img_url}" class="card-img" loading="lazy">` : ''}
                     <div class="card-info">
                         <div class="badges"><span class="badge" style="color:#60a5fa">${e.platform}</span>${isNew ? '<span class="badge new">NEW</span>' : ''}${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}<span class="badge">${e.type}</span></div>
                         <div style="font-weight:500; font-size:1rem;">${e.title}</div>
-                        <div style="font-size:0.8rem; color:#888;">${e.date}</div>
+                        <div style="font-size:0.8rem; color:#888;">${e.date || '詳內文'}</div>
                     </div></div>`;
         }).join('');
     }
@@ -291,7 +303,6 @@
 
     function changePage(delta) { currentPage += delta; renderList(); renderPagination(); window.scrollTo(0, 0); }
 
-    // [修改] 更新後的 openDetail 函式，支援顯示詳細資料
     function openDetail(url) {
         const ev = allEvents.find(e => e.url === url);
         if(!ev) return;
@@ -302,22 +313,18 @@
             updateStatusCounts(); 
         }
 
-        // 填入標題與平台資訊
         document.getElementById('m-title').textContent = ev.title;
         document.getElementById('m-platform').textContent = ev.platform;
-        document.getElementById('m-type').textContent = ev.type; // 對應新的 id="m-type"
+        document.getElementById('m-type').textContent = ev.type;
         document.getElementById('m-link').href = ev.url;
         
-        // [新增] 填入詳細資料 (若資料為空則顯示預設值)
         document.getElementById('m-date').textContent = ev.date || '詳內文';
         document.getElementById('m-location').textContent = ev.location || '詳內文';
         document.getElementById('m-price').textContent = ev.price || '詳內文';
         
-        // 處理簡介：若無簡介則顯示提示
         const desc = ev.description ? ev.description : '暫無詳細簡介，請點擊下方按鈕前往官網查看。';
         document.getElementById('m-desc').textContent = desc;
 
-        // 處理圖片
         const img = document.getElementById('m-img');
         if(ev.img_url) { 
             img.src = ev.img_url; 
