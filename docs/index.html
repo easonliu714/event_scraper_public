@@ -39,10 +39,8 @@
         .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .chip.active span { opacity: 1; color: #fff; }
         
-        /* [修改] list-header 樣式微調，適應多行內容 */
         .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; }
         .list-info-row { display: flex; justify-content: space-between; align-items: center; }
-        /* [新增] 免責聲明樣式 */
         .disclaimer { font-size: 0.75rem; color: #666; margin-top: 6px; padding-top: 6px; border-top: 1px solid #333; text-align: right; }
         
         #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 300px; }
@@ -92,6 +90,18 @@
         <div class="block-title">🏛️ 平台篩選</div>
         <div id="platform-chips" class="chips"></div>
     </div>
+    
+    <div class="filter-block">
+        <div class="block-title">📍 地區篩選 (含聯集，未定區域自動保留)</div>
+        <div id="region-chips" class="chips">
+            <div class="chip" onclick="toggleFilter('regions', 'north', this)">北區</div>
+            <div class="chip" onclick="toggleFilter('regions', 'central', this)">中區</div>
+            <div class="chip" onclick="toggleFilter('regions', 'south', this)">南區</div>
+            <div class="chip" onclick="toggleFilter('regions', 'east', this)">東區</div>
+            <div class="chip" onclick="toggleFilter('regions', 'islands', this)">離島</div>
+        </div>
+    </div>
+
     <div class="filter-block">
         <div class="block-title">✨ 狀態篩選</div>
         <div class="chips" id="status-chips"></div>
@@ -157,7 +167,7 @@
                 狀態: 未知
             </p>
             <p style="font-size:0.75rem; color:#666; margin-top:4px; line-height:1.4;">
-                ⚠️ PWA 限制：網頁必須在開啟狀態下(或下拉刷新時)才能觸發通知。若需要背景推送，請確認 Termux 背景執行狀態。
+                ⚠️ PWA 限制：網頁必須在開啟狀態下(或下拉刷新時)才能觸發通知。
             </p>
         </div>
 
@@ -175,11 +185,21 @@
     let currentPage = 1;
     const PAGE_SIZE = 50;
     
-    const filters = { platforms: new Set(), status: new Set(), types: new Set() };
+    // [修改] 增加 regions 篩選器
+    const filters = { platforms: new Set(), status: new Set(), types: new Set(), regions: new Set() };
     let myKeywords = JSON.parse(localStorage.getItem('myKeywords') || '[]');
     let readEvents = JSON.parse(localStorage.getItem('readEvents') || '[]');
 
-    // 下拉更新邏輯
+    // 地區定義
+    const regionMap = {
+        'north': ['台北', '新北', '基隆', '桃園', '新竹', '宜蘭'],
+        'central': ['苗栗', '台中', '彰化', '南投', '雲林'],
+        'south': ['嘉義', '台南', '高雄', '屏東'],
+        'east': ['花蓮', '台東'],
+        'islands': ['澎湖', '金門', '馬祖']
+    };
+
+    // 下拉更新邏輯 (保持不變)
     let touchStartY = 0;
     const ptrEl = document.getElementById('pull-to-refresh');
     const ptrIcon = document.getElementById('ptr-icon');
@@ -204,17 +224,16 @@
     async function init() {
         checkNotifyStatus();
         
-        // 設定重試次數與延遲
+        // 重試機制 (解決 CDN 延遲)
         const maxRetries = 3;
         let attempt = 0;
         let success = false;
 
         while (attempt < maxRetries && !success) {
             try {
-                // [修改 1] 加入時間戳記 + 強制不快取標頭
                 const timestamp = Date.now();
                 const res = await fetch(`data.json?t=${timestamp}`, {
-                    cache: 'no-store', // 關鍵：告訴瀏覽器不要使用快取
+                    cache: 'no-store',
                     headers: {
                         'Cache-Control': 'no-cache, no-store, must-revalidate',
                         'Pragma': 'no-cache',
@@ -227,7 +246,6 @@
                 allEvents = await res.json();
                 allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
                 
-                // [原本的通知邏輯]
                 const latestTime = allEvents[0]?.scraped_at;
                 const lastKnownTime = localStorage.getItem('lastDataTime');
                 if (latestTime && latestTime !== lastKnownTime) {
@@ -237,44 +255,35 @@
 
                 document.getElementById('update-time').textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
                 
-                // [修改 2] 成功載入後，清除錯誤訊息並顯示列表
                 document.getElementById('event-list').innerHTML = ''; 
                 renderChips();
                 applyFilters();
-                success = true; // 標記成功，跳出迴圈
+                success = true;
 
             } catch(e) {
                 console.error(`Attempt ${attempt + 1} failed:`, e);
                 attempt++;
-                
-                // 如果還有重試機會，等待 1 秒後再試
                 if (attempt < maxRetries) {
                     await new Promise(r => setTimeout(r, 1000));
                 } else {
-                    // 真的失敗了才顯示錯誤畫面
                     document.getElementById('event-list').innerHTML = `
                         <div style="text-align:center; padding:40px; color:#ff6b6b;">
                             <div style="font-size:3rem; margin-bottom:10px;">📡</div>
                             <div>連線不穩或資料更新中</div>
                             <div style="font-size:0.8rem; opacity:0.7; margin-top:5px;">請嘗試下拉頁面重新整理</div>
-                            <div style="font-size:0.7rem; color:#666; margin-top:10px;">錯誤: ${e.message}</div>
                         </div>`;
                 }
             }
         }
     }
 
-    // [新增] 檢查並發送通知
     function checkAndNotifyNewFavs() {
         if (Notification.permission !== "granted") return;
-        
-        // 找出：是新活動 (未讀) 且 符合關注關鍵字 的項目
         const newFavs = allEvents.filter(e => !readEvents.includes(e.url) && checkIsFav(e.title));
-        
         if (newFavs.length > 0) {
             new Notification("📡 活動雷達：發現關注活動！", {
-                body: `發現 ${newFavs.length} 筆新的關注活動（${newFavs[0].title}...），點擊查看！`,
-                icon: 'icons/icon-192.png', // 確保 manifest 有這個路徑，沒有也沒關係
+                body: `發現 ${newFavs.length} 筆新的關注活動，點擊查看！`,
+                icon: 'icons/icon-192.png',
                 tag: 'fav-event-alert'
             });
         }
@@ -327,17 +336,47 @@
 
     function resetPageAndRender() { currentPage = 1; applyFilters(); }
 
+    // [修改] 輔助函式：判斷活動地區
+    function getEventRegion(location) {
+        if (!location || location.includes('詳內文')) return 'unknown';
+        for (const [key, keywords] of Object.entries(regionMap)) {
+            if (keywords.some(k => location.includes(k))) return key;
+        }
+        return 'unknown';
+    }
+
     function applyFilters() {
         const query = document.getElementById('search').value.toLowerCase();
         filteredEvents = allEvents.filter(e => {
             const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
             
+            // 關鍵字搜尋
             if (query && !e.title.toLowerCase().includes(query)) return false;
+            
+            // 平台篩選
             if (filters.platforms.size > 0 && !filters.platforms.has(e.platform)) return false;
+            
+            // 類別篩選
             if (filters.types.size > 0 && !filters.types.has(e.type)) return false;
+            
+            // 狀態篩選
             if (filters.status.has('isNew') && !isNew) return false;
             if (filters.status.has('isFav') && !isFav) return false;
+
+            // [新增] 地區篩選邏輯
+            if (filters.regions.size > 0) {
+                const eventRegion = getEventRegion(e.location);
+                // 邏輯：
+                // 1. 如果活動地區是 unknown，則保留 (顯示)
+                // 2. 如果活動地區是 known，則必須包含在用戶選擇的篩選器中
+                // 也就是：保留 (是 unknown) OR (是 selected)
+                const isSelected = filters.regions.has(eventRegion);
+                const isUnknown = eventRegion === 'unknown';
+                
+                if (!isUnknown && !isSelected) return false;
+            }
+
             return true;
         });
         document.getElementById('result-count').textContent = `顯示 ${filteredEvents.length} 筆活動 (共 ${allEvents.length} 筆)`;
@@ -358,7 +397,7 @@
                     <div class="card-info">
                         <div class="badges"><span class="badge" style="color:#60a5fa">${e.platform}</span>${isNew ? '<span class="badge new">NEW</span>' : ''}${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}<span class="badge">${e.type}</span></div>
                         <div style="font-weight:500; font-size:1rem;">${e.title}</div>
-                        <div style="font-size:0.8rem; color:#888;">${e.date || '詳內文'}</div>
+                        <div style="font-size:0.8rem; color:#888;">${e.date || '詳內文'} ${e.location ? `| ${e.location}` : ''}</div>
                     </div></div>`;
         }).join('');
     }
