@@ -203,27 +203,64 @@
 
     async function init() {
         checkNotifyStatus();
-        try {
-            const res = await fetch(`data.json?t=${Date.now()}`);
-            allEvents = await res.json();
-            allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
-            
-            // [修改] 增加通知觸發邏輯
-            const latestTime = allEvents[0]?.scraped_at;
-            const lastKnownTime = localStorage.getItem('lastDataTime');
-            
-            // 如果資料有更新 (或者第一次載入)
-            if (latestTime && latestTime !== lastKnownTime) {
-                localStorage.setItem('lastDataTime', latestTime);
-                checkAndNotifyNewFavs();
-            }
+        
+        // 設定重試次數與延遲
+        const maxRetries = 3;
+        let attempt = 0;
+        let success = false;
 
-            document.getElementById('update-time').textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
-            renderChips();
-            applyFilters();
-        } catch(e) {
-            console.error(e);
-            document.getElementById('event-list').innerHTML = '<div style="text-align:center; padding:40px;">❌ 資料載入失敗</div>';
+        while (attempt < maxRetries && !success) {
+            try {
+                // [修改 1] 加入時間戳記 + 強制不快取標頭
+                const timestamp = Date.now();
+                const res = await fetch(`data.json?t=${timestamp}`, {
+                    cache: 'no-store', // 關鍵：告訴瀏覽器不要使用快取
+                    headers: {
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0'
+                    }
+                });
+
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                
+                allEvents = await res.json();
+                allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
+                
+                // [原本的通知邏輯]
+                const latestTime = allEvents[0]?.scraped_at;
+                const lastKnownTime = localStorage.getItem('lastDataTime');
+                if (latestTime && latestTime !== lastKnownTime) {
+                    localStorage.setItem('lastDataTime', latestTime);
+                    checkAndNotifyNewFavs();
+                }
+
+                document.getElementById('update-time').textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
+                
+                // [修改 2] 成功載入後，清除錯誤訊息並顯示列表
+                document.getElementById('event-list').innerHTML = ''; 
+                renderChips();
+                applyFilters();
+                success = true; // 標記成功，跳出迴圈
+
+            } catch(e) {
+                console.error(`Attempt ${attempt + 1} failed:`, e);
+                attempt++;
+                
+                // 如果還有重試機會，等待 1 秒後再試
+                if (attempt < maxRetries) {
+                    await new Promise(r => setTimeout(r, 1000));
+                } else {
+                    // 真的失敗了才顯示錯誤畫面
+                    document.getElementById('event-list').innerHTML = `
+                        <div style="text-align:center; padding:40px; color:#ff6b6b;">
+                            <div style="font-size:3rem; margin-bottom:10px;">📡</div>
+                            <div>連線不穩或資料更新中</div>
+                            <div style="font-size:0.8rem; opacity:0.7; margin-top:5px;">請嘗試下拉頁面重新整理</div>
+                            <div style="font-size:0.7rem; color:#666; margin-top:10px;">錯誤: ${e.message}</div>
+                        </div>`;
+                }
+            }
         }
     }
 
