@@ -190,15 +190,6 @@
     let myKeywords = JSON.parse(localStorage.getItem('myKeywords') || '[]');
     let readEvents = JSON.parse(localStorage.getItem('readEvents') || '[]');
 
-    // 地區定義
-    const regionMap = {
-        'north': ['台北', '新北', '基隆', '桃園', '新竹', '宜蘭'],
-        'central': ['苗栗', '台中', '彰化', '南投', '雲林'],
-        'south': ['嘉義', '台南', '高雄', '屏東'],
-        'east': ['花蓮', '台東'],
-        'islands': ['澎湖', '金門', '馬祖']
-    };
-
     // 下拉更新邏輯 (保持不變)
     let touchStartY = 0;
     const ptrEl = document.getElementById('pull-to-refresh');
@@ -336,17 +327,9 @@
 
     function resetPageAndRender() { currentPage = 1; applyFilters(); }
 
-    // [修改] 輔助函式：判斷活動地區
-    function getEventRegion(location) {
-        if (!location || location.includes('詳內文')) return 'unknown';
-        for (const [key, keywords] of Object.entries(regionMap)) {
-            if (keywords.some(k => location.includes(k))) return key;
-        }
-        return 'unknown';
-    }
-
     function applyFilters() {
         const query = document.getElementById('search').value.toLowerCase();
+        
         filteredEvents = allEvents.filter(e => {
             const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
@@ -364,21 +347,26 @@
             if (filters.status.has('isNew') && !isNew) return false;
             if (filters.status.has('isFav') && !isFav) return false;
 
-            // [新增] 地區篩選邏輯
+            // [修改] 地區篩選邏輯 (配合 V39 後端)
             if (filters.regions.size > 0) {
-                const eventRegion = getEventRegion(e.location);
-                // 邏輯：
-                // 1. 如果活動地區是 unknown，則保留 (顯示)
-                // 2. 如果活動地區是 known，則必須包含在用戶選擇的篩選器中
-                // 也就是：保留 (是 unknown) OR (是 selected)
-                const isSelected = filters.regions.has(eventRegion);
-                const isUnknown = eventRegion === 'unknown';
+                // 後端回傳的是 'North', 'Central'... 轉為小寫以配合 HTML 的 filter key
+                const rawRegion = e.region || 'unknown'; 
+                const region = rawRegion.toLowerCase(); 
                 
-                if (!isUnknown && !isSelected) return false;
+                // 定義已知的區域列表
+                const knownRegions = ['north', 'central', 'south', 'east', 'islands'];
+
+                // 邏輯：
+                // 1. 如果這個活動屬於「已知區域」，則它必須在用戶選擇的篩選器中才顯示。
+                // 2. 如果這個活動是「unknown」(無法判斷)，則永遠保留 (不 return false)。
+                if (knownRegions.includes(region)) {
+                    if (!filters.regions.has(region)) return false;
+                }
             }
 
             return true;
         });
+        
         document.getElementById('result-count').textContent = `顯示 ${filteredEvents.length} 筆活動 (共 ${allEvents.length} 筆)`;
         renderList();
         renderPagination();
