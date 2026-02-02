@@ -93,13 +93,7 @@
     
     <div class="filter-block">
         <div class="block-title">📍 地區篩選 (含聯集，未定區域自動保留)</div>
-        <div id="region-chips" class="chips">
-            <div class="chip" onclick="toggleFilter('regions', 'north', this)">北區</div>
-            <div class="chip" onclick="toggleFilter('regions', 'central', this)">中區</div>
-            <div class="chip" onclick="toggleFilter('regions', 'south', this)">南區</div>
-            <div class="chip" onclick="toggleFilter('regions', 'east', this)">東區</div>
-            <div class="chip" onclick="toggleFilter('regions', 'islands', this)">離島</div>
-        </div>
+        <div id="region-chips" class="chips"></div>
     </div>
 
     <div class="filter-block">
@@ -297,15 +291,55 @@
     }
 
     function renderChips() {
-        const pStats = {}; allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
-        document.getElementById('platform-chips').innerHTML = Object.entries(pStats).sort((a,b) => b[1]-a[1]).map(([k,v]) => `<div class="chip" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`).join('');
+        // 1. 平台篩選 (Platforms)
+        const pStats = {}; 
+        allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
+        document.getElementById('platform-chips').innerHTML = Object.entries(pStats)
+            .sort((a,b) => b[1]-a[1])
+            .map(([k,v]) => {
+                // 增加 isActive 判斷，確保下拉更新後選取狀態不會消失
+                const isActive = filters.platforms.has(k) ? 'active' : '';
+                return `<div class="chip ${isActive}" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`;
+            }).join('');
 
-        const tStats = {}; allEvents.forEach(e => tStats[e.type] = (tStats[e.type]||0)+1);
-        document.getElementById('type-chips').innerHTML = Object.entries(tStats).sort((a,b) => b[1]-a[1]).map(([k,v]) => `<div class="chip" onclick="toggleFilter('types', '${k}', this)">${k} <span>${v}</span></div>`).join('');
+        // 2. 地區篩選 (Regions) - [新增] 動態生成邏輯
+        const regionMap = [
+            { key: 'north', label: '北區' },
+            { key: 'central', label: '中區' },
+            { key: 'south', label: '南區' },
+            { key: 'east', label: '東區' },
+            { key: 'islands', label: '離島' }
+        ];
+        
+        // 計算各地區數量
+        const rStats = { 'north': 0, 'central': 0, 'south': 0, 'east': 0, 'islands': 0 };
+        allEvents.forEach(e => {
+            if (e.region) {
+                const r = e.region.toLowerCase();
+                if (rStats.hasOwnProperty(r)) rStats[r]++;
+            }
+        });
+
+        // 生成 HTML
+        document.getElementById('region-chips').innerHTML = regionMap.map(item => {
+            const count = rStats[item.key] || 0;
+            const isActive = filters.regions.has(item.key) ? 'active' : '';
+            return `<div class="chip ${isActive}" onclick="toggleFilter('regions', '${item.key}', this)">${item.label} <span>${count}</span></div>`;
+        }).join('');
+
+        // 3. 類別篩選 (Types)
+        const tStats = {}; 
+        allEvents.forEach(e => tStats[e.type] = (tStats[e.type]||0)+1);
+        document.getElementById('type-chips').innerHTML = Object.entries(tStats)
+            .sort((a,b) => b[1]-a[1])
+            .map(([k,v]) => {
+                const isActive = filters.types.has(k) ? 'active' : '';
+                return `<div class="chip ${isActive}" onclick="toggleFilter('types', '${k}', this)">${k} <span>${v}</span></div>`;
+            }).join('');
 
         updateStatusCounts();
     }
-
+    
     function updateStatusCounts() {
         const newCount = allEvents.filter(e => !readEvents.includes(e.url)).length;
         const favCount = allEvents.filter(e => checkIsFav(e.title)).length;
