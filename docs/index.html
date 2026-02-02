@@ -376,14 +376,41 @@
         const start = (currentPage - 1) * PAGE_SIZE;
         const pageData = filteredEvents.slice(start, start + PAGE_SIZE);
         const list = document.getElementById('event-list');
-        if(pageData.length === 0) { list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>'; return; }
+        
+        if(pageData.length === 0) { 
+            list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>'; 
+            return; 
+        }
+
+        // [新增] 地區代碼轉中文名稱的對照表
+        const regionLabelMap = {
+            'North': '北區', 
+            'Central': '中區', 
+            'South': '南區', 
+            'East': '東區', 
+            'Islands': '離島'
+            // Unknown 會回傳 undefined，下方邏輯會自動處理為不顯示
+        };
+
         list.innerHTML = pageData.map(e => {
             const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
+            
+            // [新增] 取得該活動的地區中文標籤 (若無 region 或 region 為 Unknown，則為空字串)
+            const regionLabel = regionLabelMap[e.region] || '';
+
             return `<div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
                     ${e.img_url ? `<img src="${e.img_url}" class="card-img" loading="lazy">` : ''}
                     <div class="card-info">
-                        <div class="badges"><span class="badge" style="color:#60a5fa">${e.platform}</span>${isNew ? '<span class="badge new">NEW</span>' : ''}${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}<span class="badge">${e.type}</span></div>
+                        <div class="badges">
+                            <span class="badge" style="color:#60a5fa">${e.platform}</span>
+                            
+                            ${regionLabel ? `<span class="badge" style="background:#4b5563; color:#fff">${regionLabel}</span>` : ''}
+                            
+                            ${isNew ? '<span class="badge new">NEW</span>' : ''}
+                            ${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}
+                            <span class="badge">${e.type}</span>
+                        </div>
                         <div style="font-weight:500; font-size:1rem;">${e.title}</div>
                         <div style="font-size:0.8rem; color:#888;">${e.date || '詳內文'} ${e.location ? `| ${e.location}` : ''}</div>
                     </div></div>`;
