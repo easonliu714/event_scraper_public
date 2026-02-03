@@ -360,11 +360,13 @@
     }
 
     function resetPageAndRender() { currentPage = 1; applyFilters(); }
-
+    
     function applyFilters() {
         const query = document.getElementById('search').value.toLowerCase();
         
-        filteredEvents = allEvents.filter(e => {
+        // 1. 先進行篩選 (Filter)
+        // 使用 let 宣告 tempEvents 以便後續排序
+        let tempEvents = allEvents.filter(e => {
             const isFav = checkIsFav(e.title);
             const isNew = !readEvents.includes(e.url);
             
@@ -381,18 +383,15 @@
             if (filters.status.has('isNew') && !isNew) return false;
             if (filters.status.has('isFav') && !isFav) return false;
 
-            // [修改] 地區篩選邏輯 (配合 V39 後端)
+            // 地區篩選邏輯
             if (filters.regions.size > 0) {
-                // 後端回傳的是 'North', 'Central'... 轉為小寫以配合 HTML 的 filter key
                 const rawRegion = e.region || 'unknown'; 
                 const region = rawRegion.toLowerCase(); 
-                
-                // 定義已知的區域列表
                 const knownRegions = ['north', 'central', 'south', 'east', 'islands'];
 
                 // 邏輯：
-                // 1. 如果這個活動屬於「已知區域」，則它必須在用戶選擇的篩選器中才顯示。
-                // 2. 如果這個活動是「unknown」(無法判斷)，則永遠保留 (不 return false)。
+                // 若是已知區域 (如 North)，必須在用戶勾選的名單內才顯示
+                // 若是 Unknown，則暫時保留 (不 return false)
                 if (knownRegions.includes(region)) {
                     if (!filters.regions.has(region)) return false;
                 }
@@ -400,6 +399,41 @@
 
             return true;
         });
+
+        // 2. 進行排序 (Sort) - [新增]
+        // 排序優先級：符合篩選地區 > 關注中 > 新活動 > 原始順序
+        tempEvents.sort((a, b) => {
+            // (A) 地區優先排序
+            // 當有篩選地區時，將「明確符合該地區」的活動排在前面，「Unknown」排在後面
+            if (filters.regions.size > 0) {
+                const regionA = (a.region || 'unknown').toLowerCase();
+                const regionB = (b.region || 'unknown').toLowerCase();
+                
+                const aIsSelected = filters.regions.has(regionA);
+                const bIsSelected = filters.regions.has(regionB);
+                
+                // 若 A 是選中地區，B 不是 (例如 B 是 Unknown)，則 A 排前 (-1)
+                if (aIsSelected && !bIsSelected) return -1;
+                // 若 A 不是 (Unknown)，B 是選中地區，則 B 排前 (1)
+                if (!aIsSelected && bIsSelected) return 1;
+            }
+
+            // (B) 關注優先 (Favorite)
+            const aFav = checkIsFav(a.title);
+            const bFav = checkIsFav(b.title);
+            if (aFav !== bFav) return bFav - aFav; // true(1) - false(0) = 1 (大的在前? 不，sort logic: b-a means descending) 
+            // 修正：Boolean 相減 true=1, false=0。 b(1)-a(0)=1 -> b 在前。 b(0)-a(1)=-1 -> a 在前。正確。
+
+            // (C) 新活動優先 (New)
+            const aNew = !readEvents.includes(a.url);
+            const bNew = !readEvents.includes(b.url);
+            if (aNew !== bNew) return bNew - aNew;
+
+            return 0; // 保持原始順序
+        });
+        
+        // 3. 更新全域變數並渲染
+        filteredEvents = tempEvents;
         
         document.getElementById('result-count').textContent = `顯示 ${filteredEvents.length} 筆活動 (共 ${allEvents.length} 筆)`;
         renderList();
