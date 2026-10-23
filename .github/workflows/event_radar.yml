@@ -1,0 +1,45 @@
+name: Event Radar V44.2 - Daily Cloud Update
+on:
+  schedule:
+    - cron: '17 9,15,21 * * *'
+      timezone: 'Asia/Taipei'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: event-radar-single-writer-main
+  cancel-in-progress: false
+jobs:
+  scrape-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TZ: Asia/Taipei
+      EVENT_RADAR_ACTIONS: '1'
+      EVENT_RADAR_TELEGRAM: '0'
+      EVENT_RADAR_TERMUX: '0'
+      DETAIL_NEW_LIMIT: '24'
+      DETAIL_REPAIR_LIMIT: '16'
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify deployed program version
+        run: bash scripts/run_show_news.sh --version
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements-actions.txt
+      - name: Offline syntax and data parser tests
+        run: |
+          python -m compileall -q show_news.py event_details.py scripts
+          python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Scrape once (notifications OFF)
+        run: bash scripts/run_show_news.sh --once
+      - name: Validate output and publish
+        run: bash scripts/commit_data.sh
