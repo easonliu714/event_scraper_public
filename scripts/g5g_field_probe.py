@@ -21,7 +21,7 @@ from g5f_probe import (load_targets, validate_url, cloud_authorized, MANIFEST_SH
 import event_details
 
 EXPECTED_G5F_MANIFEST = '30c846a526491b1eb574f1f60f63cfc3990fa8a24d05661c467e55ab70716894'
-EXPECTED_PARSER_BLOB = 'd5b8b6600aff987f350ea211dd293ec2ab3e2ee0'
+EXPECTED_PARSER_BLOB = 'ed425662b4f2ce2032a0fa0c3e83075842f30767'
 EXPECTED_G5G_REL = 'eventradar_toolkit/gates/g5g_field_parity_v100/evidence'
 MAX_BYTES = 350_000
 MAX_FIELD = {'title': 120, 'date': 90, 'location': 130, 'price': 75}
