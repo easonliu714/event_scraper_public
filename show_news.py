@@ -1334,8 +1334,8 @@ async def fetch_accupass_events_list(session):
         "https://www.accupass.com/search?p=free&utm_source=accupass&utm_medium=web_header&utm_campaign=accu_web_header", # 免費活動
         "https://www.accupass.com/search?c=charitable&utm_source=accupass&utm_medium=web_header&utm_campaign=accu_web_header",   # 公益
         "https://www.accupass.com/search?c=learning&utm_source=accupass&utm_medium=web_header&utm_campaign=accu_web_header", # 學習
-        "https://www.accupass.com/search?c=arts&utm_source=accupass&utm_medium=web_header&utm_campaign=accu_web_header" #藝文
-        "https://www.accupass.com/search?c=travel&utm_source=accupass&utm_medium=web_header&utm_campaign=accu_web_header" #戶外體驗
+        "https://www.accupass.com/search?c=arts&utm_source=accupass&utm_medium=web_header&utm_campaign=accu_web_header", #藝文
+        "https://www.accupass.com/search?c=travel&utm_source=accupass&utm_medium=web_header&utm_campaign=accu_web_header", #戶外體驗
         "https://www.accupass.com/?area=north"       # 北部活動 (首頁分頁)
     ]
 
@@ -2594,6 +2594,27 @@ async def stage2_fetch_details_and_notify(all_list_events, first_run=False, firs
     append_log_run(f"DETAIL_SUMMARY selected={len(events_to_process)} fresh={fresh_count} repair_candidates={repair_count} sent={sent_count} failed={failed_count}")
     return fresh_count, sent_count, failed_count, details_stats
 
+# [PR1 G4A] Source-specific, evidence-bound navigation-only guards.
+# Do not delete historical rows here; this excludes only the current list batch.
+KNOWN_NON_EVENT_TITLES = {
+    "年代售票": frozenset({"slide"}),
+    "中正紀念堂": frozenset({"我要報名"}),
+    "松山文創": frozenset({"展演活動"}),
+}
+
+def is_known_non_event_list_entry(event):
+    if not isinstance(event, dict):
+        return False
+    platform = str(event.get('platform') or '').strip()
+    title = re.sub(r'\s+', ' ', str(event.get('title') or '')).strip()
+    if title in KNOWN_NON_EVENT_TITLES.get(platform, ()):
+        return True
+    # Source's QueryReg page is a registration *search*, not an activity.
+    if (platform == '中正紀念堂' and
+            re.search(r'/QueryReg\.init\.ctr(?:\?|$)', str(event.get('url') or ''), re.I)):
+        return True
+    return False
+
 async def check_and_notify(first_run=False, first_mode=False, target_platform=None):
     global favorites_found_current_run
     favorites_found_current_run = []
@@ -2609,6 +2630,13 @@ async def check_and_notify(first_run=False, first_mode=False, target_platform=No
 
     # Stage 1
     all_list_events, platform_stats = await stage1_fetch_lists(limit_per_platform=limit, target_platform=target_platform)
+
+    # Exclude only directly demonstrated navigation-only rows from new lists.
+    # Historical docs/data.json remains untouched by this filter.
+    invalid_count = sum(is_known_non_event_list_entry(e) for e in all_list_events)
+    if invalid_count:
+        append_log_run(f"PR1_G4A_NAVIGATION_FILTER rejected={invalid_count}")
+    all_list_events = [e for e in all_list_events if not is_known_non_event_list_entry(e)]
 
     seen_urls = set()
     filtered_events = [e for e in all_list_events if e.get('url') not in seen_urls and not seen_urls.add(e.get('url'))]
