@@ -1,0 +1,88 @@
+{
+  "manifest_version": "PR1_G4B_SOURCE_BOUND_V1",
+  "purpose": "Acquire limited source-evidence only, not golden field values",
+  "baseline_run": 39906440620,
+  "baseline_head": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+  "source_samples": [
+    {
+      "platform": "ACCUPASS",
+      "url": "https://www.accupass.com/event/2610150106001825130082",
+      "observed_title": "【面孔遊行｜Persona Parade】韓國藝術家聯展 展覽｜Korean Artists Group Exhibition",
+      "evidence_run": 39906440620,
+      "evidence_sha": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+      "observed_date": "詳內文",
+      "observed_location": "詳內文",
+      "observed_price": "詳內文",
+      "golden_status": "UNVERIFIED_SOURCE_CAPTURE_PENDING"
+    },
+    {
+      "platform": "ACCUPASS",
+      "url": "https://www.accupass.com/event/2610040452086680116600",
+      "observed_title": "漫才 Open Mic : City Pleasure ／ 10/24（六）20:00 ／ 飛客劇樂部",
+      "evidence_run": 39906440620,
+      "evidence_sha": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+      "observed_date": "詳內文",
+      "observed_location": "詳內文",
+      "observed_price": "詳內文",
+      "golden_status": "UNVERIFIED_SOURCE_CAPTURE_PENDING"
+    },
+    {
+      "platform": "FamiTicket",
+      "url": "https://www.famiticket.com.tw/Home/Activity/Info/bwBRAHoAMABPADkAUQBIADYAcAA0ADEAUwBUAHQATwBnAGMAQQBHACsAdAB5AEgAegB3AE4AQQBDAFEAbgBHAEsAMgBIAHEAawBsAHYAZgBnAFQAWQA9AA2",
+      "observed_title": "屏菸1936文化基地｜屏東縣立美術館",
+      "evidence_run": 39906440620,
+      "evidence_sha": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+      "observed_date": "詳內文",
+      "observed_location": "詳內文",
+      "observed_price": "詳內文",
+      "golden_status": "UNVERIFIED_SOURCE_CAPTURE_PENDING"
+    },
+    {
+      "platform": "FamiTicket",
+      "url": "https://www.famiticket.com.tw/Home/Activity/Info/WQBzAFoAbwA4AGIASQBXAHgAZgArAGQAcgBPAGoAYwAzAEcAUgA1AEoAbwBIAHMARQBQAGIAMQA5AEsAcwBMAGoAVQBHAHgANwB1AFEAdABLADIAVQA9AA2",
+      "observed_title": "【微醺大飯店The Great Tipsy】早鳥單人票",
+      "evidence_run": 39906440620,
+      "evidence_sha": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+      "observed_date": "詳內文",
+      "observed_location": "詳內文",
+      "observed_price": "詳內文",
+      "golden_status": "UNVERIFIED_SOURCE_CAPTURE_PENDING"
+    },
+    {
+      "platform": "OPENTIX",
+      "url": "https://www.opentix.life/event/1681876419374891009",
+      "observed_title": "國家兩廳院X紅玉滿赤心雞蛋糕2023/8/1 (二)                     -                     2026/12/31 ",
+      "evidence_run": 39906440620,
+      "evidence_sha": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+      "observed_date": "2026/02/01-2026/02/28",
+      "observed_location": "國家音樂廳二號門",
+      "observed_price": "詳內文",
+      "golden_status": "UNVERIFIED_SOURCE_CAPTURE_PENDING",
+      "official_category_reference": "商品"
+    },
+    {
+      "platform": "OPENTIX",
+      "url": "https://www.opentix.life/event/1606114530117398530",
+      "observed_title": "衛武營主辦節目免費身障票專區2024/1/1 (一)                     -                     2026/11/28 ",
+      "evidence_run": 39906440620,
+      "evidence_sha": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+      "observed_date": "2026/02/11-2026/02/11",
+      "observed_location": "衛武營國家藝術文化中心表演廳",
+      "observed_price": "詳內文",
+      "golden_status": "UNVERIFIED_SOURCE_CAPTURE_PENDING",
+      "official_category_reference": "免費身障"
+    },
+    {
+      "platform": "OPENTIX",
+      "url": "https://www.opentix.life/event/1863403624657735681",
+      "observed_title": "文化觀光傳統表演藝術劇場-臺北戲棚2025/1/1 (三)                     -                     2026/12/",
+      "evidence_run": 39906440620,
+      "evidence_sha": "509dfeb3b849b7dd05ca91ec39b79f7c3c8e21ca",
+      "observed_date": "2026/03/03-2026/06/27",
+      "observed_location": "台泥大樓士敏廳",
+      "observed_price": "詳內文",
+      "golden_status": "UNVERIFIED_SOURCE_CAPTURE_PENDING",
+      "official_category_reference": "戲劇"
+    }
+  ]
+}
