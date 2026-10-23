@@ -24,7 +24,7 @@ class DryRunTests(unittest.TestCase):
                            ('EVENT_RADAR_TERMUX','1')]:
             bad=dict(good);bad[key]=value;self.assertFalse(m.is_runner_authorized(bad))
     def test_workflow_has_no_write_or_main_actions(self):
-        yaml=(P/'workflow/event_radar_pr_dryrun.yml').read_text()
+        yaml=(P/'.github/workflows/event_radar_pr_dryrun.yml').read_text(encoding='utf-8')
         self.assertIn('permissions:\n  contents: read',yaml)
         self.assertIn('persist-credentials: false',yaml)
         self.assertIn('pull_request:',yaml)
