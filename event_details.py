@@ -3,6 +3,7 @@
 Uses JSON-LD Event first, then event-specific DOM metadata/labels.
 All parsing is deterministic and can be tested without network access.
 """
+import html as html_entities
 import json
 import re
 from datetime import datetime
@@ -18,7 +19,13 @@ NOISE = {'立即購票', '詳細內容', 'Read More', '活動詳情', '查看更
 def clean_text(value, limit=1000):
     if not isinstance(value, str):
         return None
-    value = re.sub(r'\s+', ' ', BeautifulSoup(value, 'html.parser').get_text(' ', strip=True)).strip()
+    # Do not feed plain URLs to BeautifulSoup: it emits MarkupResemblesLocatorWarning.
+    # Only markup requires an HTML parser; entities in plain text still get decoded.
+    if '<' in value:
+        value = BeautifulSoup(value, 'html.parser').get_text(' ', strip=True)
+    else:
+        value = html_entities.unescape(value)
+    value = re.sub(r'\s+', ' ', value).strip()
     return value[:limit] if value and value not in SKIP else None
 
 
@@ -170,10 +177,20 @@ def parse_detail(html, expected_url=None):
             candidates.extend(_walk(json.loads(script.string or script.get_text())))
         except (ValueError, TypeError):
             continue
-    for event in candidates:
-        target = str(event.get('url') or '').split('#')[0].rstrip('/')
-        if target and pageurl and target != pageurl:
-            continue
+    # G5H provenance guard: an URL-less Event in a multi-Event graph is
+    # ambiguous. Prefer an explicit matching URL; never take the first orphan.
+    # Preserve the previous single-Event (URL-less) behavior for compatibility.
+    exact_matches = [e for e in candidates
+                     if pageurl and str(e.get('url') or '').split('#')[0].rstrip('/') == pageurl]
+    if exact_matches:
+        chosen = exact_matches[0]
+    elif len(candidates) == 1 and not str(candidates[0].get('url') or '').strip():
+        chosen = candidates[0]
+    elif not pageurl and len(candidates) == 1:
+        chosen = candidates[0]
+    else:
+        chosen = None
+    for event in ([chosen] if chosen is not None else []):
         start, end = _date(event.get('startDate')), _date(event.get('endDate'))
         if start:
             result['date'] = start + (' ~ ' + end if end and end != start and end >= start else '')
