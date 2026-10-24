@@ -1,0 +1,35 @@
+name: Event Radar PR - Read Only Python Gate
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  python-offline-gate:
+    if: github.event.pull_request.number == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EVENT_RADAR_TELEGRAM: '0'
+      EVENT_RADAR_TERMUX: '0'
+      EVENT_RADAR_ACTIONS: '0'
+    steps:
+      - name: Checkout PR merge candidate (read-only)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify program version (no network)
+        run: bash scripts/run_show_news.sh --version
+      - name: Install runtime dependencies
+        run: python -m pip install -r requirements-actions.txt
+      - name: Verify syntax and offline tests
+        run: |
+          python -m compileall -q show_news.py event_details.py scripts
+          python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Mark PR offline gate passed
+        run: echo 'PASS EVENT_RADAR_PR1_UBUNTU_PY312_READONLY_TESTS'

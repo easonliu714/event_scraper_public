@@ -1,0 +1,61 @@
+{
+  "kind": "G5E_PINNED_SOURCE_PROBES",
+  "snapshot_sha256": "ef39c6be44a3f26c30bc3ce13f41548d1bd6b6408af8e872eb55fff360fea43b",
+  "targets": [
+    {
+      "id": "BECLASS_115_0720",
+      "platform": "BeClass",
+      "url": "https://www.beclass.com/rid=305264169e18e6893ba6"
+    },
+    {
+      "id": "BECLASS_115_0710",
+      "platform": "BeClass",
+      "url": "https://www.beclass.com/rid=30526a36a06b9c6d21cd"
+    },
+    {
+      "id": "KIDSCLUB_TEAMLAB_2021",
+      "platform": "KidsClub",
+      "url": "https://kidsclub.com.tw/course/teamlab%e6%9c%aa%e4%be%86%e9%81%8a%e6%a8%82%e5%9c%92-%e5%8f%b0%e5%8c%972021-%e5%b1%95%e8%a6%bd%e6%b4%bb%e5%8b%95/"
+    },
+    {
+      "id": "KIDSCLUB_MARKET_2021",
+      "platform": "KidsClub",
+      "url": "https://kidsclub.com.tw/course/2021-%e5%8f%b0%e5%8c%97%e8%a6%aa%e5%ad%90%e5%b8%82%e9%9b%86-parents-and-kids-fair/"
+    },
+    {
+      "id": "ACCUPASS_EXHIBITION",
+      "platform": "ACCUPASS",
+      "url": "https://www.accupass.com/event/2610150106001825130082"
+    },
+    {
+      "id": "ACCUPASS_UPCOMING",
+      "platform": "ACCUPASS",
+      "url": "https://www.accupass.com/event/2610040452086680116600"
+    },
+    {
+      "id": "TWTCP_EXHIBITION_2026",
+      "platform": "台北世貿",
+      "url": "https://www.twtc.com.tw/exhibition_more.aspx?p=home&amp;id=28767"
+    },
+    {
+      "id": "FAMITICKET_CULTURAL_SITE",
+      "platform": "FamiTicket",
+      "url": "https://www.famiticket.com.tw/Home/Activity/Info/bwBRAHoAMABPADkAUQBIADYAcAA0ADEAUwBUAHQATwBnAGMAQQBHACsAdAB5AEgAegB3AE4AQQBDAFEAbgBHAEsAMgBIAHEAawBsAHYAZgBnAFQAWQA9AA2"
+    },
+    {
+      "id": "STROLLTIMES_ZOO",
+      "platform": "StrollTimes",
+      "url": "https://strolltimes.com/events/taipei/260702214348"
+    },
+    {
+      "id": "KKTIX_FILM",
+      "platform": "KKTIX",
+      "url": "https://hsinchucityfilm.kktix.cc/events/70thtaiyufilms"
+    },
+    {
+      "id": "OPENTIX_LONG_RUN",
+      "platform": "OPENTIX",
+      "url": "https://www.opentix.life/event/1863403624657735681"
+    }
+  ]
+}
