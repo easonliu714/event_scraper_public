@@ -1,3 +1,44 @@
+# 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
+
+> **權威快照：2026-10-24（Asia/Taipei），SRC-P25 Merge 已驗證。** Source Repo `main` = `a8d21d2e6aa056a13d5eb9de3d32920d11d4f740`；[Docs PR #3](https://github.com/easonliu714/event_scraper_public/pull/3) 已 `MERGED`，Merge Commit 同上，雙 Parent 為 `6004754f90d551cdb0cdb91a3e04b42c04f45f48` 與 `145189c19e2a58207fc1dc77ca558cb347e7bcca`。下文保留 P24 合併前原始快照作歷史證據，不得用歷史 `GOVERNANCE_MAIN_MERGED=false` 覆蓋本章。
+> **此 P26 增量的發布界線：** Source main 上 P25 文件已是正式治理權威；本 P26 頂部更正須經獨立 Docs-only Draft PR 審查及另行核准 Merge 後，才能取代 `main` 內容。未經合併不得宣稱 P26 已在 main 生效。
+> **業務發布狀態：** `SOURCE_RUNTIME=DORMANT`、`P20_PR_HEAD_DIRECT_CI=NOT_ATTESTED`、`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`。
+
+## 最新治理判定（P25 Merge 後，P26 增量候選）
+
+| 權威物件 | 固定基準／狀態 | 治理結論 |
+|---|---|---|
+| Source main | `a8d21d2e6aa056a13d5eb9de3d32920d11d4f740` | 已合併 P24 PR #3，新增精確兩份治理 MD，無程式/資料/Workflow 改動 |
+| Source PR #3 | `MERGED`，HEAD `145189c19e2a58207fc1dc77ca558cb347e7bcca` | 文件合併 Gate SRC-P25 PASS，不再 `ready/merge` |
+| Source PR #1 | `OPEN/DRAFT`，HEAD `26888422e48634d9729d2deea67b7996a5d1e4ee`，34 檔 | Cloud Scheduler / writer **HIGH-RISK HOLD**，不得合併 |
+| Source PR #2 | `OPEN/DRAFT`，HEAD `4c2c9ec93ae90410230a074e09b2aa853b7bfcf0`，五個新增檔 | Source-only DORMANT，尚未接 Runtime |
+| Preview main | `a8cde084ab5581736d86094d8cdcc2cdc9963000` | 不修改靜態資料與現有 PWA |
+| Preview PR #1 | `OPEN/DRAFT`，HEAD `b55b3673088b6df7bfe51f04d8d82b8e7616324f`，僅 `index.html` | 九卡片/九詳情 Android UAT PASS，尚未正式 Merge |
+| P23 Source Runner | [Run #40094208387](https://github.com/easonliu714/event_scraper_public/actions/runs/40094208387) SUCCESS | 治理分支固定 P20 HEAD 測試 PASS |
+| P23 Preview Runner | [Run #40094214324](https://github.com/easonliu714/eventradar-pwa-preview/actions/runs/40094214324) SUCCESS | 治理分支固定 P20 HEAD 測試 PASS |
+| P20 兩個 PR HEAD Checks | GitHub 各 0 個 Check runs | **NOT_ATTESTED**，不能以 P23 branch run 替代 |
+| GitHub 獨立 Open Issues | 最後查核 0（排除 Issues API 中的 PR） | 無證據可關閉任何獨立 Issue |
+
+### 後續 Roadmap（不重啟已完成 Gate）
+
+```text
+EventRadar / 活動暨售票雷達
+├── SRC-P1～P24: Android／GitHub 各 Gate PASS，禁止重跑或重新發布
+├── SRC-P25: PR #3 已解除 Draft、一般 Merge Commit、雙 Parent 與兩檔獨立 SHA 讀回 PASS
+├── SRC-P26: 只修正兩份 main 治理 MD 的「最新頂部狀態」，Docs-only Draft PR，未合併前為候選
+├── P20 PR HEAD 直接 CI Check: OPEN／NOT_ATTESTED（與 P23 分支 Runner PASS 分開）
+├── R3C-O3: Golden 官方內容人工覆核：HOLD；GOLDEN_ACCEPTED=0
+├── G5J: 活動有效性判定：OPEN／HOLD，須保留可逆性與來源證據
+├── G5K: 真實候選資料隔離 E2E + Android UAT：OPEN／HOLD
+└── Cloud Scheduler／資料寫入／通知／正式網站 Merge/Publish：LOCKED，需獨立授權
+```
+
+**讀取規則：** 此章為截至 SRC-P25 的最新權威事實；以下 P24 歷史正文因原樣封存而仍含「尚未合併／未建立」字樣，僅反映當時狀態。每輪必須先對照 GitHub 最新 main HEAD 與 PR/CI，不得因對話切換而回退至 P24 或重跑 P1～P25。
+
+---
+
+## 歷史封存：SRC-P24 文件治理 Draft PR 編製時點（原文逐位元組保留）
+
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核（SRC-P24 候選）
 
 > **最新快照：2026-10-24，Asia/Taipei。** 本文件為 SRC-P24 **文件治理 Draft PR 候選**，只有在經核准合併至 Source Repo `main` 並獨立讀回後，才成為該路徑的正式 main 治理權威。歷史附錄包含各時點的「待驗、未建立」文字，**不得覆蓋本章最新狀態**。

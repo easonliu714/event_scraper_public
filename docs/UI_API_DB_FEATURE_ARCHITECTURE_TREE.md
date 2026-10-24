@@ -1,3 +1,44 @@
+# 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
+
+> **最新合併基準：SRC-P25（2026-10-24，Asia/Taipei）。** Source `main@a8d21d2e6aa056a13d5eb9de3d32920d11d4f740` 已一般 Merge Commit 合併 [Docs PR #3](https://github.com/easonliu714/event_scraper_public/pull/3)；兩份文件正式存在 `main`。下方 SRC-P24「候選」章節是原始歷史記錄，不再代表現況。
+> **P26 文件修訂範圍：** 本次僅新增最新狀態與歷史分界，仍需新的 Docs-only Draft PR 合併才能成為 `main` 的最新版；不更動 Source、Preview、Workflow 或資料。
+
+## 現行 UI／API／資料架構（SRC-P25 基準）
+
+```text
+EventRadar Taiwan
+├── SOURCE: easonliu714/event_scraper_public
+│   ├── main@a8d21d2e6aa... [GOVERNANCE_MAIN; P25 MERGED]
+│   │   ├── scraper.py [legacy runtime，未改]
+│   │   ├── docs/data.json [既有正式靜態資料，未改]
+│   │   ├── docs/index.html [既有網頁，未改]
+│   │   ├── docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md [正式治理]
+│   │   └── docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md [正式治理]
+│   ├── PR #1@26888422e486... [OPEN/DRAFT; 34 檔; Cloud Writer HIGH-RISK HOLD]
+│   ├── PR #2@4c2c9ec93ae... [OPEN/DRAFT; 新增 5 檔; SOURCE DORMANT]
+│   └── ci/eventradar-source-ci-p22@a50bfd25... [Runner 40094208387 SUCCESS]
+├── PREVIEW: easonliu714/eventradar-pwa-preview
+│   ├── main@a8cde084ab55... [既有 PWA；data.json／visibility.js／period_gate.js 不變]
+│   ├── PR #1@b55b3673088b... [OPEN/DRAFT; index.html 僅一檔；九案例 Android UAT]
+│   └── ci/eventradar-preview-ci-p22@0c894a36... [Runner 40094214324 SUCCESS]
+├── STORAGE／API [不自行捏造資料庫]
+│   ├── Python parser candidate → 靜態 JSON [main Runtime 尚未接入]
+│   ├── Source docs/data.json／Preview data.json [不可在本 Gate 業務寫入]
+│   ├── PWA HTTP 靜態 JSON 載入、localStorage 已讀、卡片/Modal 顯示
+│   └── 沒有已證明的新 EventRadar 專屬 REST/SQL 後端
+└── QUALITY / RELEASE
+    ├── SRC-P1～P25: PASS；P23 固定 P20 HEAD 的兩條 Runner SUCCESS
+    ├── P20 PR HEAD 直接 CI: 0/0 Check runs，NOT_ATTESTED
+    ├── GOLDEN_ACCEPTED=0;AUTO_HIDDEN=0;APP_DATA_PUBLISHED=false；G5J／G5K: OPEN／HOLD
+    └── Merge/正式資料/Cloud Scheduler/通知: LOCKED
+```
+
+**架構更新政策：** 保留 SRC-P24 以下所有 UI/UX、API、資料架構與 Gate 歷史原文；新開發以 GitHub `main` 這兩份文件為唯一進度治理基線。任何 Runtime/資料發布須另行授權，不能以 Candidate 或 CI 成功冒稱 Golden。
+
+---
+
+## 歷史封存：SRC-P24 UI／API／資料架構（原文逐位元組保留）
+
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹（SRC-P24 候選）
 
 > **最新快照：2026-10-24，Asia/Taipei。** 本文件為 GitHub `docs/` 文件治理 Draft PR 候選；待經核准 Merge 至 `main` 並獨立讀回後，才可主張為 Source Repo `main` 的正式功能樹權威。後續歷史附錄為時間點紀錄，最新狀態以本章為準。
