@@ -1,0 +1,58 @@
+name: EventRadar P22 source pinned-head branch CI
+on:
+  push:
+    branches: [ci/eventradar-source-ci-p22]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p22-source-branch-ci
+  cancel-in-progress: false
+jobs:
+  source-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head, no persistent credentials
+        uses: actions/checkout@v4
+        with:
+          ref: 4c2c9ec93ae90410230a074e09b2aa853b7bfcf0
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact main-based five-file diff (read-only)
+        env:
+          BASE_SHA: 6004754f90d551cdb0cdb91a3e04b42c04f45f48
+          HEAD_SHA: 4c2c9ec93ae90410230a074e09b2aa853b7bfcf0
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          diff="$(git diff --name-status "$BASE_SHA" "$HEAD_SHA" | LC_ALL=C sort)"
+          expected="$(printf 'A\tevent_details.py\nA\trequirements-actions.txt\nA\tshow_news.py\nA\ttests/test_event_details.py\nA\ttests/test_event_details_g5h.py\n' | LC_ALL=C sort)"
+          test "$diff" = "$expected"
+          echo PASS P21_SOURCE_ONLY_EXACT_FIVE_ADD
+      - name: Freeze P20 target branch HEAD and main remotely, read only
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/main | awk '{print $1}')" = "6004754f90d551cdb0cdb91a3e04b42c04f45f48"
+          test "$(git ls-remote origin refs/heads/feat/eventradar-source-only-p20 | awk '{print $1}')" = "4c2c9ec93ae90410230a074e09b2aa853b7bfcf0"
+          echo PASS P22_SOURCE_PINNED_REMOTE_MAIN_AND_PR_BRANCH
+      - name: Install parser-only test dependency (package index only, no activity-site requests)
+        run: python -m pip install 'beautifulsoup4>=4.12,<5'
+      - name: Python AST and two exact offline parser suites
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          for name in ('show_news.py', 'event_details.py', 'tests/test_event_details.py', 'tests/test_event_details_g5h.py'):
+              ast.parse(Path(name).read_text(encoding='utf-8'), filename=name)
+          print('PASS P21_SOURCE_PYTHON_AST')
+          PY
+          python -m unittest discover -s tests -p 'test_event_details*.py' -v
+      - name: Explicit read-only completion
+        run: echo 'PASS P21_SOURCE_CI_NO_SCRAPER_RUN_NO_DATA_COMMIT_NO_NOTIFICATIONS'
