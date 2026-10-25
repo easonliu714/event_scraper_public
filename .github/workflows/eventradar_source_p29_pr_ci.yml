@@ -3,7 +3,7 @@ name: EventRadar P29 source native PR CI
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
 permissions:
   contents: read
 concurrency:
@@ -32,7 +32,7 @@ jobs:
           pr = event['pull_request']
           repo = 'easonliu714/event_scraper_public'
           assert os.environ['GITHUB_EVENT_NAME'] == 'pull_request'
-          assert event['action'] in ('opened', 'synchronize', 'reopened')
+          assert event['action'] in ('opened', 'synchronize', 'reopened', 'edited')
           assert pr['base']['repo']['full_name'] == repo
           assert pr['head']['repo']['full_name'] == repo
           assert pr['base']['ref'] == 'main'
