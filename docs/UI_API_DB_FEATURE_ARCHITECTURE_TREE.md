@@ -1,5 +1,81 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+
+> **最新架構增量候選｜2026-10-25 P30 重新抓取優先（Docs-only Draft；尚未併入 main）**
+>
+> GitHub 即時身分：Source main \`fc4f963247d68eed29425808cc14e7250f312d05\`、Preview main \`03e515d65e827d5ed67fe341d079907a96bf784a\`、ShowNews main \`85fed3e85ff5deff479a85b8d692aa9e6d2bdcad\`。SRC-P29 Source PR #5/Preview PR #2 **MERGED**，原 P20 HEAD 各 1 個 GitHub native check SUCCESS，歷史下文舊「P29 候選」「HEAD 0 checks」不再代表現況；SRC-P1～P28 Android 實測 PASS 繼續有效。
+>
+> 本節把本輪最新討論的分段 Gate 明確繫結到 **UI／API／Parser／Data／CI**；詳細分層 Gate、驗收契約、狀態詞與優先順序由相同 GitHub Commit 的 \`docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md\` 唯一對應，不可另建平行 Roadmap。舊正文完整保留。
+
+## SRC-P30 即時來源品質導向 UI／API／資料架構
+
+\`\`\`text
+GitHub easonliu714/event_scraper_public  [最終單一權威目標; 目前尚未正式整併]
+├─ main@fc4f963247d6... [已部署歷史狀態，禁止本 Gate 覆蓋]
+│  ├─ scraper.py [舊版同步/非同步抓取+寫 docs/data.json+通知，會有副作用]
+│  ├─ docs/index.html, docs/manifest.json [正式 Pages 舊入口；保持不變]
+│  ├─ docs/data.json [8,436 筆舊靜態資料；最新內容未被證明]
+│  └─ docs/{ROADMAP_PR_ISSUE_CLOSURE_AUDIT,UI_API_DB_FEATURE_ARCHITECTURE_TREE}.md [兩份唯一治理]
+├─ PR #7: feat/eventradar-p30-live-diagnostic@959324cb3bad... [DRAFT, NO MERGE]
+│  ├─ scripts/p30_live_acquisition.py [P30-L1 僅診斷；單次有限量 public HTTPS]
+│  │  ├─ Stage 1 HTTP [原始/最後網址、狀態碼、HTML、redirect、安全白名單]
+│  │  ├─ Stage 2 LIST [HTML anchor → 清單候選 title/url/platform，不推測日期]
+│  │  ├─ Stage 3 DETAIL [每平台最多抽樣一頁，標 HTTP 與來源身分]
+│  │  ├─ Stage 4 FIELDS [date/location/price/description 獨立證據，允許 UNKNOWN]
+│  │  └─ Runtime 只產生 p30-artifacts，不 import 主程式、不呼叫通知/寫入功能
+│  ├─ tests/p30/test_live_acquisition.py [HTTP block, redirect, URL, list, unknowns 等離線負例]
+│  ├─ docs/P30_LIVE_ACQUISITION_DIAGNOSTIC.md [非正式運作的技術候選說明]
+│  └─ .github/workflows/eventradar_p30_live_diagnostic.yml [P30 專用隔離分支 push]
+│     ├─ CI 校驗正式 docs/data.json / scraper.py Git Blob 沒變、P20 純 parser SHA
+│     ├─ P20 PR #2 event_details.py@4c2c9ec... [僅作純解析器，未合併/未執行 show_news]
+│     └─ Run 40196442965 SUCCESS → Artifact 12600795314 [新鮮 338 筆抽樣候選]
+│        ├─ candidate.json [短期候選，非完整資料、非 Golden、非正式 Pages]
+│        └─ diagnostics.json [19 平台 HTTP / 清單 / 詳情 / 欄位品質與失敗原因]
+├─ PR #6: feat/eventradar-p30-preview-isolated@1402df1bd32a... [DRAFT, SUPERSEDED]
+│  └─ docs/p30-preview/data-parts/* [歷史 9,850 筆 byte-preserving CI PASS，非新 PWA 資料來源]
+├─ PR #2: feat/eventradar-source-only-p20@4c2c9ec... [DRAFT, DORMANT]
+│  ├─ show_news.py [複合抓取/排程/通知；不得直接執行]
+│  └─ event_details.py [JSON-LD/DOM 身分及欄位候選；已被 P30-L1 SHA 限定讀用]
+├─ PR #1@26888422e486... [DRAFT, Cloud Scheduler/Writer HIGH-RISK HOLD]
+└─ Future P30 source-quality modules [尚未實作]
+   ├─ source_catalog / http_probe [L2: 官方來源入口 + 403/404/429/redirect 診斷]
+   ├─ list_parser / fixture tests [L3: 正確清單、URL、去重、分頁]
+   ├─ detail_parser / identity tests [L4: 詳情身分、多場次/合集、缺頁]
+   ├─ field_evidence / source_roles [L5: 活動日期 vs 售票期間、地點、票價、摘要]
+   ├─ reversible_validity_ledger [L6/G5J: ACTIVE/EXPIRED/NON_EVENT/SOURCE_GONE/UNCERTAIN]
+   ├─ candidate-json / schema / sha / report [L7/R3C-O3: 新鮮隔離資料 + 官方 Golden]
+   ├─ docs/p30-fresh-qa/ [L8/G5K: 新資料隔離 PWA 與 Android UAT，路徑待 Gate 核准]
+   ├─ single-authorized-writer / production QA [L9: 完整驗證+另案發布授權]
+   └─ repo-consolidation [L10: Source 最終單 Repo；Preview/ShowNews 不自動封存/刪除]
+
+Separate Preview main@03e515d65e... [舊 9,850 筆測試快照與 G5C/G5D visibility UI；不當新數據]
+└─ PR #1@b55b367308... [九卡片/詳情 Android UAT PASS, HEAD 原生 CI SUCCESS, STILL DRAFT]
+
+Separate ShowNews main@85fed3e85ff5... [歷史 FastAPI/七平台/Telegram，Render 仍 UNKNOWN]
+└─ /test-crawl 可能觸發網路抓取+推播；禁止在唯讀/QA 中呼叫
+\`\`\`
+
+### 新資料契約與 PWA 介面角色（規格，非已發布）
+
+| 節點 | 最小可安全使用的輸出 | 必須保留的證據／邊界 |
+| --- | --- | --- |
+| HTTP network (L2) | platform, requested/final_url, status, timestamp, content_type | 403/404/429/Redirect/非 HTML ≠ HTTP PASS；域名白名單，不繞過限制 |
+| List parser (L3) | title, official_url, platform, list_observed_at, list_status | URL 去重、清單身份、連結是活動而非導覽；空清單/JS-only 明示 HOLD |
+| Detail parser (L4) | detail_http, canonical_identity, source_page_type, session evidence | 可核實的來源身分，集合頁/多場次不得誤綁單場 |
+| Field roles (L5) | date?, location?, price?, description?, type?, evidence and UNKNOWN | 日期必須是活動角色而非促銷／開賣日期；不得捏造票價、票況 |
+| Validity (L6/G5J) | reversible validity_status + reason + original record | 五種狀態；單次來源失效不自動下架 |
+| Candidate JSON (L7) | isolated new snapshot + run_id + acquisition time + report/hash | 舊 8,436/9,850 不混用；Schema、欄位完整率、來源清單 |
+| PWA list (L8) | card title / official URL / source / available verified fields | 允許局部資訊；空值顯示「未確認／請見官方」，不顯示假精度 |
+| PWA detail (L8) | source-linked detail and session disambiguation | 票價／日期／場次若條件性或來源不確定，標示以官方公告為準 |
+| Publish (L9) | approved data.json via single writer, manifest/URL parity & rollback | 尚 LOCKED；Android 新資料驗證不能借用舊 P20 測試代替 |
+
+**Stage-to-Gate Crosswalk**：\`P30-L2\` HTTP → \`L3\` LIST → \`L4\` DETAIL → \`L5\` FIELDS → \`L6\` G5J VALIDITY → \`L7\` R3C-O3 GOLDEN+NEW JSON → \`L8\` G5K ANDROID UAT → \`L9\` controlled production → \`L10\` repo consolidation。下一個開發點為 **START P30-L2-A HTTP 失敗類型與官方入口修復**；先用 Run \`40196442965\` 的 \`diagnostics.json\` 分流 403/404/429 和 HTML 200 但無清單，建立來源負例，再定點更正；避免原樣重跑全部 19 平台。
+
+**治理固定旗標**：\`SOURCE_RUNTIME=DORMANT\`; \`GOLDEN_ACCEPTED=0\`; \`AUTO_HIDDEN=0\`; \`APP_DATA_PUBLISHED=false\`。即使使用者允許忽略/將來刪除舊 JSON，也不是允許本 PR 改寫正式 JSON、清空 Pages、啟動 Cloud Writer、通知、Schedule、改開 PR 狀態或 Archive Repo。將來正式新資料可取代舊資料之前，必須有單 Writer、SHA、回復、UAT 與獨立授權。
+
+---
+
+
 > **SRC-P29 受控 PR CI 候選｜2026-10-25（Asia/Taipei）**
 >
 > 本段為新 CI 分支上的候選；未合併前不取代 main 正式治理權威。P24／P25／P26 以下歷史全文保留。
