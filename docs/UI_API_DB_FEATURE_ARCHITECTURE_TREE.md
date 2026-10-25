@@ -1,5 +1,20 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-25 SRC-P30-G1 隔離整併候選增量（僅受控 Draft PR，尚未進 main）**
+>
+> 最新已驗證 Source main `fc4f963247d68eed29425808cc14e7250f312d05`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`。下方「SRC-P29 候選」是合併前歷史記錄，**不得用歷史 0 Check / NOT_ATTESTED 回退 P29**。
+>
+> **SRC-P29 COMPLETE**：Source PR #5 MERGED `fc4f963247d68eed29425808cc14e7250f312d05`、Preview PR #2 MERGED `03e515d65e827d5ed67fe341d079907a96bf784a`；Source PR #2 原 HEAD `4c2c9ec93ae90410230a074e09b2aa853b7bfcf0` Run `40156884831` Check SUCCESS，Preview PR #1 原 HEAD `b55b3673088b6df7bfe51f04d8d82b8e7616324f` Run `40156894950` Check SUCCESS。P1～P29 已通過 Gates 不重新開始。
+>
+> **P30-G0-DATA 唯讀完整 JSON 比對**：Source `docs/data.json` 8436 筆 / 8436 唯一 URL / Git Blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`；Preview `data.json` 9850 筆 / 9850 唯一 URL / Git Blob `c64a72bafd32f1248c53acd83279a33eaca4c41b`；交集 7914、僅 Source 522、僅 Preview 1936。**資料不相同、不可互相覆寫，9,850 筆不是 Golden**。
+>
+> **P30-G1 尚未批准 Merge**：`feat/eventradar-p30-preview-isolated` 新增隔離路徑 `docs/p30-preview/`、`tests/p30/`、純讀取 CI。因 GitHub 連接器單檔超大提交受阻，候選將 5,161,754 bytes 原 Preview JSON 以 13 個 UTF-8 無損片段儲存，在瀏覽器與 CI 重組驗證原 SHA256 `ef39c6be44a3f26c30bc3ce13f41548d1bd6b6408af8e872eb55fff360fea43b`、Git Blob SHA、原 9850 筆；不可冒稱新檔名為原 Preview `data.json`。保留 Preview 兩個 JS、manifest、status 原 Git Blob；Source `docs/index.html`、`docs/data.json`、`docs/manifest.json` 沒有修改。**G1 只在 Draft PR，未實施正式 Pages 切換/發佈，必須另行授權 Merge。**
+>
+> **風險邊界**：ShowNews 的 Render/外部服務存活 UNKNOWN，`/test-crawl` 會觸發 Telegram 副作用不得呼叫。Source PR #1 與 Source PR #2、Preview PR #1 都維持 Open/Draft，不合併。R3C-O3、G5J、G5K HOLD。固定 `SOURCE_RUNTIME=DORMANT`、`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`。P30-G2 純解析遷移與 G3 安全驗證在 G1 CI 基線成立後繼續；未得授權不得 Archive/Delete Repo 或停外部服務。
+>
+---
+
+
 > **SRC-P29 受控 PR CI 候選｜2026-10-25（Asia/Taipei）**
 >
 > 本段為新 CI 分支上的候選；未合併前不取代 main 正式治理權威。P24／P25／P26 以下歷史全文保留。

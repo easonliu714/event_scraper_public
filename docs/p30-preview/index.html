@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>活動雷達｜P30 整併測試版</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+
+    <style>
+        :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #3b82f6; --chip-bg: #2a2a2a; }
+        body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 60px; overscroll-behavior-y: contain; }
+
+        #pull-to-refresh {
+            position: fixed; top: -50px; left: 0; width: 100%; height: 50px;
+            display: flex; justify-content: center; align-items: center;
+            color: var(--accent); font-size: 1.2rem; transition: top 0.2s; z-index: 200;
+        }
+        #pull-to-refresh.visible { top: 60px; }
+        .spinner { animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        header { position: sticky; top: 0; z-index: 100; background: rgba(18,18,18,0.95); backdrop-filter: blur(10px); padding: 12px 16px; border-bottom: 1px solid #333; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        h1 { margin: 0; font-size: 1.2rem; }
+        .header-actions { display: flex; gap: 12px; }
+        .action-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #aaa; transition: 0.2s; }
+        .action-btn:hover { color: #fff; }
+
+        .search-box { width: 100%; padding: 12px; border-radius: 12px; background: #2a2a2a; border: 1px solid #333; color: #fff; font-size: 1rem; }
+
+        .filter-section { padding: 16px; background: #181818; border-bottom: 1px solid #333; }
+        .filter-block { margin-bottom: 16px; }
+        .block-title { font-size: 0.85rem; color: #888; margin-bottom: 8px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .chip { padding: 6px 12px; background: var(--chip-bg); border-radius: 8px; font-size: 0.9rem; cursor: pointer; border: 1px solid #333; transition: 0.2s; display: flex; gap: 6px; }
+        .chip span { opacity: 0.6; font-size: 0.8em; }
+        .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .chip.active span { opacity: 1; color: #fff; }
+
+        .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; }
+        .list-info-row { display: flex; justify-content: space-between; align-items: center; }
+        .disclaimer { font-size: 0.75rem; color: #666; margin-top: 6px; padding-top: 6px; border-top: 1px solid #333; text-align: right; }
+
+        #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 300px; }
+        .card { background: var(--card); border-radius: 12px; padding: 12px; display: flex; gap: 12px; border: 1px solid #333; }
+        .card.read { opacity: 0.6; }
+        .card-img { width: 90px; height: 90px; border-radius: 8px; background: #333; object-fit: cover; }
+        .card-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .badges { display: flex; flex-wrap: wrap; gap: 4px; font-size: 0.75rem; }
+        .badge { padding: 2px 6px; border-radius: 4px; background: #333; color: #ccc; }
+        .badge.new { background: #ef4444; color: #fff; }
+        .badge.fav { background: #f59e0b; color: #fff; }
+
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin: 20px 0; }
+        .page-btn { padding: 8px 16px; background: #333; border: none; color: #fff; border-radius: 8px; cursor: pointer; }
+        .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: none; justify-content: center; align-items: end; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: #222; width: 100%; max-width: 600px; padding: 24px; border-radius: 20px 20px 0 0; max-height: 90vh; overflow-y: auto; }
+
+        .settings-panel { padding: 16px; background: #2a2a2a; border-radius: 12px; margin-bottom: 16px; }
+        .keyword-input { width: 100%; padding: 10px; border-radius: 8px; background: #121212; border: 1px solid #444; color: #fff; margin-bottom: 8px; }
+        .tags-container { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { background: #444; padding: 4px 10px; border-radius: 16px; font-size: 0.85rem; display: flex; gap: 6px; }
+    </style>
+<meta name="robots" content="noindex,nofollow">
+</head>
+<body>
+<div role="note" style="background:#573000;color:#fff;padding:8px;text-align:center;font-weight:bold;font-size:13px">P30 隔離整併候選｜9,850 筆歷史測試快照（非 Golden、非正式發布）</div>
+<div role="status" style="position:relative;z-index:999;background:#753400;color:#fff;text-align:center;padding:10px 12px;font-size:14px;font-weight:700;line-height:1.5">【EventRadar 測試版】此頁顯示 PR #1 Dry-Run 擷取快照；日期、地點、票價與活動分類尚未驗證。正式網站與 GitHub main 未更新。</div>
+
+<div id="pull-to-refresh">
+    <span id="ptr-icon">⬇️ 下拉更新</span>
+    <span id="ptr-spinner" class="spinner">🔄</span>
+</div>
+
+<header>
+    <div class="top-bar">
+        <h1>📡 活動雷達</h1>
+        <div class="header-actions">
+            <button class="action-btn" onclick="markAllRead()" title="全部設為已讀">✅</button>
+            <button class="action-btn" onclick="openSettings()" title="設定">⚙️</button>
+        </div>
+    </div>
+    <input type="text" id="search" class="search-box" placeholder="搜尋關鍵字..." oninput="resetPageAndRender()">
+</header>
+
+<div class="filter-section">
+    <div class="filter-block">
+        <div class="block-title">🏛️ 平台篩選</div>
+        <div id="platform-chips" class="chips"></div>
+    </div>
+
+    <div class="filter-block">
+        <div class="block-title">📍 地區篩選 (含聯集，未定區域自動保留)</div>
+        <div id="region-chips" class="chips"></div>
+    </div>
+
+    <div class="filter-block">
+        <div class="block-title">✨ 狀態篩選</div>
+        <div class="chips" id="status-chips"></div>
+    </div>
+    <div class="filter-block">
+        <div class="block-title">🏷️ 類別篩選</div>
+        <div id="type-chips" class="chips"></div>
+    </div>
+</div>
+
+<div class="list-header">
+    <div class="list-info-row">
+        <span id="result-count">顯示 0 筆活動</span>
+        <span id="update-time" style="font-size:0.8em">更新於: ...</span>
+    </div>
+    <div class="disclaimer">⚠️ 活動列表僅供參考，活動內容以各平台資訊為準。</div>
+</div>
+
+<div id="validity-audit" role="status" aria-live="polite"
+     style="background:#181818;color:#ddd;font-size:0.8rem;padding:10px 16px;border-bottom:1px solid #333">
+    G5C 活動有效性檢查中…
+</div>
+
+<div id="event-list"></div>
+
+<div class="pagination">
+    <button class="page-btn" onclick="changePage(-1)" id="prev-btn">◀ 上一頁</button>
+    <span id="page-info">第 1 / 1 頁</span>
+    <button class="page-btn" onclick="changePage(1)" id="next-btn">下一頁 ▶</button>
+</div>
+
+<div class="modal-overlay" id="detail-modal" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <img id="m-img" style="width:100%; max-height:250px; object-fit:cover; border-radius:12px; margin-bottom:16px; display:none;">
+
+        <div style="margin-bottom:8px;">
+            <span id="m-platform" class="badge" style="background:#333; color:#60a5fa; padding:4px 8px; border-radius:4px; font-size:0.8rem;"></span>
+            <span id="m-type" class="badge" style="background:#333; color:#ccc; padding:4px 8px; border-radius:4px; font-size:0.8rem;"></span>
+        </div>
+
+        <h2 id="m-title" style="margin-bottom:15px; line-height: 1.4;"></h2>
+
+        <div style="background: #2a2a2a; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.95rem;">
+            <div style="margin-bottom: 6px;">📅 <b>日期：</b><span id="m-date" style="color:#ddd"></span></div>
+            <div style="margin-bottom: 6px;">📍 <b>地點：</b><span id="m-location" style="color:#ddd"></span></div>
+            <div>💰 <b>票價：</b><span id="m-price" style="color:#ddd"></span></div>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <h4 style="margin: 0 0 8px 0; color: #888; font-size: 0.9rem;">📝 活動簡介</h4>
+            <p id="m-desc" style="color: #ccc; font-size: 0.95rem; line-height: 1.6; white-space: pre-line; max-height: 300px; overflow-y: auto;"></p>
+        </div>
+
+        <a id="m-link" href="#" target="_blank" style="display:block; padding:12px; background:#3b82f6; color:#fff; text-align:center; border-radius:8px; text-decoration:none; font-weight:bold;">前往官網查看詳情</a>
+    </div>
+</div>
+
+<div class="modal-overlay" id="settings-modal" onclick="closeModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+        <h2>⚙️ 設定</h2>
+
+        <div class="settings-panel">
+            <div class="block-title">🔔 通知設定</div>
+            <button onclick="requestNotifyPermission()" style="width:100%; padding:10px; background:#333; color:#fff; border:none; border-radius:8px; margin-top:8px;">
+                檢查通知權限
+            </button>
+            <p id="notify-status" style="font-size:0.8rem; color:#888; margin-top:8px; text-align:center;">
+                狀態: 未知
+            </p>
+            <p style="font-size:0.75rem; color:#666; margin-top:4px; line-height:1.4;">
+                ⚠️ PWA 限制：網頁必須在開啟狀態下(或下拉刷新時)才能觸發通知。
+            </p>
+        </div>
+
+        <div class="settings-panel">
+            <label>⭐ 關注關鍵字 (按 Enter 新增)</label>
+            <input type="text" id="keyword-input" class="keyword-input">
+            <div id="keywords-tags" class="tags-container"></div>
+        </div>
+    </div>
+</div>
+
+<script src="event_visibility.js"></script>
+<script src="eventgo_period_gate.js"></script>
+<script>
+    let allEvents = [];
+    let filteredEvents = [];
+    let currentPage = 1;
+    const PAGE_SIZE = 50;
+
+    // [修改] 增加 regions 篩選器
+    const filters = { platforms: new Set(), status: new Set(), types: new Set(), regions: new Set() };
+    let myKeywords = JSON.parse(localStorage.getItem('eventradar_preview_myKeywords') || '[]');
+    let readEvents = JSON.parse(localStorage.getItem('eventradar_preview_readEvents') || '[]');
+
+    // 下拉更新邏輯 (保持不變)
+    let touchStartY = 0;
+    const ptrEl = document.getElementById('pull-to-refresh');
+    const ptrIcon = document.getElementById('ptr-icon');
+    const ptrSpinner = document.getElementById('ptr-spinner');
+
+    window.addEventListener('touchstart', e => { if (window.scrollY === 0) touchStartY = e.touches[0].clientY; });
+    window.addEventListener('touchmove', e => {
+        if (window.scrollY === 0 && e.touches[0].clientY > touchStartY) {
+            if (e.touches[0].clientY - touchStartY > 60) {
+                ptrEl.style.top = '60px'; ptrIcon.style.display = 'block'; ptrSpinner.style.display = 'none';
+            }
+        }
+    });
+    window.addEventListener('touchend', async e => {
+        if (ptrEl.style.top === '60px') {
+            ptrIcon.style.display = 'none'; ptrSpinner.style.display = 'block';
+            await init();
+            setTimeout(() => { ptrEl.style.top = '-50px'; }, 500);
+        }
+    });
+
+    // P30-G1: load the byte-identical frozen Preview JSON from bounded same-origin
+    // text parts. No source runtime, data writer, external request or notification.
+    async function loadIsolatedSnapshot() {
+        const cfgResp = await fetch('snapshot_manifest.json', { cache: 'no-store' });
+        if (!cfgResp.ok) throw new Error('P30_MANIFEST_UNAVAILABLE');
+        const cfg = await cfgResp.json();
+        if (cfg.kind !== 'EVENTRADAR_P30_IMMUTABLE_PREVIEW_SNAPSHOT' ||
+            cfg.preview_rows !== 9850 || cfg.parts.length !== 13 ||
+            cfg.preview_data_sha256 !== 'ef39c6be44a3f26c30bc3ce13f41548d1bd6b6408af8e872eb55fff360fea43b') {
+            throw new Error('P30_MANIFEST_DRIFT');
+        }
+        const pieces = await Promise.all(cfg.parts.map(async (name, i) => {
+            if (name !== ('data-parts/part_' + String(i).padStart(2, '0') + '.txt')) throw new Error('P30_PART_PATH_DRIFT');
+            const res = await fetch(name, { cache: 'no-store' });
+            if (!res.ok) throw new Error('P30_SNAPSHOT_PART_UNAVAILABLE_' + i);
+            return await res.text();
+        }));
+        const payload = pieces.join('');
+        const bytes = new TextEncoder().encode(payload);
+        if (bytes.length !== 5161754) throw new Error('P30_SNAPSHOT_LENGTH_DRIFT');
+        if (!globalThis.crypto || !crypto.subtle) throw new Error('P30_CRYPTO_UNAVAILABLE');
+        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+        if (digest !== cfg.preview_data_sha256) throw new Error('P30_SNAPSHOT_SHA256_DRIFT');
+        const events = JSON.parse(payload);
+        if (!Array.isArray(events) || events.length !== cfg.preview_rows) throw new Error('P30_SNAPSHOT_ROW_DRIFT');
+        return events;
+    }
+
+    async function init() {
+        checkNotifyStatus();
+
+        // 重試機制 (解決 CDN 延遲)
+        const maxRetries = 3;
+        let attempt = 0;
+        let success = false;
+
+        while (attempt < maxRetries && !success) {
+            try {
+                // P30 isolated byte-authenticated historical snapshot; main data.json untouched.
+                const rawSnapshot = await loadIsolatedSnapshot();
+                // G5C: reversible display filtering; original data.json is never edited.
+                const visibility = EventRadarValidity.filter(rawSnapshot);
+                // G5D: exact Event Go title period evidence; G5C already executed.
+                const g5d = EventRadarTitlePeriodGate.filter(visibility.visible, visibility.report.day);
+                allEvents = g5d.visible;
+                const audit = visibility.report;
+                document.getElementById('validity-audit').textContent =
+                    `活動有效性：顯示 ${g5d.report.visible}／${audit.total} 筆；隱藏 ${audit.hidden + g5d.report.hidden} 筆` +
+                    `（專用日期逾期 ${audit.expired_strict}、Event Go 完整活動區間逾期 ${g5d.report.hidden}、非活動 ${audit.non_event}）。` +
+                    `暫留待查 ${audit.date_conflict_keep + audit.date_mismatch_review + audit.title_expiry_review_keep - g5d.report.hidden} 筆` +
+                    `；日期不明 ${audit.date_unknown_keep} 筆。來源失效候選不會自動隱藏。`;
+                allEvents.sort((a,b) => new Date(b.scraped_at) - new Date(a.scraped_at));
+
+                const latestTime = allEvents[0]?.scraped_at;
+                const lastKnownTime = localStorage.getItem('eventradar_preview_lastDataTime');
+                if (latestTime && latestTime !== lastKnownTime) {
+                    localStorage.setItem('eventradar_preview_lastDataTime', latestTime);
+                    checkAndNotifyNewFavs();
+                }
+
+                document.getElementById('update-time').textContent = `更新於: ${new Date(allEvents[0]?.scraped_at).toLocaleString()}`;
+
+                document.getElementById('event-list').innerHTML = '';
+                renderChips();
+                applyFilters();
+                success = true;
+
+            } catch(e) {
+                console.error(`Attempt ${attempt + 1} failed:`, e);
+                attempt++;
+                if (attempt < maxRetries) {
+                    await new Promise(r => setTimeout(r, 1000));
+                } else {
+                    document.getElementById('event-list').innerHTML = `
+                        <div style="text-align:center; padding:40px; color:#ff6b6b;">
+                            <div style="font-size:3rem; margin-bottom:10px;">📡</div>
+                            <div>連線不穩或資料更新中</div>
+                            <div style="font-size:0.8rem; opacity:0.7; margin-top:5px;">請嘗試下拉頁面重新整理</div>
+                        </div>`;
+                }
+            }
+        }
+    }
+
+    function checkAndNotifyNewFavs() { return; /* PREVIEW_NOTIFICATIONS_OFF */
+        if (Notification.permission !== "granted") return;
+        const newFavs = allEvents.filter(e => !readEvents.includes(e.url) && checkIsFav(e.title));
+        if (newFavs.length > 0) {
+            new Notification("📡 活動雷達：發現關注活動！", {
+                body: `發現 ${newFavs.length} 筆新的關注活動，點擊查看！`,
+                icon: 'icons/icon-192.png',
+                tag: 'fav-event-alert'
+            });
+        }
+    }
+
+    function markAllRead() {
+        if(!confirm("確定要將所有活動設為已讀嗎？")) return;
+        const currentUrls = allEvents.map(e => e.url);
+        const uniqueReads = new Set([...readEvents, ...currentUrls]);
+        readEvents = Array.from(uniqueReads);
+        localStorage.setItem('eventradar_preview_readEvents', JSON.stringify(readEvents));
+        updateStatusCounts();
+        renderList();
+    }
+
+    function checkIsFav(title) {
+        if (!title) return false;
+        const t = title.toLowerCase();
+        return myKeywords.some(k => t.includes(k.toLowerCase()));
+    }
+
+    function renderChips() {
+        // 1. 平台篩選 (Platforms)
+        const pStats = {};
+        allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
+        document.getElementById('platform-chips').innerHTML = Object.entries(pStats)
+            .sort((a,b) => b[1]-a[1])
+            .map(([k,v]) => {
+                // 增加 isActive 判斷，確保下拉更新後選取狀態不會消失
+                const isActive = filters.platforms.has(k) ? 'active' : '';
+                return `<div class="chip ${isActive}" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`;
+            }).join('');
+
+        // 2. 地區篩選 (Regions) - [新增] 動態生成邏輯
+        const regionMap = [
+            { key: 'north', label: '北區' },
+            { key: 'central', label: '中區' },
+            { key: 'south', label: '南區' },
+            { key: 'east', label: '東區' },
+            { key: 'islands', label: '離島' }
+        ];
+
+        // 計算各地區數量
+        const rStats = { 'north': 0, 'central': 0, 'south': 0, 'east': 0, 'islands': 0 };
+        allEvents.forEach(e => {
+            if (e.region) {
+                const r = e.region.toLowerCase();
+                if (rStats.hasOwnProperty(r)) rStats[r]++;
+            }
+        });
+
+        // 生成 HTML
+        document.getElementById('region-chips').innerHTML = regionMap.map(item => {
+            const count = rStats[item.key] || 0;
+            const isActive = filters.regions.has(item.key) ? 'active' : '';
+            return `<div class="chip ${isActive}" onclick="toggleFilter('regions', '${item.key}', this)">${item.label} <span>${count}</span></div>`;
+        }).join('');
+
+        // 3. 類別篩選 (Types)
+        const tStats = {};
+        allEvents.forEach(e => tStats[e.type] = (tStats[e.type]||0)+1);
+        document.getElementById('type-chips').innerHTML = Object.entries(tStats)
+            .sort((a,b) => b[1]-a[1])
+            .map(([k,v]) => {
+                const isActive = filters.types.has(k) ? 'active' : '';
+                return `<div class="chip ${isActive}" onclick="toggleFilter('types', '${k}', this)">${k} <span>${v}</span></div>`;
+            }).join('');
+
+        updateStatusCounts();
+    }
+
+    function updateStatusCounts() {
+        const newCount = allEvents.filter(e => !readEvents.includes(e.url)).length;
+        const favCount = allEvents.filter(e => checkIsFav(e.title)).length;
+
+        const isNewActive = filters.status.has('isNew') ? 'active' : '';
+        const isFavActive = filters.status.has('isFav') ? 'active' : '';
+        document.getElementById('status-chips').innerHTML = `
+            <div class="chip ${isNewActive}" onclick="toggleFilter('status', 'isNew', this)">🆕 新進活動 <span>${newCount}</span></div>
+            <div class="chip ${isFavActive}" onclick="toggleFilter('status', 'isFav', this)">⭐ 關注關鍵字 <span>${favCount}</span></div>
+        `;
+    }
+
+    function toggleFilter(category, value, el) {
+        el.classList.toggle('active');
+        if (filters[category].has(value)) filters[category].delete(value);
+        else filters[category].add(value);
+        resetPageAndRender();
+    }
+
+    function resetPageAndRender() { currentPage = 1; applyFilters(); }
+
+    function applyFilters() {
+        const query = document.getElementById('search').value.toLowerCase();
+
+        // 1. 先進行篩選 (Filter)
+        // 使用 let 宣告 tempEvents 以便後續排序
+        let tempEvents = allEvents.filter(e => {
+            const isFav = checkIsFav(e.title);
+            const isNew = !readEvents.includes(e.url);
+
+            // 關鍵字搜尋
+            if (query && !e.title.toLowerCase().includes(query)) return false;
+
+            // 平台篩選
+            if (filters.platforms.size > 0 && !filters.platforms.has(e.platform)) return false;
+
+            // 類別篩選
+            if (filters.types.size > 0 && !filters.types.has(e.type)) return false;
+
+            // 狀態篩選
+            if (filters.status.has('isNew') && !isNew) return false;
+            if (filters.status.has('isFav') && !isFav) return false;
+
+            // 地區篩選邏輯
+            if (filters.regions.size > 0) {
+                const rawRegion = e.region || 'unknown';
+                const region = rawRegion.toLowerCase();
+                const knownRegions = ['north', 'central', 'south', 'east', 'islands'];
+
+                // 邏輯：
+                // 若是已知區域 (如 North)，必須在用戶勾選的名單內才顯示
+                // 若是 Unknown，則暫時保留 (不 return false)
+                if (knownRegions.includes(region)) {
+                    if (!filters.regions.has(region)) return false;
+                }
+            }
+
+            return true;
+        });
+
+        // 2. 進行排序 (Sort) - [新增]
+        // 排序優先級：符合篩選地區 > 關注中 > 新活動 > 原始順序
+        tempEvents.sort((a, b) => {
+            // (A) 地區優先排序
+            // 當有篩選地區時，將「明確符合該地區」的活動排在前面，「Unknown」排在後面
+            if (filters.regions.size > 0) {
+                const regionA = (a.region || 'unknown').toLowerCase();
+                const regionB = (b.region || 'unknown').toLowerCase();
+
+                const aIsSelected = filters.regions.has(regionA);
+                const bIsSelected = filters.regions.has(regionB);
+
+                // 若 A 是選中地區，B 不是 (例如 B 是 Unknown)，則 A 排前 (-1)
+                if (aIsSelected && !bIsSelected) return -1;
+                // 若 A 不是 (Unknown)，B 是選中地區，則 B 排前 (1)
+                if (!aIsSelected && bIsSelected) return 1;
+            }
+
+            // (B) 關注優先 (Favorite)
+            const aFav = checkIsFav(a.title);
+            const bFav = checkIsFav(b.title);
+            if (aFav !== bFav) return bFav - aFav; // true(1) - false(0) = 1 (大的在前? 不，sort logic: b-a means descending)
+            // 修正：Boolean 相減 true=1, false=0。 b(1)-a(0)=1 -> b 在前。 b(0)-a(1)=-1 -> a 在前。正確。
+
+            // (C) 新活動優先 (New)
+            const aNew = !readEvents.includes(a.url);
+            const bNew = !readEvents.includes(b.url);
+            if (aNew !== bNew) return bNew - aNew;
+
+            return 0; // 保持原始順序
+        });
+
+        // 3. 更新全域變數並渲染
+        filteredEvents = tempEvents;
+
+        document.getElementById('result-count').textContent = `顯示 ${filteredEvents.length} 筆活動 (共 ${allEvents.length} 筆)`;
+        renderList();
+        renderPagination();
+    }
+
+    function renderList() {
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const pageData = filteredEvents.slice(start, start + PAGE_SIZE);
+        const list = document.getElementById('event-list');
+
+        if(pageData.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:40px; color:#666;">沒有符合條件的活動 🐢</div>';
+            return;
+        }
+
+        // [新增] 地區代碼轉中文名稱的對照表
+        const regionLabelMap = {
+            'North': '北區',
+            'Central': '中區',
+            'South': '南區',
+            'East': '東區',
+            'Islands': '離島'
+            // Unknown 會回傳 undefined，下方邏輯會自動處理為不顯示
+        };
+
+        list.innerHTML = pageData.map(e => {
+            const isFav = checkIsFav(e.title);
+            const isNew = !readEvents.includes(e.url);
+
+            // [新增] 取得該活動的地區中文標籤 (若無 region 或 region 為 Unknown，則為空字串)
+            const regionLabel = regionLabelMap[e.region] || '';
+
+            return `<div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
+                    ${e.img_url ? `<img src="${e.img_url}" class="card-img" loading="lazy">` : ''}
+                    <div class="card-info">
+                        <div class="badges">
+                            <span class="badge" style="color:#60a5fa">${e.platform}</span>
+
+                            ${regionLabel ? `<span class="badge" style="background:#4b5563; color:#fff">${regionLabel}</span>` : ''}
+
+                            ${isNew ? '<span class="badge new">NEW</span>' : ''}
+                            ${isFav ? '<span class="badge fav">⭐ 關注</span>' : ''}
+                            <span class="badge">${e.type}</span>
+                        </div>
+                        <div style="font-weight:500; font-size:1rem;">${e.title}</div>
+                        <div style="font-size:0.8rem; color:#888;">${e.date || '詳內文'} ${e.location ? `| ${e.location}` : ''}</div>
+                    </div></div>`;
+        }).join('');
+    }
+
+    function renderPagination() {
+        const totalPages = Math.ceil(filteredEvents.length / PAGE_SIZE) || 1;
+        document.getElementById('page-info').textContent = `第 ${currentPage} / ${totalPages} 頁`;
+        document.getElementById('prev-btn').disabled = currentPage === 1;
+        document.getElementById('next-btn').disabled = currentPage === totalPages;
+    }
+
+    function changePage(delta) { currentPage += delta; renderList(); renderPagination(); window.scrollTo(0, 0); }
+
+    function openDetail(url) {
+        const ev = allEvents.find(e => e.url === url);
+        if(!ev) return;
+
+        if(!readEvents.includes(url)) {
+            readEvents.push(url);
+            localStorage.setItem('eventradar_preview_readEvents', JSON.stringify(readEvents));
+            updateStatusCounts();
+        }
+
+        document.getElementById('m-title').textContent = ev.title;
+        document.getElementById('m-platform').textContent = ev.platform;
+        document.getElementById('m-type').textContent = ev.type;
+        document.getElementById('m-link').href = ev.url;
+
+        document.getElementById('m-date').textContent = ev.date || '詳內文';
+        document.getElementById('m-location').textContent = ev.location || '詳內文';
+        document.getElementById('m-price').textContent = ev.price || '詳內文';
+
+        const desc = ev.description ? ev.description : '暫無詳細簡介，請點擊下方按鈕前往官網查看。';
+        document.getElementById('m-desc').textContent = desc;
+
+        const img = document.getElementById('m-img');
+        if(ev.img_url) {
+            img.src = ev.img_url;
+            img.style.display = 'block';
+        } else {
+            img.style.display = 'none';
+        }
+
+        document.getElementById('detail-modal').classList.add('open');
+        renderList();
+    }
+
+    function closeModal() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open')); }
+    function openSettings() { renderKeywords(); checkNotifyStatus(); document.getElementById('settings-modal').classList.add('open'); }
+    function renderKeywords() { document.getElementById('keywords-tags').innerHTML = myKeywords.map((k, i) => `<div class="tag">${k} <span onclick="removeKeyword(${i})" style="cursor:pointer; color:#f87171">×</span></div>`).join(''); }
+    function removeKeyword(i) { myKeywords.splice(i, 1); renderKeywords(); localStorage.setItem('eventradar_preview_myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); }
+    document.getElementById('keyword-input').onkeypress = (e) => { if(e.key === 'Enter') { const val = e.target.value.trim(); if(val && !myKeywords.includes(val)) { myKeywords.push(val); e.target.value = ''; renderKeywords(); localStorage.setItem('eventradar_preview_myKeywords', JSON.stringify(myKeywords)); applyFilters(); updateStatusCounts(); } } };
+
+    function requestNotifyPermission() { alert("測試站不啟用通知"); return; /* PREVIEW_NOTIFICATIONS_OFF */
+        Notification.requestPermission().then(p => {
+            alert(p === "granted" ? "✅ 通知已開啟" : "🚫 通知被拒絕");
+            checkNotifyStatus();
+        });
+    }
+
+    function checkNotifyStatus() { document.getElementById("notify-status").textContent="狀態: 測試站通知停用"; return; /* PREVIEW_NOTIFICATIONS_OFF */
+        const p = Notification.permission;
+        const statusMap = { 'default': '未詢問', 'granted': '✅ 已開啟', 'denied': '🚫 已封鎖' };
+        document.getElementById('notify-status').textContent = `狀態: ${statusMap[p] || p}`;
+    }
+
+    init();
+</script>
+</body>
+</html>

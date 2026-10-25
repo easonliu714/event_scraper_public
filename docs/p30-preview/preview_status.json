@@ -1,0 +1,19 @@
+{
+  "kind": "EVENTRADAR_PR1_PREVIEW_ONLY",
+  "public_unverified": true,
+  "source_repository": "easonliu714/event_scraper_public",
+  "source_branch": "fix/event-radar-v44-cloud-20261023",
+  "source_pr_number": 1,
+  "source_head_sha": "c5ce044c206aca470abb89b7ebb79e35d492537e",
+  "baseline_main_sha": "6004754f90d551cdb0cdb91a3e04b42c04f45f48",
+  "baseline_data_sha256": "d812b6872bb2959b101d03ae659d84f3ea899fae04ae227acad9f40969d0823b",
+  "unsanitized_output_sha256": "ee2de65c693424d60f3d209def8ce41e39690e379f8fac11c2f4afb9e88ab177",
+  "preview_data_sha256": "ef39c6be44a3f26c30bc3ce13f41548d1bd6b6408af8e872eb55fff360fea43b",
+  "preview_rows": 9850,
+  "source_output_rows": 9850,
+  "dropped_invalid_rows": 0,
+  "new_rows_in_dryrun": 1414,
+  "changed_or_new_rows": 1764,
+  "created_at_utc": "2026-10-23T06:50:19.798524+00:00",
+  "warning": "Preview only; activity dates, places, prices and classification are NOT verified."
+}
