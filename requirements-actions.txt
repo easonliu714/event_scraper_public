@@ -1,0 +1,5 @@
+aiohttp>=3.9,<4
+beautifulsoup4>=4.12,<5
+requests>=2.31,<3
+schedule>=1.2,<2
+python-telegram-bot>=20,<23
