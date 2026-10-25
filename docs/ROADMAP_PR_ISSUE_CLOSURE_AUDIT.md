@@ -1,5 +1,102 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+
+> **最新增量提案｜2026-10-25 P30 即時來源品質 Roadmap（Docs-only Draft；尚未合併 main）**
+>
+> 此章是以 GitHub 即時讀回及使用者最新要求編製的「後續治理變更候選」。原下方 SRC-P29 候選、P25/P26 等字樣都是歷史時點描述，**不代表目前 P29 未完成**。此章經獨立文件 PR 合併後方成為 main 上最新正式進度；未合併前 Source main 仍以舊正文加上 GitHub 遠端事實解讀。原文逐位元組保留。
+>
+> 最新已核對權威：Source main \`fc4f963247d68eed29425808cc14e7250f312d05\`；Preview main \`03e515d65e827d5ed67fe341d079907a96bf784a\`；ShowNews main \`85fed3e85ff5deff479a85b8d692aa9e6d2bdcad\`。
+>
+> **業務要求調整**：Source \`docs/data.json\` 歷史 8,436 筆與 Preview \`data.json\` 歷史 9,850 筆均不作為下一次 PWA 候選活動清單；優先重新取得現時官方來源資料，以「HTTP 回應成功 → 有效活動清單 → 詳情成功 → 重要欄位可信」分段改善。不得因「可忽略舊 JSON」直接刪除 Git 歷史、覆蓋現有 Pages 資料或啟動單一正式 Writer；舊檔刪除/入口切換另設可復歸發布 Gate。
+
+## SRC-P29 完成／SRC-P30 最新決策：2026-10-25 增量狀態
+
+| 物件 | 即時核對的身分及 Gate | 決策 |
+| --- | --- | --- |
+| SRC-P1～P28（含 Android Gates） | 既有承接快照及實機驗證證據 PASS | 凍結保留，不重跑；不得以新對話推翻 |
+| SRC-P29 | Source PR #5、Preview PR #2 已 MERGED；各 main 為上方兩個固定 SHA | COMPLETE，不重跑 |
+| P20 Source PR #2 | OPEN/DRAFT，HEAD \`4c2c9ec93ae90410230a074e09b2aa853b7bfcf0\`；原生 \`source-offline\` check SUCCESS，Run \`40156884831\` | 程式仍 DORMANT，未授權 Merge |
+| P20 Preview PR #1 | OPEN/DRAFT，HEAD \`b55b3673088b6df7bfe51f04d8d82b8e7616324f\`；原生 \`ui-offline\` check SUCCESS，Run \`40156894950\` | UI Android/Synthetic 驗收歷史保留，未授權 Merge |
+| Source PR #1 | OPEN/DRAFT，HEAD \`26888422e48634d9729d2deea67b7996a5d1e4ee\` | Cloud Scheduler / writer HIGH-RISK HOLD |
+| SRC-P30 PR #6 | OPEN/DRAFT，HEAD \`1402df1bd32a1fafaa6b1842c54b796f977ea2c7\`；隔離舊 9,850 筆快照 CI \`40195542386\` SUCCESS | **歷史驗證保留，但已被最新「重新抓取優先」業務決策取代**；不得 Merge |
+| SRC-P30 PR #7 | OPEN/DRAFT，HEAD \`959324cb3bad8f56fb411b7cfb6de2a294f18850\`；一次性 Runner \`40196442965\` completed/success | **P30-L1 診斷工具 Gate PASS；各來源品質尚未 PASS；未進正式 Runtime** |
+| P30 首輪結果 | 19 平台取樣；15 HTTP OK；11 平台有清單候選；338 筆新清單候選；11 筆詳情抽樣 HTTP OK | 僅 **診斷與候選資料**，不是完整抓取／官方 Golden／可發布資料 |
+| Source P29 workflow 在 P30 PR | 對 P30 PR #6/#7 為 SKIPPED（非白名單中的 P20 工作） | 合乎原限制；不得以 skipped 當作 P30 CI PASS 或 P29 Gate 失效 |
+
+### 最新授權範圍與證據語義
+
+- \`CODE_EXISTS\` ≠ \`CI_SUCCESS\` ≠ \`HTTP_OK\` ≠ \`LIST_EXTRACTED\` ≠ \`DETAIL_EXTRACTED\` ≠ \`FIELD_VERIFIED\` ≠ \`GOLDEN_ACCEPTED\` ≠ \`ANDROID_UAT_PASS\` ≠ \`PUBLISHED\`。
+- 首輪 P30-L1 使用僅讀、一次性、限流的 19 平台清單入口與最多每平台 1 筆詳情抽樣；輸出 GitHub Run Artifact \`eventradar-p30-fresh-diagnostic\`（Run \`40196442965\`；Artifact ID \`12600795314\`，保留期間依 Actions 實際顯示）；\`candidate.json\` 和 \`diagnostics.json\` 不進 \`docs/data.json\`。
+- 來源 HTML 200 不保證 JavaScript 動態清單可解析；403、429、404、轉址異常等必須獨立呈現，不能重試繞過網站限制。2026-10-25 的 338 筆為限額抽樣清單；**不得以 338 判定全面覆蓋率或事件真實性**。
+- 使用者容許部分日期、票價、地點、描述未解析時**顯示官方連結 + 明確缺值／以官方為準**，但不得猜測或把售票日期、清單日期直接當活動場次日期；未知票況一律 UNKNOWN。
+- 維持 \`SOURCE_RUNTIME=DORMANT\`、\`GOLDEN_ACCEPTED=0\`、\`AUTO_HIDDEN=0\`、\`APP_DATA_PUBLISHED=false\`；禁止自動隱藏、正式爬蟲寫入、通知、排程、未核准發版。
+
+### SRC-P30 多階層後續 Gate Roadmap（新工作優先序）
+
+\`\`\`text
+EventRadar Taiwan / SRC-P30 SOURCE-FIRST ROADMAP
+├── P1～P29 [歷史 PASS / FROZEN; 不重做]
+├── P30-L1 即時診斷基線 [TOOL/ONE-SHOT RUN PASS; SOURCE QUALITY STILL OPEN]
+│   ├── GitHub 唯讀權威、P20 PR HEAD、既有 Pages/data Blob [PASS]
+│   ├── HTTP → 清單 → 詳情 → 欄位分層觀察 [RUN 40196442965 SUCCESS]
+│   └── 19 平台 / 15 HTTP OK / 11 有清單 / 338 候選 / 11 詳情 HTTP OK [非 Golden]
+├── P30-L2 可達性與安全來源入口 [NEXT / OPEN]
+│   ├── L2-A HTTP 403/404/429/Timeout/Redirect/Content-Type 與現行 URL 分類
+│   ├── L2-B 只更正官方公開入口/允許的轉址與網站已公開的清單來源；不能繞過限制
+│   └── L2-C 每平台固定官方 URL、HTTP 成功/失敗證據、HTML fixture、變更前後差異
+├── P30-L3 活動清單可靠取得 [OPEN]
+│   ├── HTTP 200 但 0 筆：診斷 JS 渲染、入口與選擇器飄移，不宣稱 PASS
+│   ├── 逐平台 URL 白名單、活動明細連結驗證、標題非雜訊、去重、分頁上限
+│   └── 平台未通過可顯式 DEFERRED；可用平台不得被不良來源污染
+├── P30-L4 詳情成功與來源身分 [OPEN]
+│   ├── 每平台先抽樣，將 HTTP、Event URL／canonical／JSON-LD 身分分離
+│   ├── 多場次、集合頁、轉址、缺詳情、票種/資格特殊頁以 HOLD/UNKNOWN 表示
+│   └── 經個別來源 Gate 後再受控擴大詳情範圍，禁止無上限全站抓取
+├── P30-L5 欄位解析品質 [OPEN]
+│   ├── title / canonical official_url / event date vs sales window / location / price / description
+│   ├── confidence + evidence source + parsed role + missing reason，避免推測
+│   └── UI 顯示摘要與「以官方為準」；缺部分欄位不強迫丟棄有用活動
+├── P30-L6 分類、去重、有效性 [OPEN; 映射 G5J]
+│   ├── 來源特定類別與非活動判定、URL/活動身分去重、多場次分流
+│   ├── ACTIVE / EXPIRED / NON_EVENT / SOURCE_GONE / UNCERTAIN 可逆狀態
+│   └── 403/404 或單次失效不可自動下架；AUTO_HIDDEN=0 直到正式授權
+├── P30-L7 新鮮候選 JSON 資料契約／官方 Golden [OPEN; 映射 R3C-O3]
+│   ├── 新 run_id、取得時點、來源網址、品質報告、SHA、JSON schema、覆蓋統計
+│   ├── 只存隔離 Artifact / candidate 路徑；舊 8436/9850 不混入新集
+│   └── 人工官方 Golden 签認另行 Gate；缺證據明確 HOLD
+├── P30-L8 隔離 PWA / Android 真實 UAT [OPEN; 映射 G5K]
+│   ├── 資料欄位/篩選/詳細頁 UI、來源與未知欄位清楚標示
+│   ├── 先隔離 URL 與保護正式路徑，再核准部署/Android 真機比對
+│   └── 原 P20 Android Gate 繼續有效，但不能代替「新資料」的 G5K 驗收
+├── P30-L9 正式發布／單一 Writer [LOCKED]
+│   ├── R3C-O3、G5J、G5K、Rollback、PR review、來源合法性/權限條件
+│   └── 經另外授權才可資料替換、Schedule、通知、正式 Pages 切換
+└── P30-L10 三 Repo 收斂 [LOCKED; 原 P30-G2～G4]
+    ├── Source 為唯一程式/CI/治理/資料/PWA 權威；ShowNews 純函式擇優搬移
+    └── Preview / ShowNews 外部 Render 或其他部署依賴查明、轉址/安裝/回復核實後
+        另行授權才可 Archive；永不在本 Gate 自動 Delete Repo
+\`\`\`
+
+### 分段驗收判定（可量測，但沒有捏造達成率）
+
+| 層級 | 每平台最小證據／候選 PASS 準則 | 未通過時 |
+| --- | --- | --- |
+| L2 HTTP | 來源/取得時點、原始與最終 URL、HTTP code、HTML 型別、redirect 與 byte digest；阻擋不偽裝成功 | BLOCKED/HOLD + 原因 |
+| L3 清單 | 來源身分合法、活動 URL/title 有值、規則不吸入導覽雜訊、URL 去重且有合成負例 | LIST_EMPTY/SELECTOR_HOLD |
+| L4 詳情 | 有一組以上可複驗的官方詳情樣本及身分綁定；多場次/集合頁單獨分類 | DETAIL_UNKNOWN/HOLD |
+| L5 欄位 | 核心欄位逐一標來源證據、角色/時間語義及未知狀態；不推定售票中 | FIELD_PARTIAL/UNKNOWN |
+| L6 有效性 | 可逆 ledger、負向測試；無官方證據不自動下架 | UNCERTAIN（保留顯示/待查） |
+| L7 JSON | 每輪完整 JSON schema、唯一 URL、來源溯源、候選 vs Golden 隔離、SHA/統計 | DATA_HOLD |
+| L8 PWA | Synthetic + 瀏覽器 + 真機 UI／路徑/存取權限驗收；未核准不能上 Pages 正式入口 | UAT_HOLD |
+| L9 發布 | 人工 Golden、G5J/G5K、單 writer、復歸和變更授權全到位 | RELEASE_LOCKED |
+
+**下個具體任務：START P30-L2-A。** 不再重跑成功的 19 平台原樣一次性診斷；基於 Run \`40196442965\` 的 \`diagnostics.json\` 做「HTTP 非 200 優先，HTTP 200 卻無清單次之」定點修正。先建立可重播的 HTML/HTTP 正負案例與來源白名單表，分開記錄穩定來源和網站限制；未取得可用合法存取途徑的平台維持 HOLD，不妨礙其他平台的受控進度。
+
+**後續協作規範**：每輪以 GitHub 最新三 Repo HEAD → 兩治理 MD 最新章節 → Open PR/Actions/Check Run → 現有 Artifact → 最小必要 Diff 為序；Remote main 校驗、Docs-only/Code-only 變更分流、Draft PR、獨立 Read-back；未另授權不得 Merge、Ready for Review、清除舊 JSON、正式寫入/發布/通知/封存 Repo。以上數字均為 2026-10-25 診斷時點，不是今日持續即時狀態。
+
+---
+
+
 > **SRC-P29 受控 PR CI 候選｜2026-10-25（Asia/Taipei）**
 >
 > 本段為新 CI 分支上的候選；未合併前不取代 main 正式治理權威。P24／P25／P26 以下歷史全文保留。
