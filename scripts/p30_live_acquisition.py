@@ -17,7 +17,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urljoin, urlsplit
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, UnicodeDammit
 
 # One public list entry per known platform; no search blasting or paging.
 PLATFORMS = (
@@ -97,8 +97,8 @@ def get_html(session, url, hosts, timeout):
                     return None, meta
                 meta["bytes"] = len(content)
                 meta["html_sha256"] = hashlib.sha256(content).hexdigest()
-                response.encoding = response.apparent_encoding or "utf-8"
-                return content.decode(response.encoding, errors="replace"), meta
+                decoded = UnicodeDammit(bytes(content), is_html=True).unicode_markup
+                return (decoded or bytes(content).decode("utf-8", errors="replace")), meta
         except requests.RequestException as error:
             return None, {"status": "NETWORK_ERROR",
                           "error_type": type(error).__name__, "trail": trail}
