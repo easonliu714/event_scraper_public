@@ -1,0 +1,93 @@
+name: EventRadar P30 one-shot live source diagnostic
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-live-diagnostic
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-live-diagnostic-branch
+  cancel-in-progress: false
+jobs:
+  bounded-live-audit:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-live-diagnostic'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout isolated P30 HEAD without token persistence
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify source main and frozen runtime/data identities
+        run: |
+          set -euo pipefail
+          base=fc4f963247d68eed29425808cc14e7250f312d05
+          test "$(git rev-parse "$base":docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          git merge-base --is-ancestor "$base" HEAD
+          changed="$(git diff --name-only "$base" HEAD)"
+          if echo "$changed" | grep -Ev '^(scripts/p30_live_acquisition.py|tests/p30/test_live_acquisition.py|docs/P30_LIVE_ACQUISITION_DIAGNOSTIC.md|\.github/workflows/eventradar_p30_live_diagnostic.yml)$'; then
+            echo HOLD_UNEXPECTED_CHANGED_PATH; exit 1
+          fi
+          echo PASS P30_FROZEN_SOURCE_RUNTIME_AND_DATA
+      - name: Install read-only parser dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Compile and execute offline negative tests before network
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_live_acquisition.py tests/p30/test_live_acquisition.py
+          python -m unittest discover -s tests/p30 -p 'test_live_acquisition.py' -v
+          echo PASS P30_OFFLINE_GUARD_TESTS
+      - name: Materialize pinned pure P20 detail parser without merging its PR
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin 4c2c9ec93ae90410230a074e09b2aa853b7bfcf0 --depth=1
+          mkdir -p "$RUNNER_TEMP/p30-parser"
+          git show 4c2c9ec93ae90410230a074e09b2aa853b7bfcf0:event_details.py > "$RUNNER_TEMP/p30-parser/event_details.py"
+          test "$(git hash-object "$RUNNER_TEMP/p30-parser/event_details.py")" = 3ff1f7cdba536248f7bdf5da936aa51e092f6ac2
+          python -m py_compile "$RUNNER_TEMP/p30-parser/event_details.py"
+          echo PASS P30_P20_PURE_PARSER_IDENTITY
+      - name: Bounded public list and sampled detail GET diagnostics
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_live_acquisition.py \
+            --parser-file "$RUNNER_TEMP/p30-parser/event_details.py" \
+            --out p30-artifacts \
+            --platform-limit 19 \
+            --detail-per-platform 1 \
+            --timeout 12 \
+            --min-interval 1 \
+            --max-seconds 1000
+      - name: Check candidate artifact fail-closed flags
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-artifacts/diagnostics.json').read_text(encoding='utf-8'))
+          rows=json.loads(Path('p30-artifacts/candidate.json').read_text(encoding='utf-8'))
+          assert d['kind']=='EVENTRADAR_P30_FRESH_DIAGNOSTIC_CANDIDATE'
+          assert not d['writer_executed'] and not d['notification_executed']
+          assert not d['golden_accepted'] and not d['app_data_published']
+          assert d['counts']['total_list_candidates']==len(rows)
+          assert len({x['url'] for x in rows})==len(rows)
+          assert all(x['ticket_availability']=='UNKNOWN' for x in rows)
+          print('PASS P30_NEW_JSON_CANDIDATE_ONLY rows=',len(rows))
+          PY
+      - name: Upload fresh diagnostic JSON as immutable run artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-fresh-diagnostic
+          path: p30-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
