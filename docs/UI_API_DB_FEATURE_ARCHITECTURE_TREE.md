@@ -1,5 +1,28 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **SRC-P29 受控 PR CI 候選｜2026-10-25（Asia/Taipei）**
+>
+> 本段為新 CI 分支上的候選；未合併前不取代 main 正式治理權威。P24／P25／P26 以下歷史全文保留。
+> 最新遠端唯讀核對：Source main `63eb062295757983cf51c2ccc51d9ba039391e93`；Preview main `a8cde084ab5581736d86094d8cdcc2cdc9963000`。
+> SRC-P27 已由 Source PR #4 一般 Merge Commit 完成；SRC-P28 Android PASS 依使用者交接保留。本輪再次讀回 P20 兩個 HEAD 與當時 API 所報 Merge SHA，Check runs 均為 0，仍為 NOT_ATTESTED。
+> SRC-P1～P28 不重啟。方案 B：原生 `pull_request` CI；不發布 P28 外部 Commit Status 候選。
+
+### SRC-P29 實作與驗收邊界
+
+- Source 新增 `.github/workflows/eventradar_source_p29_pr_ci.yml`；Preview 新增 `.github/workflows/eventradar_preview_p29_pr_ci.yml`，各從上述 main 建立獨立 `ci/eventradar-<source|preview>-pr-ci-p29` 分支與 Draft PR。
+- 沿用 P22/P23 Source Python AST + 兩組離線 parser suite、Preview 九個合成角色/escaping/modal/JS 語法測試；不改應用函數或測試內容。移除已過期的 P22 remote main SHA 斷言，保留原始 P20 父 commit、精確五新增/單一 index Diff 與固定 P20 HEAD。
+- 唯一事件：`pull_request`，base `main`，types `opened/synchronize/reopened`。唯一 token 權限 `contents: read`；checkout 不保留憑證；每 PR concurrency、10 分鐘 timeout、標準 `ubuntu-latest`。只允許同 Repo 指定 P20 PR 或 P29 bootstrap 分支；Source PR #1 不執行此 job。
+- 分別輸出觸發 PR HEAD、event base SHA、GitHub 合成 Merge SHA、workflow SHA 與被測 P20 HEAD。Check Run 的 `head_sha` 必須由 GitHub API 獨立讀回，禁止從 checkout ref 推定。
+- P29 Draft PR 的 native CI（若觸發）只證明該 P29 PR 工作流程可執行；其固定 P20 測試不等於既有 P20 PR 的原生 Check。遠端 Run/Job/Check 結論須以實際讀回為準，目前本文件不預先宣稱成功。
+- `pull_request` 從事件關聯的 Merge ref 取得 workflow，並非所有 PR Workflow 都必須先存在 default branch。獨立 P29 PR 不會為既有 P20 PR 自動補發事件。在保持 P20 HEAD/五檔/單檔不變的路線下，須另行授權把 CI Workflow 合併 main，再對既有 P20 PR 觸發允許的事件並讀回證據；本輪不合併、不開關既有 PR。
+- Source PR #1 `26888422e48634d9729d2deea67b7996a5d1e4ee` 維持 Open/Draft/Unmerged、Cloud Scheduler/writer HIGH_RISK_HOLD；Source PR #2 `4c2c9ec93ae90410230a074e09b2aa853b7bfcf0` 與 Preview PR #1 `b55b3673088b6df7bfe51f04d8d82b8e7616324f` 維持原 HEAD、Draft 與精確 Diff。
+- 禁止活動網站抓取、JSON 寫入、正式部署、通知、排程與自動合併。維持 `GOLDEN_ACCEPTED=0 AUTO_HIDDEN=0 APP_DATA_PUBLISHED=false SOURCE_RUNTIME=DORMANT`。R3C-O3 Golden、G5J、G5K 另案 OPEN/HOLD。
+- 下一階段：審查 P29 Draft PR 與原生 CI 證據，另行取得 main 合併與既有 P20 事件觸發授權；此 CI 階段不需要 Android 實機驗證。
+
+來源：[GitHub workflow 事件解析](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflows)、[pull_request 語義](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)。
+
+---
+
 > **最新合併基準：SRC-P25（2026-10-24，Asia/Taipei）。** Source `main@a8d21d2e6aa056a13d5eb9de3d32920d11d4f740` 已一般 Merge Commit 合併 [Docs PR #3](https://github.com/easonliu714/event_scraper_public/pull/3)；兩份文件正式存在 `main`。下方 SRC-P24「候選」章節是原始歷史記錄，不再代表現況。
 > **P26 文件修訂範圍：** 本次僅新增最新狀態與歷史分界，仍需新的 Docs-only Draft PR 合併才能成為 `main` 的最新版；不更動 Source、Preview、Workflow 或資料。
 

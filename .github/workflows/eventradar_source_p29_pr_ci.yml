@@ -1,0 +1,107 @@
+# P29 reuses the accepted P22 offline test bodies without changing application code.
+name: EventRadar P29 source native PR CI
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p29-source-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  source-offline:
+    # Restrict this bounded gate to the approved P20 PR or its P29 workflow bootstrap.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      ((github.event.number == 2 && github.head_ref == 'feat/eventradar-source-only-p20') ||
+       github.head_ref == 'ci/eventradar-source-pr-ci-p29')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # P29: bind the triggering PR separately from the immutable P20 test target.
+      # A bootstrap PR check is NOT evidence of a check on the existing P20 PR.
+      - name: Verify PR identity and report distinct commit roles
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          pr = event['pull_request']
+          repo = 'easonliu714/event_scraper_public'
+          assert os.environ['GITHUB_EVENT_NAME'] == 'pull_request'
+          assert event['action'] in ('opened', 'synchronize', 'reopened', 'edited')
+          assert pr['base']['repo']['full_name'] == repo
+          assert pr['head']['repo']['full_name'] == repo
+          assert pr['base']['ref'] == 'main'
+          target = '4c2c9ec93ae90410230a074e09b2aa853b7bfcf0'
+          if pr['head']['ref'] == 'feat/eventradar-source-only-p20':
+              assert event['number'] == 2
+              assert pr['head']['sha'] == target, 'P20 HEAD drift: HOLD'
+              mode = 'P20_NATIVE_PR_HEAD_TEST'
+          else:
+              assert pr['head']['ref'] == 'ci/eventradar-source-pr-ci-p29'
+              mode = 'P29_WORKFLOW_BOOTSTRAP_NOT_P20_ATTESTATION'
+          assert os.environ['GITHUB_REF'] == f"refs/pull/{event['number']}/merge"
+          roles = {
+              'MODE': mode,
+              'TRIGGER_PR_HEAD_SHA': pr['head']['sha'],
+              'EVENT_BASE_SHA': pr['base']['sha'],
+              'SYNTHETIC_MERGE_SHA': os.environ['GITHUB_SHA'],
+              'WORKFLOW_SHA': os.environ['WORKFLOW_SHA'],
+              'TESTED_P20_HEAD_SHA': target,
+          }
+          for key, value in roles.items():
+              if key.endswith('_SHA'):
+                  assert re.fullmatch(r'[0-9a-f]{40}', value), key
+              print(f'{key}={value}')
+          print('CHECK_RUN_HEAD_SHA=REQUIRES_INDEPENDENT_API_READBACK')
+          print('GOLDEN_ACCEPTED=0 AUTO_HIDDEN=0 APP_DATA_PUBLISHED=false SOURCE_RUNTIME=DORMANT')
+          PY
+      - name: Checkout immutable P20 test target, no persistent credentials
+        uses: actions/checkout@v4
+        with:
+          ref: 4c2c9ec93ae90410230a074e09b2aa853b7bfcf0
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact main-based five-file diff (read-only)
+        env:
+          BASE_SHA: 6004754f90d551cdb0cdb91a3e04b42c04f45f48
+          HEAD_SHA: 4c2c9ec93ae90410230a074e09b2aa853b7bfcf0
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          diff="$(git diff --name-status "$BASE_SHA" "$HEAD_SHA" | LC_ALL=C sort)"
+          expected="$(printf 'A\tevent_details.py\nA\trequirements-actions.txt\nA\tshow_news.py\nA\ttests/test_event_details.py\nA\ttests/test_event_details_g5h.py\n' | LC_ALL=C sort)"
+          test "$diff" = "$expected"
+          echo PASS P21_SOURCE_ONLY_EXACT_FIVE_ADD
+      # P29: main may advance through separately authorized governance merges.
+      # Keep the P20 branch frozen; do not assert obsolete P22 main SHAs.
+      - name: Verify immutable P20 branch remotely, read only
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/feat/eventradar-source-only-p20 | awk '{print $1}')" = "4c2c9ec93ae90410230a074e09b2aa853b7bfcf0"
+          echo PASS P29_PINNED_P20_REMOTE_HEAD
+      - name: Install parser-only test dependency (package index only, no activity-site requests)
+        run: python -m pip install 'beautifulsoup4>=4.12,<5'
+      - name: Python AST and two exact offline parser suites
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          for name in ('show_news.py', 'event_details.py', 'tests/test_event_details.py', 'tests/test_event_details_g5h.py'):
+              ast.parse(Path(name).read_text(encoding='utf-8'), filename=name)
+          print('PASS P21_SOURCE_PYTHON_AST')
+          PY
+          python -m unittest discover -s tests -p 'test_event_details*.py' -v
+      - name: Explicit read-only completion
+        run: echo 'PASS P21_SOURCE_CI_NO_SCRAPER_RUN_NO_DATA_COMMIT_NO_NOTIFICATIONS'
