@@ -69,7 +69,7 @@ Separate ShowNews main@85fed3e85ff5... [歷史 FastAPI/七平台/Telegram，Rend
 | PWA detail (L8) | source-linked detail and session disambiguation | 票價／日期／場次若條件性或來源不確定，標示以官方公告為準 |
 | Publish (L9) | approved data.json via single writer, manifest/URL parity & rollback | 尚 LOCKED；Android 新資料驗證不能借用舊 P20 測試代替 |
 
-**Stage-to-Gate Crosswalk**：`P30-L2` HTTP → `L3` LIST → `L4` DETAIL → `L5` FIELDS → `L6` G5J VALIDITY → `L7` R3C-O3 GOLDEN+NEW JSON → `L8` G5K ANDROID UAT → `L9` controlled production → `L10` repo consolidation。下一個開發點為 **START P30-L2-A HTTP 失敗類型與官方入口修復**；先用 Run `40196442965` 的 `diagnostics.json` 分流 403/404/429 和 HTML 200 但無清單，建立來源負例，再定點更正；避免原樣重跑全部 19 平台。
+**Stage-to-Gate Crosswalk**：`P30-L2` HTTP → `P30-L3` LIST → `P30-L4` DETAIL → `P30-L5` FIELDS → `P30-L6` G5J VALIDITY → `P30-L7` R3C-O3 GOLDEN+NEW JSON → `P30-L8` G5K ANDROID UAT → `P30-L9` controlled production → `P30-L10` repo consolidation。下一個開發點為 **START P30-L2-A HTTP 失敗類型與官方入口修復**；先用 Run `40196442965` 的 `diagnostics.json` 分流 403/404/429 和 HTML 200 但無清單，建立來源負例，再定點更正；避免原樣重跑全部 19 平台。
 
 **治理固定旗標**：`SOURCE_RUNTIME=DORMANT`; `GOLDEN_ACCEPTED=0`; `AUTO_HIDDEN=0`; `APP_DATA_PUBLISHED=false`。即使使用者允許忽略/將來刪除舊 JSON，也不是允許本 PR 改寫正式 JSON、清空 Pages、啟動 Cloud Writer、通知、Schedule、改開 PR 狀態或 Archive Repo。將來正式新資料可取代舊資料之前，必須有單 Writer、SHA、回復、UAT 與獨立授權。
 
