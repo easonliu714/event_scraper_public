@@ -1,5 +1,8 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **L2-B 可用來源入口候選（尚未程式實作）：** 中正紀念堂（`event.culture.tw`）以 `https://event.culture.tw/CKSMH` 或 `https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr` 作唯讀官網資料入口提案；原診斷基線 `https://event.culture.tw/mocweb/reg/CKSMH/` 回 404。**入口存在不代表 Python Runner 200、清單/詳情欄位可解析**。後續需要 allowlist/事件連結解析、受控單次 HTTP 及 CI/Artifact，未達成則 L2-B HOLD。
+>
+
 > **SRC-P30-L2-A 實作證據（2026-10-26，Source PR #9 Draft，未併入 main）**
 >
 > - `scripts/p30_l2_http_triage.py`：只解析 P30-L1 GitHub Artifact 的 `diagnostics.json`，逐平台原樣保留 HTTP code、observed URL、redirect trail、Content-Type、HTML SHA256、list/detail 計數；僅輸出 L2_HTTP_FAILURE_REVIEW、L3_LIST_EMPTY_REVIEW、L4_DETAIL_SAMPLE_NEXT 三類，不發活動網站 HTTP，不推定 SOURCE_GONE/過期/售票情況，不允許 AUTO_HIDE。
