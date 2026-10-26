@@ -1,5 +1,14 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **SRC-P30-L2-A 實作證據（2026-10-26，Source PR #9 Draft，未併入 main）**
+>
+> - `scripts/p30_l2_http_triage.py`：只解析 P30-L1 GitHub Artifact 的 `diagnostics.json`，逐平台原樣保留 HTTP code、observed URL、redirect trail、Content-Type、HTML SHA256、list/detail 計數；僅輸出 L2_HTTP_FAILURE_REVIEW、L3_LIST_EMPTY_REVIEW、L4_DETAIL_SAMPLE_NEXT 三類，不發活動網站 HTTP，不推定 SOURCE_GONE/過期/售票情況，不允許 AUTO_HIDE。
+> - `tests/p30/test_http_triage.py`：9 個離線正反向案例（錯誤狀態碼、計數不符、重複來源、Writer/通知/Golden/發布旗標、403/404/429 等 FAIL CLOSED）。
+> - `.github/workflows/eventradar_p30_l2a_offline.yml`：P30-L2-A 單分支唯讀 push Gate，檢查相對 PR #7 **恰好三檔新增**、主線 `docs/data.json` / `scraper.py` / `docs/index.html` 不變、Python 離線測試、從既有 Run 40196442965 下載診斷 Artifact 並產出獨立 triage 報告，不抓活動網站、不寫正式資料。
+> - Run `40266605126` SUCCESS，Job `121390275278`、9/9 測試、19/4/4/11 重播全 PASS；下個 L2-B 以 403: KKTIX/拓元/BeClass，404: 中正紀念堂；HTTP 200/LIST=0: FamiTicket/ibon/台北世貿/StrollTimes 為優先對象。可解析 11 平台繼續 L4，不等待其他來源解除 HOLD。
+> - L2-A 的 Source PR #9 Head `7fd14010f5dbc3ef383919ee67eb21283904afe2`，其 PR base 為未合併 PR #7，非正式 main；任何 P30-L2-A 正式併入 main 須先解決堆疊祖先/Review/授權及獨立 Read-back。
+>
+
 > **2026-10-26 最新功能架構檢核（PR #8 候選；僅 Source 最終保留）**
 >
 > - 實際 GitHub 權威：Source main `fc4f963247d68eed29425808cc14e7250f312d05`；Preview `03e515d65e827d5ed67fe341d079907a96bf784a`；ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`。Source PR #6 是凍結 Snapshot 遷移候選（CI PASS 但已被「新資料優先」決策取代）；#7 是一次性診斷工具；#8 是此文件治理候選。
