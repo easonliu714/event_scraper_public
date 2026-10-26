@@ -48,15 +48,15 @@ class TestGate(unittest.TestCase):
  def test_05_unrelated_sidebar_date_must_not_bind(self):
   v=m.parse_calendar("活動日期： 2026-09-01 ~ 2026-09-22 其他展覽 "+CAL)
   self.assertEqual(v["observedPeriod"],["2026-10-17","2026-12-13"])
- def test_06_date missing rejects(self):
+ def test_06_date_missing_rejects(self):
   v=m.parse_calendar(CAL.replace("2026-12-13","2026-12-31"))
   self.assertFalse(v["completeIdentity"])
- def test_07_partial dates cannot get year from news(self):
+ def test_07_partial_dates_cannot_get_year_from_news(self):
   v=m.parse_calendar(CAL.replace("2026-10-17 ~ 2026-12-13","10/17 ~ 12/13"))
   self.assertFalse(v["completeIdentity"])
- def test_08_wrong agency fails(self):
+ def test_08_wrong_agency_fails(self):
   self.assertFalse(m.parse_calendar(CAL.replace("主辦單位：觀光旅遊局","主辦單位：某旅行社"))["completeIdentity"])
- def test_09_wrong venue fails(self):
+ def test_09_wrong_venue_fails(self):
   self.assertFalse(m.parse_calendar(CAL.replace(m.VENUE,"臺北國際會議中心"))["completeIdentity"])
  def test_10 title mismatch fails(self):
   self.assertEqual(m.parse_calendar(CAL.replace(m.OFFICIAL_NAME,"2026其他展覽"))["identity"],
