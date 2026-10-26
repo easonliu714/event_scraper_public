@@ -1,0 +1,110 @@
+name: EventRadar P30 L4-D1 FamiTicket official detail roles stability
+on:
+  push:
+    branches: [feat/eventradar-p30-l4d-fami-detail-stability]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l4d1-fami
+  cancel-in-progress: false
+jobs:
+  detail-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l4d-fami-detail-stability'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Lock P30-L3BC accepted source, only three additions, unchanged original Pages
+        run: |
+          set -euo pipefail
+          base=e7e13c845d042b4a0b13cc98bdd51ba03d836fa8
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l4d1_famiticket.yml' 'scripts/p30_l4d1_famiticket_detail_roles.py' 'tests/p30/test_l4d1_famiticket_detail_roles.py' |LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD|LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_UNEXPECTED_DIFF; exit 1; }
+          echo PASS P30_L4D1_IMMUTABLE_SOURCE_BLOBS_AND_EXACT_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install read-only parsing dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline date roles, forbidden promotion and two-response stability matrix
+        run: |
+          python -m py_compile scripts/p30_l3b_a_famiticket.py scripts/p30_l4d1_famiticket_detail_roles.py tests/p30/test_l4d1_famiticket_detail_roles.py
+          python -m unittest discover -s tests/p30 -p 'test_l4d1_famiticket_detail_roles.py' -v
+          echo PASS P30_L4D1_DATE_ROLE_NEGATIVE_MATRIX
+      - name: Read current official FamiTicket homepage and exactly two spaced target details
+        run: |
+          python scripts/p30_l4d1_famiticket_detail_roles.py --out-dir p30-l4d1-evidence
+      - name: Assert audit not equivalence to event date proof
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("p30-l4d1-evidence/diagnostics.json").read_text())
+          c=json.loads(Path("p30-l4d1-evidence/sample_candidate.json").read_text())
+          assert d['kind']=='EVENTRADAR_P30_L4D1_FAMITICKET_DETAIL_ROLE_AND_STABILITY_ONLY'
+          assert d['listHttp']['http_status']==200
+          assert d['listParse']['candidate_count']>=1
+          assert d['sampleCount']==2 and len(d['observations'])==2
+          assert d['maxListGET']==1 and d['maxDetailGET']==2
+          assert d['noRetries'] and d['noLogin'] and d['noCheckout']
+          assert d['targetOfficialUrl']==c['officialUrl']
+          assert d['goldenAccepted'] is False and d['published'] is False
+          assert d['writerExecuted'] is False and d['notifierExecuted'] is False
+          assert d['autoHidden']==0 and d['sourceRuntime']=='DORMANT'
+          assert d['eventDateStart'] is None and d['eventDateEnd'] is None
+          assert c['dateStart'] is None and c['dateEnd'] is None
+          assert c['ticketStatus']=='UNKNOWN' and c['price'] is None
+          assert c['eventTimeVerified'] is False and c['goldenVerified'] is False
+          assert len({x['url'] for x in d['observations']})==1
+          for x in d['observations']:
+              assert x['dateStart'] is None and x['dateEnd'] is None
+              assert x['saleStatus']=='UNKNOWN' and x['price'] is None
+              assert x['goldenVerified'] is False
+              assert all(r['evidenceStatus']=='UNPROMOTED_ROLE_ONLY'
+                  and r['role'] in (
+                    'EVENT_OCCURRENCE_EVIDENCE',
+                    'SALE_WINDOW_NOT_EVENT',
+                    'REGISTRATION_WINDOW_NOT_EVENT',
+                    'VOUCHER_VALIDITY_NOT_EVENT')
+                  for r in x['roles'])
+          print('PASS P30_L4D1_DUAL_OBSERVATION_AUDIT_ONLY',d['state'])
+          if d['state']!='SAMPLED_TWICE_IDENTITY_MATCH_NOT_EVENT_GOLDEN':
+              print('HOLD P30_L4D1_DETAIL_TITLE_STABILITY',d['state'])
+          else:
+              print('PASS P30_L4D1_TWO_DETAIL_TITLE_IDENTITIES')
+          print('GOLDEN=0, NO_EVENT_DATE_PROMOTION, OFFICIAL_PWA_UNCHANGED')
+          PY
+      - name: Create read-only evidence SHA manifest
+        if: always()
+        run: |
+          mkdir -p p30-l4d1-evidence
+          cat > p30-l4d1-evidence/README.txt <<'EOF'
+          P30-L4-D1 FamiTicket official detail stability and semantic date roles.
+          Audit only, source homepage+2 separated detail snapshots maximum.
+          Date-role labels are raw evidence, NEVER an accepted event schedule.
+          The title can fluctuate on HTTP200: report HOLD, not an invented pass.
+          No old or new candidate event is published; Android accepted 44 stays.
+          Do not treat checkout buttons as real-time ticket availability.
+          EOF
+          if [[ -f p30-l4d1-evidence/diagnostics.json && -f p30-l4d1-evidence/sample_candidate.json ]]; then
+            (cd p30-l4d1-evidence && sha256sum diagnostics.json sample_candidate.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L4D1_SEALED_ARTIFACT
+          else
+            echo HOLD P30_L4D1_MISSING_DIAGNOSTICS
+          fi
+      - name: Upload audit artifact (never Pages)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l4d1-famiticket-detail-evidence
+          path: p30-l4d1-evidence/
+          if-no-files-found: warn
+          retention-days: 14
