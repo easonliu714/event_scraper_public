@@ -1,0 +1,87 @@
+name: EventRadar P30 L3-B-A official FamiTicket list recovery
+on:
+  push:
+    branches: [feat/eventradar-p30-l3b-famiticket-official]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l3b-fami
+  cancel-in-progress: false
+jobs:
+  famiticket-list:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l3b-famiticket-official'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen L4C Android predecessor and exactly three additions
+        run: |
+          set -euo pipefail
+          base=2656c43fc1fa4486fcbd8be641531e4d15220104
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l3b_a_famiticket.yml' 'scripts/p30_l3b_a_famiticket.py' 'tests/p30/test_l3b_a_famiticket.py'|LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD|LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_SCOPE_DRIFT; exit 1; }
+          echo PASS P30_L3B_FAMITICKET_FROZEN_IDENTITY_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parser without browser automations
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline provenance and security matrix
+        run: |
+          python -m py_compile scripts/p30_l3b_a_famiticket.py tests/p30/test_l3b_a_famiticket.py
+          python -m unittest discover -s tests/p30 -p 'test_l3b_a_famiticket.py' -v
+          echo PASS P30_L3B_A_FAMITICKET_OFFLINE_NEGATIVE_MATRIX
+      - name: Exact official Home list GET then one item detail sample
+        run: python scripts/p30_l3b_a_famiticket.py --out-dir p30-l3b-a
+      - name: Assert live list identity, sample title and no Golden leakage
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path('p30-l3b-a/candidate.json').read_text(encoding='utf-8'))
+          d=json.loads(Path('p30-l3b-a/diagnostics.json').read_text(encoding='utf-8'))
+          assert d['list']['http']['state']=='HTTP_OK' and d['list']['http']['http_status']==200
+          assert d['list']['parse']['candidate_count']>=2
+          assert len(c)==d['list']['parse']['candidate_count']
+          assert d['sample']['http']['state']=='HTTP_OK'
+          assert d['sample']['state']=='DETAIL_TITLE_VERIFIED'
+          assert len({row['official_url'] for row in c})==len(c)
+          assert all(row['dateStart'] is None and row['dateEnd'] is None
+                     and row['ticketStatus']=='UNKNOWN' and row['goldenVerified'] is False
+                     and row['published'] is False for row in c)
+          for k,v in [('published',False),('goldenAccepted',False),
+                      ('writerExecuted',False),('notificationExecuted',False),
+                      ('autoHidden',0),('sourceRuntime','DORMANT'),
+                      ('completeCatalogProven',False)]:
+              assert d[k]==v,k
+          print('PASS P30_L3B_A_LIVE_FAMITICKET_LIST',len(c))
+          print('PASS P30_L3B_A_DETAIL_TITLE_HTTP_OK_NOT_GOLDEN')
+          PY
+      - name: SHA sealed diagnostic artifact (no Pages, no Android premature merge)
+        if: always()
+        run: |
+          mkdir -p p30-l3b-a
+          cat > p30-l3b-a/README.txt <<'EOF'
+          EventRadar P30-L3-B-A: one-shot official FamiTicket list + sample detail.
+          Derived candidate only; NOT validated date/price/availability/classification.
+          Does not alter Android accepted 44 rows or published docs/data.json.
+          Next: run separate source role and cross-source duplicate Gate, then
+          isolated Android UAT before possible promotion into formal PWA.
+          EOF
+          (cd p30-l3b-a && sha256sum candidate.json diagnostics.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt) || true
+      - name: Upload evidence irrespective of pass/failure, no notification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l3b-a-famiticket-official
+          path: p30-l3b-a/
+          if-no-files-found: warn
+          retention-days: 14
