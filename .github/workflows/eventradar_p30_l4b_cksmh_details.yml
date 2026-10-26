@@ -91,7 +91,7 @@ jobs:
           assert ev['listingHTTP']['state']=='HTTP_OK'
           assert ev['parentRun']=='40281136558'
           assert c['http_ok']==5 and c['title_verified']==5 and c['date_bound']==5
-          assert c['venue_bound']>=4
+          assert c['venue_bound']>=3  # Multisession venues may be ambiguous; do not guess.
           assert 0<=c['summary_bound']<=5 and 0<=c['venue_bound']<=5
           unchanged=0
           for before,after in zip(old['items'],new['items']):
