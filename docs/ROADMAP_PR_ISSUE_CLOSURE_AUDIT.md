@@ -1,5 +1,16 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+> **2026-10-26 SRC-P30 L2-A 治理增量（仍為 PR #8 Draft；未進 main）**
+>
+> - 本輪 GitHub 重新核對：Source main `fc4f963247d68eed29425808cc14e7250f312d05`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、Legacy ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`；唯一最後保留 Repo 已由使用者明定為 `easonliu714/event_scraper_public`，其他兩庫只作來源證據及將來受控退役。
+> - Source PR #6、#7、#8 皆仍 OPEN/DRAFT/UNMERGED，Source PR #1 高風險 HOLD、#2 原生 CI PASS 但程式仍 DORMANT。PR #6 獨立 CI Run `40195542386` SUCCESS；PR #7 單次 Run `40196442965` SUCCESS；#8 為 Docs-only Draft，P29 在其上的 skipped 並非 P30 L2 CI 成功。
+> - 從 PR #7 實際 Job `121178174230` 的 2026-10-25 Runner log 獨立讀回：19 平台中 15 HTTP_OK、4 HTTP_ERROR；11 平台有非空清單、8 平台無清單；338 個限量候選；11/11 取樣詳情 HTTP_OK（**不是欄位 Golden**）。
+> - HTTP_ERROR 平台：**KKTIX／拓元售票／BeClass／中正紀念堂**。HTTP_OK 卻 LIST=0：**FamiTicket／ibon／台北世貿／StrollTimes**。L2-A 應先對四個 HTTP_ERROR 逐筆取 **真正狀態碼／轉址**，不可單以 `HTTP_ERROR` 推定為 403 或站方封鎖；L3 優先處理另外四個 LIST_EMPTY／JS_RENDERED，不可把 HTTP 200 當成有活動清單。
+> - 本輪決定：優先序固定 `HTTP accessible → valid LIST → DETAIL identity → field evidence → classification → fresh candidate JSON → isolated PWA UAT → authorized publish → repository retirement`。不把歷史 Source 8,436／Preview 9,850 當作新發布資料，亦不得直接刪除、改寫現行 Pages JSON。
+> - **L2-A 必須以同一份 Run Artifact `12600795314` / `diagnostics.json` 取來源證據**（必要時再進行受控、限流、同平台目的明確的 GET）；下階段產物為版本化 source inventory 與 offline fixtures/test，先改善真實回應再改善 selector。將現有成功來源視為可繼續開發的候選，不因其他來源 BLOCKED 中止全局。
+> - 退役原有 Preview/ShowNews Repo 尚未授權；必須先核實外部 Pages/Render、舊網址、manifest/PWA scope、rollback。任何正式資料 Writer、schedule、通知、Auto-Hide、Merge/ReadyForReview 均維持 LOCKED。
+>
+
 
 > **最新增量提案｜2026-10-25 P30 即時來源品質 Roadmap（Docs-only Draft；尚未合併 main）**
 >
