@@ -76,7 +76,7 @@ jobs:
           Next: run separate source role and cross-source duplicate Gate, then
           isolated Android UAT before possible promotion into formal PWA.
           EOF
-          (cd p30-l3b-a && sha256sum candidate.json diagnostics.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt) || true
+          (cd p30-l3b-a && sha256sum candidate.json diagnostics.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
       - name: Upload evidence irrespective of pass/failure, no notification
         if: always()
         uses: actions/upload-artifact@v4
