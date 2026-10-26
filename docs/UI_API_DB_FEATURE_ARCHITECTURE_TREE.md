@@ -1,5 +1,29 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-26 SRC-P30-L7-B fresh acquisition architecture — isolated Source Draft PR #36**
+>
+> ```text
+> event_scraper_public [source only; main unchanged]
+> └─ feat/eventradar-p30-l7b-fresh-acquisition [PR #36 Draft on PR #35]
+>    ├─ scripts/p30_l7b_fresh_acquisition.py
+>    │  ├─ nineteen named public HTTPS list-entry configurations [no old JSON input]
+>    │  ├─ get_page -> 403/404/429/redirect/timeout/oversize/content-SHA evidence
+>    │  ├─ parse_list -> conservative canonical host + event URL + title + stable ID
+>    │  ├─ detail sample <=1/platform -> HTTP + exact source URL + title parity
+>    │  ├─ labeled EVENT_PERIOD / ADMISSION_TIME / REGISTRATION_PERIOD /
+>    │  │  SALE_PERIOD / VOUCHER_VALIDITY / VENUE / PRICE only as REVIEW_REQUIRED
+>    │  └─ emit isolated fresh_candidate.json + platform_diagnostics.json + manifest.json
+>    ├─ tests/p30/test_l7b_fresh_acquisition.py [34 mocked positive/negative cases]
+>    ├─ schemas/p30_l7b_fresh_candidates.schema.json [Draft 2020-12, freshness guard]
+>    └─ .github/workflows/eventradar_p30_l7b_fresh.yml [push-only, read-only, SHA seal]
+> ```
+> - **Immutable boundaries:** PR #36 base PR #35 at `17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8`, main `fc4f963247d68eed29425808cc14e7250f312d05`, exact four additions verified by native CI; no replacement of historical offline L7A 12-node + 66-edge snapshot, no use of `docs/data.json` or old L1 response for new data. All three existing Repo main/Android original 44 preserved.
+> - **LIVE run 40353068648 completed/success** at first HEAD `5e132dbc881b75aae124833110969084940c2b6d`: actual fresh HTTP 33, 19 configured sources, 15 HTTP 200, 11 nonempty parsed list groups, 223 list-identity *candidates*, 11 HTTP 200 sampled details, only 5 conservative title parity passes and 12 extracted role-labeled review-only snippets. Artifact 12665121626 SHA256 `280ecd745e87919e6f711bbe4251d185c63c46021b1557d93f2ae4a4ac36de6c`. Success is only **minimum actual HTTP → LIST → identity-matched DETAIL chain**; full 19-platform coverage is false and no event metadata Golden promoted.
+> - **Four known source-entry corrections now on same PR #36** HEAD `e680456f0033e528fb25da61a4b3b6e35aa22447` pending subsequent CI: FamiTicket `/Home` official portal, ibon `/Index/entertainment` official JS shell, TWTC `/exhibition?p=home` official exhibition listing, CKSMH `/Query.list.ctr` official cultural activity list. These routes came from prior source parser Gated code, but **each must still make a new GET**; live CI pending, no false claim of success. Other platforms remain per-source HOLD when 403, no list or detail title mismatch; no bypass.
+> - **Source JSON:** `candidateOrigin=L7B_ACTUAL_NEW_PUBLIC_HTTP`, `collectedAtUTC`, `actualFreshHTTPRequests`, `sourcePlatform`, `sourceRole`, `sourceUrl`, `listEvidence`, `detailHttp`, `detailTitle`, `detailIdentityVerified`, `fieldEvidence[{role,label,observedValue,sourceUrl,verification:REVIEW_REQUIRED}]`. Formal `dateStart/dateEnd/eventTimeZone/venue/price/registrationPeriod/saleWindow/voucherValidity=null`, `ticketStatus=UNKNOWN`, `category=待分類`, `mergeAllowed=goldenVerified=published=false`. Unit mock explicitly `candidateOrigin=L7B_SYNTHETIC_TEST_INJECTION_NOT_FRESH`, fresh count zero, must fail LIVE schema acceptance. Label observations must not conflate registration/sale/admission/show periods.
+> - **Next layer:** P30-L7-C current-source isolated JSON quality review + separated preview UI → L8 G5K new-source Android E2E. L9 Writer/Publisher/rollback and L10 consolidation remain HOLD until explicit approval; Cloud Scheduler PR #1 remains HIGH_RISK_HOLD. Two governance files only on docs Draft PR #8, never silently promoted to main.
+>
+
 
 > **2026-10-26 SRC-P30-L7-A source pinned sample to schema 2020-12 candidate JSON architecture**
 >
