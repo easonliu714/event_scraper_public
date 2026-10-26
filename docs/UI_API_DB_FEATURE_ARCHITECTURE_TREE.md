@@ -1,5 +1,14 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-26 最新功能架構檢核（PR #8 候選；僅 Source 最終保留）**
+>
+> - 實際 GitHub 權威：Source main `fc4f963247d68eed29425808cc14e7250f312d05`；Preview `03e515d65e827d5ed67fe341d079907a96bf784a`；ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`。Source PR #6 是凍結 Snapshot 遷移候選（CI PASS 但已被「新資料優先」決策取代）；#7 是一次性診斷工具；#8 是此文件治理候選。
+> - L2 HTTP fault buckets：`HTTP_ERROR` 4（KKTIX、拓元、BeClass、中正紀念堂）；L3 HTML `HTTP_OK/LIST=0` 4（FamiTicket、ibon、台北世貿、StrollTimes）；其他 11 平台已有非空清單候選，**只有取樣 11 筆詳情成功，非正式覆蓋率**。證據為 Source Actions `40196442965` 的 Job `121178174230`，Report Artifact `12600795314`。
+> - L2 最小架構：純函式 `classify_http(outcome)`、受控官方 URL allowlist、HTTP code/redirect/content-type/byte SHA + error bucket 的資料結構、offline fixture；禁止以 HTML 200 代理 LIST 成功、不能用 403/404 直接判定 SOURCE_GONE、更不能用繞過限制或重試轟炸修正錯誤。
+> - L3～L5 架構優先繫結 `platform→list URL→event URL→detail response→canonical event identity→field role/evidence`，欄位可 NULL/UNKNOWN、保留官方連結；L6 可逆 ledger；L7 新一輪 candidate JSON+run_id+SHA，不讀入歷史 JSON；L8 隔離 UI Android UAT，L9 明確授權單 Writer/正式 Pages，L10 兩庫外部依賴核查後再授權 Archive。
+> - 已有 P1～P29 Android/P29 原生 CI Gate 保留且不重做；Source 原 PR #1 writer / notification / schedule HIGH_RISK_HOLD，Source P20 PR #2 與 Preview P20 PR #1 暫不 Merge。完整各 Gate 測試、優先序與驗收狀態唯一參照同版本 `ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md`。
+>
+
 
 > **最新架構增量候選｜2026-10-25 P30 重新抓取優先（Docs-only Draft；尚未併入 main）**
 >
