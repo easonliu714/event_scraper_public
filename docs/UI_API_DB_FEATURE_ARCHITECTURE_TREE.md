@@ -1,5 +1,19 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-26 L7-C new candidate mobile preview source tree: WIP / CI HOLD**
+>
+> ```text
+> Source [Draft PR #37, head 1f76f00173d3ec96d88f9b11f65bd995e020bd45]
+> ├─ scripts/p30_l7c_isolated_preview.mjs     [candidate; immutable L7B evidence input, no HTTP]
+> ├─ scripts/p30_l7c_isolated_index.html      [candidate; responsive review-tier UI; safe DOM]
+> └─ tests/p30/test_l7c_isolated_preview.mjs  [candidate; 18 unexecuted in native CI]
+> Native L7-C GitHub Actions workflow: NOT PUBLISHED / platform safety write BLOCKED
+> Artifact: NONE; SHA read-back: NONE; Android UAT: NOT STARTED
+> ```
+> - Exact L7B parent Draft PR #36 `e680456f0033e528fb25da61a4b3b6e35aa22447` remains **PASS** under [Run 40353636708](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708) (19-source actual GET, 16 HTTP OK, 12 list-positive, 264 candidates, 12 detail GET, five title-parity, 12 labeled review snippets). Intended L7-C source is only the SHA-sealed [Artifact 12665097220](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708/artifacts/12665097220), never L7-A historical JSON or production docs/data.json.
+> - Proposed UI defaults to 5 detail-title parity candidates and marks 259 others list-only/title-HOLD, official links only, formal event dates/sale/registration/voucher/price/ticketStatus UNKNOWN, third-party StrollTimes never first-party. This is **source design only, not live E2E proof**. Workflow publication requires a permitted authorized route; do not circumvent security blockers, merge PR or request new Android UAT until actual CI, artifact SHA and independent read-back PASS. Prior Android accepted 44 preserved.
+>
+
 > **2026-10-26 P30-L7-B final live-source topology and quality tier summary (supersedes pending entry below)**
 >
 > - Source [PR #36](https://github.com/easonliu714/event_scraper_public/pull/36) Draft HEAD `e680456f0033e528fb25da61a4b3b6e35aa22447`, base PR #35 `17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8`; Native [Run 40353636708](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708) completed/success, 34/34 offline, exact four added paths, SHA and JSON Schema PASS; [Artifact 12665097220](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708/artifacts/12665097220) ZIP `sha256:8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6`.
