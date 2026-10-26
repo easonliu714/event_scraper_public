@@ -1,0 +1,91 @@
+name: EventRadar P30 L2-A immutable offline HTTP triage
+on:
+  push:
+    branches: [feat/eventradar-p30-l2a-offline-triage]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l2a-offline-triage
+  cancel-in-progress: false
+jobs:
+  offline-l2a:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l2a-offline-triage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout candidate, no persistent credential
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Guard frozen P30 L1 lineage and exact changed paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          main=fc4f963247d68eed29425808cc14e7250f312d05
+          l1=959324cb3bad8f56fb411b7cfb6de2a294f18850
+          git merge-base --is-ancestor "$main" HEAD
+          git merge-base --is-ancestor "$l1" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          expected="$(printf '%s\n' \
+            '.github/workflows/eventradar_p30_l2a_offline.yml' \
+            'scripts/p30_l2_http_triage.py' \
+            'tests/p30/test_http_triage.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-only "$l1" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L2A_DIFF_SCOPE; exit 1; }
+          echo PASS L2A_EXACT_THREE_ADD_NO_FORMAL_DATA_CHANGE
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline tests with zero activity-site requests
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l2_http_triage.py tests/p30/test_http_triage.py
+          python -m unittest discover -s tests/p30 -p 'test_http_triage.py' -v
+          echo PASS P30_L2A_OFFLINE_FIXTURES
+      - name: Download frozen L1 diagnostic artifact by exact Run ID
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-fresh-diagnostic
+          run-id: 40196442965
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l1-input
+      - name: Triage existing evidence, NEVER fetch activity websites
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l2_http_triage.py \
+            --input p30-l1-input/diagnostics.json \
+            --run-id 40196442965 \
+            --out p30-l2a-output/triage.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-l2a-output/triage.json').read_text(encoding='utf-8'))
+          c=d['counts']
+          assert c['platforms_checked']==19, c
+          assert c['http_ok_platforms']==15, c
+          assert c['list_nonempty_platforms']==11, c
+          assert c['total_list_candidates']==338, c
+          assert c['l2_http_failure_review']==4, c
+          assert c['l3_empty_list_review']==4, c
+          assert c['l4_detail_sample_next']==11, c
+          assert all(not p['automatic_hide_permitted'] and not p['source_gone_proven'] for p in d['platforms'])
+          assert d['no_new_http_requests'] and not d['app_data_published']
+          print('PASS P30_L2A_PINNED_ARTIFACT_19_4_4_11_REPLAY')
+          for p in d['platforms']:
+              print('SOURCE',p['platform'],'TIER',p['triage_tier'],'HTTP',p['http_status'])
+          PY
+      - name: Upload only classified offline report
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l2a-offline-triage
+          path: p30-l2a-output/triage.json
+          if-no-files-found: error
+          retention-days: 14
