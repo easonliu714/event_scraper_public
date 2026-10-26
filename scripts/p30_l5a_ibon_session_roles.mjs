@@ -40,7 +40,7 @@ export function decodeActivityBlock(block){
   const inline=/^日期\s*[\/／]\s*時間\s*[｜|:：]/.test(head);
   if(!box&&!inline)throw Error("HOLD_EVENT_TIME_HEADING");
   const raw=String(block.rawExcerpt??"");
-  if(!raw.startsWith(head)||raw.length>360)throw Error("HOLD_ACTIVITY_LABEL_BINDING");
+  if(!norm(raw).startsWith(head)||raw.length>360)throw Error("HOLD_ACTIVITY_LABEL_BINDING");
   const matches=[...raw.matchAll(DATE)];
   if(!matches.length||matches.length>8)return {state:"HOLD_BOUNDED_DATE_COUNT",proposals:[]};
   const dates=matches.map(x=>isoDate(x[1],x[2],x[3]));
