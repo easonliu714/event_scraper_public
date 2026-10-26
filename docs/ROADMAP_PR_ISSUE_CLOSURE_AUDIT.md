@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L4-A 官方詳情完整年份修復：使用者 Android 截圖揭示的資料缺口**
+>
+> - 使用者實機截圖顯示：L7-A 7/7 UI Smoke PASS 同時，TWTC 部分活動仍顯示「11/06～11/09（年份待核對）」，但同一活動官方詳情清楚列「展出日期：2026/11/06～2026/11/09」，另有「2026展昭世界貓咪博覽會」2026/10/08～10/11 等樣本。這是**資料解析覆蓋缺口**，不是 UI 無法顯示年份；舊 L3-A/PR #11 只抽查第一筆詳情，L7-A 因而僅有部分完整日期。
+> - 新 Source PR #13：https://github.com/easonliu714/event_scraper_public/pull/13；L4-A Draft 分支堆疊於 L3-A PR #11 HEAD a63baf94baa46853381d3e791c9b1ff62b771b09，恰好新增三檔：scripts/p30_l4a_twtc_detail_dates.py、tests/p30/test_l4a_twtc_detail_dates.py、.github/workflows/eventradar_p30_l4a_twtc_details.yml。固定以 GitHub Run 40270383643 下載既有 39 筆 L3-A Artifact，按官方詳情 ID／HTML 標題／清單 MM/DD 三重身分證據核對後才採納完整年份展期；不得由現在年份、活動名稱年份或其他來源推測。
+> - 安全限制：最多 40 筆官方詳情（本次固定 39 筆）、無重試、每次至少 1.5 秒、僅 twtc.com.tw/exhibition_more.aspx 公開 HTTPS、總預算 240 秒、無正式資料／頁面／通知／排程寫入。CI PASS 僅表示可生成日期候選證據，非 Golden、非發布，也非正式多來源全面取得。
+> - **下一個 L7-B Gate** 須引用 L4-A 成功 Artifact 與已完成 L7-A 的 44 筆固定資料，在隔離分支以可溯源日期回填重建 Android Smoke；不能修改或使舊 PR #12 已通過的 7/7 Android 驗收失效。保留 G5K 全平台正式 UAT、G5J 可逆有效性、Golden 與來源缺口 OPEN。
+>
+
+
 > **2026-10-26 P30-L7-A Android USER-ATTESTED 7/7 PASS（正式使用者回條；候選本機 Smoke）**
 >
 > - 使用者於本對話親自回報：**(1)** 首頁候選 44 筆，**(2)** 中正紀念堂 5 筆、台北世貿 39 筆來源篩選，**(3)** 關鍵字搜尋與類別篩選，**(4)** 詳情開關與版面無重疊，**(5)** 未知日期/票價/票況正確提示，**(6)** 官方來源連結能開啟。依原始測試表七項計數：首頁44、CKSMH5、TWTC39、搜尋類別、詳情UI、未知欄位、官方連結 **7/7 PASS**。
