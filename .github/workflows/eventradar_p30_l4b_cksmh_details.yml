@@ -1,0 +1,151 @@
+name: EventRadar P30 L4-B CKSMH five official detail + Android local UAT
+on:
+  push:
+    branches: [feat/eventradar-p30-l4b-cksmh-details]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l4b-cksmh
+  cancel-in-progress: false
+jobs:
+  cksmh-five-bound-official-details:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l4b-cksmh-details'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: No published Pages changes and exact four-path scope
+        run: |
+          set -euo pipefail
+          base=c18e3aa0b73039cd98f1c4107c6fe342611b16eb
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l4b_cksmh_details.yml' \
+            'scripts/p30_l4b_cksmh_details.py' \
+            'tests/p30/test_l4b_cksmh_details.py'
+            printf 'M\t%s\n' 'scripts/p30_l7a_smoke_index.html')"
+          expected="$(printf '%s\n' "$expected" | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_SCOPE_DRIFT; exit 1; }
+          echo PASS P30_L4B_EXACT_FOUR_PATHS_AND_FROZEN_MAIN_BLOBS
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install read-only parser dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: CKSMH field-role negative tests and Android JS syntax before public GET
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l4b_cksmh_details.py tests/p30/test_l4b_cksmh_details.py
+          python -m unittest discover -s tests/p30 -p 'test_l4b_cksmh_details.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/p30_l7a_smoke_index.html').read_text(encoding='utf-8')
+          assert "CKSMH_DETAIL_DATE_CANDIDATE" in s
+          assert "官方場次" in s and "OFFICIAL_MULTIPLE_SESSIONS_BOUNDS" in s
+          assert "POSTPONED_PENDING_FINAL_CONFIRMATION" in s
+          assert "innerHTML" not in s and "<script src=" not in s
+          assert s.count("<script>")==1
+          Path("cksmh_ui_check.js").write_text(s.split("<script>")[1].split("</script>")[0],encoding="utf-8")
+          PY
+          node --check cksmh_ui_check.js
+          echo PASS P30_L4B_OFFLINE_AND_MOBILE_JS
+      - name: Get frozen 44-row L7D Android parent, no new full-platform fetch
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7d-android-official-fallback
+          run-id: 40281136558
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l7d-parent
+      - name: Verify frozen Android parent SHA manifest
+        run: |
+          (cd p30-l7d-parent && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L4B_FROZEN_L7D_ANDROID_SHA
+      - name: Five HTTPS official activity pages maximum, details and sessions
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l4b_cksmh_details.py \
+            --parent p30-l7d-parent/data.json --out-dir p30-l4b-output
+      - name: Fail-closed field counters / Tang Prize sample / 44 unchanged IDs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          old=json.loads(Path('p30-l7d-parent/data.json').read_text(encoding='utf-8'))
+          new=json.loads(Path('p30-l4b-output/data.json').read_text(encoding='utf-8'))
+          ev=json.loads(Path('p30-l4b-output/detail_evidence.json').read_text(encoding='utf-8'))
+          c=new['cksmhDetailCounts']
+          assert new['count']==len(new['items'])==44
+          assert [x['id'] for x in old['items']]==[x['id'] for x in new['items']]
+          assert len(ev['records'])==5 and ev['noRetries'] is True and ev['fetchMax']==6
+          assert ev['listingHTTP']['state']=='HTTP_OK'
+          assert ev['parentRun']=='40281136558'
+          assert c['http_ok']==5 and c['title_verified']==5 and c['date_bound']==5
+          assert c['venue_bound']>=3  # Multisession venues may be ambiguous; do not guess.
+          assert 0<=c['summary_bound']<=5 and 0<=c['venue_bound']<=5
+          unchanged=0
+          for before,after in zip(old['items'],new['items']):
+              if before['platform']=='台北世貿':
+                  assert before==after
+                  unchanged+=1
+              else:
+                  assert before['id']==after['id']
+                  assert before['officialUrl']==after['officialUrl']
+                  assert after['ticketStatus']=='UNKNOWN'
+                  assert after['validity']=='UNCERTAIN'
+                  assert after['goldenVerified'] is False
+                  if after['dateStart'] is not None:
+                      assert after['timeRole'].startswith('OFFICIAL_')
+          assert unchanged==39
+          tang=[r for r in new['items'] if r['platform']=='中正紀念堂' and '唐獎榮耀展' in r['title']]
+          assert len(tang)==1
+          assert tang[0]['dateStart']=='2026-09-01' and tang[0]['dateEnd']=='2026-10-30'
+          print('PASS P30_L4B_44_IDS_39_TWTC_UNCHANGED_CKSMH_DETAILS')
+          print('CKSMH_FIELDS',c)
+          print('TANG_PRIZE',tang[0]['title'],tang[0]['dateStart'],tang[0]['dateEnd'],tang[0]['venue'])
+          for k,v in (('published',False),('goldenAccepted',False),
+                      ('writerExecuted',False),('notificationExecuted',False),
+                      ('autoHidden',0),('sourceRuntime','DORMANT')):
+              assert new[k]==v
+          print('PASS P30_L4B_NO_PUBLISH_NO_AUTOHIDE_NO_GOLDEN')
+          PY
+      - name: Assemble Android local-only CKSMH details smoke
+        run: |
+          cp scripts/p30_l7a_smoke_index.html p30-l4b-output/index.html
+          cat > p30-l4b-output/README.txt <<'EOF'
+          EventRadar P30 L4-B - CKSMH Official Detail Date, Venue and Sessions.
+          NOT PRODUCTION PWA. Immutable original two sources; candidate only.
+          44 event identities unchanged: 5 CKSMH + 39 TWTC.
+          CKSMH title/date/place/description are independently proven fields.
+          Multiple CKSMH sessions stay distinct, not continuous daily events.
+          Prior financial technology exhibition postponement retained.
+          On Android phone with Termux:
+            cd ~/eventradar_p30_l4b_20261026
+            sha256sum -c SHA256SUMS.txt
+            python -m http.server 8769 --bind 127.0.0.1
+          Chrome on the SAME device: http://127.0.0.1:8769/
+          Validate 44 / CKSMH 5 / TWTC 39, Tang Prize dates & venue,
+          5 CKSMH details/summary, multi-sessions, safe official links,
+          FinTech postponed schedule unchanged, search/filter/detail UI.
+          No uploading or copying candidate JSON to Pages.
+          EOF
+          (cd p30-l4b-output && sha256sum index.html data.json detail_evidence.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L4B_ANDROID_PORTABLE_SHA
+      - name: Android ZIP evidence only; no public Pages deploy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l4b-cksmh-details-android
+          path: p30-l4b-output/
+          if-no-files-found: warn
+          retention-days: 14

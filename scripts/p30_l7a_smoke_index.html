@@ -68,8 +68,8 @@ const dialog=document.getElementById("dialog");
 let items=[];
 const t=(tag,value,cls)=>{const n=document.createElement(tag);if(value!==undefined&&value!==null)n.textContent=String(value);if(cls)n.className=cls;return n;};
 const unknown=v=>typeof v==="string"&&v.trim()?v:"未取得（以官方為準）";
-const when=e=>e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?"已延期／正式展期待確認":e.dateStart&&e.dateEnd?(e.dateStart===e.dateEnd?e.dateStart:e.dateStart+" ～ "+e.dateEnd):e.rawPeriod==="延期未定"?"展覽延期／日期未定（以官方為準）":e.dateEvidenceStatus==="LIST_DETAIL_PERIOD_CONFLICT"?"原始展期："+unknown(e.rawPeriod)+"（清單與官方詳情日期不一致，待核對）":e.rawPeriod?"原始展期："+e.rawPeriod+"（年份待核對）":"日期未取得（以官方為準）";
-const sourceLabel=e=>e.sourceLevel==="DETAIL_DATE_CANDIDATE"?"已核對官方詳情展期（候選）":e.sourceLevel==="LIST_TABLE_ONLY"?"僅有官方清單資料":e.sourceLevel==="LIST_ONLY"?"僅有官方活動連結":unknown(e.sourceLevel);
+const when=e=>e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?"已延期／正式展期待確認":e.timeRole==="OFFICIAL_MULTIPLE_SESSIONS_BOUNDS"&&e.dateStart&&e.dateEnd?"多場次："+e.dateStart+" ～ "+e.dateEnd+"（詳見個別場次）":e.timeRole==="OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE"&&e.dateStart&&e.dateEnd?"官方清單期間："+e.dateStart+" ～ "+e.dateEnd+"（實際開放以官方為準）":e.dateStart&&e.dateEnd?(e.dateStart===e.dateEnd?e.dateStart:e.dateStart+" ～ "+e.dateEnd):e.rawPeriod==="延期未定"?"展覽延期／日期未定（以官方為準）":e.dateEvidenceStatus==="LIST_DETAIL_PERIOD_CONFLICT"?"原始展期："+unknown(e.rawPeriod)+"（清單與官方詳情日期不一致，待核對）":e.rawPeriod?"原始展期："+e.rawPeriod+"（年份待核對）":"日期未取得（以官方為準）";
+const sourceLabel=e=>e.sourceLevel==="CKSMH_LIST_DATE_WITH_DETAIL_TITLE_CONFIRMED"?"官方清單期間／詳情身分已核對（候選）":e.sourceLevel==="CKSMH_DETAIL_DATE_CANDIDATE"?"已核對中正紀念堂活動詳情（候選）":e.sourceLevel==="DETAIL_DATE_CANDIDATE"?"已核對官方詳情展期（候選）":e.sourceLevel==="LIST_TABLE_ONLY"?"僅有官方清單資料":e.sourceLevel==="LIST_ONLY"?"僅有官方活動連結":unknown(e.sourceLevel);
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"&&["event.culture.tw","twtc.com.tw"].includes(u.hostname)?u.href:null;}catch{return null;}}
 function safeNoticeLink(value){try{const u=new URL(value);return u.protocol==="https:"&&["www.tfsr.org.tw","www.nccc.com.tw"].includes(u.hostname)?u.href:null;}catch{return null;}}
 function fillPill(node,value){node.appendChild(t("span",value,"pill"));}
@@ -78,11 +78,12 @@ function openDetail(e){
  fillPill(pills,e.platform);fillPill(pills,e.category);
  document.getElementById("detail-title").textContent=e.title;
  const lines=document.getElementById("detail-lines");lines.replaceChildren();
- const fields=[["活動期間",when(e)],...(e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?[["原訂日期",e.originalDateStart+" ～ "+e.originalDateEnd+"（已延期）"],["預定改期",e.tentativeDateStart&&e.tentativeDateEnd?e.tentativeDateStart+" ～ "+e.tentativeDateEnd+"（尚未最終確認）":"尚未取得可信改期日期"],["正式日期","尚待主辦單位確認"]]:[]),["場地",unknown(e.venue)],
+ const fields=[["活動期間",when(e)],...(e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?[["原訂日期",e.originalDateStart+" ～ "+e.originalDateEnd+"（已延期）"],["預定改期",e.tentativeDateStart&&e.tentativeDateEnd?e.tentativeDateStart+" ～ "+e.tentativeDateEnd+"（尚未最終確認）":"尚未取得可信改期日期"],["正式日期","尚待主辦單位確認"]]:[]),["場地",e.venueNote||unknown(e.venue)],
  ["票價",unknown(e.price)],["售票狀態","未知（請查看官方）"],
  ["資訊完整度",sourceLabel(e)],["內容摘要",unknown(e.summary)],
  ["資料狀態","候選／尚未官方逐筆覆核"]];
  fields.forEach(x=>{const div=t("div",null,"detail-line");const k=t("strong",x[0]+"：");const v=t("span",x[1]);div.append(k,v);lines.append(div);});
+ if(Array.isArray(e.sessions)&&e.sessions.length){const d=t("div",null,"detail-line");d.append(t("strong","官方場次："+e.sessions.length+" 場"));for(const s of e.sessions.slice(0,20)){d.append(t("div",s.start.replace("T"," ")+" ～ "+s.end.replace("T"," ")+"（臺灣時間）","meta"));}lines.append(d);}
  if(e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"){const ext=e.tentativeSourceUrl||e.organizerStatusSourceUrl;const u=safeNoticeLink(ext);if(u){const outer=t("div",null,"detail-line");const notice=t("a","查看延期公告來源");notice.href=u;notice.target="_blank";notice.rel="noopener noreferrer";outer.append(notice);lines.append(outer);}}
  const link=document.getElementById("official");const url=safeLink(e.officialUrl);
  link.hidden=!url;if(url)link.href=url;else link.removeAttribute("href");
@@ -99,7 +100,7 @@ function render(){
  found.forEach(e=>{
   const card=t("article");const tags=t("div",null,"pills");fillPill(tags,e.platform);fillPill(tags,e.category);
   card.append(tags,t("h2",e.title));
-  card.append(t("div",when(e),"meta"));card.append(t("div","地點："+unknown(e.venue),"meta"));
+  card.append(t("div",when(e),"meta"));card.append(t("div","地點："+(e.venueNote||unknown(e.venue)),"meta"));
   card.append(t("div","票況：未知 · 來源："+sourceLabel(e),"meta"));
   const btn=t("button","查看摘要與詳情","card-button");
   btn.type="button";btn.addEventListener("click",()=>openDetail(e));card.append(btn);root.append(card);
