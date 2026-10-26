@@ -78,7 +78,7 @@ function openDetail(e){
  fillPill(pills,e.platform);fillPill(pills,e.category);
  document.getElementById("detail-title").textContent=e.title;
  const lines=document.getElementById("detail-lines");lines.replaceChildren();
- const fields=[["活動期間",when(e)],...(e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?[["原訂日期",e.originalDateStart+" ～ "+e.originalDateEnd+"（已延期）"],["預定改期",e.tentativeDateStart&&e.tentativeDateEnd?e.tentativeDateStart+" ～ "+e.tentativeDateEnd+"（尚未最終確認）":"尚未取得可信改期日期"],["正式日期","尚待主辦單位確認"]]:[]),["場地",unknown(e.venue)],
+ const fields=[["活動期間",when(e)],...(e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?[["原訂日期",e.originalDateStart+" ～ "+e.originalDateEnd+"（已延期）"],["預定改期",e.tentativeDateStart&&e.tentativeDateEnd?e.tentativeDateStart+" ～ "+e.tentativeDateEnd+"（尚未最終確認）":"尚未取得可信改期日期"],["正式日期","尚待主辦單位確認"]]:[]),["場地",e.venueNote||unknown(e.venue)],
  ["票價",unknown(e.price)],["售票狀態","未知（請查看官方）"],
  ["資訊完整度",sourceLabel(e)],["內容摘要",unknown(e.summary)],
  ["資料狀態","候選／尚未官方逐筆覆核"]];
