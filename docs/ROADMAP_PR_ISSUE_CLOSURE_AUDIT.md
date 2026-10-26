@@ -1,6 +1,10 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **P30-L7-A Android SHA Manifest 2026-10-26 最終可實機回條**：PR #12 修復了 ZIP 內 `SHA256SUMS.txt` 的可攜式相對路徑（原驗證包 SHA manifest 不應被視為 Android 最終交付）；新 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc`，Actions [40271164263](https://github.com/easonliu714/event_scraper_public/actions/runs/40271164263) Job `121404074474` **SUCCESS**，真實 candidate 44 筆；CI 在 Artifact 打包前實際 `cd p30-smoke && sha256sum -c SHA256SUMS.txt` 三檔 `index.html: OK` / `data.json: OK` / `README.txt: OK`。**唯一要交付 Android 的最終包**：[Artifact 12628147623](https://github.com/easonliu714/event_scraper_public/actions/runs/40271164263/artifacts/12628147623)，Archive digest `sha256:da198b4c6700dd6d824380f429a324c6421e896933f42f4e679c001d0026ed73`，到期 2026-11-09T04:51:14Z。先前 Run 40270957865 僅保留 CI 歷史，不作 Android 最終下載來源。**ANDROID_UAT=WAITING_USER_LOCAL**、`PUBLISHED=false`、正式 main 未改。
+>
+
+
 > **P30-L7-A Android 本機候選驗證 Gate 2026-10-26｜READY FOR USER SMOKE TEST（不是 Golden／正式 G5K）**
 >
 > - 新 Source [PR #11](https://github.com/easonliu714/event_scraper_public/pull/11)（L3-A TWTC，base P30-L1 PR #7，3 新增檔）Head `a63baf94baa46853381d3e791c9b1ff62b771b09`；Run [40270383643](https://github.com/easonliu714/event_scraper_public/actions/runs/40270383643) **SUCCESS**，11/11 離線測試 PASS，官方 `https://twtc.com.tw/exhibition?p=home` HTTP 200，**39 個展覽清單候選**，詳情抽樣 `DETAIL_DATE_CANDIDATE`（僅一筆，非 Golden）。Artifact `12628056468`。
