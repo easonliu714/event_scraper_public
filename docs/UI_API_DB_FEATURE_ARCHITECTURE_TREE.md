@@ -1,5 +1,14 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+
+> **P30-L3-A 與 L7-A Android 隔離 UI 實作 2026-10-26（PR #11 / #12 仍 Draft）**
+>
+> - L3-A 官方展覽檔期（PR #11）：`scripts/p30_l3a_twtc.py` 以 TWTC `/exhibition?p=home` HTML 表格逐列解析 title/organizer/venue/rawPeriod/本網站 `exhibition_more.aspx?id`；對只含月日的清單日期保留 `date=null`、`EXHIBITION_PERIOD_RAW_UNNORMALIZED`；只有抽樣詳情頁**來源身分及完整年份展期都匹配**才產生日期候選。正式 Run 40270383643：HTTP 200、39 清單、11/11 offline、單筆詳情日期候選；非 Golden。Workflow `.github/workflows/eventradar_p30_l3a_twtc.yml` 限一清單與一詳情 GET。
+> - L7-A Android local smoke（PR #12）：`scripts/p30_l7a_build_candidate.py` 將 L2-B CKSMH 5 件與 L3-A TWTC 39 件 Artifact 唯讀轉 `P30-CANDIDATE-1` Schema（來源名稱、原始網址、日期欄位角色、分類依據、UNKNOWN 票況、UNCERTAIN 有效性、id SHA）；嚴格禁用假 Golden/Writer/已發布與非允許來源；不連網，不讀舊 JSON。CI Run 40270957865 PASS，8/8 offline + Node syntax；結果 Artifact 12629030170。
+> - Mobile UI `scripts/p30_l7a_smoke_index.html`：單檔 CSS/JS、`fetch('./data.json')`、來源與類別篩選、關鍵字搜尋、活動清單、詳情 modal、官方 HTTPS 連結、缺值以官方為準、固定候選免責聲明；**不含** Service Worker/安裝 PWA/正式 UI 合併/正式資料 Writer、外部 JS/CDN。Artifact `index.html + data.json + README.txt + SHA256SUMS.txt` 由 Android 同機 loopback HTTP server 讀取，不改原 Pages scope。
+> - 狀態層級：`L7A_CI_PASS` / `ANDROID_LOCAL_SMOKE_READY`，但 `ANDROID_UAT=NOT_ATTESTED`、`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`。此 UI 是最小候選驗證面板，不等於完整 P20 Preview UI 功能已合併或真實 G5K 已結案。
+>
+
 > **2026-10-26 CKSMH 官方入口實作（PR #10，尚未併入 main）**：新增 `scripts/p30_l2b_cksmh.py`（兩個官網 allowlisted HTTPS GET + 最多一筆詳情、分段 HTTP/HTML digest、actId 去 session/tracking、LIST_ONLY 不推定票況）；`tests/p30/test_l2b_cksmh.py`（11/11 Offline）；`.github/workflows/eventradar_p30_l2b_cksmh.yml`（自動隔離 Gate，原 JSON/UI/Runtime 不變）。Run [40269917573](https://github.com/easonliu714/event_scraper_public/actions/runs/40269917573) SUCCESS，Query.list.ctr **200 / LIST=5**、`/CKSMH` **200 / LIST=0**、一筆 DETAIL_HTTP_OK；報告 Artifact `12627554765`。以上只代表清單與回應層次，可用來源修復，不代表 Golden/PWA 發布。
 >
 
