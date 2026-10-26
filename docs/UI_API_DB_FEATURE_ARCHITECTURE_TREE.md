@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L3-B-A FamiTicket isolated official list recovery source module**
+>
+> - 確認 P30-L4-C Android local `8770` 使用者截圖驗收 PASS（限來源日期角色/場地/清單/詳情/不回歸），不重新開始 L4-B/C 來源開發。新增 FamiTicket SRC[PR #19](https://github.com/easonliu714/event_scraper_public/pull/19)，分支堆疊 PR #18 `2656c43fc1fa4486fcbd8be641531e4d15220104`，三個新增檔案**無 UI/Android/formal docs 改動**。
+> - `scripts/p30_l3b_a_famiticket.py` 的 `allowed/canonical/fetch` 只接受 `https://www.famiticket.com.tw/Home` 與固定 same-host `/Home/Activity/Info/<opaque-id>`；最多 1 listing + 1 sampled detail；TLS/HTTP 200、Content-Type、SHA256、HTML body 限 2 MB、無 GET retry/登入/購票流程。卡片解析優先 heading、去重 unique detail URL，保留 title、official_url、rawScheduleText、`rawScheduleRole=UNCLASSIFIED_LISTING_TEXT`；尚未證實日期/票價/票況/分類，全部 UNKNOWN/NULL/待分類。
+> - 同一 ITF 已被觀察到 GitHub Runner 連續樣本變動：實際清單始終 HTTP200 並產 47 unique rows，但詳情有時包含 `h2` 精確標題，有時 200 HTML 無 heading；這屬 `DETAIL_TITLE_CONTENT_INTERMITTENT_HOLD`，不誤認為整個清單恢復失敗或整批詳情 Golden。最終 CI [Run 40289865032](https://github.com/easonliu714/event_scraper_public/actions/runs/40289865032) Success、12/12 offline、47 LIST、1 正確 detail identity、SHA manifest PASS；Artifact 12636240385；PR #19 HEAD `17acb05b8da6066883113e91d68e852ba3db080f`。
+> - 尚未串接 `docs/data.json` 或已驗收 44 Android rows，正式 PWA/Web/UI 的 FamiTicket 新平台維持 **NOT_DEPLOYED**。L3-B-B ibon、L3-B-C StrollTimes = OPEN；需要更完整詳情來源與欄位語義、活動身份和跨平台重複確認才可產 Android 新候選。
+>
+
+
 > **2026-10-26 P30-L4-C CKSMH EVENT_SESSION versus REGISTRATION_WINDOW semantic model**
 >
 > - P30-L4-B Android 真機部分 PASS，但多場次時間來源角色錯誤：官方 `場次：` 標題明確列 *活動實際時間*，其下 `報 名 期 間` 為 **REGISTER WINDOW**。L4-C 新讀取層先以固定 5 筆 HTTPS actId/標題驗證，再按個別 `場次：` 區塊截斷 `報名期間`；標題內接受 `YYYY/MM/DD (星期) HHmm-HHmm` 或 `YYYY/MM/DD HH:MM～YYYY/MM/DD HH:MM`，不允許以未標記長區間冒充場次。有活動日期卻含多個未命名日期時 fail-closed，不推測。「自由花蕊」名稱不可混淆不同 actId（61021 為系列講座、51331 為免費參觀常設展）。
