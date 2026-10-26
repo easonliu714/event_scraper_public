@@ -1,0 +1,115 @@
+name: EventRadar P30 L5-A ibon event-start versus admission role Gate
+on:
+  push:
+    branches: [feat/eventradar-p30-l5a-ibon-sessions]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l5a-ibon
+  cancel-in-progress: false
+jobs:
+  time-semantics:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l5a-ibon-sessions'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Freeze P30-L4D3 predecessor, formal runtime blobs and exact three-file delta
+        run: |
+          set -euo pipefail
+          base=622a5221d6fded07d0829486f3877835e372da40
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l5a_ibon_sessions.yml' 'scripts/p30_l5a_ibon_session_roles.mjs' 'tests/p30/test_l5a_ibon_session_roles.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD|LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNEXPECTED_SOURCE_DELTA; exit 1; }
+          echo PASS P30_L5A_EXACT_PARENT_AND_THREE_FILE_SCOPE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install standard public Chromium for existing official L4D2 sample
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Check parser and 22 source-bound negative role cases
+        run: |
+          node --check scripts/p30_l5a_ibon_session_roles.mjs
+          node --test tests/p30/test_l5a_ibon_session_roles.mjs
+          echo PASS P30_L5A_OFFLINE_22_ROLE_AND_PROVENANCE_MATRIX
+      - name: Reuse bounded first-party L4D2 official public two-detail sample
+        run: |
+          node scripts/p30_l4d2_ibon_detail_roles.mjs --out-dir p30-l5a-input
+      - name: Explicit event start, admission, and timezone candidate mapping
+        run: |
+          node scripts/p30_l5a_ibon_session_roles.mjs --input p30-l5a-input/diagnostics.json --out-dir p30-l5a-output
+      - name: Gate real two source identities, three event-starts, zero promotion
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          i=json.loads(Path("p30-l5a-input/diagnostics.json").read_text())
+          d=json.loads(Path("p30-l5a-output/session_candidates.json").read_text())
+          assert i['kind']=='EVENTRADAR_P30_L4D2_IBON_PUBLIC_DETAIL_ROLE_EVIDENCE_NOT_GOLDEN'
+          assert i['stats']['listStatus']==200 and i['listCount']>=2 and len(i['details'])==2
+          assert d['kind']=='EVENTRADAR_P30_L5A_IBON_SESSION_ROLE_REVIEW_ONLY'
+          assert d['inputKind']==i['kind']
+          assert d['sourceCount']==2 and d['detailSourcesParsed']==2
+          assert d['sessionRoleCandidateCount']==3
+          assert d['overallState']=='TWO_DETAIL_SOURCES_EVENT_TIMES_DECODED'
+          assert d['fieldPromotionCount']==0
+          assert d['androidOriginalAccepted44Preserved'] is True
+          assert d['published'] is False and d['goldenAccepted'] is False
+          assert d['writerExecuted'] is False and d['notifierExecuted'] is False
+          assert d['autoHidden']==0 and d['sourceRuntime']=='DORMANT'
+          assert all(row['dateStart'] is None and row['dateEnd'] is None
+             and row['ticketStatus']=='UNKNOWN' and row['price'] is None
+             and row['saleWindow'] is None and row['registrationWindow'] is None
+             and row['voucherValidity'] is None and row['goldenVerified'] is False
+             for row in d['samples'])
+          sessions=[s for row in d['samples'] for s in row['proposedSessions']]
+          assert {s['eventStartLocal'] for s in sessions}=={
+            '2026-12-19T17:00','2027-02-20T18:00','2027-02-21T14:00'}
+          assert {s['admissionStartLocal'] for s in sessions}=={
+            '2026-12-19T16:00','2027-02-20T17:00','2027-02-21T13:00'}
+          assert sum(s['sourceTimeZone']=='Asia/Taipei' for s in sessions)==1
+          assert sum(s['sourceTimeZone'] is None for s in sessions)==2
+          assert all(s['proposedOnly'] and not s['verifiedAgainstOrganiser']
+            and not s['verifiedAgainstChangeNotices'] for s in sessions)
+          print('PASS P30_L5A_TWO_OFFICIAL_DETAILS_THREE_EVENT_STARTS_AND_THREE_ADMISSION_TIMES')
+          print('PASS P30_L5A_EXPLICIT_ASIA_TAIPEI_ONE_UNSPECIFIED_TWO')
+          print('PASS P30_L5A_ZERO_FORMAL_DATA_PROMOTION_AND_PUBLISHED_44_IMMUTABLE')
+          PY
+      - name: Seal single isolated diagnostic artifact and exact hashes
+        if: always()
+        run: |
+          mkdir -p p30-l5a-output
+          cat > p30-l5a-output/README.txt <<'EOF'
+          EventRadar P30-L5-A: ibon sample event starts != admission times.
+          L4D2 upstream was sampled only: 2 exact official detail identities,
+          bounded 3 public navigations; 23 list candidates not all verified.
+          All session_candidates.json proposals need independent organiser
+          change notices, tickets and full UAT before official date promotion.
+          L4D2 captured one explicitly Taiwan-time labeled block; second
+          block does not explicitly prove timezone.
+          No Pages/Android writer, schedule, sale/price assertions, notifier.
+          EOF
+          if [[ -f p30-l5a-input/diagnostics.json && -f p30-l5a-output/session_candidates.json ]]; then
+            cp p30-l5a-input/diagnostics.json p30-l5a-output/input_diagnostics.json
+            (cd p30-l5a-output && sha256sum input_diagnostics.json session_candidates.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L5A_SHA_SEALED_EVIDENCE
+          else
+            echo HOLD P30_L5A_MISSING_EVIDENCE
+          fi
+      - name: Upload no-publication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l5a-ibon-session-role-evidence
+          path: p30-l5a-output/
+          if-no-files-found: warn
+          retention-days: 14
