@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L7-C FINTECH POSTPONEMENT SEMANTIC DATA ROLES**
+>
+> - Source TWTC 清單 `延期未定` + TWTC 詳情 `展出日期：2026/10/23～2026/10/24` 並非不同 HTML 日期格式，為同一活動**取消原訂／預定另定日期**的狀態切換。現有 P30-L4-A `raw_period_matches()` 將 `延期未定` 拒絕與正常 MM/DD 日期同等對照，產出 `LIST_DETAIL_PERIOD_CONFLICT` 防止原訂日期誤作有效日期。
+> - 大會正式公告 2026/10/20 `https://www.fintechtaipei.tw/Announcement/19` 表示「預定延期至 2026/12/18～12/19」，**仍待正式確認**。新 PR #15 隔離候選 schema 準備 `originalDateStart/End`、`tentativeDateStart/End`、`confirmedDateStart/End=NULL`、`scheduleStatus`、HTTP SHA256/來源與公告連結，顯示原訂與暫定各自標籤，不得填 `dateStart/End` 為已確認。
+> - 11/11 Python 離線測試 PASS，Node frontend JS Syntax PASS。P30-L7-C GitHub Run `40275813585` 對 TWTC detail HTTP OK、對大會 announcement 為 `SSLError`，故 Gate **HOLD**，沒有生成新的 Android candidate；只保存 `hold_diagnostics.json` 至 Artifact `12630675096`。這是網站對 GitHub Runner 憑證信任／TLS 連線驗證問題，非 HTML Parser 合約通過或否定；禁止 TLS verify=false 繞過。
+> - 使用者已回報 P30-L7-B Android 截圖符合預期，舊已驗收版仍有效；此 PR #15 未成功更新發布資料及 Android ZIP。未來有可信第二來源後再做独立 UAT／收斂至正式資料架構。
+>
+
+
 > **2026-10-26 L4-A / L7-B 完整年份回填與 Android CI 實證**
 >
 > - L4-A 新 `scripts/p30_l4a_twtc_detail_dates.py`（PR #13）實際以 L3-A Run 40270383643 原始 39 筆為身份參照，39 次限流官方詳情 GET，來源資料 Evidence 僅標準化 `DATE_VERIFIED_BY_OFFICIAL_DETAIL_CANDIDATE` 38 件，延期活動一件 HOLD。Run 40273199767 CI SUCCESS，13/13 tests；來源 Artifact 12629371018。這裡的 DATE_VERIFIED 仍為候選證據，不是人工 Golden。
