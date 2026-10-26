@@ -76,7 +76,9 @@ jobs:
               for item in row['fields']:
                   assert item['role'] in ('EVENT_TIME_LABEL_ONLY','VENUE_LABEL_ONLY',
                      'ADMISSION_NOT_EVENT_START','SALE_WINDOW_NOT_EVENT',
-                     'REGISTRATION_WINDOW_NOT_EVENT','VOUCHER_VALIDITY_NOT_EVENT')
+                     'REGISTRATION_WINDOW_NOT_EVENT','VOUCHER_VALIDITY_NOT_EVENT',
+                     'SERIES_DESCRIPTOR_NOT_EVENT_TIME',
+                     'VOUCHER_REDEMPTION_LOCATION_NOT_EVENT_VENUE')
                   assert item['officialEventDateAccepted'] is False
                   assert item['sourceQuality'] in ('LABELED_RAW_EVIDENCE_UNPROMOTED',
                      'EMPTY_ROLE_VALUE_HOLD')
@@ -84,9 +86,12 @@ jobs:
           if d['exactTitleMatches']<2:
               print('HOLD P30_L5D_MULTI_DETAIL_TITLE_IDENTITY',d['exactTitleMatches'])
           else:print('PASS P30_L5D_MULTI_DETAIL_EXACT_TITLE',d['exactTitleMatches'])
-          if d['labeledRoleEvidenceCount']==0:
-              print('HOLD P30_L5D_NO_LABELLED_OFFICIAL_FIELD_ROLES')
-          else:print('PASS P30_L5D_SOURCE_ROLE_EVIDENCE',d['labeledRoleEvidenceCount'])
+          assert d['labeledRoleEvidenceCount']>=3
+          actual_roles={f['role'] for x in d['detailSamples'] for f in x['fields']}
+          assert 'VENUE_LABEL_ONLY' in actual_roles
+          assert 'SALE_WINDOW_NOT_EVENT' in actual_roles
+          assert 'SERIES_DESCRIPTOR_NOT_EVENT_TIME' in actual_roles
+          print('PASS P30_L5D_TPBL_REAL_VENUE_SERIES_SALE_ROLE_EVIDENCE',d['labeledRoleEvidenceCount'])
           print('PASS P30_L5D_ZERO_FIELD_PROMOTIONS')
           PY
       - name: Seal all diagnostic evidence, including quality HOLD
