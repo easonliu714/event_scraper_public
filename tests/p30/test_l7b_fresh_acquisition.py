@@ -79,6 +79,13 @@ class L7BTests(unittest.TestCase):
     def test_01_all_19_sources_are_named_without_live_requests(self):
         self.assertEqual(len(m.PLATFORMS), 19)
         self.assertEqual(len(set(x[0] for x in m.PLATFORMS)), 19)
+        endpoints = {p[0]: p[1] for p in m.PLATFORMS}
+        self.assertEqual(endpoints["台北世貿"], "https://twtc.com.tw/exhibition?p=home")
+        self.assertEqual(endpoints["中正紀念堂"],
+                         "https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr")
+        self.assertEqual(endpoints["FamiTicket"], "https://www.famiticket.com.tw/Home")
+        self.assertEqual(endpoints["ibon"], "https://ticket.ibon.com.tw/Index/entertainment")
+        self.assertTrue(all(m.allow_url(p[1], p[2]) for p in m.PLATFORMS))
 
     def test_02_http_allowlist_positive(self):
         self.assertTrue(m.allow_url(DETAIL_URL, HOSTS))
