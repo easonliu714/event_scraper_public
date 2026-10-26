@@ -1,6 +1,13 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L4-B 最終清單與場次時態 UI 保護**
+>
+> - CKSMH `OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE` 改成 UI 明確「官方清單期間」而非無條件活動場次，`OFFICIAL_MULTIPLE_SESSIONS_BOUNDS` 顯示涵蓋日期並展開獨立 sessions（非每日舉辦），多場次無唯一場地保留 `venueNote`。CKSMH source role 轉繁體中文可理解標示。
+> - PR #17 HEAD `d79de853c007ac965d02b56cc2e556f8ad5f1bff`。最終 CI Run `40285154986` completed/success，14/14 test + JS + 五件詳情/清單綁定 + 44 Id／39 TWTC immutable + SHA 4/4。**Android 最終 Artifact 12633104025**，舊 12633399655 只保留歷史；Android 實機未 PASS 前保持 `WAITING_USER`。不寫 formal Pages，不發通知，不更動 G5J/G5K 或 Golden。
+>
+
+
 > **2026-10-26 P30-L4-B CKSMH 活動詳情場次來源分欄（PR #17 Draft，Android 8769 待回報）**
 >
 > - `scripts/p30_l4b_cksmh_details.py` 使用已驗證 L7-D 44 rows 的五個 CKSMH 官方活動 actId URL，逐一 HTTPS GET (5)，另對官方 `Query.list.ctr` GET (1)；嚴格 TLS、限定 `event.culture.tw` 官方 actId 路徑、同 ID redirect、HTML byte budget、無重試。優先以詳情 top title 精確匹配（僅移除尾端「圖片說明」alt）、`場次資料` 區取得毫秒以下的 YYYY/MM/DD HH:MM 開始/結束，保留獨立 `sessions[]`（多場次不可當作每日連續開放），單場地僅在 Google Map 官方 anchor 唯一時成立，`活動內容介紹` 區取得最長 360 字摘要；缺值保留未知。
