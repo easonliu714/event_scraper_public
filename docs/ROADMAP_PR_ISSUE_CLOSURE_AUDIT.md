@@ -1,6 +1,19 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L3-B-C StrollTimes 聚合清單 24 筆與 1 篇聚合文章 Gate PASS（最新）**
+>
+> - GitHub authority：Source `main@fc4f963247d68eed29425808cc14e7250f312d05` 未修改；前序 P30-L4-C Android 8770 USER_ATTESTED_PASS（44=5 CKSMH+39 TWTC）保留，FamiTicket L3-B-A 47 list、ibon L3-B-B2 23 rendered list / CI success 均不退回、不重跑。PR #8（文件）、#21（ibon）保持 Draft，無 Merge、無正式 JSON 修改。
+> - StrollTimes 現行 `https://strolltimes.com/` 展示全台活動；自站「關於我們」稱**獨立編輯整理活動**，有自己的 `/events/<county>/<numericArticleId>/` 文章，而非活動主辦或售票機構，故其內容不能自動核定官方場次、票價、票況或可否報名；外部連結也必須另核對主辦身分。
+> - 新 [Source Draft PR #22](https://github.com/easonliu714/event_scraper_public/pull/22) `feat/eventradar-p30-l3bc-strolltimes-aggregation` 堆疊 PR #21 frozen HEAD `6fa959de1613458505fec8d9813d9916be5cfcd7`；精確三新增檔 `scripts/p30_l3bc_strolltimes.mjs`、`tests/p30/test_l3bc_strolltimes.mjs`、`.github/workflows/eventradar_p30_l3bc_strolltimes.yml`。Native CI 限制原生 Chromium 公開頁面 1 homepage + 1 same-host article；不登入、不繞過驗證碼、無 stealth、攔截第三方請求／圖片媒體等非必要資源、最高 100 allowlisted requests。禁止 Pages writer、通知、排程、Golden、資料刪除。
+> - 初始 CI `40294549909` 有 1/10 負例失敗（「查看更多」被當文章名稱），修正後 HTTP200 取得 24 unique list URLs；另一項 `ARTICLE_TITLE_HOLD` 查出首頁「2026新竹市萬聖節」與文章 H1「2026新竹市萬聖節（10/16~10/31）」差異，改成**只允許尾端單純 MM/DD～MM/DD 日期展示註記**的相同活動身分核對，絕不把該字串當官方日期證據，不能模糊替換其他活動。
+> - **最終 Source PR #22 HEAD `e7e13c845d042b4a0b13cc98bdd51ba03d836fa8`**，[GitHub Actions Run 40295191261](https://github.com/easonliu714/event_scraper_public/actions/runs/40295191261) **completed/success**：11/11 Node provenance/security 正反測試、Source main docs Blob Guard、GitHub 原生 browser homepage HTTP200、DOM anchors 113、**24 筆 aggregator article 身分去重候選**、sample 同站文章 HTTP200 + bounded H1 title match PASS；62 allowed asset requests、11 external blocked、4,059 image/font/media requests blocked、24 JS pageerrors（外部／被攔截資源可能造成、需後續關注，但本次已取得穩定清單）。所有欄位 `dateStart/End=NULL`、`price=NULL`、`ticketStatus=UNKNOWN`、`category=待分類`、`originalOfficialUrl=NULL`，無一被認列 first-party Golden。
+> - 只讀證據 GitHub [Artifact 12638155320](https://github.com/easonliu714/event_scraper_public/actions/runs/40295191261/artifacts/12638155320) `eventradar-p30-l3bc-strolltimes-aggregation`，zip SHA256 `e2d973d1e0faf03de78d8ed86abc292333f85d9112dd74033d6562e4b9e538c1`，expires `2026-11-09T08:52:01Z`，內含 `candidate.json`、`diagnostics.json`、`README.txt`、`SHA256SUMS.txt`；各檔 SHA in CI PASS。之前 Run 40294702951 清單成功但 article H1 HOLD，只作改進歷史，**非最終結果**。
+> - 判定：`P30_L3BC_STROLLTIMES_AGGREGATOR_LIST=PASS_24`、`P30_L3BC_ONE_AGGREGATOR_ARTICLE_IDENTITY=PASS`，但 `P30_L3BC_PRIMARY_ORGANISER_SOURCE=OPEN_NOT_VERIFIED`、`P30_L3BC_DATE_PRICE_TICKET_CLASSIFICATION=UNKNOWN`、`P30_L3BC_ANDROID_UAT=NOT_REQUIRED_YET`。不得把 24 筆 StrollTimes 作為 24 筆新增官方活動；先對照 FamiTicket／ibon／政府／主辦原始來源並執行來源 lineage 和可逆去重。現有 Android 44 筆未更動。
+> - 下一優先：`P30-L4/L5` 分層來源品質（FamiTicket 詳情穩定性、ibon detail 官方身份；StrollTimes 聚合→原始活動來源的可追溯證據、真正活動日期與報名／票券使用期間角色）→ `P30-L6` 分類及跨平台保守去重 → `P30-L7/L8` 新隔離 JSON、Android/PWA 實機驗證。19 平台 Golden、正式 Data Writer、Pages、通知與 ShowNews/Preview repo 退役皆 LOCKED。兩份治理變更僅在 Docs Draft PR #8，**尚未合併 main**。
+>
+
+
 > **2026-10-26 P30-L3-B-B ibon JS Browser 23 official link candidates CI PASS（本次最新 Gate）**
 >
 > - GitHub 權威讀回：Source `main@fc4f963247d68eed29425808cc14e7250f312d05` 未變；原使用者已驗收 **P30-L4-C Android 8770 USER_ATTESTED_PASS** 與 P30-L3-B-A **FamiTicket LIST=47** 全保留。FamiTicket Source PR #19 HEAD `17acb05b8da6066883113e91d68e852ba3db080f` 仍 Draft。正式 `docs/data.json`、`docs/index.html`、`scraper.py` Blob parity 無修改。其它 Source PR 未經授權不 Merge。
