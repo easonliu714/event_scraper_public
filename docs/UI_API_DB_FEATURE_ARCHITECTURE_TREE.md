@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L4-B CKSMH 活動詳情場次來源分欄（PR #17 Draft，Android 8769 待回報）**
+>
+> - `scripts/p30_l4b_cksmh_details.py` 使用已驗證 L7-D 44 rows 的五個 CKSMH 官方活動 actId URL，逐一 HTTPS GET (5)，另對官方 `Query.list.ctr` GET (1)；嚴格 TLS、限定 `event.culture.tw` 官方 actId 路徑、同 ID redirect、HTML byte budget、無重試。優先以詳情 top title 精確匹配（僅移除尾端「圖片說明」alt）、`場次資料` 區取得毫秒以下的 YYYY/MM/DD HH:MM 開始/結束，保留獨立 `sessions[]`（多場次不可當作每日連續開放），單場地僅在 Google Map 官方 anchor 唯一時成立，`活動內容介紹` 區取得最長 360 字摘要；缺值保留未知。
+> - 對 actId 51331「自由花蕊」之詳情**未提供活動場次日期**，獨立允許官方清單 `/mocweb/reg/CKSMH/Query.list.ctr` 同一 `actId+title` 之活動卡片 `活動時間` 2025/11/24～2030/12/31，回填 `timeRole=OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE`，不可假冒「詳情場次」或以全站日期推測。其它有 session 的四筆以詳情為準；兩筆多場次無法證明唯一場地，UI 透過 `venueNote` 顯示「多場次：各場次地點請依官方明細確認」。
+> - `scripts/p30_l7a_smoke_index.html` 僅在 PR #17 隔離分支修改：CKSMH `dateStart/dateEnd`、`venue`、`venueNote`、`summary`、`sessions[]`、官方證據 label；多場次清單顯示涵蓋日期和「詳見個別場次」，modal 展開每個 `start/end` 臺灣時間，不用 `innerHTML`；舊金融科技展延期原訂/暫定/未確認三種欄位維持。
+> - CI Run [40284806144](https://github.com/easonliu714/event_scraper_public/actions/runs/40284806144) 14/14 tests + JS + 完整父資料 SHA PASS，5/5 title、5/5 date、3/5 unique venue、5/5摘要、2 multi-session；Android-only Artifact `12633399655`，SHA manifest PASS。44 IDs 不變、39 TWTC rows 完全不變；不更動正式 `docs/data.json`、`docs/index.html`、`scraper.py`、PWA Scope/Service Worker、Writer、通知、Golden。Android 8769 尚未實測。
+>
+
+
 > **2026-10-26 P30-L7-D 官方機構雙角色延期候選與 Android UI（PR #16 Draft）**
 >
 > - 新 source `scripts/p30_l7d_official_fallback.py`：三個固定 HTTPS 入口，一次一站、有限位元組、嚴格網域路徑與 redirect allowlist、不得重試與停用 TLS；`TWTC_DETAIL`=官方原訂時間與延期標題、`FINANCIAL_FEDERATION_NOTICE`=聯合主辦/金融總會延期暨正式確認未完成、`NCCC_NOTICE`=聯卡中心對預定 12/18～19 的公告。各來源 HTTP status/sha256/URL/parse 對應證據寫入隔離 `schedule_roles.json`／`diagnostics.json`。聯卡中心 canonical HTTPS host 為 `www.nccc.com.tw`；原 bare host 故障不被當成 HTML 解析問題。
