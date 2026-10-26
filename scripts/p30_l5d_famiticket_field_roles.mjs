@@ -117,7 +117,16 @@ function detailsDOM(){
   return {headings:[...document.querySelectorAll("h1,h2,h3,h4")]
     .map(n=>n.textContent.replace(/\s+/g," ").trim()).filter(Boolean).slice(0,50),
     lines:text.split("\n").map(x=>x.trim()).filter(Boolean).slice(0,280),
-    visibleCharacters:text.length,scriptTags:document.scripts.length};
+    visibleCharacters:text.length,scriptTags:document.scripts.length,
+    fieldHintLines:text.split("\n").map(x=>x.replace(/\s+/g," ").trim())
+      .filter(x=>/日期|時間|場次|展期|地點|場館|地址|票券|售票|購票|入場|兌換|2026\/|2027\//.test(x))
+      .slice(0,16).map(x=>x.slice(0,160)),
+    structuredFieldPairs:[...document.querySelectorAll("dt,th,label,strong,b")]
+      .filter(x=>/日期|時間|展期|地點|場館|地址|票券|入場|購票|售票/.test(x.textContent||""))
+      .slice(0,12).map(x=>({
+        tag:x.tagName,label:(x.textContent||"").replace(/\s+/g," ").trim().slice(0,90),
+        adjacent:(x.nextElementSibling?.textContent||"").replace(/\s+/g," ").trim().slice(0,120)
+      }))};
 }
 export function audit(row,page,http){
   const bound=http?.status===200&&http.url===row.url&&
@@ -127,6 +136,8 @@ export function audit(row,page,http){
     identity:bound?"EXACT_LIST_DETAIL_TITLE_PASS":"DETAIL_TITLE_OR_HTTP_HOLD",
     visibleCharacters:page?.visibleCharacters??0,headingCount:page?.headings.length??0,
     fields:bound?roleFields(page.lines):[],
+    fieldHintLines:bound?(page.fieldHintLines||[]):[],
+    structuredFieldPairs:bound?(page.structuredFieldPairs||[]):[],
     firstPartyPlatform:"OFFICIAL_TICKET_PLATFORM_NOT_ORGANISER",
     dateStart:null,dateEnd:null,venue:null,ticketStatus:"UNKNOWN",
     price:null,category:"待分類",fieldPromotionCount:0,
@@ -193,7 +204,9 @@ export async function run(out){
   console.log("FAMI_L5D_HOME",network.homepageStatus,"SELECTED",candidates.length,selectionState);
   console.log("FAMI_L5D_SAMPLES",samples.length,"MATCHED",valid.length,"ROLE_EVIDENCE",roleCount);
   for(const s of samples)console.log("FAMI_L5D_DETAIL",JSON.stringify({
-    title:s.listTitle,http:s.detailHttp,identity:s.identity,roleLabels:s.fields.map(x=>x.label)}));
+    title:s.listTitle,http:s.detailHttp,identity:s.identity,
+    roleLabels:s.fields.map(x=>x.label),fieldHintLines:s.fieldHintLines,
+    structural:s.structuredFieldPairs}));
   if(network.homepageStatus!==200||candidates.length<2||samples.length<2){
     console.log("HOLD P30_L5D_INSUFFICIENT_PUBLIC_DETAIL_SAMPLES");process.exitCode=2;
   }else{
