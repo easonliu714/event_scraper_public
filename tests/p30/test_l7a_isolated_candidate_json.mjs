@@ -198,6 +198,6 @@ test("29 two source reference edges not two additional event records",()=>{
 });
 test("30 preserving 3 ibon shows means two timed producer evidence, no fake RUNIDRE",()=>{
  const a=built().candidate;
- assert.equal(a.showStartsInPinnnedInput,3);
+ assert.equal(a.showStartsInPinnedInput,3);
  assert.equal(a.candidateEventRecords.reduce((n,x)=>n+x.showSessionEvidence.length,0),2);
 });
