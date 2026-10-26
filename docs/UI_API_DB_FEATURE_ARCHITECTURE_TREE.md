@@ -1,5 +1,13 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-26 P30-L7-B final live-source topology and quality tier summary (supersedes pending entry below)**
+>
+> - Source [PR #36](https://github.com/easonliu714/event_scraper_public/pull/36) Draft HEAD `e680456f0033e528fb25da61a4b3b6e35aa22447`, base PR #35 `17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8`; Native [Run 40353636708](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708) completed/success, 34/34 offline, exact four added paths, SHA and JSON Schema PASS; [Artifact 12665097220](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708/artifacts/12665097220) ZIP `sha256:8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6`.
+> - **Real source stage counts:** fresh HTTP requests=34; 19 platform entries; HTTP_OK=16 (3 HTTP_403), LIST_POSITIVE=12, LIST_CANDIDATES=264 (unreviewed), DETAIL_HTTP_OK=12/12, DETAIL_TITLE_PARITY=5/12, FIELDS_LABELED_REVIEW_ONLY=12 snippets. Only five detail-source title parity matches; all 264 are not automatically verified events. None of the five are promoted to Golden; `fullPlatformCoverageVerified=false`.
+> - **Stage-level source holds:** ACCUPASS 25 list-only, OPENTIX 40 list/1 parity, UDN 6 list/1 parity, FamiTicket 40 list-only, 年代 28 list-only, TixFun 24 list-only, Event Go 38 list/1 parity, 華山 7 list/1 parity, 松山 1 list-only, KidsClub 33 list-only, iNDIEVOX 19 list/1 parity, StrollTimes 3 aggregator-only/list; CKSMH/TWTC/ibon HTTP200 but generic LIST0, 寬宏 HTTP200/list0, KKTIX/拓元/BeClass HTTP403. Every stage failure remains a specific HOLD, never silently interpreted as expired/removed events.
+> - **Data-to-UI contract for next L7-C:** default detail-confirmed tier [5 current candidates] vs list-only/mismatch [259 candidates] clearly separated; third-party StrollTimes cannot be rebranded as official organiser; no date/price/ticket-status inference; official platform link only if URL provenance checked. A new isolated file-based preview must not replace `docs/index.html`, `docs/data.json` or P20 preview; user-attested Android 44 unchanged. L8 Android test is only of **new** isolated candidate UI.
+>
+
 > **2026-10-26 SRC-P30-L7-B fresh acquisition architecture — isolated Source Draft PR #36**
 >
 > ```text
