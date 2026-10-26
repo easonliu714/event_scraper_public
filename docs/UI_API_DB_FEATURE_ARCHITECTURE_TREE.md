@@ -1,6 +1,14 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L4-D3 FamiTicket official rendered detail exact image-alt identity**
+>
+> - 新 Source [Draft PR #25](https://github.com/easonliu714/event_scraper_public/pull/25) `scripts/p30_l4d3_famiticket_browser.mjs` 以 Chrome/Playwright 原生 public browser 只開 `https://www.famiticket.com.tw/Home` 一次並限同站 opaque-ID `/Home/Activity/Info/<id>` detail 一次，不使用登入、購票、stealth、繞過驗證碼、非公開 API 或任意外網轉址。清單 DOM 231 anchors；同標題「2026 ITF 台灣國際旅展」在 `img alt`，分類 `textContent` 有時是「展覽」。四種可見標題欄位各自做 **exact title equality**，以 URL 去重後必須只有一個活動 ID；不能因標題相似而合併不同活動。詳細頁 Chromium HTTP 200、H1/H2/H3/H4 取得唯一相符標題，與純 requests 之前連續兩次 200 卻無標題的變異分別記錄，不能直接宣稱 47 筆品質全證實。
+> - Source PR #25 final `622a5221d6fded07d0829486f3877835e372da40`；native [CI Run 40299649653](https://github.com/easonliu714/event_scraper_public/actions/runs/40299649653) Success、16/16 offline guard tests、parent Source PR #24 frozen SHA、正式 `docs/data.json`/`docs/index.html`/`scraper.py` blob identity、三新增檔路徑精確、real public HTTP + exact title、diagnostic/SHA PASS。Artifact 12639478214。新 `detail` 診斷欄位 `eventDateStart=null,eventDateEnd=null,price=null,ticketStatus=UNKNOWN,fieldPromotion=0,goldenVerified=false`，即使詳情標題可見也絕不推測活動日期/票務。
+> - 下個 Source 層 L5：FamiTicket 進一步有限抽樣官方詳情中有角色標籤的時間／場地／票券期限，ibon 目前 2 件標準官方 DOM 取得的 event-time blocks 規範化並與開場時間/多場次/售票時間分離，StrollTimes `sourceRole=THIRD_PARTY_EVENT_AGGREGATOR` 維持無原官方證據不進 Golden。原 44 Android UAT 不變、Source `main@fc4f963247d68eed29425808cc14e7250f312d05` 未動，未開啟正式 PWA/Writer/通知/排程。
+>
+
+
 > **2026-10-26 P30-L4-D1 / L4-D2 official detail role and stability architecture**
 >
 > - 新 Source [PR #23](https://github.com/easonliu714/event_scraper_public/pull/23) `scripts/p30_l4d1_famiticket_detail_roles.py`：匯入已驗證 `p30_l3b_a_famiticket.py` 限定 HTTPS list/detail 函式，單次首頁 JSON 標題／opaque URL 身分綁定，分隔兩次 public official detail GET。每次保存 HTTPS status、SHA256/byte、headings exact identity、明確標籤角色 `EVENT_OCCURRENCE_EVIDENCE` vs `SALE_WINDOW_NOT_EVENT`／`REGISTRATION_WINDOW_NOT_EVENT`／`VOUCHER_VALIDITY_NOT_EVENT`；嚴格四位西元年與合法日期，所有解析結果僅 `UNPROMOTED_ROLE_ONLY`。CI 40297130466 19/19 offline PASS，首頁 47、兩次詳情 HTTP200 但皆無標題，**資料品質必須 HOLD**（非平台無活動或付款狀態）。`docs/data.json`、`docs/index.html`、`scraper.py` 仍 immutable。
