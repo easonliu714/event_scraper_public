@@ -23,6 +23,16 @@ export function lexicalIdentity(cardTitle,h1) {
  if(articleHeadingMatches(a,b))
    return {state:"AGGREGATOR_TITLE_IDENTITY_MATCH",commonTitleEvidence:a,
      parentChildRelationship:"NOT_PROVEN",mergeAllowed:false};
+ // Editorial headlines frequently extend an exact card title with a colon
+ // and explanatory prose. This is neither a disjoint unrelated event nor an
+ // independently proven identical event or organiser-level parent/subevent.
+ const compact=s=>s.replace(/\s+/g,"");
+ const ac=compact(a),bc=compact(b);
+ if(bc.startsWith(ac)&&/^[:：|｜—-]/u.test(bc.slice(ac.length)))
+   return {state:"EDITORIAL_HEADLINE_EXTENSION_REVIEW",
+     commonTitleEvidence:a,
+     parentChildRelationship:"EDITORIAL_SUBTITLE_RELATIONSHIP_NOT_PROVEN",
+     mergeAllowed:false};
  // Meaningful shared Han phrase is only a discovery hint. The repeated
  // calendar year "2026", city name or common "活動" alone proves nothing.
  const cn=s=>s.replace(/20\d{2}/g,"").replace(/[^\p{Script=Han}]/gu,"");
