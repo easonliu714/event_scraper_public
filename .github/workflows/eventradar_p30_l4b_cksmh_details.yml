@@ -87,7 +87,8 @@ jobs:
           c=new['cksmhDetailCounts']
           assert new['count']==len(new['items'])==44
           assert [x['id'] for x in old['items']]==[x['id'] for x in new['items']]
-          assert len(ev['records'])==5 and ev['noRetries'] is True and ev['fetchMax']==5
+          assert len(ev['records'])==5 and ev['noRetries'] is True and ev['fetchMax']==6
+          assert ev['listingHTTP']['state']=='HTTP_OK'
           assert ev['parentRun']=='40281136558'
           assert c['http_ok']>=4 and c['title_verified']>=4 and c['date_bound']>=3
           assert 0<=c['summary_bound']<=5 and 0<=c['venue_bound']<=5
