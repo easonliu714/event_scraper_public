@@ -68,7 +68,8 @@ const dialog=document.getElementById("dialog");
 let items=[];
 const t=(tag,value,cls)=>{const n=document.createElement(tag);if(value!==undefined&&value!==null)n.textContent=String(value);if(cls)n.className=cls;return n;};
 const unknown=v=>typeof v==="string"&&v.trim()?v:"未取得（以官方為準）";
-const when=e=>e.dateStart&&e.dateEnd?(e.dateStart===e.dateEnd?e.dateStart:e.dateStart+" ～ "+e.dateEnd):e.rawPeriod?"原始展期："+e.rawPeriod+"（年份待核對）":"日期未取得（以官方為準）";
+const when=e=>e.dateStart&&e.dateEnd?(e.dateStart===e.dateEnd?e.dateStart:e.dateStart+" ～ "+e.dateEnd):e.rawPeriod==="延期未定"?"展覽延期／日期未定（以官方為準）":e.dateEvidenceStatus==="LIST_DETAIL_PERIOD_CONFLICT"?"原始展期："+unknown(e.rawPeriod)+"（清單與官方詳情日期不一致，待核對）":e.rawPeriod?"原始展期："+e.rawPeriod+"（年份待核對）":"日期未取得（以官方為準）";
+const sourceLabel=e=>e.sourceLevel==="DETAIL_DATE_CANDIDATE"?"已核對官方詳情展期（候選）":e.sourceLevel==="LIST_TABLE_ONLY"?"僅有官方清單資料":e.sourceLevel==="LIST_ONLY"?"僅有官方活動連結":unknown(e.sourceLevel);
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"&&["event.culture.tw","twtc.com.tw"].includes(u.hostname)?u.href:null;}catch{return null;}}
 function fillPill(node,value){node.appendChild(t("span",value,"pill"));}
 function openDetail(e){
@@ -78,7 +79,7 @@ function openDetail(e){
  const lines=document.getElementById("detail-lines");lines.replaceChildren();
  const fields=[["活動期間",when(e)],["場地",unknown(e.venue)],
  ["票價",unknown(e.price)],["售票狀態","未知（請查看官方）"],
- ["資訊完整度",e.sourceLevel||"來源候選"],["內容摘要",unknown(e.summary)],
+ ["資訊完整度",sourceLabel(e)],["內容摘要",unknown(e.summary)],
  ["資料狀態","候選／尚未官方逐筆覆核"]];
  fields.forEach(x=>{const div=t("div",null,"detail-line");const k=t("strong",x[0]+"：");const v=t("span",x[1]);div.append(k,v);lines.append(div);});
  const link=document.getElementById("official");const url=safeLink(e.officialUrl);
@@ -97,7 +98,7 @@ function render(){
   const card=t("article");const tags=t("div",null,"pills");fillPill(tags,e.platform);fillPill(tags,e.category);
   card.append(tags,t("h2",e.title));
   card.append(t("div",when(e),"meta"));card.append(t("div","地點："+unknown(e.venue),"meta"));
-  card.append(t("div","票況：未知 · 來源："+unknown(e.sourceLevel),"meta"));
+  card.append(t("div","票況：未知 · 來源："+sourceLabel(e),"meta"));
   const btn=t("button","查看摘要與詳情","card-button");
   btn.type="button";btn.addEventListener("click",()=>openDetail(e));card.append(btn);root.append(card);
  });
