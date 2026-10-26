@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L4-C CKSMH EVENT_SESSION versus REGISTRATION_WINDOW semantic model**
+>
+> - P30-L4-B Android 真機部分 PASS，但多場次時間來源角色錯誤：官方 `場次：` 標題明確列 *活動實際時間*，其下 `報 名 期 間` 為 **REGISTER WINDOW**。L4-C 新讀取層先以固定 5 筆 HTTPS actId/標題驗證，再按個別 `場次：` 區塊截斷 `報名期間`；標題內接受 `YYYY/MM/DD (星期) HHmm-HHmm` 或 `YYYY/MM/DD HH:MM～YYYY/MM/DD HH:MM`，不允許以未標記長區間冒充場次。有活動日期卻含多個未命名日期時 fail-closed，不推測。「自由花蕊」名稱不可混淆不同 actId（61021 為系列講座、51331 為免費參觀常設展）。
+> - 新候選欄位 `sessions[].{start,end,venue,role=OFFICIAL_EVENT_SESSION_TIME,registration}` + `registrationWindows[].{start,end,role=OFFICIAL_REGISTRATION_WINDOW}` + `timeRole=OFFICIAL_EVENT_SESSION_BOUNDS`；`dateStart/dateEnd` 僅代表有證據的**活動場次涵蓋日期**。對常設展 actId 51331，`listPeriodStart/End` 保留 2025/11/24～2030/12/31，`timeRole=OFFICIAL_LIST_PERIOD_UNCLASSIFIED`，`dateStart/End=NULL`，UI 說明「官方清單所列期間／非每日場次，實際開放以官方為準」，不得自行寫成報名或每日場次。
+> - Android `scripts/p30_l7a_smoke_index.html` 結構不增加權限：列表「活動場次：日期範圍（非報名期間）」、modal 每場顯示活動時間、個別場地、報名開始結束並註明「非活動時間」，清單期間單獨呈現。仍只使用 `textContent` 避免 XSS。平台其他 39 TWTC rows 位元級相同；FinTech 原訂／暫定／confirmed NULL 不變。沒有 PWA Scope/Service Worker、Golden、票況可信資料或正式 JSON 發布。
+> - [Draft PR #18](https://github.com/easonliu714/event_scraper_public/pull/18) HEAD `2656c43fc1fa4486fcbd8be641531e4d15220104`，CI [40287542387](https://github.com/easonliu714/event_scraper_public/actions/runs/40287542387) completed/success：12/12 tests、5 HTTP 200、10 real event sessions、8 registration windows，actId 51331 long listing interval separate、Android local Artifact `12634941609` SHA256 manifest PASS，port 8770 真機待使用者驗收。全 Repo `docs/data.json`／`scraper.py`／`docs/index.html` 保持原 Blob，PR #8 文件更新只在治理分支。
+>
+
+
 > **2026-10-26 P30-L4-B 最終清單與場次時態 UI 保護**
 >
 > - CKSMH `OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE` 改成 UI 明確「官方清單期間」而非無條件活動場次，`OFFICIAL_MULTIPLE_SESSIONS_BOUNDS` 顯示涵蓋日期並展開獨立 sessions（非每日舉辦），多場次無唯一場地保留 `venueNote`。CKSMH source role 轉繁體中文可理解標示。
