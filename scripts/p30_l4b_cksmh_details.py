@@ -24,6 +24,7 @@ PARENT_RUN = "40281136558"
 HOST = "event.culture.tw"
 DETAIL = "/mocweb/reg/CKSMH/Detail.init.ctr"
 PORTAL = "/CKSMH/portal/Registration/C0103MAction"
+LIST_URL = "https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr"
 UA = "EventRadar-P30-readonly/1.0 (github.com/easonliu714/event_scraper_public)"
 MAX_HTML = 1_500_000
 MAX_ROWS = 5
@@ -67,6 +68,79 @@ def exact_act_id(url):
         return values[0]
     except ValueError:
         return None
+
+
+def fetch_listing(session,timeout=12):
+    """Single full official CKSMH list GET; no content from other domains."""
+    try:
+        with session.get(LIST_URL,allow_redirects=False,stream=True,
+                         timeout=(6,timeout),headers={"User-Agent":UA,
+                         "Accept-Language":"zh-TW,zh;q=0.9"}) as resp:
+            meta={"state":"HTTP_OK" if resp.status_code==200 else "HTTP_ERROR",
+                  "http_status":resp.status_code,"url":LIST_URL,
+                  "content_type":resp.headers.get("content-type","")[:100]}
+            if resp.status_code!=200:return None,meta
+            if "text/html" not in meta["content_type"].lower():
+                meta["state"]="NON_HTML";return None,meta
+            blob=bytearray()
+            for part in resp.iter_content(chunk_size=32768):
+                blob.extend(part)
+                if len(blob)>MAX_HTML:
+                    meta["state"]="TOO_LARGE";return None,meta
+            if not blob:
+                meta["state"]="EMPTY_BODY";return None,meta
+            meta["sha256"]=hashlib.sha256(blob).hexdigest()
+            return bytes(blob),meta
+    except requests.RequestException as err:
+        return None,{"state":"NETWORK_ERROR","error_type":type(err).__name__,
+                     "url":LIST_URL}
+
+
+def parse_list_bound(page,events):
+    """No global regex: each date/location must be inside one actId-bound card.
+
+    Page 'Query.list' contains activity cards with their own '活動時間' and
+    '活動地點'. We accept a card only when its sole CKSMH detail ID equals
+    a frozen candidate and its linked title is identical after alt-label strip.
+    """
+    soup=BeautifulSoup(page,"html.parser")
+    targets={exact_act_id(x["officialUrl"]):x for x in events}
+    bound={}
+    for a in soup.find_all("a",href=True):
+        id_num=exact_act_id(urljoin(LIST_URL,a.get("href","")))
+        if id_num not in targets or id_num in bound:continue
+        target=targets[id_num]
+        if normalize(short_title(a.get_text(" ",strip=True)))!=normalize(short_title(target["title"])):
+            continue
+        node=a
+        for depth in range(7):
+            node=node.parent
+            if node is None:break
+            anchors=node.find_all("a",href=True)
+            ids={exact_act_id(urljoin(LIST_URL,link.get("href","")))
+                 for link in anchors}
+            ids.discard(None)
+            if ids!={id_num}:break
+            value=" ".join(node.stripped_strings)
+            if len(value)>3500:break
+            pattern=re.search(r"活動時間\s*(20\d{2}/\d{1,2}/\d{1,2})\s*[~～]\s*"
+                              r"(20\d{2}/\d{1,2}/\d{1,2})",value)
+            if not pattern:continue
+            try:
+                start,end=(date.fromisoformat(x.replace("/","-")) for x in pattern.groups())
+            except ValueError:continue
+            if start>end:continue
+            vm=re.search(r"活動地點\s*(.*?)\s*活動時間",value)
+            venue=re.sub(r"\s+"," ",vm.group(1)).strip() if vm else None
+            if venue and (len(venue)>100 or venue=="地點詳如內頁"):
+                venue=None
+            bound[id_num]={"title":short_title(target["title"]),
+                           "dateStart":start.isoformat(),"dateEnd":end.isoformat(),
+                           "venue":venue,"actId":id_num,
+                           "sourceUrl":LIST_URL,
+                           "sourceRole":"OFFICIAL_LIST_ACTID_BOUND_FIELDS"}
+            break
+    return bound
 
 
 def fetch(session,url,timeout=12):
@@ -247,7 +321,7 @@ def validate_parent(parent):
     return rows
 
 
-def enrich(parent,records):
+def enrich(parent,records,listing=None):
     src=validate_parent(parent)
     ids={x["id"]:x for x in src}
     if len(records)!=MAX_ROWS or {x["id"] for x in records}!=set(ids):
@@ -271,17 +345,36 @@ def enrich(parent,records):
         row["cksmhDetailStatus"]="OFFICIAL_TITLE_VERIFIED"
         row["detailEvidenceSHA256"]=rec["http"]["sha256"]
         row["detailEvidenceRole"]="P30_L4B_CKSMH_OFFICIAL_DETAIL"
+        list_fields=(listing or {}).get(rec["actId"])
+        if list_fields and (list_fields["title"]!=fields["officialTitle"]
+                            or list_fields["actId"]!=exact_act_id(row["officialUrl"])):
+            raise ValueError("HOLD_LIST_DETAIL_IDENTITY_MISMATCH")
         if fields["dateStart"] and fields["dateEnd"]:
             row["dateStart"],row["dateEnd"]=fields["dateStart"],fields["dateEnd"]
             row["timeRole"]=fields["timeRole"]
             row["sourceLevel"]="CKSMH_DETAIL_DATE_CANDIDATE"
             counters["date_bound"]+=1
+        if list_fields and not fields["dateStart"]:
+            row["dateStart"]=list_fields["dateStart"]
+            row["dateEnd"]=list_fields["dateEnd"]
+            row["timeRole"]="OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE"
+            row["sourceLevel"]="CKSMH_LIST_DATE_WITH_DETAIL_TITLE_CONFIRMED"
+            row["dateEvidenceSourceUrl"]=LIST_URL
+            counters["date_bound"]+=1
         if fields["sessions"]:
             row["sessions"]=fields["sessions"]
             if len(fields["sessions"])>1:counters["multi_session"]+=1
+        if list_fields and fields.get("dateStart"):
+            # Cross-check the list by actual days when detail sessions are available.
+            if list_fields["dateStart"]!=fields["dateStart"] or list_fields["dateEnd"]!=fields["dateEnd"]:
+                row["listDetailDateComparison"]="MISMATCH_REVIEW_NOT_AUTOCORRECTED"
         if fields.get("venue"):
             row["venue"]=fields["venue"]
             row["venueRole"]=fields["venueRole"]
+            counters["venue_bound"]+=1
+        elif list_fields and list_fields.get("venue"):
+            row["venue"]=list_fields["venue"]
+            row["venueRole"]="OFFICIAL_LIST_ACTID_BOUND_VENUE"
             counters["venue_bound"]+=1
         if fields.get("summary"):
             row["summary"]=fields["summary"]
@@ -308,6 +401,8 @@ def main(argv=None):
     parent=json.loads(parent_blob.decode("utf-8"))
     rows=validate_parent(parent)
     evidence=[]
+    listing_fields={}
+    listing_meta={"state":"NOT_ATTEMPTED"}
     with requests.Session() as sess:
         for i,item in enumerate(rows):
             if i: time.sleep(1.2)
@@ -322,15 +417,22 @@ def main(argv=None):
                   "DATE",fields.get("dateStart") if fields else None,
                   "VENUE",fields.get("venue") if fields else None,
                   "SESSIONS",fields.get("sessionCount") if fields else None)
+        time.sleep(1.2)
+        listing_html,listing_meta=fetch_listing(sess)
+        if listing_html is not None:
+            listing_fields=parse_list_bound(listing_html,rows)
+        print("OFFICIAL_LIST",listing_meta["state"],listing_meta.get("http_status"),
+              "ACTID_BOUND",len(listing_fields))
     output={"kind":KIND,"generatedAtUTC":datetime.now(timezone.utc).isoformat(),
             "parentRun":PARENT_RUN,"parentSHA256":hashlib.sha256(parent_blob).hexdigest(),
-            "records":evidence,"fetchMax":MAX_ROWS,"noRetries":True,
+            "records":evidence,"listingBound":listing_fields,"listingHTTP":listing_meta,
+            "fetchMax":MAX_ROWS+1,"noRetries":True,
             "sourceRuntime":"DORMANT","published":False,"goldenAccepted":False,
             "writerExecuted":False,"notificationExecuted":False,"autoHidden":0}
     out.mkdir(parents=True,exist_ok=True)
     (out/"detail_evidence.json").write_text(json.dumps(output,ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
     try:
-        new,counts=enrich(parent,evidence)
+        new,counts=enrich(parent,evidence,listing_fields)
     except ValueError as e:
         (out/"hold_diagnostics.json").write_text(
             json.dumps({"state":str(e),"records":len(evidence)},ensure_ascii=False,indent=2)+"\n",
