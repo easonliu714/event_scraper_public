@@ -1,6 +1,13 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L7-A USER-ATTESTED Android 7/7 PASS**
+>
+> - Android 本機 `127.0.0.1:8766` 候選 UI 已由使用者回報七項 PASS：44 筆首頁、CKSMH 5／TWTC 39、關鍵字及類別、詳情 modal/關閉與無重疊、未知日期票價票況提示、官方 HTTPS 連結。對應 PR #12 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc`、Run `40271164263`、Artifact `12628147623`。不改動 UI/PWA 正式 `docs/index.html`、`docs/data.json`。
+> - 架構狀態升級只適用 `ANDROID_LOCAL_TWO_SOURCE_SMOKE=PASS`，不得延伸為 PWA Install/Offline Scope、19 平台全面來源回歸、官方 Golden、有效性可逆引擎或已部署 Pages PASS。後續 P30-L3-B 需維持可追溯的 GET→LIST→DETAIL→FIELDS 來源分層證據，個別失敗不得污染已過 Gate。
+>
+
+
 > **P30-L7-A Android Portable Manifest 修復驗證**：PR #12 最新 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc` 僅更新 workflow 打包命令，在 Artifact 內使用相對檔名的 `SHA256SUMS.txt`，CI 先在 `p30-smoke/` 下 `sha256sum -c`，三檔 OK。正式 GitHub Run `40271164263` SUCCESS，最終 Android-only Artifact `12628147623`，須使用此包、不要使用前版 `12629030170`。瀏覽器測試必須以同支 Android `127.0.0.1:8766` loopback HTTP 服務載入，非正式 Pages、非安裝型 PWA、無外部數據寫入。Android 實機尚待使用者執行，不得將 Actions SUCCESS 當 Android UAT PASS。
 >
 
