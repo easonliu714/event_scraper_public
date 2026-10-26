@@ -27,7 +27,9 @@ MAX_CANDIDATES = 40
 MAX_REDIRECTS = 2
 MAX_FIELD_EVIDENCE = 12
 NOISE = {"read more", "more", "詳細內容", "活動詳情", "立即購票", "購票", "了解更多", "下一頁", "查看更多", "更多", "首頁"}
-# Historical platform ENTRY configurations; this run does NOT reuse historical responses or JSON.
+# Platform endpoints pinned from previously audited isolated P30 source code, NOT cached HTTP.
+# P30-L3A TWTC official exhibition table; L4B CKSMH Query.list; L3BA Fami Home;
+# L3BB ibon entertainment shell. 403/empty/JS remain HOLD with no bypass.
 PLATFORMS = (
     ("KKTIX", "https://kktix.com/events?category_id=2", ("kktix.com", "kktix.cc"), r"/events/"),
     ("ACCUPASS", "https://www.accupass.com/search?q=%E9%9F%B3%E6%A8%82", ("accupass.com",), r"/event/"),
@@ -35,17 +37,17 @@ PLATFORMS = (
     ("寬宏", "https://kham.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=205", ("kham.com.tw",), r"UTK0201"),
     ("OPENTIX", "https://www.opentix.life/event", ("opentix.life",), r"/event/[0-9]"),
     ("UDN售票網", "https://tickets.udnfunlife.com/application/UTK01/UTK0101_03.aspx?Category=231&kdid=cateList", ("udnfunlife.com",), r"UTK0201"),
-    ("FamiTicket", "https://www.famiticket.com.tw/Home/Activity/Search/242", ("famiticket.com.tw",), r"/Activity/Info"),
+    ("FamiTicket", "https://www.famiticket.com.tw/Home", ("famiticket.com.tw",), r"/Activity/Info"),
     ("年代售票", "https://ticket.com.tw/application/UTK01/UTK0101_06.aspx?TYPE=1&CATEGORY=77", ("ticket.com.tw",), r"UTK0201"),
     ("TixFun售票網", "https://tixfun.com/UTK0101_?TYPE=1&CATEGORY=77", ("tixfun.com",), r"UTK0201"),
     ("Event Go", "https://eventgo.bnextmedia.com.tw/", ("bnextmedia.com.tw",), r"/event/detail"),
     ("BeClass", "https://www.beclass.com/default.php?name=ShowList&op=recent", ("beclass.com",), r"rid="),
-    ("ibon", "https://ticket.ibon.com.tw/Activity/Index", ("ibon.com.tw",), r"/Activity/"),
+    ("ibon", "https://ticket.ibon.com.tw/Index/entertainment", ("ibon.com.tw",), r"/(?:Web/|WebV3/)?ActivityInfo/Details/"),
     ("華山1914", "https://www.huashan1914.com/w/huashan1914/exhibition", ("huashan1914.com",), r"/exhibition/"),
     ("松山文創", "https://www.songshanculturalpark.org/", ("songshanculturalpark.org",), r"/exhibition/|/events?/"),
     ("KidsClub", "https://www.kidsclub.com.tw/", ("kidsclub.com.tw",), r"/courses/|/product/"),
-    ("台北世貿", "https://www.twtc.com.tw/", ("twtc.com.tw",), r"/event/|/exhibition/"),
-    ("中正紀念堂", "https://event.culture.tw/mocweb/reg/CKSMH/", ("culture.tw",), r"/Detail\.|actId="),
+    ("台北世貿", "https://twtc.com.tw/exhibition?p=home", ("twtc.com.tw",), r"exhibition_more\.aspx\?id="),
+    ("中正紀念堂", "https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr", ("culture.tw",), r"/Detail\.init\.ctr\?actId="),
     ("iNDIEVOX", "https://www.indievox.com/activity/list", ("indievox.com",), r"/activity/detail"),
     ("StrollTimes", "https://strolltimes.com/", ("strolltimes.com",), r"/events/"),
 )
