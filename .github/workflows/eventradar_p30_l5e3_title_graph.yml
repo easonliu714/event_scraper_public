@@ -1,0 +1,157 @@
+name: EventRadar P30 L5-E3 reversible StrollTimes parent-subevent identity graph
+on:
+  push:
+    branches: [feat/eventradar-p30-l5e3-article-identity-graph]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l5e3-identity-graph
+  cancel-in-progress: false
+jobs:
+  source-bound-title-graph:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l5e3-article-identity-graph'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Freeze prior L5E2 source, formal data blobs and exactly three new files
+        run: |
+          set -euo pipefail
+          base=f0b07bf4ad45ed9e833d6825c4c119097c698694
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l5e3_title_graph.yml' 'scripts/p30_l5e3_strolltimes_identity_graph.mjs' 'tests/p30/test_l5e3_strolltimes_identity_graph.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNEXPECTED_SOURCE_CHANGE; exit 1; }
+          echo PASS P30_L5E3_EXACT_PARENT_AND_THREE_FILE_SCOPE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Standard public Chromium, no login/captcha or stealth
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Offline 25 parent-subevent, identity and zero-promotion negatives
+        run: |
+          node --check scripts/p30_l5e3_strolltimes_identity_graph.mjs
+          node --test tests/p30/test_l5e3_strolltimes_identity_graph.mjs
+          echo PASS P30_L5E3_RECURSIBLE_GRAPH_NEGATIVE_MATRIX
+      - name: Download exact L5E1 accepted lineage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5e-strolltimes-attributed-sources
+          run-id: 40314650154
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l5e3-e1
+      - name: Download exact L5E2 accepted government reference
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5e2-bitan-gov-official
+          run-id: 40315847664
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l5e3-e2
+      - name: Verify both upstream manifests and one-government-event proof
+        run: |
+          set -euo pipefail
+          (cd p30-l5e3-e1 && sha256sum -c SHA256SUMS.txt)
+          (cd p30-l5e3-e2 && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path('p30-l5e3-e1/lineage_evidence.json').read_text())
+          b=json.loads(Path('p30-l5e3-e2/independent_gov_event_review.json').read_text())
+          assert a['kind']=='EVENTRADAR_P30_L5E1_STROLLTIMES_ATTRIBUTED_SOURCE_LINEAGE_NOT_GOLDEN'
+          assert a['listCandidateCount']==24 and a['articleSamplesCount']==6
+          assert a['exactAggregatorArticleCount']==2
+          assert a['firstPartyEventDetailsIndependentlyVerified']==0
+          assert b['kind']=='EVENTRADAR_P30_L5E2_BITAN_GOV_EVENT_IDENTITY_REVIEW_ONLY'
+          assert b['officialFirstPartyIndependentEventIdentityCount']==1
+          assert b['reviewOnlyOfficialEventPeriod']==['2026-10-17','2026-12-13']
+          assert a['published'] is False and b['published'] is False
+          print('PASS P30_L5E3_TWO_PINNED_ARTIFACTS_AND_ONE_GOV_REFERENCE')
+          PY
+      - name: Reobserve six exact StrollTimes article H1 and source-bound graph
+        run: |
+          node scripts/p30_l5e3_strolltimes_identity_graph.mjs \
+            --e1 p30-l5e3-e1/lineage_evidence.json \
+            --e2 p30-l5e3-e2/independent_gov_event_review.json \
+            --out-dir p30-l5e3-out
+      - name: Verify conservative graph edges and no silent dedup
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-l5e3-out/identity_graph_review.json').read_text())
+          assert d['kind']=='EVENTRADAR_P30_L5E3_STROLLTIMES_REVERSIBLE_ARTICLE_GRAPH_REVIEW_ONLY'
+          assert d['priorArticleSampleCount']==6 and d['currentSampleCount']==6
+          assert d['priorE1ExactH1Count']==2 and d['currentExactH1Count']>=2
+          assert d['network']['navigationCount']==6
+          assert d['maxArticleNavigation']==6 and d['maxApprovedRequests']==300
+          assert len(d['nodes'])==6 and len({n['id'] for n in d['nodes']})==6
+          assert len(d['edges'])==7
+          assert len([e for e in d['edges'] if e['kind']=='AGGREGATOR_LIST_CARD_POINTS_TO_SAME_ARTICLE'])==6
+          assert len([e for e in d['edges'] if e['kind']=='ONE_EVENT_OFFICIAL_GOV_CALENDAR_CORROBORATED'])==1
+          assert d['oneIndependentGovReferenceCount']==1
+          assert d['confirmedParentChildEventEdges']==0
+          assert d['automaticDedupMergeCount']==0 and d['graphReversible'] is True
+          assert d['all24AggregatorDetailsVerified'] is False
+          assert d['all23OthersOriginalSourcesVerified'] is False
+          assert d['sourceEventPromotionCount']==0 and d['formalDatePromotionCount']==0
+          assert d['accepted44AndroidPreserved'] is True
+          assert d['goldenAccepted'] is False and d['published'] is False
+          assert d['writerExecuted'] is False and d['notifierExecuted'] is False
+          assert d['autoHidden']==0 and d['sourceRuntime']=='DORMANT'
+          assert d['noCheckout'] and d['noLogin'] and d['noStealth']
+          assert d['noCaptchaBypass'] and d['noUndocumentedAPI'] and d['noRetries']
+          assert all(n['mergeAllowed'] is False and n['sourceEventDateStart'] is None
+                     and n['sourceEventDateEnd'] is None and n['ticketStatus']=='UNKNOWN'
+                     and n['price'] is None and n['goldenVerified'] is False
+                     and n['published'] is False for n in d['nodes'])
+          assert all(e['mergeAllowed'] is False for e in d['edges'])
+          assert all(e['autoMergeAllowed'] is False for e in d['notesRequiringReview'])
+          print('PASS P30_L5E3_SIX_AGGREGATOR_ARTICLE_EDGES_PLUS_ONE_OFFICIAL_CALENDAR_REFERENCE')
+          print('PASS P30_L5E3_ZERO_UNVERIFIED_PARENT_CHILD_MERGE_OR_PRODUCTION_FIELDS')
+          if d['notesRequiringReview']:
+              print('HOLD P30_L5E3_TITLE_DRIFT_AND_SUBEVENT_RELATIONSHIPS',len(d['notesRequiringReview']))
+          else:
+              print('HOLD P30_L5E3_PARENT_CHILD_RELATIONSHIPS_UNVERIFIED_INDEPENDENTLY')
+          PY
+      - name: SHA seal isolated graph evidence including HOLD
+        if: always()
+        run: |
+          mkdir -p p30-l5e3-out
+          cat > p30-l5e3-out/README.txt <<'EOF'
+          P30-L5-E3 StrollTimes homepage card to article graph with bounded
+          public H1 reobservation for six samples. Only same article URL edges
+          are source identity; NEVER assume duplicate events or parent-child.
+          One Bitan independent New Taipei government calendar reference
+          is inherited from L5-E2 and is still not a production app event.
+          Any headline overlaps, series vs locality and historical drift
+          remain review-only until independently verified source lineage.
+          All 24 aggregator list cards and the other 23 first-party status
+          remain UNVERIFIED. No Golden, PWA writer, Android change or merger.
+          EOF
+          if [[ -f p30-l5e3-out/identity_graph_review.json ]]; then
+            cp p30-l5e3-e1/lineage_evidence.json p30-l5e3-out/parent_e1_lineage.json
+            cp p30-l5e3-e2/independent_gov_event_review.json p30-l5e3-out/parent_e2_government.json
+            (cd p30-l5e3-out && sha256sum identity_graph_review.json parent_e1_lineage.json parent_e2_government.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L5E3_SEALED_GRAPH_SHA_MANIFEST
+          else
+            echo HOLD P30_L5E3_MISSING_GRAPH_EVIDENCE
+          fi
+      - name: Upload source-bound reversible graph audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l5e3-strolltimes-identity-graph
+          path: p30-l5e3-out/
+          if-no-files-found: warn
+          retention-days: 14
