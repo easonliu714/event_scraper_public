@@ -37,8 +37,10 @@ export function selectExact(list){
   for(const a of list){
     const url=officialDetail(a.href);
     if(!url)continue;
-    const text=clean(a.heading||a.label||a.text||a.alt);
-    if(text!==TITLE)continue;
+    // Official promotional cards can have image-alt identity and category
+    // text "展覽"; truthy category must not hide an exact official image alt.
+    const textFields=[a.heading,a.label,a.text,a.alt].map(clean);
+    if(!textFields.includes(TITLE))continue;
     if(seen.has(url))continue;
     seen.set(url,{title:TITLE,url});
   }
