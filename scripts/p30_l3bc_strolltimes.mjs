@@ -174,6 +174,8 @@ export async function run(out,opts={}){
               "SCRIPTS",home?.scriptCount??0);
   console.log("STROLLTIMES_AGGREGATOR_LIST",rows.length,"DETAIL",detail.state,
               "DETAIL_HTTP",metrics.articleHttp);
+  console.log("STROLLTIMES_SAMPLE_TITLE",JSON.stringify(detail.homepageCandidateTitle??null),
+              "AGGREGATOR_H1",JSON.stringify(detail.h1??[]));
   console.log("STROLLTIMES_METRICS",JSON.stringify(metrics));
   if(!rows.length){console.log("HOLD P30_L3BC_AGGREGATOR_LIST_EMPTY");process.exitCode=2;}
   else console.log("PASS P30_L3BC_AGGREGATOR_LIST_IDENTITY_ONLY");
