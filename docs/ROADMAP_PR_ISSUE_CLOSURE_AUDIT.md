@@ -1,6 +1,16 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L4-D3 FamiTicket Chromium official detail identity（最新）**
+>
+> - 接續本日 P30-L4-D1 / L4-D2，不回退既有 44 Android USER_ATTESTED_PASS、FamiTicket list 47、ibon rendered list 23／2 個明確來源時間證據、StrollTimes 24 篇聚合文章。Source `main@fc4f963247d68eed29425808cc14e7250f312d05`、`docs/data.json`、`docs/index.html`、`scraper.py` 仍 frozen/未發布。本次新 [Draft PR #25](https://github.com/easonliu714/event_scraper_public/pull/25) `feat/eventradar-p30-l4d3-fami-public-browser` base Source PR #24 完成 HEAD `ca9ab41c930296c4c9c74a329454466f55a6e611`，只新增 `scripts/p30_l4d3_famiticket_browser.mjs`、`tests/p30/test_l4d3_famiticket_browser.mjs`、`.github/workflows/eventradar_p30_l4d3_fami_browser.yml`。只用未修改 Chromium 單次 FamiTicket `/Home` 和**以唯一 opaque 詳情 URL 綁定的** 2026 ITF 台灣國際旅展單一 public detail，禁止登入／購票／驗證碼繞過／私人 API 猜測。
+> - 初版 CI `40299320318` / `40299497551` 14/14 offline PASS，但標的活動 `HOLD_LIST_EXACT_UNIQUE_IDENTITY`。**實際原因已確認**：FamiTicket 2026 ITF 多處重複首頁卡片的官方標題在 `img alt`，連結 `textContent` 可能只有「展覽」或是空字串；原 selector `heading||label||text||alt` 受先遇到的分類文字影響。修成獨立比較四個欄位任一 **exact title** 並依 canonical 同一 opaque URL 去重（如有不同 URL 仍 HOLD），新增兩個來源實例的正反向 regression；未放寬一般 fuzzy matching。
+> - **最終 Source PR #25 HEAD `622a5221d6fded07d0829486f3877835e372da40`**，native [GitHub Actions Run 40299649653](https://github.com/easonliu714/event_scraper_public/actions/runs/40299649653) **completed/success，16/16 offline、安全 scope／Blob Gate PASS**。官方 FamiTicket homepage **HTTP200，Chromium DOM 231 anchors**；ITF 唯一 same-ID 連結綁定 PASS；官方 detail **HTTP200、1 個精確匹配 H1/H2/H3/H4 標題、頁面文字含 ITF 名稱**；檔案 SHA manifest PASS。隔離證據 [Artifact 12639478214](https://github.com/easonliu714/event_scraper_public/actions/runs/40299649653/artifacts/12639478214)，archive SHA256 `aff6a0e169bc972b8632cb62930b63dd92ad6cc82d5c50680f66a0f94bbb3732`，expires `2026-11-09T09:27:59Z`。這次證明 public Chromium **一筆**詳情可正確顯示／綁定，**不能倒推整批 47 件、不同 Runner/日期都穩定**；過去 P30-L4-D1 requests 同 URL 0/2 headings 的變異列為待進一步查明，並非活動失效。
+> - `P30_L4D3_FAMITICKET_ONE_BROWSER_DETAIL_IDENTITY=PASS`，`P30_L4D1_FAMITICKET_RAW_HTTP_DETAIL_STABILITY=HOLD`，`P30_L5_FAMITICKET_DATE_ROLE/PRICE/TICKET_STATUS=OPEN`。`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`、`SOURCE_RUNTIME=DORMANT`。PR #23/#24/#25 皆 Draft/未合併，兩份治理 docs 只存在 [PR #8](https://github.com/easonliu714/event_scraper_public/pull/8) Draft、尚未 main merge。
+> - 下一 Gate **P30-L5**：針對 ibon 現有 2 件的官方「活動時間」原始證據，建構可稽核日期／開場／開演／多場次與售票／報名／票券有效期角色，保護已發現 19→1、20→02 的 date token 回歸；FamiTicket Chromium 詳情欄位進一步小樣本擷取（不得以首頁卡片 MM/DD 當已確認年與活動），StrollTimes 只可作聚合線索，須綁原始主辦／票務出處後才能放入候選整併。再進入 L6 可逆去重/分類 → L7 isolated JSON → L8 Android 實機，**不必重做已通過的 44 Android UAT**。
+>
+
+
 > **2026-10-26 P30-L4-D1 FamiTicket / L4-D2 ibon source detail Gate（最新正式治理追蹤，PR #8 Draft）**
 >
 > - **版次前提**：直接讀回 Source `main@fc4f963247d68eed29425808cc14e7250f312d05`；Source P30-L3-B-C PR #22 `e7e13c845d042b4a0b13cc98bdd51ba03d836fa8` 及 CI `40295191261` PASS（StrollTimes 24 聚合文章）保留不回退；P30-L4-C Android 8770 **USER_ATTESTED_PASS**（44=5 CKSMH+39 TWTC）保留。所有新 Gate 是基於 Source P30 stacked Draft PR、不改正式 main/Android 44/Pages/原正式 JSON。
