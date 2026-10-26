@@ -1,0 +1,89 @@
+name: EventRadar P30 L3-B-B2 ibon public Chromium rendering audit
+on:
+  push:
+    branches: [feat/eventradar-p30-l3bb-ibon-browser]
+permissions:
+  contents: read
+jobs:
+  ibon-browser-readonly:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l3bb-ibon-browser'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Immutable Source main, verified accepted Android, 3 new files
+        run: |
+          set -euo pipefail
+          base=54d65d382ab30b5d864f1841fc6a12452895b927
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l3bb2_ibon_browser.yml' 'scripts/p30_l3bb_ibon_browser.mjs' 'tests/p30/test_l3bb_ibon_browser.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD|LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNEXPECTED_WRITER_CHANGE; exit 1; }
+          echo PASS P30_L3BB2_EXACT_SOURCE_SCOPE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install standard Chromium (no stealth extension or automation bypass)
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Offline negative controls and syntax prior to any web request
+        run: |
+          node --check scripts/p30_l3bb_ibon_browser.mjs
+          node --test tests/p30/test_l3bb_ibon_browser.mjs
+          echo PASS P30_L3BB2_BROWSER_OFFLINE_MATRIX
+      - name: One public ibon browser navigation, restricted request budget
+        run: |
+          node scripts/p30_l3bb_ibon_browser.mjs --out-dir p30-l3bb2-out
+      - name: Assert recovered links and no live ticket claim
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("p30-l3bb2-out/diagnostics.json").read_text())
+          c=json.loads(Path("p30-l3bb2-out/candidate.json").read_text())
+          assert len(c)>=1
+          assert d['http']['pageHttpStatus']==200
+          assert len(c)==d['dom']['listCandidates']
+          assert d['maxNavigation']==1 and d['maxRequests']==90 and d['noCaptchaBypass'] and d['noLogin']
+          assert d['goldenAccepted'] is False and d['published'] is False
+          assert d['writerExecuted'] is False and d['notifierExecuted'] is False
+          assert d['autoHidden']==0 and d['sourceRuntime']=='DORMANT'
+          assert len({x['officialUrl'] for x in c})==len(c)
+          assert all(x['dateStart'] is None and x['dateEnd'] is None and
+               x['ticketStatus']=='UNKNOWN' and x['price'] is None and
+               x['category']=='待分類' and x['goldenVerified'] is False for x in c)
+          print('PASS P30_L3BB2_PUBLIC_BROWSER_DOM_LIST',len(c))
+          PY
+      - name: Always seal per-run browser diagnostics
+        if: always()
+        run: |
+          mkdir -p p30-l3bb2-out
+          cat > p30-l3bb2-out/README.txt <<'EOF'
+          P30-L3-B-B2: stock Chromium, one public ibon entertainment URL.
+          This is a JS rendering response diagnostic, not CAPTCHA/WAF bypass.
+          HTTPS allowlist, request budget 90, no login, no purchase or notifier.
+          If site renders a shell, mark source HOLD and stop.
+          Candidate rows have date, price, sale-state and category unverified.
+          Do not merge into formal Pages, PWA, notifications or Android 44 UAT.
+          EOF
+          if [[ -f p30-l3bb2-out/diagnostics.json && -f p30-l3bb2-out/candidate.json ]]; then
+            (cd p30-l3bb2-out && sha256sum candidate.json diagnostics.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L3BB2_DIAGNOSTICS_SHA
+          else
+            echo HOLD P30_L3BB2_NO_HTTP_DIAGNOSTICS
+          fi
+      - name: Store audit only; no Pages publish
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l3bb2-ibon-browser-audit
+          path: p30-l3bb2-out/
+          if-no-files-found: warn
+          retention-days: 14
