@@ -1,6 +1,17 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L4-C Android date-role semantics post real-device feedback**
+>
+> - 使用者提交 P30-L4-B Android `127.0.0.1:8769` 實機截圖，表明「實機驗證基本上都通過」，但指出部分多場次活動（自由花蕊系列講座等）把**報名期間誤標示為活動日期**。只核准本次畫面範圍的清單／詳情／標題／場地／摘要回歸結果，新增 `L4B_DATE_ROLE_SEMANTICS_FOLLOWUP`；不得把該 UAT 當成完整 Golden/19 平台/正式上線通過。
+> - 直接源端原因：舊 P30-L4-B `SESSION_RE.findall(section)` 抓取所有完整時間區間，混淆官網「場次：實際講座日期/時間」與同區塊「報 名 期 間：開始～結束」。actId 61021「自由花蕊系列講座 Part II：自己的房間」原誤顯示從 2026/10/16 到 2027/01/16；實際第一場 2026/11/07 14:00～16:00，10/16 11:30 為該場報名起始。actId 61024「《民主大冒險》圖文書新書分享會」實際活動從 2026/11/04 起，10/01 是首場報名起始。官網 `自由花蕊(免費參觀)` actId 51331 為**另一筆常設展活動**，官方清單 2025/11/24～2030/12/31；目前既無證據宣稱「每天開放」亦不能自行認定此整段是報名期間。
+> - 新 [Source Draft PR #18](https://github.com/easonliu714/event_scraper_public/pull/18) `feat/eventradar-p30-l4c-session-registration-roles` 堆疊在 PR #17 已實測版本 `d79de853c007ac965d02b56cc2e556f8ad5f1bff`；四路徑（新增 `scripts/p30_l4c_cksmh_semantic_roles.py`、`tests/p30/test_l4c_cksmh_semantic_roles.py`、`.github/workflows/eventradar_p30_l4c_semantic_roles.yml`，僅修改隔離版 `scripts/p30_l7a_smoke_index.html`）。首次 CI `40287370407` offline 有 3 failed fixtures（FULL_RANGE date year 被 heading HHMM partial match；無角色標籤時應 FAIL CLOSED），修補後最終 HEAD `2656c43fc1fa4486fcbd8be641531e4d15220104` 完整 PASS；舊失敗 CI 是修補歷史，非正式 Gate PASS。
+> - **最終 CI [Run 40287542387](https://github.com/easonliu714/event_scraper_public/actions/runs/40287542387)** `completed/success`，12/12 positive/negative tests、JS syntax、父 P30-L4-B 44 筆 Artifact SHA、五筆 CKSMH 來源 HTTPS HTTP200、來源 actId/title match、39 筆 TWTC data exact parity、候選資料 SHA bundle。取回 **10 組真正活動場次**（61004=1、61024=2、61026=1、61021=6）、**8 組報名時間窗**（61024=2、61021=6）、保留 51331 **OFFICIAL_LIST_PERIOD_UNCLASSIFIED** 而不宣稱開放／報名時間。實際場次 `dateStart/dateEnd` 與 `registrationWindows`／`sessions[].registration` 分離，單場次場地逐一保留，不再拼成錯誤活動區間；活動資訊未驗證者不臆測。
+> - **下一個 Android 實機 UAT（尚未回報）**：隔離 Artifact [12634941609](https://github.com/easonliu714/event_scraper_public/actions/runs/40287542387/artifacts/12634941609) `eventradar-p30-l4c-semantic-android`，archive digest `sha256:d9cd41ffb7c0eaebf1be066e2a5dbcb380f59d3f0366da2ed183261414d3abd1`，expires `2026-11-09T07:43:49Z`；Android 本機 `127.0.0.1:8770`。優先驗證 61021 / 61024 真正場次時間與報名期間分欄、51331 官方清單期間但非每日場次、金融科技展延期與 39 筆世貿未回歸、44/5/39。
+> - `P30_L4C_OFFICIAL_AND_CI=PASS`、`P30_L4C_ANDROID_REAL_UAT=WAITING_USER`。PR #18 與治理 PR #8 均 Draft/未 Merge；Source `main@fc4f963247d68eed29425808cc14e7250f312d05` 不動，`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`、`SOURCE_RUNTIME=DORMANT`，正式 PWA /通知/排程/Writer/三 Repo 退役未授權。
+>
+
+
 > **2026-10-26 P30-L4-B 最終 Android 類型標籤修補及 Artifact 鎖定**
 >
 > - 先前 PR #17 的 CI Run `40284806144` PASS，但新增顯示語義修正：`OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE` 顯示 **「官方清單期間：YYYY-MM-DD～YYYY-MM-DD（實際開放以官方為準）」**，與詳情 `OFFICIAL_SINGLE_SESSION`、`OFFICIAL_MULTIPLE_SESSIONS_BOUNDS` 分開；`CKSMH_LIST_DATE_WITH_DETAIL_TITLE_CONFIRMED` source label 不再顯示機器碼。新 PR #17 HEAD **`d79de853c007ac965d02b56cc2e556f8ad5f1bff`**，只修改同一隔離 HTML，不觸碰正式 PWA。
