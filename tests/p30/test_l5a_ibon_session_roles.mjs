@@ -105,7 +105,7 @@ test("13 admission time later than show time requires manual review",()=>{
 });
 test("14 sales/registration/voucher heading cannot create a session",()=>{
   for(const heading of ["售票期間：","票券使用期限：","報名期間："]){
-    assert.throws(()=>decodeActivityBlock({...block1,heading,rawExcerpt:heading+" 2026/12/19 開演17:00"}),/HOLD_ACTIVITY_TIME_HEADING/);
+    assert.throws(()=>decodeActivityBlock({...block1,heading,rawExcerpt:heading+" 2026/12/19 開演17:00"}),/HOLD_EVENT_TIME_HEADING/);
   }
 });
 test("15 full-year date required, no inference from event title",()=>{
@@ -147,5 +147,5 @@ test("21 no show time rejects while admission alone remains not an event",()=>{
 test("22 bounded multiple explicit blocks, wrong role not copied",()=>{
   const x=fixture();
   x.details[0].scheduleBlockEvidence=[block1,{...block1,heading:"【售票時間】"}];
-  assert.throws(()=>transform(x),/HOLD_ACTIVITY_TIME_HEADING|HOLD_ACTIVITY_LABEL_BINDING/);
+  assert.throws(()=>transform(x),/HOLD_EVENT_TIME_HEADING|HOLD_ACTIVITY_LABEL_BINDING/);
 });
