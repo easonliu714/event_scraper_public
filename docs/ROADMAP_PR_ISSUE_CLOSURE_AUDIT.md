@@ -1,5 +1,14 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+> **SRC-P30-L2-A 2026-10-26 CI 完成（候選分支 PASS；PR #9 仍 Draft）**
+>
+> - Source PR [#9](https://github.com/easonliu714/event_scraper_public/pull/9) 為**堆疊 PR**：`feat/eventradar-p30-l2a-offline-triage@7fd14010f5dbc3ef383919ee67eb21283904afe2` → PR #7 `feat/eventradar-p30-live-diagnostic@959324cb3bad8f56fb411b7cfb6de2a294f18850`；僅三新增檔，未改正式 Source、UI、JSON、通知、排程及部署，未合併。
+> - 原生 Actions Run [40266605126](https://github.com/easonliu714/event_scraper_public/actions/runs/40266605126) `completed/success`，Job `121390275278` 所有階段 SUCCESS；9/9 offline unittest PASS；以 GitHub Actions 唯讀下載既有 L1 Artifact `12600795314`，`diagnostics.json` SHA256 `91a08e022ee080a3435229eb6393d656c97104d78c3a46a07b31a2423be3e4ff`；重播驗證 19 / 15 HTTP_OK / 11 LIST 非空 / 338 候選，L2 HTTP=4、L3 清單空=4、L4 可取詳情候選=11。
+> - 確切源端 HTTP（**2026-10-25 L1 單次觀測，不代表今天即時狀態**）：KKTIX **403**、拓元售票 **403**、BeClass **403**、中正紀念堂 **404**；FamiTicket / ibon / 台北世貿 / StrollTimes 均 **HTTP 200 但清單 0**。HTTP 403 非活動無效證據，404 亦不能直接證明來源下架。
+> - PR #9 Artifact `eventradar-p30-l2a-offline-triage` ID `12626960522`（2026-11-09 到期），報告只含來源觀察/分層/雜湊，`NO_NEW_HTTP=true`、`APP_DATA_PUBLISHED=false`，不構成 Golden 或正式功能啟用。
+> - **下一工作 P30-L2-B**：只以已公開官方入口核對中正紀念堂 404 的實際路徑；其餘 403 按 BLOCKED 保留，逐平台可用證據再決定替代合法公開清單，禁止繞過門檻。接 P30-L3 四個 HTTP 200/清單 0 的可重播 HTML/JSON 負例。PR #9 的 CI PASS 與 PR #7 的 live diagnostic PASS 不等於其他來源品質 PASS，更不等於可合併、正式上線或刪除舊庫。
+>
+
 > **2026-10-26 SRC-P30 L2-A 治理增量（仍為 PR #8 Draft；未進 main）**
 >
 > - 本輪 GitHub 重新核對：Source main `fc4f963247d68eed29425808cc14e7250f312d05`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、Legacy ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`；唯一最後保留 Repo 已由使用者明定為 `easonliu714/event_scraper_public`，其他兩庫只作來源證據及將來受控退役。
