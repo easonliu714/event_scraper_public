@@ -1,0 +1,102 @@
+name: EventRadar P30 L3-B-B ibon official list response Gate
+on:
+  push:
+    branches: [feat/eventradar-p30-l3bb-ibon-official]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l3bb-ibon
+  cancel-in-progress: false
+jobs:
+  public-ibon:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l3bb-ibon-official'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen predecessor Android and official blob SHA/changed-file scope
+        run: |
+          set -euo pipefail
+          base=17acb05b8da6066883113e91d68e852ba3db080f
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l3bb_ibon.yml' 'scripts/p30_l3bb_ibon.py' 'tests/p30/test_l3bb_ibon.py'|LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD|LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_SOURCE_DIFF; exit 1; }
+          echo PASS P30_L3BB_IBON_FROZEN_PREDECESSOR_AND_EXACT_PATHS
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Negative matrix before any HTTPS GET
+        run: |
+          python -m py_compile scripts/p30_l3bb_ibon.py tests/p30/test_l3bb_ibon.py
+          python -m unittest discover -s tests/p30 -p 'test_l3bb_ibon.py' -v
+          echo PASS P30_L3BB_IBON_OFFLINE_NEGATIVE_MATRIX
+      - name: Public official entertainment HTTPS limited GET (two lists, one detail)
+        id: live
+        run: |
+          python scripts/p30_l3bb_ibon.py --out-dir p30-l3bb-out
+      - name: Evidence and no-publish invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          c=json.loads(Path('p30-l3bb-out/candidate.json').read_text(encoding='utf-8'))
+          d=json.loads(Path('p30-l3bb-out/diagnostics.json').read_text(encoding='utf-8'))
+          assert d['counts']['uniqueCandidates']>=1
+          assert d['counts']['listHTTP200']>=1
+          assert len(d['lists'])==2 and d['maxListGET']==2 and d['maxDetailGET']==1
+          assert d['retryCount']==0
+          assert len(c)==d['counts']['uniqueCandidates']
+          assert len({x['officialUrl'] for x in c})==len(c)
+          assert all(x['dateStart'] is None and x['dateEnd'] is None and
+                     x['ticketStatus']=='UNKNOWN' and x['price'] is None
+                     and x['categoryBasis']=='UNVERIFIED' and not x['goldenVerified']
+                     and x['candidateOnly'] for x in c)
+          for name,value in [('goldenAccepted',False),('appDataPublished',False),
+                             ('writerExecuted',False),('notifierExecuted',False),
+                             ('autoHidden',0),('sourceRuntime','DORMANT'),
+                             ('fullCatalogProven',False)]:
+              assert d[name]==value,name
+          # Detail identity is independent; failure to match a dynamic shell
+          # must NEVER be upgraded to a verified detail.
+          sample=d['detail']
+          if sample['state']!='TITLE_MATCH':
+              print('HOLD P30_L3BB_IBON_DETAIL_NOT_IDENTITY_VERIFIED',sample['state'])
+          else:print('PASS P30_L3BB_IBON_ONE_DETAIL_TITLE_VERIFIED')
+          print('PASS P30_L3BB_IBON_LIST_EVIDENCE',len(c))
+          PY
+      - name: Portable manifest for audit artifact
+        if: always()
+        run: |
+          mkdir -p p30-l3bb-out
+          cat > p30-l3bb-out/README.txt <<'EOF'
+          P30-L3-B-B ibon public HTML response/list/detail one-shot Gate.
+          Only official entertainment links. 2 list GET max, 1 detail sample
+          max, no replay/retry/login/checkout/API endpoint guessing.
+          2026 /Activity/Index earlier HTTP200 LIST0; new
+          /Index/entertainment and /Home/MoreResult?inATAPID=105&...
+          The sample may show a JS-only detail shell: see diagnostics.json.
+          Do NOT turn dates, price, tickets, category into verified values.
+          Never publish candidate.json to formal docs/data.json or PWA.
+          EOF
+          if [[ -f p30-l3bb-out/candidate.json && -f p30-l3bb-out/diagnostics.json ]]; then
+            (cd p30-l3bb-out && sha256sum candidate.json diagnostics.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L3BB_PORTABLE_SHA_GATE
+          else
+            echo HOLD P30_L3BB_NO_OUTPUT_ARTIFACTS
+          fi
+      - name: Upload isolated diagnostic artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l3bb-ibon-official-probe
+          path: p30-l3bb-out/
+          retention-days: 14
+          if-no-files-found: warn
