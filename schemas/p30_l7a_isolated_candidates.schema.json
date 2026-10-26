@@ -23,7 +23,7 @@
     "referenceCount",
     "totalSourceEventRecords",
     "candidateEventRecords",
-    "showStartsInPinnnedInput",
+    "showStartsInPinnedInput",
     "independentFirstPartyRefs",
     "automaticMergeCount",
     "automaticHideCount",
@@ -413,7 +413,7 @@
         }
       }
     },
-    "showStartsInPinnnedInput": {
+    "showStartsInPinnedInput": {
       "const": 3
     },
     "independentFirstPartyRefs": {
