@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {KIND,HOME,normalize,canonicalArticle,isAggregatorOwned,safeAssetHost,titleText,candidatesFromLinks} from "../../scripts/p30_l3bc_strolltimes.mjs";
+import {KIND,HOME,normalize,canonicalArticle,isAggregatorOwned,safeAssetHost,titleText,candidatesFromLinks,articleHeadingMatches} from "../../scripts/p30_l3bc_strolltimes.mjs";
 const A="https://strolltimes.com/events/hsinchu/261016123223/";
 const B="https://strolltimes.com/events/new-taipei/261016084730/";
 test("immutable role: aggregator, not original organiser",()=>{
@@ -53,6 +53,14 @@ test("dedup same article identity and explicit UNKNOWN data roles",()=>{
   assert.equal(items[0].ticketStatus,"UNKNOWN");
   assert.equal(items[0].goldenVerified,false);
   assert.equal(items[0].published,false);
+});
+test("only terminal date-display suffix is removable from H1 for aggregator identity",()=>{
+  assert.equal(articleHeadingMatches("2026新竹市萬聖節","2026新竹市萬聖節（10/16~10/31）"),true);
+  assert.equal(articleHeadingMatches("2026新竹市萬聖節","2026新竹市萬聖節"),true);
+  assert.equal(articleHeadingMatches("2026新竹市萬聖節","2026新竹市萬聖節（10/16~10/31）不同場次"),false);
+  assert.equal(articleHeadingMatches("2026新竹市萬聖節","新竹市萬聖節（10/16~10/31）"),false);
+  assert.equal(articleHeadingMatches("2026新竹市萬聖節","2026新竹市萬聖節（已延期）"),false);
+  assert.equal(articleHeadingMatches("2026新竹市萬聖節","2026新竹市萬聖節（2026/10/16~10/31）"),false);
 });
 test("deny link-only CTA and navigation as event names",()=>{
   const items=candidatesFromLinks([
