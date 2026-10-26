@@ -15,7 +15,7 @@ const HOSTS=new Set(["strolltimes.com","www.strolltimes.com"]);
 const CDN_HOSTS=new Set(["cdn.jsdelivr.net","cdnjs.cloudflare.com","fonts.googleapis.com","fonts.gstatic.com","unpkg.com"]);
 const MAX_REQUESTS=100,MAX_ROWS=120,MAX_SAMPLE=1;
 const ARTICLE_PATH=/^\/events\/[a-z][a-z0-9-]{1,32}\/[0-9]{12,18}\/?$/;
-const generic=/^(?:首頁|最新活動|所有活動|查看詳情|閱讀更多|了解更多|活動資訊|漫步時光|更多|更多活動|搜尋活動|點擊查看|前往活動)$/;
+const generic=/^(?:首頁|最新活動|所有活動|查看更多|查看詳情|閱讀更多|了解更多|活動資訊|漫步時光|更多|更多活動|搜尋活動|點擊查看|前往活動)$/;
 export function normalize(s){
   return String(s??"").replace(/\s+/g," ").trim().slice(0,220);
 }
