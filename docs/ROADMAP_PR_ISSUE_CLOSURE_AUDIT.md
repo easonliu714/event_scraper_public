@@ -1,5 +1,16 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+
+> **P30-L7-A Android 本機候選驗證 Gate 2026-10-26｜READY FOR USER SMOKE TEST（不是 Golden／正式 G5K）**
+>
+> - 新 Source [PR #11](https://github.com/easonliu714/event_scraper_public/pull/11)（L3-A TWTC，base P30-L1 PR #7，3 新增檔）Head `a63baf94baa46853381d3e791c9b1ff62b771b09`；Run [40270383643](https://github.com/easonliu714/event_scraper_public/actions/runs/40270383643) **SUCCESS**，11/11 離線測試 PASS，官方 `https://twtc.com.tw/exhibition?p=home` HTTP 200，**39 個展覽清單候選**，詳情抽樣 `DETAIL_DATE_CANDIDATE`（僅一筆，非 Golden）。Artifact `12628056468`。
+> - 新 Source [PR #12](https://github.com/easonliu714/event_scraper_public/pull/12)（L7-A，從正式 `main@fc4f963247d68eed29425808cc14e7250f312d05` 建獨立 Docs/PWA 未發布分支，4 新增檔），HEAD `93b0ea012c537ddc8f6a679ef7266cc5a405396d`；Run [40270957865](https://github.com/easonliu714/event_scraper_public/actions/runs/40270957865) **SUCCESS**，8/8 離線資料合約測試、Node JS 語法檢查、原始 `docs/data.json` / `docs/index.html` / `scraper.py` Blob parity PASS。
+> - L7-A Actions 僅唯讀下載 CKSMH Run `40269917573` 與 TWTC Run `40270383643` 已完成 Artifact，**5 + 39 = 44** 筆去重後、來源綁定之最新受控候選 JSON（僅兩來源單次抽樣，不是 19 平台全部活動）。用此候選資料打包靜態 `index.html`、`data.json`、`README.txt`、`SHA256SUMS.txt` 至 Artifact [12629030170](https://github.com/easonliu714/event_scraper_public/actions/runs/40270957865/artifacts/12629030170)，2026-11-09T04:48:45Z 到期。下載只讀，不上傳 `docs/`、不更新正式 PWA。
+> - Android Smoke 必須由使用者於同支手機 Termux 解壓 Artifact、`sha256sum -c SHA256SUMS.txt`，透過 `python -m http.server 8766 --bind 127.0.0.1` 後在瀏覽器開 `http://127.0.0.1:8766/`；檢查 44 筆、來源/類別/關鍵字篩選、詳情視窗/關閉、官方連結、未知日期/票況與手機版面、Console 無錯。**實機未回報前 UAT=NOT_ATTESTED**；取得真機 PASS 也僅為兩來源候選 Smoke，不能取代 R3C-O3/G5J/G5K 正式內容驗證。
+> - 新 19 平台來源品質 L2～L6 仍 OPEN；除 CKSMH、TWTC 外不宣稱其它網站品質已修正。Source PR #1 Cloud HIGH_RISK_HOLD，PR #7/#9/#10/#11/#12 均未授權 Merge/Ready，Source main 不變。其他兩 Repo 仍保留，資料/排程/通知/正式部署依舊 LOCKED。
+> - **下一關卡**：Android 候選 smoke UAT 回條；同時持續 L3-B FamiTicket/ibon/StrollTimes HTTP200/LIST0 診斷、L4/L5 Golden/日期角色；將本 PR #8 的兩份治理文件經審查/核准 Merge main 後，才可宣稱正式治理 main 已同步。
+>
+
 > **2026-10-26 L2-B CKSMH 實際來源驗證（PR #10 Draft；未併 main）**：GitHub Run [40269917573](https://github.com/easonliu714/event_scraper_public/actions/runs/40269917573) `completed/success`；Job `121400294421` 全 Steps SUCCESS；11/11 離線測試 PASS。中正紀念堂官方 `https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr` HTTP 200 並解析 **5 筆活動清單候選**；`https://event.culture.tw/CKSMH` HTTP 200 但直接活動 anchor 候選 0；取樣第一筆詳情 HTTP 200（**不代表日期/身份 Golden**）。Runner output 只保存 candidate+diagnostics Artifact `12627554765`，不寫正式資料。PR #10 HEAD `da451c9537a05ba23db094533cc9887f7db8b6bc`，堆疊於 PR #9，三檔隔離變更、正式原有 JSON/UI/Runtime Blob parity 保持。L2-B **CKSMH 來源回應與有限清單可達性 PASS**，L4 內容正確性仍 OPEN。原 404 路徑不得再作為唯一來源。
 >
 
