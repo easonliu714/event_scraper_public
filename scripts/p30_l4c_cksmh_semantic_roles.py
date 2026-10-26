@@ -37,7 +37,7 @@ FULL_RANGE = re.compile(
 HEADING_RANGE = re.compile(
     r"(?P<d>20\d{2}/\d{1,2}/\d{1,2})\s*"
     r"(?:[\(（]\s*[一二三四五六日天]\s*[\)）])?\s*"
-    r"(?P<t1>\d{2}:?\d{2})\s*[～~\-]\s*(?P<t2>\d{2}:?\d{2})")
+    r"(?P<t1>\d{2}:?\d{2})\s*[～~\-]\s*(?P<t2>\d{2}:?\d{2})(?![/\d:])")
 DATEISH = re.compile(r"20\d{2}/\d{1,2}/\d{1,2}")
 
 
