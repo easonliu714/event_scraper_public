@@ -61,6 +61,11 @@ export function checkParent(p){
     throw Error("HOLD_PARENT_SOURCE_ROW_FIELD_PROMOTION_OR_DUPLICATION");
   if(s.platform==="StrollTimes"&&s.provenance!=="THIRD_PARTY_AGGREGATOR_ONLY")throw Error("HOLD_PARENT_STROLL_ROLE");
   if(["ibon","FamiTicket"].includes(s.platform)&&s.provenance!=="OFFICIAL_TICKET_DETAIL_EXACT_TITLE")throw Error("HOLD_PARENT_TICKET_ROLE");
+  const firstPartyExpected=s.eventUrl===BITAN?GOV:s.eventUrl===NIER?PRODUCER:null;
+  if(s.referenceFirstPartyUrl!==firstPartyExpected||
+     (s.eventUrl===BITAN?frozen(s.referenceTimeRange)!==frozen(["2026-10-17","2026-12-13"]):
+          s.referenceTimeRange!==null))
+    throw Error("HOLD_PARENT_FIRST_PARTY_REFERENCE_SCOPE");
   if(s.platform!=="ibon"&&(s.sessionCount!==0||s.unverifiedSessionCount!==0))throw Error("HOLD_PARENT_AGGREGATOR_OR_FAMITICKET_SESSIONS");
   if(s.platform==="ibon"&&(s.sessionCount<1||s.sessionCount>2||s.unverifiedSessionCount!==s.sessionCount))
     throw Error("HOLD_PARENT_TICKET_SESSIONS");
@@ -165,7 +170,7 @@ export function transform(p,parentBytes){
   candidateCount:12,platformBreakdown:{StrollTimes:6,FamiTicket:4,ibon:2},
   referenceCount:2,totalSourceEventRecords:12,
   candidateEventRecords:lines,
-  showStartsInPinnnedInput:3,independentFirstPartyRefs:2,
+  showStartsInPinnedInput:3,independentFirstPartyRefs:2,
   automaticMergeCount:0,automaticHideCount:0,deletedCount:0,
   formalDatePromotionCount:0,formalFieldPromotionCount:0,
   goldenAccepted:0,appDataPublished:false,notifierExecuted:false,
