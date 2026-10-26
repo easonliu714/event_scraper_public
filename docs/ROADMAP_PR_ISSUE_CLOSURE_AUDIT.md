@@ -1,6 +1,16 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L4-A / L7-B 實際 CI 結案證據（只有候選 Gate PASS；Android L7-B 尚未實測）**
+>
+> - P30-L4-A GitHub [PR #13](https://github.com/easonliu714/event_scraper_public/pull/13) HEAD `b1651e6faf41d48eed8c42ef13e8aae91dc19702`，Run [40273199767](https://github.com/easonliu714/event_scraper_public/actions/runs/40273199767) **SUCCESS**，13/13 離線測試 PASS。原始 TWTC 39 筆候選的 39 個官方詳情皆受控 GET，經 Event ID、官方標題、完整 YYYY/MM/DD、清單 MM/DD 對照，**38 筆 DATE_VERIFIED_BY_OFFICIAL_DETAIL_CANDIDATE、1 筆 LIST_DETAIL_PERIOD_CONFLICT**。唯一 HOLD 為「2026台北金融科技展【展覽延期】」，原清單 `延期未定`，不得擅自發布活動日期。L4-A 來源證據 Artifact `12629371018`，非 Golden。
+> - 新 P30-L7-B GitHub [PR #14](https://github.com/easonliu714/event_scraper_public/pull/14) HEAD `05b30b9d8e57848edf6190b37d3b9fa8f1f58257`，base 為 **先前使用者已驗收的 PR #12 HEAD** `76171eae8352818721a5480d18a1cc4c0e283ccc`，不同分支、不改原 PR #12。4 條精確異動：新增 `scripts/p30_l7b_date_overlay.py`、`tests/p30/test_l7b_date_overlay.py`、`.github/workflows/eventradar_p30_l7b_date_uat.yml`；修改候選 UI `scripts/p30_l7a_smoke_index.html`（顯示完整年份、將技術狀態翻譯為使用者易懂文字、延展活動顯示「展覽延期／日期未定」）。
+> - L7-B native Actions 最終 Run [40273949404](https://github.com/easonliu714/event_scraper_public/actions/runs/40273949404) **SUCCESS**，10/10 離線負例、Node JS syntax、舊 L7-A Immutable SHA、L4-A evidence lineage、44 筆活動 ID parity、**38 完整日期＋1 延期 HOLD**、正式 Git Blob、SHA manifest 四檔一致全部 PASS。最終唯一 Android UAT ZIP Artifact [12628754512](https://github.com/easonliu714/event_scraper_public/actions/runs/40273949404/artifacts/12628754512)，Archive digest `sha256:4fc3929bc642089d821e1a1a1bbd8535358572c6ebbf36cca170576bb728988f`，2026-11-09T05:23:32Z 到期。前一個 L7-B Run 40273848296 僅保留 CI 歷史，非最終交付。
+> - **Gate 判定**：`P30_L4A_SOURCE_DATE_EVIDENCE=PASS_38_OF_39`、`P30_L7B_ANDROID_BUILD_CI=PASS`、`P30_L7B_ANDROID_UAT=WAITING_USER`；舊 `P30_L7A_ANDROID_LOCAL_SMOKE=USER_ATTESTED_PASS_7_OF_7` 不回退；`R3C_O3_GOLDEN_ACCEPTED=0`、`G5J=OPEN`、`G5K_FORMAL_LIVE_19_PLATFORM=OPEN`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`。新資料未進 main Pages；PR #13/#14 保持 Draft，禁止未授權合併。
+> - Android 下一步：下載唯一 Artifact `12628754512`，在手機 Termux 相同目錄 `sha256sum -c SHA256SUMS.txt`、`python -m http.server 8767 --bind 127.0.0.1`，Chrome 開 `http://127.0.0.1:8767/`；驗證完整年份與展覽延期、總 44 與來源 5/39、其餘來源/類別/官方連結、無回歸。回報前不得宣稱 P30-L7-B Android 真機 PASS。
+>
+
+
 > **2026-10-26 P30-L4-A 官方詳情完整年份修復：使用者 Android 截圖揭示的資料缺口**
 >
 > - 使用者實機截圖顯示：L7-A 7/7 UI Smoke PASS 同時，TWTC 部分活動仍顯示「11/06～11/09（年份待核對）」，但同一活動官方詳情清楚列「展出日期：2026/11/06～2026/11/09」，另有「2026展昭世界貓咪博覽會」2026/10/08～10/11 等樣本。這是**資料解析覆蓋缺口**，不是 UI 無法顯示年份；舊 L3-A/PR #11 只抽查第一筆詳情，L7-A 因而僅有部分完整日期。
