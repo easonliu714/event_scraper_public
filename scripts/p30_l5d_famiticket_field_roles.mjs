@@ -21,6 +21,12 @@ export const ROLE={
   "展覽期間":"EVENT_TIME_LABEL_ONLY","展期":"EVENT_TIME_LABEL_ONLY",
   "展出期間":"EVENT_TIME_LABEL_ONLY","開放日期":"EVENT_TIME_LABEL_ONLY",
   "活動期間":"EVENT_TIME_LABEL_ONLY",
+  "比賽日期":"EVENT_TIME_LABEL_ONLY",
+  "比賽時間":"EVENT_TIME_LABEL_ONLY",
+  "比賽地點":"VENUE_LABEL_ONLY",
+  "開放場次":"SERIES_DESCRIPTOR_NOT_EVENT_TIME",
+  "預售票全面販售時間":"SALE_WINDOW_NOT_EVENT",
+  "兌換地點":"VOUCHER_REDEMPTION_LOCATION_NOT_EVENT_VENUE",
   "活動地點":"VENUE_LABEL_ONLY","活動場地":"VENUE_LABEL_ONLY",
   "演出地點":"VENUE_LABEL_ONLY","展覽地點":"VENUE_LABEL_ONLY",
   "展出地點":"VENUE_LABEL_ONLY","展覽場地":"VENUE_LABEL_ONLY",
@@ -51,7 +57,9 @@ export function parseDates(s){
 export function roleFields(lines){
   const data=[],all=(Array.isArray(lines)?lines:[]).map(norm).filter(Boolean).slice(0,280);
   for(let i=0;i<all.length&&data.length<35;i++){
-    const line=all[i];
+    // TPBL real first-party detail uses a sport-team emoji before labels.
+    // Strip ONLY a known single decorative badge, not arbitrary prose.
+    const line=all[i].replace(/^[🔱🌊]\s*/u,"");
     let label=null,value=null,how=null;
     for(const key of LABELS){
       if(line===key||line===key+"："||line===key+":"){
@@ -71,7 +79,8 @@ export function roleFields(lines){
     }
     if(label===null)continue;
     const role=ROLE[label];
-    const dates=role==="VENUE_LABEL_ONLY"?[]:parseDates(value);
+    const dates=["VENUE_LABEL_ONLY","SERIES_DESCRIPTOR_NOT_EVENT_TIME",
+      "VOUCHER_REDEMPTION_LOCATION_NOT_EVENT_VENUE"].includes(role)?[]:parseDates(value);
     data.push({label,role,evidenceBinding:how,
       evidenceExcerpt:value.slice(0,180),fullYearDateTokens:dates,
       sourceQuality:!value?"EMPTY_ROLE_VALUE_HOLD":"LABELED_RAW_EVIDENCE_UNPROMOTED",
