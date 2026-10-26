@@ -1,6 +1,10 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **P30-L7-A Android Portable Manifest 修復驗證**：PR #12 最新 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc` 僅更新 workflow 打包命令，在 Artifact 內使用相對檔名的 `SHA256SUMS.txt`，CI 先在 `p30-smoke/` 下 `sha256sum -c`，三檔 OK。正式 GitHub Run `40271164263` SUCCESS，最終 Android-only Artifact `12628147623`，須使用此包、不要使用前版 `12629030170`。瀏覽器測試必須以同支 Android `127.0.0.1:8766` loopback HTTP 服務載入，非正式 Pages、非安裝型 PWA、無外部數據寫入。Android 實機尚待使用者執行，不得將 Actions SUCCESS 當 Android UAT PASS。
+>
+
+
 > **P30-L3-A 與 L7-A Android 隔離 UI 實作 2026-10-26（PR #11 / #12 仍 Draft）**
 >
 > - L3-A 官方展覽檔期（PR #11）：`scripts/p30_l3a_twtc.py` 以 TWTC `/exhibition?p=home` HTML 表格逐列解析 title/organizer/venue/rawPeriod/本網站 `exhibition_more.aspx?id`；對只含月日的清單日期保留 `date=null`、`EXHIBITION_PERIOD_RAW_UNNORMALIZED`；只有抽樣詳情頁**來源身分及完整年份展期都匹配**才產生日期候選。正式 Run 40270383643：HTTP 200、39 清單、11/11 offline、單筆詳情日期候選；非 Golden。Workflow `.github/workflows/eventradar_p30_l3a_twtc.yml` 限一清單與一詳情 GET。
