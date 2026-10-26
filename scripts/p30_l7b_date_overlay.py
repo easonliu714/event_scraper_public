@@ -27,7 +27,7 @@ def load(path):
 
 
 def key(title, official_url, raw_period):
-    return (title, official_url, raw_period)
+    return (title.strip() if isinstance(title, str) else title, official_url, raw_period)
 
 
 def gate_flags(data, schema):
