@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 L4-A / L7-B 完整年份回填與 Android CI 實證**
+>
+> - L4-A 新 `scripts/p30_l4a_twtc_detail_dates.py`（PR #13）實際以 L3-A Run 40270383643 原始 39 筆為身份參照，39 次限流官方詳情 GET，來源資料 Evidence 僅標準化 `DATE_VERIFIED_BY_OFFICIAL_DETAIL_CANDIDATE` 38 件，延期活動一件 HOLD。Run 40273199767 CI SUCCESS，13/13 tests；來源 Artifact 12629371018。這裡的 DATE_VERIFIED 仍為候選證據，不是人工 Golden。
+> - L7-B 新 `scripts/p30_l7b_date_overlay.py` 對固定原 44 筆 Android candidate 與 L4-A 原始 39 筆來源 SHA 進行雙向 lineage Gate，只有正確活動網址/標題/原始展期的 38 筆填入 `dateStart/dateEnd`、`OFFICIAL_EXHIBITION_DATE`、`dateEvidenceRunId`、`dateEvidenceSHA256`，一件延期維持 NULL；CKSMH 五件完全保留、44 活動 IDs 未改、票況 UNKNOWN、validity UNCERTAIN。新的 UI `when()` 能顯示 YYYY-MM-DD，延期優先顯示「展覽延期／日期未定」，`sourceLabel()` 將 LIST_TABLE_ONLY 等技術代號翻譯為易懂文字。
+> - PR #14 `feat/eventradar-p30-l7b-android-date-uat` 與已通過的 PR #12 採**新增分支／隔離差異**，不改既有 Android 7/7 PASS 原始版本。Run [40273949404](https://github.com/easonliu714/event_scraper_public/actions/runs/40273949404) 10/10 Offline、Node syntax、Immutable SHA、44/38/1 實際 Artifact + 四檔 SHA Gate PASS。最終 Artifact 12628754512；**使用者 L7-B Android UAT 尚未執行**。
+> - 後續發展：先 P30-L7-B Android 日期回填 UI 煙霧測試；其後 L3-B FamiTicket/ibon/StrollTimes 列表、CKSMH 詳情欄位、TWTC 延期語義、全來源 Category/Golden/可逆有效性，再進入正式 PWA、單 Writer/發版及雙 Repo 退役。
+>
+
+
 > **2026-10-26 P30-L4-A TWTC date evidence 結構修正（PR #13 Draft）**
 >
 > - 使用者 Android 畫面證明：TWTC 清單 LIST_TABLE_ONLY 只有 MM/DD～MM/DD，許多活動仍標示年份待核對，然而官方 exhibition_more.aspx?id=... 詳情有 YYYY/MM/DD～YYYY/MM/DD。原 L3-A run() 只抽樣第一筆，所以其餘不自動回填。
