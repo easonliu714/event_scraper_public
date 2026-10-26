@@ -1,0 +1,124 @@
+name: EventRadar P30 L5-D FamiTicket official detail field roles
+on:
+  push:
+    branches: [feat/eventradar-p30-l5d-famiticket-fields]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l5d-famiticket
+  cancel-in-progress: false
+jobs:
+  official-sample-field-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l5d-famiticket-fields'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact P30-L5C predecessor and immutable production blobs
+        run: |
+          set -euo pipefail
+          base=16bb4bda029e8eee3951396d9031aac14576ad74
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l5d_famiticket_fields.yml' 'scripts/p30_l5d_famiticket_field_roles.mjs' 'tests/p30/test_l5d_famiticket_field_roles.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_SOURCE_SCOPE_DRIFT; exit 1; }
+          echo PASS P30_L5D_SOURCE_SCOPE_FROZEN
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install standard Chromium without stealth/checkout workflow
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Source role and calendar negative matrix prior to internet probe
+        run: |
+          node --check scripts/p30_l5d_famiticket_field_roles.mjs
+          node --test tests/p30/test_l5d_famiticket_field_roles.mjs
+          echo PASS P30_L5D_FAMITICKET_OFFLINE_NEGATIVES
+      - name: One official homepage plus maximum four exact-ID sample details
+        run: |
+          node scripts/p30_l5d_famiticket_field_roles.mjs --out-dir p30-l5d-evidence
+      - name: Assert honest sampled coverage, fields, and no official promotions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("p30-l5d-evidence/role_evidence.json").read_text())
+          assert d['kind']=='EVENTRADAR_P30_L5D1_FAMITICKET_OFFICIAL_FIELD_ROLES_REVIEW_ONLY'
+          assert d['network']['homepageStatus']==200
+          assert d['selectionState']=='UNIQUE_ITF_PLUS_DEDUP_OTHER_CARDS'
+          assert 2<=d['listedSampleCount']<=4
+          assert len(d['detailSamples'])==d['listedSampleCount']
+          assert d['maxNavigation']==5 and d['maxApprovedRequests']==160
+          assert d['network']['navigations']<=5
+          assert d['noLogin'] and d['noCheckout'] and d['noStealth']
+          assert d['noCaptchaBypass'] and d['noPrivateAPI'] and d['noRetries']
+          assert d['acceptedEventDates']==0 and not d['sampledFullCatalog']
+          assert d['sourceRuntime']=='DORMANT'
+          assert d['goldenAccepted'] is False and d['published'] is False
+          assert d['writerExecuted'] is False and d['notifierExecuted'] is False
+          assert d['autoHidden']==0
+          assert d['exactTitleMatches']>=1  # prior one real ITF identity preserved
+          assert len({x['officialUrl'] for x in d['detailSamples']})==d['listedSampleCount']
+          for row in d['detailSamples']:
+              assert row['dateStart'] is None and row['dateEnd'] is None
+              assert row['venue'] is None and row['price'] is None
+              assert row['ticketStatus']=='UNKNOWN' and row['category']=='待分類'
+              assert row['fieldPromotionCount']==0 and not row['goldenVerified']
+              if row['identity']!='EXACT_LIST_DETAIL_TITLE_PASS':
+                  assert row['fields']==[]
+              for item in row['fields']:
+                  assert item['role'] in ('EVENT_TIME_LABEL_ONLY','VENUE_LABEL_ONLY',
+                     'ADMISSION_NOT_EVENT_START','SALE_WINDOW_NOT_EVENT',
+                     'REGISTRATION_WINDOW_NOT_EVENT','VOUCHER_VALIDITY_NOT_EVENT',
+                     'SERIES_DESCRIPTOR_NOT_EVENT_TIME',
+                     'VOUCHER_REDEMPTION_LOCATION_NOT_EVENT_VENUE')
+                  assert item['officialEventDateAccepted'] is False
+                  assert item['sourceQuality'] in ('LABELED_RAW_EVIDENCE_UNPROMOTED',
+                     'EMPTY_ROLE_VALUE_HOLD')
+          print('PASS P30_L5D_FAMITICKET_REAL_BOUNDED_SAMPLE_EVIDENCE',d['listedSampleCount'])
+          if d['exactTitleMatches']<2:
+              print('HOLD P30_L5D_MULTI_DETAIL_TITLE_IDENTITY',d['exactTitleMatches'])
+          else:print('PASS P30_L5D_MULTI_DETAIL_EXACT_TITLE',d['exactTitleMatches'])
+          assert d['labeledRoleEvidenceCount']>=3
+          actual_roles={f['role'] for x in d['detailSamples'] for f in x['fields']}
+          assert 'VENUE_LABEL_ONLY' in actual_roles
+          assert 'SALE_WINDOW_NOT_EVENT' in actual_roles
+          assert 'SERIES_DESCRIPTOR_NOT_EVENT_TIME' in actual_roles
+          print('PASS P30_L5D_TPBL_REAL_VENUE_SERIES_SALE_ROLE_EVIDENCE',d['labeledRoleEvidenceCount'])
+          print('PASS P30_L5D_ZERO_FIELD_PROMOTIONS')
+          PY
+      - name: Seal all diagnostic evidence, including quality HOLD
+        if: always()
+        run: |
+          mkdir -p p30-l5d-evidence
+          cat > p30-l5d-evidence/README.txt <<'EOF'
+          EventRadar P30-L5-D1: official FamiTicket public homepage + four
+          bounded distinct detail samples. Rows must match list/title/opaque ID.
+          Date labels / venue labels / sales windows / registration / voucher
+          windows are role EVIDENCE, NOT accepted event date or ticket status.
+          Missing a field is UNKNOWN, not evidence that it does not exist.
+          Existing 44 Android UAT passed records stay unchanged, and main
+          docs/data.json, Pages, notifier, cron and production writer untouched.
+          FamiTicket 47 total list candidates are NOT 47 verified details.
+          EOF
+          if [[ -f p30-l5d-evidence/role_evidence.json ]]; then
+            (cd p30-l5d-evidence && sha256sum role_evidence.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L5D_SEALED_ARTIFACT_SHA
+          else
+            echo HOLD P30_L5D_NO_DIAGNOSTICS
+          fi
+      - name: Upload isolated evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l5d-famiticket-field-roles
+          path: p30-l5d-evidence/
+          retention-days: 14
+          if-no-files-found: warn
