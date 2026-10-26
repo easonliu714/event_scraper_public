@@ -113,7 +113,8 @@ jobs:
           print('PASS P30_L7A_REAL_ARTIFACT_PARITY_5_PLUS_39_44_CANDIDATES')
           print('PASS P30_L7A_ANDROID_SMOKE_CANDIDATE_ONLY_NOT_PUBLISHED')
           PY
-          sha256sum p30-smoke/index.html p30-smoke/data.json p30-smoke/README.txt > p30-smoke/SHA256SUMS.txt
+          (cd p30-smoke && sha256sum index.html data.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L7A_ANDROID_RELOCATABLE_SHA256_MANIFEST
       - name: Upload download-only local Android browser smoke bundle
         uses: actions/upload-artifact@v4
         with:
