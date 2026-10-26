@@ -1,0 +1,142 @@
+name: EventRadar P30 L7-B Android full-year date UAT bundle
+on:
+  push:
+    branches: [feat/eventradar-p30-l7b-android-date-uat]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l7b-date-uat
+  cancel-in-progress: false
+jobs:
+  android-date-candidate:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l7b-android-date-uat'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout immutable P30 L7-A source, no persisted credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prove accepted L7-A untouched and exact four-path diff
+        run: |
+          set -euo pipefail
+          base=76171eae8352818721a5480d18a1cc4c0e283ccc
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l7b_date_uat.yml' \
+            'scripts/p30_l7b_date_overlay.py' \
+            'tests/p30/test_l7b_date_overlay.py'
+            printf 'M\t%s\n' 'scripts/p30_l7a_smoke_index.html')"
+          expected="$(printf '%s\n' "$expected" | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_UNEXPECTED_CHANGE_SCOPE; exit 1; }
+          echo PASS P30_L7B_EXACT_DIFF_OLD_ANDROID_GATE_UNTOUCHED
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline schema, security and negative tests
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l7b_date_overlay.py tests/p30/test_l7b_date_overlay.py
+          python -m unittest discover -s tests/p30 -p 'test_l7b_date_overlay.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          html=Path('scripts/p30_l7a_smoke_index.html').read_text(encoding='utf-8')
+          assert "LIST_DETAIL_PERIOD_CONFLICT" in html
+          assert "已核對官方詳情展期" in html
+          assert "innerHTML" not in html
+          assert html.count("<script>")==1
+          Path('l7b_check.js').write_text(html.split("<script>")[1].split("</script>")[0],encoding='utf-8')
+          PY
+          node --check l7b_check.js
+          echo PASS P30_L7B_OFFLINE_CONTRACT_AND_JS_SYNTAX
+      - name: Download frozen, already Android-accepted 44-row candidate artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7a-android-smoke
+          run-id: 40271164263
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l7a-input
+      - name: Verify original Android UAT artifact file SHA (portable manifest)
+        run: |
+          set -euo pipefail
+          (cd p30-l7a-input && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L7B_PARENT_ARTIFACT_SHA
+      - name: Download frozen bound full-year TWTC detail evidence only
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l4a-twtc-date-evidence
+          run-id: 40273199767
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l4a-input
+      - name: Overlay bounded field evidence, no re-fetch, no Pages writes
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l7b_date_overlay.py \
+            --original p30-l7a-input/data.json \
+            --detail-evidence p30-l4a-input/detail_date_evidence.json \
+            --out-dir p30-l7b-output
+          cp scripts/p30_l7a_smoke_index.html p30-l7b-output/index.html
+          cat > p30-l7b-output/README.txt <<'EOF'
+          EventRadar P30-L7-B: Android LOCAL date-evidence smoke. NOT PUBLISHED.
+          Parent accepted 44-row UAT: Run 40271164263, Artifact 12628147623.
+          New TWTC detail date evidence: Run 40273199767, Artifact 12629371018.
+          44 candidate rows unchanged; only verified TWTC event dates get full years.
+          One or more conflicts may remain HOLD, with reason in date_hold_report.json.
+          In Android Termux:
+            mkdir -p ~/eventradar_p30_l7b && cd ~/eventradar_p30_l7b
+            unzip -o ~/storage/downloads/eventradar-p30-l7b-android-date-uat.zip
+            sha256sum -c SHA256SUMS.txt
+            python -m http.server 8767 --bind 127.0.0.1
+          Then open http://127.0.0.1:8767/ in the SAME Android phone.
+          Test full-year ranges, conflict HOLD, source/filter/modal/official links.
+          Never copy data.json to the public website or infer ticket availability.
+          EOF
+      - name: Verify full-year counts, unchanged IDs and release safety
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          old=json.loads(Path('p30-l7a-input/data.json').read_text(encoding='utf-8'))
+          new=json.loads(Path('p30-l7b-output/data.json').read_text(encoding='utf-8'))
+          held=json.loads(Path('p30-l7b-output/date_hold_report.json').read_text(encoding='utf-8'))
+          assert old['kind']==new['kind']=='EVENTRADAR_P30_ANDROID_SMOKE_CANDIDATE_NOT_GOLDEN'
+          assert new['count']==len(new['items'])==44
+          assert [x['id'] for x in old['items']]==[x['id'] for x in new['items']]
+          assert new['dateEvidenceRunId']=='40273199767'
+          assert new['dateVerifiedCount']==38 and new['dateUnverifiedCount']==1
+          assert held['held_count']==1 and len(held['held'])==1
+          assert new['goldenAccepted'] is False and new['published'] is False
+          assert new['writerExecuted'] is False and new['notificationExecuted'] is False
+          assert new['sourceRuntime']=='DORMANT' and new['autoHidden']==0
+          assert new['fullPlatformCoverageProven'] is False
+          assert all(i['ticketStatus']=='UNKNOWN' and i['validity']=='UNCERTAIN' for i in new['items'])
+          for previous,current in zip(old['items'],new['items']):
+              if current['platform']=='中正紀念堂':
+                  assert current==previous
+              if current['platform']=='台北世貿' and current['dateStart'] is not None:
+                  assert current['sourceLevel']=='DETAIL_DATE_CANDIDATE'
+                  assert current['dateEvidenceRunId']=='40273199767'
+          print('PASS P30_L7B_44_IDENTITY_38_DATES_1_EXPLICIT_HOLD')
+          print('PASS P30_L7B_NO_GOLDEN_NO_PUBLISH_NO_AUTO_HIDE')
+          print('ONE_DATE_CONFLICT',held['held'][0]['title'],held['held'][0]['rawPeriod'])
+          PY
+          (cd p30-l7b-output && sha256sum index.html data.json date_hold_report.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L7B_ANDROID_RELOCATABLE_SHA256
+      - name: Upload offline local Android candidate bundle, not Pages
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7b-android-date-uat
+          path: p30-l7b-output/
+          if-no-files-found: error
+          retention-days: 14
