@@ -14,7 +14,7 @@ ITEM = "/mocweb/reg/CKSMH/Detail.init.ctr;jsessionid=SECRET?actId=51331&utm_sour
 LIST_HTML = (b'<a href="' + ITEM.encode() + b'">2026 Public Art Exhibition</a>'
              b'<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=51331">Duplicate</a>'
              b'<a href="https://other.tld/mocweb/reg/CKSMH/Detail.init.ctr?actId=7">Evil</a>'
-             b'<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=81234">詳內容</a>')
+             '<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=81234">詳內容</a>'.encode('utf-8'))
 
 
 class Response:
