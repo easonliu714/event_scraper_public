@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {KIND,labels,listRows,assess} from "../../scripts/p30_l4d2_ibon_detail_roles.mjs";
+import {KIND,labels,listRows,assess,scheduleBlockEvidence} from "../../scripts/p30_l4d2_ibon_detail_roles.mjs";
 const U="https://ticket.ibon.com.tw/ActivityInfo/Details/40010";
 const title="2026 OPEN DREAM WORLD 音樂節";
 const row={title,officialUrl:U};
@@ -82,4 +82,34 @@ test("reject query/checkout/log-in urls",()=>{
 test("only first three full-year role tokens retained as raw evidence",()=>{
   const q=labels(["活動日期：2026/11/01,2026/11/02,2026/11/03,2026/11/04"]);
   assert.equal(q.length,1);assert.equal(q[0].observedDateTokens.length,3);
+});
+
+test("official ibon boxed activity-time section binds next text only",()=>{
+  const r=scheduleBlockEvidence(["【活動時間（台灣時間）】",
+    "2026年11月7日 14:00 - 16:00", "2026/11/13 14:00 - 16:00",
+    "入場資訊請依主辦單位"]);
+  assert.equal(r.length,1);
+  assert.equal(r[0].role,"ACTUAL_EVENT_TIME_LABELED_RAW_UNPROMOTED");
+  assert.deepEqual(r[0].observedFullYearDates,["2026-11-07","2026-11-13"]);
+  assert.equal(r[0].status,"RAW_UNPROMOTED_EVIDENCE");
+});
+test("ibon split date/time vertical-bar style retains full-year date tokens",()=>{
+  const r=scheduleBlockEvidence(["日期/時間｜2027.02.20（SAT.）18:00 開演／2027.02.21（SUN.）14:00"]);
+  assert.equal(r.length,1);
+  assert.deepEqual(r[0].observedFullYearDates,["2027-02-20","2027-02-21"]);
+});
+test("sale and voucher lines never masquerade as event time",()=>{
+  assert.deepEqual(scheduleBlockEvidence([
+    "售票時間：2026/10/01～2026/10/31","使用期限：2026/12/31",
+    "活動開賣：2026/10/15"]),[]);
+});
+test("invalid day and bare partial date not treated as full-year event",()=>{
+  const r=scheduleBlockEvidence(["【活動時間】","2026/02/29 14:00 / 11/09"]);
+  assert.deepEqual(r[0].observedFullYearDates,[]);
+});
+test("mismatched list-detail must have no event-time evidence",()=>{
+  const v=assess(row,{...view,headings:["other"],
+    lines:["【活動時間】","2027/02/20"]},{status:200,url:U});
+  assert.equal(v.identity,"DETAIL_TITLE_OR_HTTP_HOLD");
+  assert.deepEqual(v.scheduleBlockEvidence,[]);
 });
