@@ -165,7 +165,7 @@ class OfficialListIdentityFallback(unittest.TestCase):
 
     def test_wrong_list_anchor_title_cannot_fill_event(self):
         r=sample("自由花蕊(免費參觀)",51331)
-        html=b'<div><a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=51331">Other</a><p>活動時間 2025/11/24 ~ 2030/12/31</p></div>'
+        html='<div><a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=51331">Other</a><p>活動時間 2025/11/24 ~ 2030/12/31</p></div>'.encode("utf-8")
         self.assertEqual(p.parse_list_bound(html,[r]),{})
 
     def test_exact_detail_title_prerequisite_for_list_overlay(self):
