@@ -100,7 +100,7 @@ function render(){
  found.forEach(e=>{
   const card=t("article");const tags=t("div",null,"pills");fillPill(tags,e.platform);fillPill(tags,e.category);
   card.append(tags,t("h2",e.title));
-  card.append(t("div",when(e),"meta"));card.append(t("div","地點："+unknown(e.venue),"meta"));
+  card.append(t("div",when(e),"meta"));card.append(t("div","地點："+(e.venueNote||unknown(e.venue)),"meta"));
   card.append(t("div","票況：未知 · 來源："+sourceLabel(e),"meta"));
   const btn=t("button","查看摘要與詳情","card-button");
   btn.type="button";btn.addEventListener("click",()=>openDetail(e));card.append(btn);root.append(card);
