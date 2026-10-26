@@ -45,7 +45,7 @@ class TestGate(unittest.TestCase):
   v=m.parse_calendar(CAL)
   self.assertEqual(v["organiser"],"新北市政府觀光旅遊局")
   self.assertEqual(v["venueEvidence"],m.VENUE)
- def test_05_unrelated_event date earlier in sidebar cannot bind(self):
+ def test_05_unrelated_sidebar_date_must_not_bind(self):
   v=m.parse_calendar("活動日期： 2026-09-01 ~ 2026-09-22 其他展覽 "+CAL)
   self.assertEqual(v["observedPeriod"],["2026-10-17","2026-12-13"])
  def test_06_date missing rejects(self):
