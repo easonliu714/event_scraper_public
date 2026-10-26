@@ -45,7 +45,7 @@ test("04 article shorter parent-looking phrase only proposal",()=>{
 });
 test("05 article title with addition remains review, not same event",()=>{
  const x=lexicalIdentity(titles[3],h1[3]);
- assert.equal(x.state,"EDITORIAL_HEADLINE_EXTENSION_REVIEW");
+ assert.equal(x.state,"TITLE_OVERLAP_RELATIONSHIP_REVIEW");
  assert.equal(x.mergeAllowed,false);
 });
 test("06 title entirely different is disjoint hold",()=>{
