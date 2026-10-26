@@ -68,7 +68,7 @@ const dialog=document.getElementById("dialog");
 let items=[];
 const t=(tag,value,cls)=>{const n=document.createElement(tag);if(value!==undefined&&value!==null)n.textContent=String(value);if(cls)n.className=cls;return n;};
 const unknown=v=>typeof v==="string"&&v.trim()?v:"未取得（以官方為準）";
-const when=e=>e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?"已延期／正式展期待確認":e.dateStart&&e.dateEnd?(e.dateStart===e.dateEnd?e.dateStart:e.dateStart+" ～ "+e.dateEnd):e.rawPeriod==="延期未定"?"展覽延期／日期未定（以官方為準）":e.dateEvidenceStatus==="LIST_DETAIL_PERIOD_CONFLICT"?"原始展期："+unknown(e.rawPeriod)+"（清單與官方詳情日期不一致，待核對）":e.rawPeriod?"原始展期："+e.rawPeriod+"（年份待核對）":"日期未取得（以官方為準）";
+const when=e=>e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"?"已延期／正式展期待確認":e.timeRole==="OFFICIAL_MULTIPLE_SESSIONS_BOUNDS"&&e.dateStart&&e.dateEnd?"多場次："+e.dateStart+" ～ "+e.dateEnd+"（詳見個別場次）":e.dateStart&&e.dateEnd?(e.dateStart===e.dateEnd?e.dateStart:e.dateStart+" ～ "+e.dateEnd):e.rawPeriod==="延期未定"?"展覽延期／日期未定（以官方為準）":e.dateEvidenceStatus==="LIST_DETAIL_PERIOD_CONFLICT"?"原始展期："+unknown(e.rawPeriod)+"（清單與官方詳情日期不一致，待核對）":e.rawPeriod?"原始展期："+e.rawPeriod+"（年份待核對）":"日期未取得（以官方為準）";
 const sourceLabel=e=>e.sourceLevel==="CKSMH_DETAIL_DATE_CANDIDATE"?"已核對中正紀念堂活動詳情（候選）":e.sourceLevel==="DETAIL_DATE_CANDIDATE"?"已核對官方詳情展期（候選）":e.sourceLevel==="LIST_TABLE_ONLY"?"僅有官方清單資料":e.sourceLevel==="LIST_ONLY"?"僅有官方活動連結":unknown(e.sourceLevel);
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"&&["event.culture.tw","twtc.com.tw"].includes(u.hostname)?u.href:null;}catch{return null;}}
 function safeNoticeLink(value){try{const u=new URL(value);return u.protocol==="https:"&&["www.tfsr.org.tw","www.nccc.com.tw"].includes(u.hostname)?u.href:null;}catch{return null;}}
