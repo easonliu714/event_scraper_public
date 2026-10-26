@@ -1,6 +1,16 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L7-D 三官方 HTTPS 來源修復並達 Android 可驗證（PR #16 Draft）**
+>
+> - PR #15 L7-C 原本在 GitHub Runner 存取大會公告 `www.fintechtaipei.tw/Announcement/19` 時遭 `SSLError`，因 fail-closed 維持歷史 HOLD，未關閉 TLS verify、未迴避 WAF、未擅自宣稱日期已確定。2026-10-26 改建獨立 **[Source PR #16](https://github.com/easonliu714/event_scraper_public/pull/16)**（stacked on 使用者已驗收 L7-B PR #14 HEAD `05b30b9d8e57848edf6190b37d3b9fa8f1f58257`；僅四個範圍異動：增 `scripts/p30_l7d_official_fallback.py`、`tests/p30/test_l7d_official_fallback.py`、`.github/workflows/eventradar_p30_l7d_official_fallback.yml`，改**隔離** `scripts/p30_l7a_smoke_index.html`）。
+> - L7-D 改用可信正式機構公開 HTTPS 證據：(A) `https://twtc.com.tw/exhibition_more.aspx?id=28255&p=home` 原訂 `2026-10-23～24`；(B) `https://www.tfsr.org.tw/information/187` 台灣金融服務業聯合總會確認延期，最終時間月底前公告；(C) `https://www.nccc.com.tw/wps/wcm/connect/zh/home/AboutNCCC/News/200261021-1` 財團法人聯合信用卡處理中心 10/21 公告延期至 `2026-12-18～19`。注意非 `www` 聯卡中心入口在較早診斷有 `NETWORK_ERROR`，改使用**真實官方 canonical www URL**，不得忽略 TLS 驗證。
+> - 最終 CI Run [40281136558](https://github.com/easonliu714/event_scraper_public/actions/runs/40281136558) **completed/success**：三來源 `HTTP_OK 200` 全部成立；13/13 offline 正反測試、Node JS syntax、來源字串核對、舊 L7-B 44 筆父 Artifact SHA、原始 Source Pages 三 Blob、四檔差異 gate、五檔 SHA256（index、data、roles、diagnostics、README）全部 PASS。JSON 報告：`ORIGINAL 2026-10-23～24`、`TENTATIVE 2026-12-18～19`、`CONFIRMED=NULL`。該狀態代表 **官方機構公布的預計改期，與金融總會仍待正式確認的聲明相容**；不能由聯卡中心單一公告直接升級成完整 Golden 或正式售票日期。
+> - 所有其他 43 筆活動身份與欄位不變；`44 IDs`、TWTC `38` 個先前官方詳情時間候選不變、五筆 CKSMH 不變、一筆 FinTech 顯示延期與獨立原訂/預定欄位。HTML 標籤與官方連結符合 XSS / URL 安全界線。**唯一 Android L7-D 最終候選 ZIP**：[Artifact 12632108815](https://github.com/easonliu714/event_scraper_public/actions/runs/40281136558/artifacts/12632108815)，archive SHA256 `a4a4cea091867b65d648273bb4420e943aaf264e750497459bbda2d1b5dbf3a6`，2026-11-09T06:40:23Z 到期。此前 L7-D CI Run `40280982817` 成功但聯卡中心仍無回應，非最後 Android 交付包。
+> - Gate 狀態：`P30_L7D_OFFICIAL_3_SOURCE_CI=PASS`、`P30_L7D_ANDROID_PACKAGE=PASS`、`P30_L7D_ANDROID_REAL_UAT=WAITING_USER`。使用者先前 L7-A 7/7 與 L7-B 實機截圖 PASS 均保留。Source `main@fc4f963247d68eed29425808cc14e7250f312d05` 以及歷史正式 `docs/data.json`、`scraper.py`、`docs/index.html` 未改。PR #15 維持 Draft/HOLD、PR #16 為 Draft 未併入 main；`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`、`G5J/G5K=OPEN`，不得自行關閉或退役其他兩個 Repo。
+>
+
+
 > **2026-10-26 P30-L7-C FINTECH POSTPONEMENT ROLE ROOT CAUSE／使用者 L7-B 真機回報**
 >
 > - 使用者已提供 P30-L7-B Android `127.0.0.1:8767` 截圖並表示此階段驗證皆符合預期：完整年份日期（電器空調影音大展 2026/11/06～11/09、展昭世界貓咪博覽會 2026/10/08～10/11 等）、39/44 TWTC 畫面與金融科技展延期提示皆可見。記錄 `P30_L7B_ANDROID_USER_SCREENSHOT_ATTESTED_PASS`；依回報範圍認列，不擴張為全平台 Golden 或正式 G5K。
