@@ -70,6 +70,15 @@ jobs:
               assert a['dateStart'] is None and a['dateEnd'] is None
               assert a['ticketStatus']=='UNKNOWN' and a['goldenVerified'] is False
               assert all(x['status']=='RAW_UNPROMOTED_EVIDENCE' for x in a['roleEvidence'])
+          # The new real official source role evidence is an explicit
+          # section, not a random date in copy or a sales/usage period.
+          assert all(x['identity']=='EXACT_LIST_DETAIL_HEADING' for x in d['details'])
+          assert all(any(block['role']=='ACTUAL_EVENT_TIME_LABELED_RAW_UNPROMOTED'
+                             and block['status']=='RAW_UNPROMOTED_EVIDENCE'
+                             and len(block['observedFullYearDates'])>=1
+                         for block in x.get('scheduleBlockEvidence',[]))
+                     for x in d['details'])
+          print('PASS P30_L4D2_IBON_TWO_OFFICIAL_EVENT_TIME_LABELED_RAW_BLOCKS')
           matches=sum(x['identity']=='EXACT_LIST_DETAIL_HEADING' for x in d['details'])
           print('PASS P30_L4D2_IBON_2_PUBLIC_DETAIL_AUDIT')
           print('IBON_DETAIL_IDENTITIES_MATCHED',matches,'of',len(d['details']))
