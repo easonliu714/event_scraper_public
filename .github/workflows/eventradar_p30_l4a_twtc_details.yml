@@ -1,0 +1,99 @@
+name: EventRadar P30 L4-A TWTC bound detail date evidence
+on:
+  push:
+    branches: [feat/eventradar-p30-l4a-twtc-detail-dates]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l4a-detail-evidence
+  cancel-in-progress: false
+jobs:
+  twtc-bound-detail-dates:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l4a-twtc-detail-dates'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout isolated candidate without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Guard frozen L3-A base and EXACT three added paths
+        run: |
+          set -euo pipefail
+          base=a63baf94baa46853381d3e791c9b1ff62b771b09
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l4a_twtc_details.yml' \
+            'scripts/p30_l4a_twtc_detail_dates.py' \
+            'tests/p30/test_l4a_twtc_detail_dates.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L4A_CHANGED_SCOPE; exit 1; }
+          echo PASS P30_L4A_FROZEN_PARENT_EXACT_THREE_ADD
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install bounded public-page parser dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline positive and negative tests BEFORE network
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l4a_twtc_detail_dates.py tests/p30/test_l4a_twtc_detail_dates.py
+          python -m unittest discover -s tests/p30 -p 'test_l4a_twtc_detail_dates.py' -v
+          echo PASS P30_L4A_OFFLINE_BOUND_DATE_GATES
+      - name: Download exact completed P30 L3-A frozen 39-row candidate artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l3a-twtc
+          run-id: 40270383643
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l3a-input
+      - name: Bounded direct TWTC official detail GET, no list re-fetch
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l4a_twtc_detail_dates.py \
+            --input-dir p30-l3a-input --out p30-l4a-evidence --delay 1.5 --timeout 12
+      - name: Check date evidence and candidate-only lineage
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-l4a-evidence/detail_date_evidence.json').read_text(encoding='utf-8'))
+          s=d['counts']
+          assert d['kind']=='EVENTRADAR_P30_L4A_TWTC_DETAIL_DATE_EVIDENCE_NOT_GOLDEN'
+          assert d['source_run_id']=='40270383643'
+          assert d['source_candidate_count']==39 and len(d['records'])==39
+          assert s['candidate_count']==39
+          assert 0 <= s['date_verified'] <= s['requests_attempted'] <= 39
+          assert s['remaining_unverified']==39-s['date_verified']
+          assert d['identity_gate']=='OFFICIAL_URL_ID+HEADING+RAW_PERIOD_PARITY'
+          assert d['accepted_fields']==['event_date_start','event_date_end']
+          assert d['source_runtime']=='DORMANT' and d['auto_hidden']==0
+          assert d['golden_accepted'] is False and d['app_data_published'] is False
+          assert d['writer_executed'] is False and d['notification_executed'] is False
+          assert d['full_catalog_coverage_proven'] is False
+          for x in d['records']:
+              if x['state']=='DATE_VERIFIED_BY_OFFICIAL_DETAIL_CANDIDATE':
+                  assert x['source_time_role']=='OFFICIAL_EXHIBITION_DATE'
+                  assert x['detail_url']==x['official_url']
+                  assert x['start'] <= x['end']
+                  assert len(x['response_sha256'])==64
+          print('PASS P30_L4A_EVIDENCE_CONTRACT_BOUND_ONLY')
+          print('DETAIL_VERIFIED',s['date_verified'],'REMAINING_HOLD',s['remaining_unverified'])
+          PY
+      - name: Preserve exact evidence as immutable candidate-only artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l4a-twtc-date-evidence
+          path: p30-l4a-evidence/
+          if-no-files-found: warn
+          retention-days: 14
