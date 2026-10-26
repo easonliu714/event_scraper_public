@@ -1,6 +1,14 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L7-A Android USER-ATTESTED 7/7 PASS（正式使用者回條；候選本機 Smoke）**
+>
+> - 使用者於本對話親自回報：**(1)** 首頁候選 44 筆，**(2)** 中正紀念堂 5 筆、台北世貿 39 筆來源篩選，**(3)** 關鍵字搜尋與類別篩選，**(4)** 詳情開關與版面無重疊，**(5)** 未知日期/票價/票況正確提示，**(6)** 官方來源連結能開啟。依原始測試表七項計數：首頁44、CKSMH5、TWTC39、搜尋類別、詳情UI、未知欄位、官方連結 **7/7 PASS**。
+> - 驗收身分綁定 PR #12 `76171eae8352818721a5480d18a1cc4c0e283ccc`、CI Run `40271164263` completed/success、Android 專用 Artifact `12628147623`。使用者結果足以將 `P30_L7A_ANDROID_LOCAL_SMOKE=USER_ATTESTED_PASS`；原 Termux 指令逐行輸出與手機完整 Console 未另行提供，不擴張為整站 Golden 或正式 End-to-End。
+> - **不變之 HOLD**：`R3C_O3_GOLDEN_ACCEPTED=0`、`G5J_VALIDITY=OPEN`、`G5K_FORMAL_LIVE_19_PLATFORM_UAT=OPEN`、`SOURCE_RUNTIME=DORMANT`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`。PR #8 / #12 仍 Draft，不 Merge、不覆蓋原始 Pages JSON；後續工作轉至 P30-L3-B 三個 HTTP 200 / LIST=0 平台（FamiTicket、ibon、StrollTimes），保持其他 Gate frozen。
+>
+
+
 > **P30-L7-A Android SHA Manifest 2026-10-26 最終可實機回條**：PR #12 修復了 ZIP 內 `SHA256SUMS.txt` 的可攜式相對路徑（原驗證包 SHA manifest 不應被視為 Android 最終交付）；新 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc`，Actions [40271164263](https://github.com/easonliu714/event_scraper_public/actions/runs/40271164263) Job `121404074474` **SUCCESS**，真實 candidate 44 筆；CI 在 Artifact 打包前實際 `cd p30-smoke && sha256sum -c SHA256SUMS.txt` 三檔 `index.html: OK` / `data.json: OK` / `README.txt: OK`。**唯一要交付 Android 的最終包**：[Artifact 12628147623](https://github.com/easonliu714/event_scraper_public/actions/runs/40271164263/artifacts/12628147623)，Archive digest `sha256:da198b4c6700dd6d824380f429a324c6421e896933f42f4e679c001d0026ed73`，到期 2026-11-09T04:51:14Z。先前 Run 40270957865 僅保留 CI 歷史，不作 Android 最終下載來源。**ANDROID_UAT=WAITING_USER_LOCAL**、`PUBLISHED=false`、正式 main 未改。
 >
 
