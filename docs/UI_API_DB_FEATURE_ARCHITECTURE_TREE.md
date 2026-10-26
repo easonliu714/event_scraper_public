@@ -1,5 +1,8 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-26 CKSMH 官方入口實作（PR #10，尚未併入 main）**：新增 `scripts/p30_l2b_cksmh.py`（兩個官網 allowlisted HTTPS GET + 最多一筆詳情、分段 HTTP/HTML digest、actId 去 session/tracking、LIST_ONLY 不推定票況）；`tests/p30/test_l2b_cksmh.py`（11/11 Offline）；`.github/workflows/eventradar_p30_l2b_cksmh.yml`（自動隔離 Gate，原 JSON/UI/Runtime 不變）。Run [40269917573](https://github.com/easonliu714/event_scraper_public/actions/runs/40269917573) SUCCESS，Query.list.ctr **200 / LIST=5**、`/CKSMH` **200 / LIST=0**、一筆 DETAIL_HTTP_OK；報告 Artifact `12627554765`。以上只代表清單與回應層次，可用來源修復，不代表 Golden/PWA 發布。
+>
+
 > **L2-B 可用來源入口候選（尚未程式實作）：** 中正紀念堂（`event.culture.tw`）以 `https://event.culture.tw/CKSMH` 或 `https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr` 作唯讀官網資料入口提案；原診斷基線 `https://event.culture.tw/mocweb/reg/CKSMH/` 回 404。**入口存在不代表 Python Runner 200、清單/詳情欄位可解析**。後續需要 allowlist/事件連結解析、受控單次 HTTP 及 CI/Artifact，未達成則 L2-B HOLD。
 >
 
