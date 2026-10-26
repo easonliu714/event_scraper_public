@@ -1,6 +1,18 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L4-B CKSMH 五活動詳情全數日期回填 Android UAT READY（正式候選，不是 Golden）**
+>
+> - 使用者提供 P30-L7-D Android `127.0.0.1:8768` 與世貿/聯卡中心兩官方頁的實機畫面，明確判定世貿科技展修補 PASS；因此接受 `P30_L7D_ANDROID_FINTECH_USER_SCREENSHOT_PASS`，但未取得整個 ZIP 的 Termux stdout，不擴張為全 19 平台或正式 PWA PASS。新缺口：中正紀念堂 5 筆原本只有 `LIST_ONLY`，官網已可見唐獎榮耀展 `2026/09/01 09:00～2026/10/30 18:00`／中央通廊與活動內容。
+> - Source 新 [Draft PR #17](https://github.com/easonliu714/event_scraper_public/pull/17) `feat/eventradar-p30-l4b-cksmh-details` 堆疊在已接受 L7-D PR #16 HEAD `c18e3aa0b73039cd98f1c4107c6fe342611b16eb`；最終 Branch HEAD `688161678093d1a48159c30abc9807b63c59e36a`。僅四個異動路徑：新增 `scripts/p30_l4b_cksmh_details.py`、`tests/p30/test_l4b_cksmh_details.py`、`.github/workflows/eventradar_p30_l4b_cksmh_details.yml`，修改**隔離候選** `scripts/p30_l7a_smoke_index.html`。原 Source `docs/data.json` / `docs/index.html` / `scraper.py` Blob parity 保持。
+> - 正式 GitHub Actions [Run 40284806144](https://github.com/easonliu714/event_scraper_public/actions/runs/40284806144) **completed/success**：14/14 Python 離線正反向測試、Node JS syntax、父 L7-D Artifact SHA、來源不可變 ID、四路徑差異、最後 ZIP SHA256 PASS。來源的 **五筆 CKSMH 詳情 HTTP 200 / 5 筆標題身分精確匹配**，官方清單 `/mocweb/reg/CKSMH/Query.list.ctr` 亦 HTTP 200 且 **5/5 actId+title exact-bound**；欄位改善：**日期 5/5、確定單一場地 3/5、官方摘要 5/5、多場次 2/5**。缺單一場地的兩筆保留「多場次：各場次地點請依官方明細確認」而非猜測。
+> - CKSMH ActivityID `61004` 唐獎榮耀展已核對：2026/09/01～2026/10/30，場次時間 09:00～18:00，場地「中央通廊」，成功移除尾端無關的「圖片說明」圖片替代文字。ActivityID `51331`「自由花蕊（免費參觀）」的官網**詳情本身沒有場次日期**，故只在其活動 ID、標題同時匹配官方清單時，才按 `OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE` 補入 `2025/11/24～2030/12/31`；應注意此為官方清單範圍，不等於每天均有獨立場次、實時開放或 Golden。
+> - 複合 UAT candidate **44 原始身份不變，39 筆台北世貿資料完全 unchanged**（含先前 38 筆完整日期、金融科技展原訂 10/23～24、暫定改期 12/18～19、confirmed NULL），5 筆 CKSMH 才依證據回填。新 Android 8769 最終 ZIP [Artifact 12633399655](https://github.com/easonliu714/event_scraper_public/actions/runs/40284806144/artifacts/12633399655) archive digest `sha256:40a3095f845d07c14fd690ac27cd0ea66ed42d6bb78b75afc3415af14a18c641`，expires 2026-11-09T07:17:08Z；其它較早 Run 僅作開發驗證歷史，**以 Run 40284806144 唯一 ZIP 實測**。
+> - Gate 判定：`P30_L4B_CKSMH_DETAIL_LIVE_HTTP=PASS_5_OF_5`、`P30_L4B_CKSMH_DATE_CANDIDATES=PASS_5_OF_5`、`P30_L4B_ANDROID_PACKAGE_CI=PASS`，但 `P30_L4B_ANDROID_UAT=WAITING_USER`；下個需使用者 Android Termux `sha256sum -c SHA256SUMS.txt`，執行 loopback `python -m http.server 8769 --bind 127.0.0.1`，驗證真機 5/39、日期、摘要、官方場次、場地註記、搜尋/詳情/外連和先前金融科技展資訊未回歸。
+> - 治理護欄持續：PR #17 Draft 未合併、Source main 不動、`GOLDEN_ACCEPTED=0`、`APP_DATA_PUBLISHED=false`、`AUTO_HIDDEN=0`、`SOURCE_RUNTIME=DORMANT`；G5J/G5K 正式 19 平台、Pages/PWA writer、通知、排程、其餘 Repo 退役保持 OPEN/LOCKED，沒有自動聲稱結案。
+>
+
+
 > **2026-10-26 P30-L7-D 三官方 HTTPS 來源修復並達 Android 可驗證（PR #16 Draft）**
 >
 > - PR #15 L7-C 原本在 GitHub Runner 存取大會公告 `www.fintechtaipei.tw/Announcement/19` 時遭 `SSLError`，因 fail-closed 維持歷史 HOLD，未關閉 TLS verify、未迴避 WAF、未擅自宣稱日期已確定。2026-10-26 改建獨立 **[Source PR #16](https://github.com/easonliu714/event_scraper_public/pull/16)**（stacked on 使用者已驗收 L7-B PR #14 HEAD `05b30b9d8e57848edf6190b37d3b9fa8f1f58257`；僅四個範圍異動：增 `scripts/p30_l7d_official_fallback.py`、`tests/p30/test_l7d_official_fallback.py`、`.github/workflows/eventradar_p30_l7d_official_fallback.yml`，改**隔離** `scripts/p30_l7a_smoke_index.html`）。
