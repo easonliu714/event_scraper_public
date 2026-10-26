@@ -345,7 +345,10 @@ def enrich(parent,records,listing=None):
         row["cksmhDetailStatus"]="OFFICIAL_TITLE_VERIFIED"
         row["detailEvidenceSHA256"]=rec["http"]["sha256"]
         row["detailEvidenceRole"]="P30_L4B_CKSMH_OFFICIAL_DETAIL"
-        list_fields=(listing or {}).get(rec["actId"])
+        detail_id=exact_act_id(rec["officialUrl"])
+        if rec.get("actId",detail_id)!=detail_id:
+            raise ValueError("HOLD_EVIDENCE_ACTID_MISMATCH")
+        list_fields=(listing or {}).get(detail_id)
         if list_fields and (list_fields["title"]!=fields["officialTitle"]
                             or list_fields["actId"]!=exact_act_id(row["officialUrl"])):
             raise ValueError("HOLD_LIST_DETAIL_IDENTITY_MISMATCH")
