@@ -145,7 +145,11 @@ def parse_list(html,base):
                     "detailState":"NOT_CHECKED","candidateOnly":True,"goldenVerified":False})
         if len(out)>=MAX_ROWS:break
     return out,{"detail_links_seen":links,"candidates":len(out),
-                "boundedLimit":MAX_ROWS,"other_links_seen":len(soup.select("a[href]"))}
+                "boundedLimit":MAX_ROWS,"other_links_seen":len(soup.select("a[href]")),
+                "title":clean(soup.title.get_text(" ",strip=True))[:120] if soup.title else None,
+                "script_tags":len(soup.find_all("script")),
+                "body_text_chars":len(soup.get_text(" ",strip=True)),
+                "form_tags":len(soup.find_all("form"))}
 
 def verify_detail(html,row):
     soup=BeautifulSoup(html,"html.parser")
@@ -206,7 +210,11 @@ def main(argv=None):
         print("IBON_LIST",r["url"],r["net"]["state"],r["net"].get("http_status"),
               "CANDIDATES",r["parse"].get("candidates",0),
               "LINKS",r["parse"].get("detail_links_seen",0),
-              "ANCHORS",r["parse"].get("other_links_seen",0))
+              "ANCHORS",r["parse"].get("other_links_seen",0),
+              "BYTES",r["net"].get("bytes"),
+              "TITLE",repr(r["parse"].get("title")),
+              "SCRIPTS",r["parse"].get("script_tags"),
+              "VISIBLE_CHARS",r["parse"].get("body_text_chars"))
     print("IBON_DETAIL",report["detail"]["state"],report["detail"].get("http",{}).get("http_status"))
     print("IBON_TOTAL",len(rows),"CANDIDATE_ONLY")
     if not rows:
