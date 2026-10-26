@@ -1,0 +1,136 @@
+name: EventRadar P30 L5-C original NieR producer corroboration
+on:
+  push:
+    branches: [feat/eventradar-p30-l5c-nier-producer-source]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l5c-nier
+  cancel-in-progress: false
+jobs:
+  producer-lineage-audit:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l5c-nier-producer-source'
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Pin L5B direct parent and three additions only
+        run: |
+          set -euo pipefail
+          base=bd0612ee49d992cd0c4c8843ba6b0a09dd39f90d
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l5c_nier_producer.yml' 'scripts/p30_l5c_nier_producer_lineage.py' 'tests/p30/test_l5c_nier_producer_lineage.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_SOURCE_SCOPE_CHANGE; exit 1; }
+          echo PASS P30_L5C_SOURCE_MAIN_FROZEN_AND_EXACT_NEW_THREE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read-only parsing dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline 20 first-party source/provenance and conflict negatives
+        run: |
+          python -m py_compile scripts/p30_l5c_nier_producer_lineage.py tests/p30/test_l5c_nier_producer_lineage.py
+          python -m unittest discover -s tests/p30 -p 'test_l5c_nier_producer_lineage.py' -v
+          echo PASS P30_L5C_OFFLINE_20_INDEPENDENT_SOURCE_NEGATIVES
+      - name: Download exact pinned L5B run artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5b-ibon-change-notice
+          run-id: 40303622151
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l5c-parent
+      - name: Verify predecessor SHA and exact 2/3 source integrity
+        run: |
+          set -euo pipefail
+          (cd p30-l5c-parent && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          v=json.loads(Path('p30-l5c-parent/change_notice_review.json').read_text(encoding='utf-8'))
+          assert v['kind']=='EVENTRADAR_P30_L5B_IBON_CHANGE_NOTICE_CROSSCHECK_NOT_GOLDEN'
+          assert v['sourceCount']==2 and len(v['details'])==2
+          assert v['scheduleParityStatus']=='TWO_SAMPLED_DETAIL_SCHEDULES_UNCHANGED'
+          assert v['organiserConfirmationCount']==0
+          assert v['formalDatePromotionCount']==0
+          assert v['published'] is False and v['goldenAccepted'] is False
+          print('PASS P30_L5C_PREDECESSOR_SHA_AND_TWO_NIER_TIMES')
+          PY
+      - name: Public producer original tour + Taipei detail + secondary evidence limited one-shot
+        run: |
+          python scripts/p30_l5c_nier_producer_lineage.py --parent p30-l5c-parent/change_notice_review.json --out-dir p30-l5c-evidence
+      - name: Fail closed on original-producer source or false ticket sale agreement
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('p30-l5c-evidence/cross_source_review.json').read_text(encoding='utf-8'))
+          assert p['kind']=='EVENTRADAR_P30_L5C_NIER_PRODUCER_CROSS_SOURCE_REVIEW_ONLY'
+          assert p['status']=='PRODUCER_TWO_TAIPEI_SESSIONS_CORROBORATED_REVIEW_ONLY'
+          assert p['producerRole']=='AWR_MUSIC_SQUARE_ENIX_ORIGINAL_PRODUCTION'
+          assert p['producerSessionCount']==2
+          assert p['producerOriginalTwoStartsSame'] is True
+          assert p['originalOfficialStarts']==['2027-02-20T18:00','2027-02-21T14:00']
+          assert p['addedShowPubliclyListedByProducer'] is True
+          assert p['additionalShowAnnouncementIndependentlyVerified'] is False
+          assert p['originalAdditionalShowAnnouncementUrl'] is None
+          assert p['announcementPublicationTimestamp'] is None
+          assert p['announcementTimestampVerified'] is False
+          assert p['organiserChangeApproval']=='NOT_VERIFIED'
+          assert p['ticketSaleEvidence']['salesTimeOfficiallyApproved'] is False
+          assert p['ticketSaleEvidence']['secondaryRole']=='THIRD_PARTY_TICKET_RESALE_LISTING'
+          assert p['sourceTimeZoneBackfillCount']==0
+          assert p['acceptedEventCount']==0 and p['formalFieldPromotionCount']==0
+          assert p['dateStart'] is None and p['dateEnd'] is None
+          assert p['ticketStatus']=='UNKNOWN' and p['price'] is None
+          assert p['goldenAccepted'] is False and p['published'] is False
+          assert p['writerExecuted'] is False and p['notifierExecuted'] is False
+          assert p['autoHidden']==0 and p['sourceRuntime']=='DORMANT'
+          assert p['originalAndroid44Preserved'] is True
+          assert p['maxSourceGET']==3 and p['noRetries']
+          assert p['noLogin'] and p['noCheckout'] and p['noCaptchaBypass'] and p['noUndocumentedAPI']
+          print('PASS P30_L5C_PRODUCER_INDEPENDENT_2_TAIPEI_SHOW_TIMES')
+          if p['ticketSaleEvidence']['saleTimeConflict']=='SECONDARY_DISAGREEMENT_HOLD':
+              print('HOLD P30_L5C_RESALE_VS_PRODUCER_SALE_TIME_DISAGREEMENT')
+          else:
+              print('HOLD P30_L5C_RESALE_SALE_TIME_NOT_COMPARABLE')
+          print('HOLD P30_L5C_NO_ORIGINAL_TIMESTAMPED_ADDITIONAL_SHOW_ANNOUNCEMENT')
+          print('PASS P30_L5C_ZERO_OFFICIAL_DATA_PUBLICATION')
+          PY
+      - name: SHA sealed isolated provenance artifact (including HOLD notes)
+        if: always()
+        run: |
+          mkdir -p p30-l5c-evidence
+          cat > p30-l5c-evidence/README.txt <<'EOF'
+          P30-L5-C NieR source evidence: show start producer first-party source.
+          Original 2/20 and 2/21 show starts can corroborate independent tour.
+          'Added' press release publication timestamp NOT established.
+          itix2go.com is a secondary ticket resale listing, not the organiser.
+          Producer 9AM vs resale 12PM may disagree on sale opening, not show time.
+          Never use a scraped sale button to claim real-time ticket availability.
+          No Android/PWA/JSON writer, notification, scheduler or auto-hide.
+          Source 44 Android acceptance and L5B original ibon proof remain intact.
+          EOF
+          if [[ -f p30-l5c-evidence/cross_source_review.json ]]; then
+            cp p30-l5c-parent/change_notice_review.json p30-l5c-evidence/parent_change_notice_review.json
+            (cd p30-l5c-evidence && sha256sum cross_source_review.json parent_change_notice_review.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L5C_SEALED_JSON_SHA
+          else
+            echo HOLD P30_L5C_MISSING_LIVE_EVIDENCE
+          fi
+      - name: Archive isolated evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l5c-nier-producer-source
+          path: p30-l5c-evidence/
+          retention-days: 14
+          if-no-files-found: warn
