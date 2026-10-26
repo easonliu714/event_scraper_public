@@ -58,35 +58,35 @@ class TestGate(unittest.TestCase):
   self.assertFalse(m.parse_calendar(CAL.replace("主辦單位：觀光旅遊局","主辦單位：某旅行社"))["completeIdentity"])
  def test_09_wrong_venue_fails(self):
   self.assertFalse(m.parse_calendar(CAL.replace(m.VENUE,"臺北國際會議中心"))["completeIdentity"])
- def test_10 title mismatch fails(self):
+ def test_10_title_mismatch_fails(self):
   self.assertEqual(m.parse_calendar(CAL.replace(m.OFFICIAL_NAME,"2026其他展覽"))["identity"],
                    "OFFICIAL_TITLE_MISSING_HOLD")
- def test_11 news published date and agency are separate from event date(self):
+ def test_11_news_published_date_and_agency_are_separate_from_event_date(self):
   v=m.parse_news(NEWS)
   self.assertEqual(v["publishedAtDate"],"2026-10-14")
   self.assertEqual(v["dateRole"],"NEWS_PUBLICATION_DATE_NOT_EVENT_START")
   self.assertTrue(v["sufficientAdditionalContext"])
- def test_12 news wrong publication fails(self):
+ def test_12_news_wrong_publication_fails(self):
   self.assertFalse(m.parse_news(NEWS.replace("2026-10-14","2026-10-15"))["sufficientAdditionalContext"])
- def test_13 unrelated news fails(self):
+ def test_13_unrelated_news_fails(self):
   self.assertFalse(m.parse_news("市政新聞 資料 2026-10-14")["sufficientAdditionalContext"])
- def test_14 true parent role and first party held until gov(self):
+ def test_14_true_parent_role_and_first_party_held_until_gov(self):
   self.assertIsNotNone(m.vet_parent(parent()))
- def test_15 wrong aggregator H1 rejected(self):
+ def test_15_wrong_aggregator_H1_rejected(self):
   p=parent();p["samples"][0]["articleIdentity"]="ARTICLE_TITLE_OR_HTTP_HOLD"
   with self.assertRaisesRegex(ValueError,"HOLD_BITAN_UNVERIFIED_AGGREGATOR_ARTICLE"):m.vet_parent(p)
- def test_16 social cannot be forged first-party(self):
+ def test_16_social_cannot_be_forged_first_party(self):
   p=parent();p["samples"][0]["credits"][0]["originalOfficialEventDetailVerified"]=True
   with self.assertRaisesRegex(ValueError,"HOLD_FORGED_PARENT_ORIGIN_PROOF"):m.vet_parent(p)
- def test_17 forged writer Golden rejected(self):
+ def test_17_forged_writer_Golden_rejected(self):
   for k,v in [("published",True),("goldenAccepted",True),
    ("sourceRuntime","ACTIVE"),("fieldPromotionCount",1)]:
    p=parent();p[k]=v
    with self.assertRaisesRegex(ValueError,"HOLD_L5E1_GOVERNANCE"):m.vet_parent(p)
- def test_18 duplicate same aggregator source rejected(self):
+ def test_18_duplicate_same_aggregator_source_rejected(self):
   p=parent();p["samples"].append(p["samples"][0])
   with self.assertRaisesRegex(ValueError,"HOLD_BITAN_AGGREGATOR_IDENTITY"):m.vet_parent(p)
- def test_19 only one review source and no production promotion(self):
+ def test_19_only_one_review_source_and_no_production_promotion(self):
   v=m.assemble(parent(),m.parse_calendar(CAL),m.parse_news(NEWS))
   self.assertEqual(v["officialFirstPartyIndependentEventIdentityCount"],1)
   self.assertEqual(v["reviewOnlyOfficialEventUrl"],m.CALENDAR)
@@ -96,7 +96,7 @@ class TestGate(unittest.TestCase):
   self.assertFalse(v["published"]);self.assertFalse(v["goldenAccepted"])
   self.assertTrue(v["strolltimesOriginalFacebookCreditsUnverified"])
   self.assertFalse(v["allOtherAggregatorArticlesVerified"])
- def test_20 incomplete government sources stay hold(self):
+ def test_20_incomplete_government_sources_stay_hold(self):
   v=m.assemble(parent(),m.parse_calendar(CAL),m.parse_news(""))
   self.assertEqual(v["officialFirstPartyIndependentEventIdentityCount"],0)
   self.assertIsNone(v["reviewOnlyOfficialEventUrl"])
