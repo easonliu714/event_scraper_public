@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L3-B-C StrollTimes third-party sourceRole tree**
+>
+> - SRC `scripts/p30_l3bc_strolltimes.mjs`（Source [Draft PR #22](https://github.com/easonliu714/event_scraper_public/pull/22)）獨立 public Chromium 1x homepage `https://strolltimes.com/` + 1x same-host `/events/<city>/<12–18-digit-id>/` article；HTTPS exact hosts、limited CDN、only 100 allowed requests、no stealth/login/verification bypass/purchase/API guessing/persisted session. `tests/p30/test_l3bc_strolltimes.mjs` 11 cases for URI/CTA/role/title/provenance. CI `.github/workflows/eventradar_p30_l3bc_strolltimes.yml` GitHub-specific immutable three-file diff and production blobs; **never changes `docs/data.json`**.
+> - Immutable candidate schema sample: `{ platform: "StrollTimes", title, aggregatorUrl, originalOfficialUrl: null, originalOfficialIdentityState: "NOT_VERIFIED", sourceRole: "THIRD_PARTY_EVENT_AGGREGATOR", sourceLevel: "AGGREGATOR_LIST_IDENTITY_ONLY", dateStart: null, dateEnd: null, dateRole: "UNKNOWN_NEEDS_ORGANISER_VERIFICATION", price: null, ticketStatus: "UNKNOWN", classification: "待分類", goldenVerified: false, published: false }`. **Aggregator `aggregatorUrl` != primary official URL**；其他平台不能因標題相似就自動複製日期或提升 Golden/售票狀態。
+> - Article identity: StrollTimes homepage `2026新竹市萬聖節` / same-site article H1 `2026新竹市萬聖節（10/16~10/31）`。僅允許有錨定的末尾純 `(MM/DD～MM/DD)` 展示標記，不能將標記當作官方展期，也不能使用一般 fuzzy title 對兩篇無關文章認列相同 ID。原主辦官方來源欄位保持 **NULL/HOLD**，L4-L6 才能來源對照。
+> - Native [Run 40295191261](https://github.com/easonliu714/event_scraper_public/actions/runs/40295191261) 11/11 offline PASS、rendered 113 anchor /24 unique aggregator articles/1 sample detail same-site title+HTTP200 PASS、original primary authority count=0。Artifact `12638155320`, SHA manifest PASS，PR #22 HEAD `e7e13c845d042b4a0b13cc98bdd51ba03d836fa8`；JS asset-block pageerrors=24 應列診斷監控、不當作官方資料。Repo main `fc4f963247d68eed29425808cc14e7250f312d05`、44 Android accepted data、FamiTicket 47、ibon 23 previous branches unchanged。Next `P30-L4/L5` lineaged first-party evidence, classification G5J and Android G5K only once candidate is usable。
+>
+
+
 > **2026-10-26 P30-L3-B-B ibon headless JS display-only list 23（Source Draft PR #20/21）**
 >
 > - `scripts/p30_l3bb_ibon.py`（PR #20）安全純 HTTP 雙官方清單入口 → requests GET 200/200、固定 5,766 bytes JS shell，`<script>` 11、DOM link 0、visible text 8；13/13 offline tests PASS，但抽不到可驗證活動，該純 HTTP Gate **HOLD**，不嘗試非公開 API、登入或驗證碼繞過。原 Source `docs/data.json` 不變。
