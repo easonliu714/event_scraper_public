@@ -111,7 +111,14 @@ export async function run(out){
       await page.waitForTimeout(2800);
       const cards=await page.evaluate(listing);
       summary={anchorCount:cards.anchorCount,visibleChars:cards.visibleChars,
-               pageTitle:cards.pageTitle};
+               pageTitle:cards.pageTitle,
+               targetHints:cards.anchors.filter(a=>[a.heading,a.label,a.text,a.alt]
+                 .some(z=>String(z||"").includes("ITF"))).slice(0,7).map(a=>({
+                   heading:clean(a.heading),label:clean(a.label),
+                   text:clean(a.text),alt:clean(a.alt),
+                   officialDetailRole:Boolean(officialDetail(a.href)),
+                   hrefSuffix:String(a.href||"").slice(-30)
+                 }))};
       selected=selectExact(cards.anchors);
       if(selected){
         await page.waitForTimeout(1300);
@@ -147,6 +154,7 @@ export async function run(out){
   await writeFile(dir+"/diagnostics.json",JSON.stringify(d,null,2)+"\n");
   console.log("FAMI_BROWSER_HOME",net.homeHttp,"ANCHORS",summary?.anchorCount??-1,
     "TARGET",selected?"UNIQUE_ID":"HOLD");
+  console.log("FAMI_BROWSER_TARGET_HINTS",JSON.stringify(summary?.targetHints??[]));
   console.log("FAMI_BROWSER_DETAIL",net.detailHttp,record.state,
     "HEADINGS",record.headingCount??0,"BODY_TITLE",record.bodyContainsTitle??false,
     "HINTS",JSON.stringify(record.hints??[]));
