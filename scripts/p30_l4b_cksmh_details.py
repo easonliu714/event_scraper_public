@@ -379,6 +379,9 @@ def enrich(parent,records,listing=None):
             row["venue"]=list_fields["venue"]
             row["venueRole"]="OFFICIAL_LIST_ACTID_BOUND_VENUE"
             counters["venue_bound"]+=1
+        if not fields.get("venue") and len(fields.get("sessions",[]))>1:
+            row["venueNote"]="多場次：各場次地點請依官方明細確認"
+            row["venueCandidates"]=fields.get("venueCandidates",[])
         if fields.get("summary"):
             row["summary"]=fields["summary"]
             row["summaryRole"]=fields["summaryRole"]
