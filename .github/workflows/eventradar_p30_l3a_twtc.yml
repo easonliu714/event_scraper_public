@@ -1,0 +1,80 @@
+name: EventRadar P30 L3-A TWTC bounded exhibition parse
+on:
+  push:
+    branches: [feat/eventradar-p30-l3a-twtc-official]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l3a-twtc
+  cancel-in-progress: false
+jobs:
+  twtc-table-readonly:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l3a-twtc-official'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout frozen L3-A identity without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate exact three-added files and main read-only parity
+        run: |
+          set -euo pipefail
+          base=959324cb3bad8f56fb411b7cfb6de2a294f18850
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l3a_twtc.yml' \
+            'scripts/p30_l3a_twtc.py' \
+            'tests/p30/test_l3a_twtc.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_SCOPE_DRIFT; exit 1; }
+          echo PASS P30_L3A_FROZEN_SOURCE_AND_EXACT_DIFF
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install read-only dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Synthetic/negative tests before network
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l3a_twtc.py tests/p30/test_l3a_twtc.py
+          python -m unittest discover -s tests/p30 -p 'test_l3a_twtc.py' -v
+          echo PASS P30_L3A_TWTC_OFFLINE_TESTS
+      - name: One bounded public timetable GET and one selected detail GET
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l3a_twtc.py --out p30-l3a-output
+      - name: Candidate, no-publish and provenance guards
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-l3a-output/diagnostics.json').read_text(encoding='utf-8'))
+          rows=json.loads(Path('p30-l3a-output/candidate.json').read_text(encoding='utf-8'))
+          assert d['kind']=='EVENTRADAR_P30_L3A_TWTC_EXHIBITION_CANDIDATE_ONLY'
+          assert d['unique_candidates']==len(rows)
+          assert d['max_list_get']==1 and d['max_detail_get']==1 and d['retry_count']==0
+          assert not d['writer_executed'] and not d['notification_executed']
+          assert not d['golden_accepted'] and not d['app_data_published']
+          assert d['auto_hidden']==0 and d['source_runtime']=='DORMANT'
+          assert all(r['ticket_availability']=='UNKNOWN' and not r['golden_verified'] for r in rows)
+          assert all(r['official_url'].startswith('https://twtc.com.tw/') for r in rows)
+          print('PASS P30_L3A_NO_WRITE_NO_GOLDEN')
+          print('LIST_HTTP',d['listing']['http'].get('http_status'),'CANDIDATES',len(rows))
+          print('DETAIL',d['sample_detail']['state'])
+          PY
+      - name: Short-lived immutable evidence artifact, not Pages data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l3a-twtc
+          path: p30-l3a-output/
+          if-no-files-found: warn
+          retention-days: 14
