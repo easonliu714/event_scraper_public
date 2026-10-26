@@ -1,0 +1,130 @@
+name: EventRadar P30 L5-E1 StrollTimes attributed article sources
+on:
+  push:
+    branches: [feat/eventradar-p30-l5e-strolltimes-source-lineage]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l5e-strolltimes
+  cancel-in-progress: false
+jobs:
+  aggregator-source-audit:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l5e-strolltimes-source-lineage'
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen L5D predecessor, original Pages and three-file delta
+        run: |
+          set -euo pipefail
+          base=f960d0bd91d4ca38df17f0ecb2c053fd7a0299f6
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l5e_strolltimes_lineage.yml' 'scripts/p30_l5e_strolltimes_source_lineage.mjs' 'tests/p30/test_l5e_strolltimes_source_lineage.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_SOURCE_DELTA_UNEXPECTED; exit 1; }
+          echo PASS P30_L5E_PARENT_FROZEN_AND_THREE_NEW_FILES
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install stock Playwright browser for public aggregator pages
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Offline 23 negative and privacy-source lineage tests
+        run: |
+          node --check scripts/p30_l5e_strolltimes_source_lineage.mjs
+          node --test tests/p30/test_l5e_strolltimes_source_lineage.mjs
+          echo PASS P30_L5E_SOURCE_ROLE_NEGATIVE_MATRIX
+      - name: One homepage and six article source sections, no outbound requests
+        run: |
+          node scripts/p30_l5e_strolltimes_source_lineage.mjs --out-dir p30-l5e-evidence
+      - name: Reject article title drift, invented officiality and data promotion
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-l5e-evidence/lineage_evidence.json').read_text(encoding='utf-8'))
+          assert d['kind']=='EVENTRADAR_P30_L5E1_STROLLTIMES_ATTRIBUTED_SOURCE_LINEAGE_NOT_GOLDEN'
+          assert d['network']['homepageHttp']==200
+          assert d['listCandidateCount']>=6
+          assert d['articleSamplesCount']==6 and len(d['samples'])==6
+          assert d['exactAggregatorArticleCount']>=2
+          assert d['maxNavigation']==7 and d['maxRequests']==300
+          assert d['network']['navigationCount']<=7
+          assert d['noLogin'] and d['noCheckout'] and d['noCaptchaBypass']
+          assert d['noStealth'] and d['noPrivateAPI'] and d['noRetries']
+          assert d['originalOfficialEventUrl'] is None
+          assert d['firstPartyEventDetailsIndependentlyVerified']==0
+          assert d['formalCandidateEventCount']==0 and d['fieldPromotionCount']==0
+          assert d['goldenAccepted'] is False and d['published'] is False
+          assert d['writerExecuted'] is False and d['notifierExecuted'] is False
+          assert d['autoHidden']==0 and d['sourceRuntime']=='DORMANT'
+          assert d['officialEventDatesVerified']==0
+          assert d['officialTicketAvailabilityVerified']==0
+          assert d['mainAndroid44Preserved'] is True
+          assert d['rawAggregatorArticlesAll24Promoted'] is False
+          assert len({s['aggregatorUrl'] for s in d['samples']})==6
+          for row in d['samples']:
+              assert row['articleIdentity'] in ('AGGREGATOR_ARTICLE_H1_MATCH','ARTICLE_TITLE_OR_HTTP_HOLD')
+              assert row['originalOfficialUrl'] is None and row['dateStart'] is None
+              assert row['dateEnd'] is None and row['ticketStatus']=='UNKNOWN'
+              assert row['price'] is None and row['venue'] is None
+              assert row['firstPartyVerified'] is False and row['goldenVerified'] is False
+              assert row['published'] is False
+              if not row['sourceSectionFound']:assert row['credits']==[]
+              for c in row['credits']:
+                  assert c['sourceSection']=='資料來源'
+                  assert c['linkedEventTitleIndependentlyMatched'] is False
+                  assert c['organiserAccountAuthenticityVerified'] is False
+                  assert c['originalOfficialEventDetailVerified'] is False
+                  assert c['independentNoticeTimestampVerified'] is False
+                  assert c['role'] in (
+                    'VENUE_MAP_NOT_EVENT_SOURCE',
+                    'ATTRIBUTED_SOCIAL_POST_ACCOUNT_NOT_VERIFIED',
+                    'TICKET_SITE_EVENT_IDENTITY_NOT_VERIFIED',
+                    'GOV_INSTITUTION_WEBSITE_EVENT_IDENTITY_NOT_VERIFIED',
+                    'OTHER_REFERENCED_WEBSITE_IDENTITY_NOT_VERIFIED')
+          print('PASS P30_L5E_BOUNDED_SIX_ARTICLE_DIAGNOSTICS',d['exactAggregatorArticleCount'],'exact_h1_matches')
+          if d['exactAggregatorArticleCount']<6:
+              print('HOLD P30_L5E_PARTIAL_PARENT_CHILD_OR_MISSING_TITLE_IDENTITIES')
+          if d['attributedCreditCount']>0:
+              print('PASS P30_L5E_EXPLICIT_ATTRIBUTED_SOURCE_LINKS',d['attributedCreditCount'])
+          else:
+              print('HOLD P30_L5E_ZERO_SOURCE_SECTION_EXTERNAL_CREDITS')
+          print('HOLD P30_L5E_FIRST_PARTY_EVENT_IDENTITY_NOT_INDEPENDENTLY_VERIFIED')
+          print('PASS P30_L5E_ANDROID_44_AND_FORMAL_DATA_UNTOUCHED')
+          PY
+      - name: SHA seal bounded provenance artifact including HOLD
+        if: always()
+        run: |
+          mkdir -p p30-l5e-evidence
+          cat > p30-l5e-evidence/README.txt <<'EOF'
+          P30-L5-E1 StrollTimes original-source citation lineage from public
+          source section of six aggregator articles. A social post is NOT an
+          independently verified organizer account; a Google map is venue
+          metadata; a ticket site URL is not independently matched to event.
+          All origin link references are unverified until separate L5-E2 Gate.
+          24 prior aggregator list candidates are NOT 24 verified events.
+          Existing Android 44 UAT remains immutable.
+          No outbound source fetched/checkout/login/writer/notifier/scheduler.
+          EOF
+          if [[ -f p30-l5e-evidence/lineage_evidence.json ]]; then
+            (cd p30-l5e-evidence && sha256sum lineage_evidence.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L5E_PROVENANCE_SHA_MANIFEST
+          else
+            echo HOLD P30_L5E_MISSING_EVIDENCE
+          fi
+      - name: Store isolated evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l5e-strolltimes-attributed-sources
+          path: p30-l5e-evidence/
+          if-no-files-found: warn
+          retention-days: 14
