@@ -267,6 +267,7 @@ def enrich(parent,records):
         if not fields or fields["state"]!="DETAIL_TITLE_VERIFIED":
             continue
         counters["title_verified"]+=1
+        row["title"]=fields["officialTitle"]  # Removes only the verified image-alt suffix.
         row["cksmhDetailStatus"]="OFFICIAL_TITLE_VERIFIED"
         row["detailEvidenceSHA256"]=rec["http"]["sha256"]
         row["detailEvidenceRole"]="P30_L4B_CKSMH_OFFICIAL_DETAIL"
