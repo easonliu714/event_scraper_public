@@ -1,0 +1,134 @@
+name: EventRadar P30 L5-E2 BItan first-party government identity
+on:
+  push:
+    branches: [feat/eventradar-p30-l5e2-bitan-government]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l5e2-bitan
+  cancel-in-progress: false
+jobs:
+  primary-government-event:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l5e2-bitan-government'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact P30-L5E1 predecessor and Pages runtime frozen
+        run: |
+          set -euo pipefail
+          base=ae2c2bdd014fdb9df2cb7d05781d6347d92848b5
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l5e2_bitan_gov.yml' 'scripts/p30_l5e2_bitan_government.py' 'tests/p30/test_l5e2_bitan_government.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_EXACT_SCOPE_DRIFT; exit 1; }
+          echo PASS P30_L5E2_EXACT_PARENT_THREE_FILE_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Standard public HTML dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline two-government-source 20 negative tests
+        run: |
+          python -m py_compile scripts/p30_l5e2_bitan_government.py tests/p30/test_l5e2_bitan_government.py
+          python -m unittest discover -s tests/p30 -p 'test_l5e2_bitan_government.py' -v
+          echo PASS P30_L5E2_ORGANISER_SOURCE_NEGATIVES
+      - name: Download exact successful L5E1 immutable source lineage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5e-strolltimes-attributed-sources
+          run-id: 40314650154
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l5e2-parent
+      - name: Verify predecessor SHA and StrollTimes article source identity
+        run: |
+          set -euo pipefail
+          (cd p30-l5e2-parent && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          x=json.loads(Path('p30-l5e2-parent/lineage_evidence.json').read_text(encoding='utf-8'))
+          assert x['kind']=='EVENTRADAR_P30_L5E1_STROLLTIMES_ATTRIBUTED_SOURCE_LINEAGE_NOT_GOLDEN'
+          assert x['listCandidateCount']==24 and x['articleSamplesCount']==6
+          assert x['firstPartyEventDetailsIndependentlyVerified']==0
+          assert x['sourceRuntime']=='DORMANT' and x['published'] is False
+          assert x['goldenAccepted'] is False and x['fieldPromotionCount']==0
+          match=[s for s in x['samples'] if s['aggregatorUrl']=='https://strolltimes.com/events/new-taipei/261016084730/']
+          assert len(match)==1 and match[0]['articleIdentity']=='AGGREGATOR_ARTICLE_H1_MATCH'
+          assert match[0]['originalOfficialUrl'] is None
+          print('PASS P30_L5E2_SHA_PINNED_BITAN_AGGREGATOR_ROLE_ONLY')
+          PY
+      - name: Public official calendar and municipal news once each
+        run: |
+          python scripts/p30_l5e2_bitan_government.py --parent p30-l5e2-parent/lineage_evidence.json --out-dir p30-l5e2-evidence
+      - name: One first-party calendar activity period only; never publish
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('p30-l5e2-evidence/independent_gov_event_review.json').read_text(encoding='utf-8'))
+          assert r['kind']=='EVENTRADAR_P30_L5E2_BITAN_GOV_EVENT_IDENTITY_REVIEW_ONLY'
+          assert [x['status'] for x in r['httpEvidence']]==[200,200]
+          assert r['maxPublicGET']==2
+          assert r['officialFirstPartyIndependentEventIdentityCount']==1
+          assert r['officialEventSourceMatchState']=='FIRST_PARTY_ORGANISER_EVENT_IDENTITY_CORROBORATED_REVIEW_ONLY'
+          assert r['reviewOnlyOfficialEventUrl']=='https://newtaipei.travel/zh-tw/calendar/detail/4058'
+          assert r['reviewOnlyOfficialEventPeriod']==['2026-10-17','2026-12-13']
+          assert r['primaryOfficialCalendar']['completeIdentity'] is True
+          assert r['primaryOfficialCalendar']['organiser']=='新北市政府觀光旅遊局'
+          assert r['primaryOfficialCalendar']['venueEvidence']=='新北市新店區碧潭風景區'
+          assert r['secondaryGovernmentNews']['publishedAtDate']=='2026-10-14'
+          assert r['secondaryGovernmentNews']['dateRole']=='NEWS_PUBLICATION_DATE_NOT_EVENT_START'
+          assert r['strolltimesOriginalFacebookCreditsUnverified'] is True
+          assert r['allOtherAggregatorArticlesVerified'] is False
+          assert r['noChangeNoticeProven'] is False
+          assert r['finalDatePromotionCount']==0
+          assert r['dateStart'] is None and r['dateEnd'] is None
+          assert r['ticketStatus']=='UNKNOWN' and r['price'] is None
+          assert r['goldenAccepted'] is False and r['published'] is False
+          assert r['writerExecuted'] is False and r['notifierExecuted'] is False
+          assert r['autoHidden']==0 and r['sourceRuntime']=='DORMANT'
+          assert r['original44AndroidPreserved'] is True
+          assert r['noRetries'] and r['noLogin'] and r['noCheckout']
+          assert r['noStealth'] and r['noCaptchaBypass'] and r['noUndocumentedAPI']
+          print('PASS P30_L5E2_FIRST_PARTY_GOV_BITAN_2026_1017_1213_AND_20261014_NEWS')
+          print('HOLD P30_L5E2_OTHER_23_AGGREGATOR_ACTIVITIES_UNVERIFIED')
+          print('PASS P30_L5E2_ZERO_PRODUCTION_WRITES')
+          PY
+      - name: SHA seal two public primary-source evidence records
+        if: always()
+        run: |
+          mkdir -p p30-l5e2-evidence
+          cat > p30-l5e2-evidence/README.txt <<'EOF'
+          P30-L5-E2 BItan original first-party source audit (one event ONLY).
+          Govt official tourism calendar has Gregorian event period and venue,
+          municipal news publication date is NOT the event date.
+          Source-link social FB posts still not independently verified.
+          Other 23 StrollTimes list articles remain aggregator candidates only;
+          four of six L5-E1 sampled article H1s remain HOLD.
+          This is REVIEW_ONLY; no production event date, sale, price, Golden,
+          auto-hide, schedule, PWA or Android 44 writer.
+          EOF
+          if [[ -f p30-l5e2-evidence/independent_gov_event_review.json ]]; then
+            cp p30-l5e2-parent/lineage_evidence.json p30-l5e2-evidence/parent_lineage_evidence.json
+            (cd p30-l5e2-evidence && sha256sum independent_gov_event_review.json parent_lineage_evidence.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L5E2_SHA_SEALED_SOURCE_EVIDENCE
+          else
+            echo HOLD P30_L5E2_MISSING_GOV_EVIDENCE
+          fi
+      - name: Upload isolated primary source evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l5e2-bitan-gov-official
+          path: p30-l5e2-evidence/
+          if-no-files-found: warn
+          retention-days: 14
