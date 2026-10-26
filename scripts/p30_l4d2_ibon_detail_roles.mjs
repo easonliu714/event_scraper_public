@@ -70,7 +70,10 @@ function detailDom(){
     lines:(document.body?.innerText||"").split("\n").map(s=>s.trim()).filter(Boolean).slice(0,300),
     pageTitle:document.title.slice(0,140),
     bodyTextLength:(document.body?.innerText||"").length,
-    iframeCount:document.querySelectorAll("iframe").length
+    iframeCount:document.querySelectorAll("iframe").length,
+    roleHintLines:(document.body?.innerText||"").split("\n")
+      .map(s=>s.replace(/\s+/g," ").trim()).filter(s=>/日期|時間|場次|演出|售票|開賣|使用期限|票券|入場|活動資訊/.test(s))
+      .slice(0,16).map(s=>s.slice(0,120))
   };
 }
 export function assess(row,observed,network){
@@ -78,6 +81,7 @@ export function assess(row,observed,network){
   return {requestedOfficialUrl:row.officialUrl,listTitle:row.title,
     responseStatus:network.status??null,responseUrl:network.url??null,
     headingCount:observed.headings.length,
+    roleHintLines:(observed.roleHintLines||[]).slice(0,16).map(s=>String(s).slice(0,120)),
     identity:network.status===200&&exact?"EXACT_LIST_DETAIL_HEADING":"DETAIL_TITLE_OR_HTTP_HOLD",
     roleEvidence:network.status===200&&exact?labels(observed.lines):[],
     dateStart:null,dateEnd:null,venue:null,price:null,ticketStatus:"UNKNOWN",
@@ -169,7 +173,8 @@ export async function run(out){
   console.log("IBON_L4D2_LIST",stats.listStatus,"CANDIDATES",output.length,
               "SAMPLED_DETAILS",sample.length);
   for(const x of sample)console.log("IBON_L4D2_DETAIL",x.responseStatus,x.identity,
-    "ROLE_LABELS",x.roleEvidence?.map(x=>x.label).join("|")??"");
+    "ROLE_LABELS",x.roleEvidence?.map(x=>x.label).join("|")??"",
+    "PAGE_FIELD_HINTS",JSON.stringify((x.roleHintLines||[]).slice(0,9)));
   if(!output.length||sample.length!==2){
     console.log("HOLD P30_L4D2_LIST_OR_TWO_SAMPLE_DETAILS");process.exitCode=2;
   }else{
