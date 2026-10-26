@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 export const KIND="EVENTRADAR_P30_L3BB2_IBON_PUBLIC_BROWSER_DIAGNOSTIC_NOT_GOLDEN";
 export const LIST="https://ticket.ibon.com.tw/Index/entertainment";
 const MAX_REQUESTS=90;
-const WORDS=new Set(["購票","立即購票","查看活動","詳情","更多","最新開賣","登入","立即預訂","售票中","已售完"]);
+const WORDS=new Set(["購票","立即購票","查看活動","詳情","更多","最新開賣","登入","立即預訂","售票中","即將開賣","已售完"]);
 export function allowedHost(url){
   try {
     const u=new URL(url);
@@ -36,7 +36,7 @@ export function candidateTitle(raw){
 function extractDom(){
   const seen=new Set(),items=[];
   const anchors=[...document.querySelectorAll("a[href]")];
-  const bad=new Set(["購票","立即購票","查看活動","詳情","更多","最新開賣","登入","立即預訂","售票中","已售完"]);
+  const bad=new Set(["購票","立即購票","查看活動","詳情","更多","最新開賣","登入","立即預訂","售票中","即將開賣","已售完"]);
   for(const a of anchors){
     let u;try{u=new URL(a.getAttribute("href"),location.href);}catch{continue;}
     if(u.protocol!=="https:"||u.hostname!=="ticket.ibon.com.tw"||u.search||u.hash)continue;
