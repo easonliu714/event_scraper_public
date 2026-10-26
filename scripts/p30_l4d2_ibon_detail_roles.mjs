@@ -42,7 +42,7 @@ export function labels(lines){
 }
 export function scheduleBlockEvidence(lines){
   const result=[],arr=(Array.isArray(lines)?lines:[]).slice(0,300);
-  const fullDate=/20\d{2}(?:[.\/-]|年)(?:0?[1-9]|1[0-2])(?:[.\/-]|月)(?:0?[1-9]|[12]\d|3[01])(?:日)?/g;
+  const fullDate=/(?<!\d)20\d{2}(?:[.\/-]|年)(?:1[0-2]|0?[1-9])(?:[.\/-]|月)(?:3[01]|[12]\d|0?[1-9])(?:日)?(?!\d)/g;
   for(let i=0;i<arr.length&&result.length<12;i++){
     const head=String(arr[i]??"").trim();
     const blockTitle=/^【活動時間(?:（台灣時間）)?】$/.test(head);
