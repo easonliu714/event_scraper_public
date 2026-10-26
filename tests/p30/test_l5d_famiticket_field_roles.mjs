@@ -120,3 +120,33 @@ test("22 unknown sale status never inferred from button",()=>{
  assert.equal(v[0].role,"EVENT_TIME_LABEL_ONLY");
  assert.equal(v[0].officialEventDateAccepted,false);
 });
+
+test("23 real TPBL sports venue badge is not sale or official venue promotion",()=>{
+  const x=roleFields(["🔱比賽地點：K-ARENA 高雄巨蛋 （高雄市左營區博愛二路757號）"]);
+  assert.equal(x.length,1);
+  assert.equal(x[0].label,"比賽地點");
+  assert.equal(x[0].role,"VENUE_LABEL_ONLY");
+  assert.equal(x[0].officialEventDateAccepted,false);
+});
+test("24 sports series season 26-27 is not a dated event session",()=>{
+  const x=roleFields(["🔱開放場次：26-27賽季例行賽 主場賽事"]);
+  assert.equal(x[0].role,"SERIES_DESCRIPTOR_NOT_EVENT_TIME");
+  assert.deepEqual(x[0].fullYearDateTokens,[]);
+});
+test("25 partial date 10/8 in advance ticket sale is not game date",()=>{
+  const x=roleFields(["🔱預售票全面販售時間：10/8(四) 中午12:00至該場次比賽當日上午11:00止"]);
+  assert.equal(x[0].role,"SALE_WINDOW_NOT_EVENT");
+  assert.deepEqual(x[0].fullYearDateTokens,[]);
+});
+test("26 voucher redemption location distinct from performance venue",()=>{
+  const x=roleFields(["兌換地點：指定超商機台"]);
+  assert.equal(x[0].role,"VOUCHER_REDEMPTION_LOCATION_NOT_EVENT_VENUE");
+  assert.deepEqual(x[0].fullYearDateTokens,[]);
+});
+test("27 marked sports lines plus sale and venue do not promote official fields",()=>{
+  const x=roleFields(["🔱比賽地點：K-ARENA 高雄巨蛋","🔱開放場次：26-27賽季例行賽",
+    "🔱預售票全面販售時間：10/8(四) 中午12:00至賽前上午11:00"]);
+  assert.deepEqual(x.map(e=>e.role),["VENUE_LABEL_ONLY",
+    "SERIES_DESCRIPTOR_NOT_EVENT_TIME","SALE_WINDOW_NOT_EVENT"]);
+  assert.ok(x.every(e=>e.officialEventDateAccepted===false));
+});
