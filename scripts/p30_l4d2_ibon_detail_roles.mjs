@@ -40,6 +40,36 @@ export function labels(lines){
   }
   return found;
 }
+export function scheduleBlockEvidence(lines){
+  const result=[],arr=(Array.isArray(lines)?lines:[]).slice(0,300);
+  const fullDate=/20\d{2}(?:[.\/-]|年)(?:0?[1-9]|1[0-2])(?:[.\/-]|月)(?:0?[1-9]|[12]\d|3[01])(?:日)?/g;
+  for(let i=0;i<arr.length&&result.length<12;i++){
+    const head=String(arr[i]??"").trim();
+    const blockTitle=/^【活動時間(?:（台灣時間）)?】$/.test(head);
+    const inline=/^日期\s*[\/／]\s*時間\s*[｜|:：]/.test(head);
+    if(!blockTitle&&!inline)continue;
+    // Only the immediately adjacent text could be bound to a distinct
+    // section; never scour the whole detail article for loose dates.
+    const fragments=blockTitle?[head,...arr.slice(i+1,i+4)]:[head];
+    const excerpt=fragments.map(x=>String(x??"").trim()).join(" ").slice(0,360);
+    const candidates=[...excerpt.matchAll(fullDate)].map(m=>m[0]);
+    const iso=[];
+    for(const v of candidates){
+      const n=/^(20\d{2})(?:[.\/-]|年)(\d{1,2})(?:[.\/-]|月)(\d{1,2})/.exec(v);
+      if(!n)continue;
+      const [y,mo,day]=n.slice(1).map(Number);
+      const d=new Date(Date.UTC(y,mo-1,day));
+      if(d.getUTCFullYear()!==y||d.getUTCMonth()+1!==mo||d.getUTCDate()!==day)continue;
+      const stamp=[y,String(mo).padStart(2,"0"),String(day).padStart(2,"0")].join("-");
+      if(!iso.includes(stamp))iso.push(stamp);
+    }
+    result.push({role:"ACTUAL_EVENT_TIME_LABELED_RAW_UNPROMOTED",
+      heading:head.slice(0,70),rawExcerpt:excerpt,
+      observedFullYearDates:iso.slice(0,8),
+      status:"RAW_UNPROMOTED_EVIDENCE"});
+  }
+  return result;
+}
 export function listRows(raw){
   const seen=new Set(),rows=[];
   for(const a of raw){
@@ -84,6 +114,7 @@ export function assess(row,observed,network){
     roleHintLines:(observed.roleHintLines||[]).slice(0,16).map(s=>String(s).slice(0,120)),
     identity:network.status===200&&exact?"EXACT_LIST_DETAIL_HEADING":"DETAIL_TITLE_OR_HTTP_HOLD",
     roleEvidence:network.status===200&&exact?labels(observed.lines):[],
+    scheduleBlockEvidence:network.status===200&&exact?scheduleBlockEvidence(observed.lines):[],
     dateStart:null,dateEnd:null,venue:null,price:null,ticketStatus:"UNKNOWN",
     officialActivityScheduleVerified:false,goldenVerified:false};
 }
@@ -174,7 +205,9 @@ export async function run(out){
               "SAMPLED_DETAILS",sample.length);
   for(const x of sample)console.log("IBON_L4D2_DETAIL",x.responseStatus,x.identity,
     "ROLE_LABELS",x.roleEvidence?.map(x=>x.label).join("|")??"",
-    "PAGE_FIELD_HINTS",JSON.stringify((x.roleHintLines||[]).slice(0,9)));
+    "PAGE_FIELD_HINTS",JSON.stringify((x.roleHintLines||[]).slice(0,9)),
+    "EVENT_TIME_BLOCKS",JSON.stringify((x.scheduleBlockEvidence||[]).map(y=>({
+      heading:y.heading,dates:y.observedFullYearDates,excerpt:y.rawExcerpt.slice(0,180)}))));
   if(!output.length||sample.length!==2){
     console.log("HOLD P30_L4D2_LIST_OR_TWO_SAMPLE_DETAILS");process.exitCode=2;
   }else{
