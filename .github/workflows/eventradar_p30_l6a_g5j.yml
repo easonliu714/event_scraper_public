@@ -1,0 +1,152 @@
+name: EventRadar P30 L6-A G5J reversible dedup and category review
+on:
+  push:
+    branches: [feat/eventradar-p30-l6a-reversible-dedup]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l6a-g5j
+  cancel-in-progress: false
+jobs:
+  immutable-source-g5j:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l6a-reversible-dedup'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Freeze accepted L5E3 HEAD, production runtime and exactly 3 additions
+        run: |
+          set -euo pipefail
+          base=7057990d9e698302fa60e933b7579492b8969620
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l6a_g5j.yml' 'scripts/p30_l6a_g5j_reversible_dedup.mjs' 'tests/p30/test_l6a_g5j_reversible_dedup.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_SOURCE_SCOPE_DRIFT; exit 1; }
+          echo PASS P30_L6A_FROZEN_MAIN_PARENT_AND_EXACT_THREE_NEW_FILES
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Offline G5J 30 negative and no-deletion tests
+        run: |
+          node --check scripts/p30_l6a_g5j_reversible_dedup.mjs
+          node --test tests/p30/test_l6a_g5j_reversible_dedup.mjs
+          echo PASS P30_L6A_30_INVARIANTS_AND_NO_AUTOMERGE
+      - name: Download SHA sealed exact accepted L5E3 evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5e3-strolltimes-identity-graph
+          run-id: 40318751941
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l6a-input
+      - name: SHA and original E1 E2 ancestry identity guards
+        run: |
+          set -euo pipefail
+          (cd p30-l6a-input && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-l6a-input/identity_graph_review.json').read_text(encoding='utf-8'))
+          e1=json.loads(Path('p30-l6a-input/parent_e1_lineage.json').read_text(encoding='utf-8'))
+          e2=json.loads(Path('p30-l6a-input/parent_e2_government.json').read_text(encoding='utf-8'))
+          assert d['kind']=='EVENTRADAR_P30_L5E3_STROLLTIMES_REVERSIBLE_ARTICLE_GRAPH_REVIEW_ONLY'
+          assert d['currentSampleCount']==6 and len(d['nodes'])==6 and len(d['edges'])==7
+          assert d['confirmedParentChildEventEdges']==0 and d['automaticDedupMergeCount']==0
+          assert e1['kind']=='EVENTRADAR_P30_L5E1_STROLLTIMES_ATTRIBUTED_SOURCE_LINEAGE_NOT_GOLDEN'
+          assert e1['listCandidateCount']==24 and e1['articleSamplesCount']==6
+          assert e2['kind']=='EVENTRADAR_P30_L5E2_BITAN_GOV_EVENT_IDENTITY_REVIEW_ONLY'
+          assert e2['officialFirstPartyIndependentEventIdentityCount']==1
+          assert e2['reviewOnlyOfficialEventPeriod']==['2026-10-17','2026-12-13']
+          assert d['goldenAccepted'] is False and d['published'] is False
+          print('PASS P30_L6A_FROZEN_E1_E2_E3_ANCESTRY_SHA_MANIFEST')
+          PY
+      - name: Offline six-source deterministic 15 pair reviews, no web or API calls
+        run: |
+          node scripts/p30_l6a_g5j_reversible_dedup.mjs \
+            --input p30-l6a-input/identity_graph_review.json \
+            --out-dir p30-l6a-evidence
+      - name: Exact six rows, fifteen review pairs, seven evidence edges and no mutations
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('p30-l6a-evidence/dedup_classification_review.json').read_text(encoding='utf-8'))
+          assert p['kind']=='EVENTRADAR_P30_L6A_G5J_REVERSIBLE_CLASSIFICATION_AND_DEDUP_REVIEW_ONLY'
+          assert p['inputNodes']==6 and len(p['reviewedCandidates'])==6
+          assert p['pairedReviewCount']==15 and len(p['reviewPairs'])==15
+          assert len(p['sourceEvidenceEdges'])==7
+          assert p['oneGovernmentReferenceCount']==1 and p['firstPartyGovEvidenceLimitedToBitan']
+          assert p['provisionalClassificationCount']>=4
+          assert p['officialClassificationPromotions']==0
+          assert p['confirmedDuplicatePairs']==0 and p['tentativeCrossPlatformDuplicates']==0
+          assert p['automaticMergeCount']==0 and p['automaticHideCount']==0 and p['deleteCount']==0
+          assert p['actualMergedRecords']==0 and p['manuallyApprovedMergeCount']==0
+          assert p['originalFirstPartyArticleProofsForOther23']==0
+          assert p['graphReversible'] is True and p['restorePlan']=='NO_MUTATIONS_WERE_PERFORMED'
+          assert p['accepted44AndroidPreserved'] is True
+          assert p['formalDatePromotionCount']==0 and p['formalFieldPromotionCount']==0
+          assert p['goldenAccepted'] is False and p['published'] is False
+          assert p['writerExecuted'] is False and p['notifierExecuted'] is False
+          assert p['autoHidden']==0 and p['sourceRuntime']=='DORMANT'
+          urls={x['id'] for x in p['reviewedCandidates']}
+          assert len(urls)==6 and all(x['id'].startswith('https://strolltimes.com/events/') for x in p['reviewedCandidates'])
+          assert all(x['mergedWith']==[] and x['autoMergeAllowed'] is False
+            and x['autoHideAllowed'] is False and x['deleteAllowed'] is False
+            and x['dateStart'] is None and x['dateEnd'] is None and x['venue'] is None
+            and x['ticketStatus']=='UNKNOWN' and x['price'] is None
+            and x['officialCategoryVerified'] is False and x['goldenVerified'] is False
+            and x['published'] is False for x in p['reviewedCandidates'])
+          assert all(x['a'] in urls and x['b'] in urls and x['a']!=x['b']
+            and x['proposedAction']=='KEEP_SEPARATE_PENDING_EVIDENCE'
+            and x['mergeAllowed'] is False and x['deleteAllowed'] is False
+            and x['autoHideAllowed'] is False and x['primarySourceCrossIdentity']=='NOT_PROVEN'
+            and x['relationship']=='UNKNOWN_NOT_MERGED'
+            for x in p['reviewPairs'])
+          assert all(x['mergeAllowed'] is False and x['reviewOnly'] for x in p['sourceEvidenceEdges'])
+          b=[x for x in p['reviewedCandidates'] if x['referenceOfficialUrl']]
+          assert len(b)==1
+          assert b[0]['referenceOfficialUrl']=='https://newtaipei.travel/zh-tw/calendar/detail/4058'
+          assert b[0]['referenceOfficialPeriod']==['2026-10-17','2026-12-13']
+          assert b[0]['dateStart'] is None and b[0]['dateEnd'] is None
+          print('PASS P30_L6A_G5J_SIX_CLASSIFICATION_HINTS_15_ZERO_MERGE_PAIRS_7_REVERSIBLE_EDGES')
+          print('HOLD P30_L6A_G5J_OFFICIAL_CLASSIFICATION_AND_CROSS_SOURCE_SAME_EVENT_PROOF')
+          print('PASS P30_L6A_G5J_ZERO_DELETE_HIDE_WRITER_AND_PUBLISHED_44_UNTOUCHED')
+          PY
+      - name: SHA seal isolated dedup review evidence
+        if: always()
+        run: |
+          mkdir -p p30-l6a-evidence
+          cat > p30-l6a-evidence/README.txt <<'EOF'
+          EventRadar P30-L6-A G5J proof: six StrollTimes aggregator article
+          identifiers, 15 PAIR reviews, seven lineage edges. Only Bitan
+          has one independently corroborated first-party calendar reference.
+          Keyword categories are UNVERIFIED REVIEW hints, not PWA taxonomy.
+          Never infer duplicate events from same StrollTimes ARTICLE or similar
+          titles; no confirmed organiser/year/venue/session/edition parity.
+          Absolutely zero merge/delete/hide, no official field/date promotion,
+          and the previously accepted 44 Android items stay unchanged.
+          Source inputs pinned to E3 Run 40318751941 and manifest verification.
+          No network operations occur in the G5J transform.
+          EOF
+          if [[ -f p30-l6a-evidence/dedup_classification_review.json ]]; then
+            cp p30-l6a-input/identity_graph_review.json p30-l6a-evidence/parent_identity_graph.json
+            (cd p30-l6a-evidence && sha256sum dedup_classification_review.json parent_identity_graph.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L6A_G5J_SEALED_REVIEW_SHA
+          else
+            echo HOLD P30_L6A_G5J_NO_OUTPUT
+          fi
+      - name: Upload isolated G5J review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l6a-g5j-reversible-dedup
+          path: p30-l6a-evidence/
+          if-no-files-found: warn
+          retention-days: 14
