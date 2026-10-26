@@ -1,5 +1,8 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+> **2026-10-26 L2-B CKSMH 實際來源驗證（PR #10 Draft；未併 main）**：GitHub Run [40269917573](https://github.com/easonliu714/event_scraper_public/actions/runs/40269917573) `completed/success`；Job `121400294421` 全 Steps SUCCESS；11/11 離線測試 PASS。中正紀念堂官方 `https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr` HTTP 200 並解析 **5 筆活動清單候選**；`https://event.culture.tw/CKSMH` HTTP 200 但直接活動 anchor 候選 0；取樣第一筆詳情 HTTP 200（**不代表日期/身份 Golden**）。Runner output 只保存 candidate+diagnostics Artifact `12627554765`，不寫正式資料。PR #10 HEAD `da451c9537a05ba23db094533cc9887f7db8b6bc`，堆疊於 PR #9，三檔隔離變更、正式原有 JSON/UI/Runtime Blob parity 保持。L2-B **CKSMH 來源回應與有限清單可達性 PASS**，L4 內容正確性仍 OPEN。原 404 路徑不得再作為唯一來源。
+>
+
 > **L2-B 入口候選（2026-10-26）：** 已由官方公開網站的網頁索引檢視確認中正紀念堂活動可經 `https://event.culture.tw/CKSMH` 與 `https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr` 存取活動資料；原 L1 使用的 `https://event.culture.tw/mocweb/reg/CKSMH/` 曾返回 HTTP 404。上述為**合法公開候選入口**，尚未以既有 GitHub Python Runner 在相同環境重驗，故 **L2-B 候選／NOT_GATED**，不是已修復或已寫入 Parser。禁止把 404 當成全部活動失效。參考：`https://event.culture.tw/CKSMH`（官方站）、`https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr`（官方活動查詢頁）。
 >
 
