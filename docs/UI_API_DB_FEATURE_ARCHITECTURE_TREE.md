@@ -1,6 +1,14 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L4-A TWTC date evidence 結構修正（PR #13 Draft）**
+>
+> - 使用者 Android 畫面證明：TWTC 清單 LIST_TABLE_ONLY 只有 MM/DD～MM/DD，許多活動仍標示年份待核對，然而官方 exhibition_more.aspx?id=... 詳情有 YYYY/MM/DD～YYYY/MM/DD。原 L3-A run() 只抽樣第一筆，所以其餘不自動回填。
+> - 隔離 L4-A source-only 實作 p30_l4a_twtc_detail_dates.py，復用 L3-A get_html()、parse_detail_date()；每筆走 HTTPS allowlist → URL Detail ID 一致 → H1/H2/H3 活動標題一致 → 完整官方日期合法 → 與原始清單 MM/DD 一致的 Gate，通過才輸出 start/end/source_time_role/response_sha256。缺詳情、403、重定向活動 ID、延期、時間衝突皆 HOLD。
+> - PR #13 目前只生產 GitHub Artifact 日期證據，不更動 PR #11 與 PR #12 原始程式、Android UI 或正式 docs/。L7-B 方可依固定 SHA 合約回填 dateStart/dateEnd 並重新驗證 Android；票價、票況仍 UNKNOWN，GOLDEN_ACCEPTED=0、AUTO_HIDDEN=0、APP_DATA_PUBLISHED=false。
+>
+
+
 > **2026-10-26 P30-L7-A USER-ATTESTED Android 7/7 PASS**
 >
 > - Android 本機 `127.0.0.1:8766` 候選 UI 已由使用者回報七項 PASS：44 筆首頁、CKSMH 5／TWTC 39、關鍵字及類別、詳情 modal/關閉與無重疊、未知日期票價票況提示、官方 HTTPS 連結。對應 PR #12 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc`、Run `40271164263`、Artifact `12628147623`。不改動 UI/PWA 正式 `docs/index.html`、`docs/data.json`。
