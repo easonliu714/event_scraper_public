@@ -82,7 +82,7 @@ class P30L7DTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"IDENTITY"):
             p.parse_co_organizer(b"<h1>other event</h1>")
         with self.assertRaisesRegex(ValueError,"IDENTITY"):
-            p.parse_financial_notice(b"<p>延期至12月18日至12月19日</p>")
+            p.parse_financial_notice("<p>延期至12月18日至12月19日</p>".encode("utf-8"))
 
     def test_date_changed_fails_closed(self):
         bad=INST.replace("12月18日".encode(),"12月21日".encode())
