@@ -1,0 +1,106 @@
+name: EventRadar P30 L4-D2 ibon first-party detail audit
+on:
+  push:
+    branches: [feat/eventradar-p30-l4d2-ibon-detail-evidence]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l4d2-ibon
+  cancel-in-progress: false
+jobs:
+  ibon-detail-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l4d2-ibon-detail-evidence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact predecessor, formal Pages and three added files
+        run: |
+          set -euo pipefail
+          base=6ae9fcdf42686474489d7df48d944bd70b89a431
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l4d2_ibon_detail.yml' 'scripts/p30_l4d2_ibon_detail_roles.mjs' 'tests/p30/test_l4d2_ibon_detail_roles.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_SOURCE_DIFF; exit 1; }
+          echo PASS P30_L4D2_FROZEN_ANCESTRY_AND_EXACT_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install standard public Chromium without automation concealment
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Offline source identity, role and negative matrix
+        run: |
+          node --check scripts/p30_l4d2_ibon_detail_roles.mjs
+          node --test tests/p30/test_l4d2_ibon_detail_roles.mjs
+          echo PASS P30_L4D2_IBON_OFFLINE_MATRIX
+      - name: One public ibon list and two exact same-host numeric details
+        run: |
+          node scripts/p30_l4d2_ibon_detail_roles.mjs --out-dir p30-l4d2-evidence
+      - name: Assert no dates tickets or Golden promoted
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("p30-l4d2-evidence/diagnostics.json").read_text())
+          c=json.loads(Path("p30-l4d2-evidence/sample_candidates.json").read_text())
+          assert d['kind']=="EVENTRADAR_P30_L4D2_IBON_PUBLIC_DETAIL_ROLE_EVIDENCE_NOT_GOLDEN"
+          assert d['stats']['listStatus']==200
+          assert d['listCount']>=2
+          assert len(d['details'])==2 and len(c)==2
+          assert d['maxNavigation']==3 and d['maxNetworkRequests']==130
+          assert d['noPrivateAPI'] and d['noCheckout'] and d['noLogin']
+          assert d['noCaptchaBypass'] and d['noRetries']
+          assert d['verifiedDateCount']==0 and d['goldenAccepted'] is False
+          assert d['published'] is False and d['writerExecuted'] is False
+          assert d['notifierExecuted'] is False and d['autoHidden']==0
+          assert d['sourceRuntime']=='DORMANT'
+          assert len({r['officialUrl'] for r in c})==len(c)
+          assert all(r['dateStart'] is None and r['dateEnd'] is None and
+                     r['ticketStatus']=='UNKNOWN' and r['price'] is None
+                     and r['goldenVerified'] is False and r['published'] is False for r in c)
+          for a in d['details']:
+              assert a['dateStart'] is None and a['dateEnd'] is None
+              assert a['ticketStatus']=='UNKNOWN' and a['goldenVerified'] is False
+              assert all(x['status']=='RAW_UNPROMOTED_EVIDENCE' for x in a['roleEvidence'])
+          matches=sum(x['identity']=='EXACT_LIST_DETAIL_HEADING' for x in d['details'])
+          print('PASS P30_L4D2_IBON_2_PUBLIC_DETAIL_AUDIT')
+          print('IBON_DETAIL_IDENTITIES_MATCHED',matches,'of',len(d['details']))
+          if matches<len(d['details']):
+              print('HOLD P30_L4D2_IBON_DETAIL_IDENTITY_QUALITY')
+          print('P30_L4D2_EVENT_DATES_PROMOTED=0 GOLDEN=0 OFFICIAL_JSON_UNTOUCHED')
+          PY
+      - name: SHA seal evidence for later source quality work
+        if: always()
+        run: |
+          mkdir -p p30-l4d2-evidence
+          cat > p30-l4d2-evidence/README.txt <<'EOF'
+          P30-L4-D2 public ibon source-bound two detail identities.
+          Diagnostics are not proof of event dates, venues, ticket availability,
+          registration windows, voucher validity, current prices, or official
+          organiser approval. No data field is promoted by this Gate.
+          Browser is stock Chromium on public HTML, without login, purchase,
+          captcha/anti-bot bypass, private APIs, or persistent state.
+          Existing 44 Android UAT records and main Pages remain untouched.
+          EOF
+          if [[ -f p30-l4d2-evidence/diagnostics.json && -f p30-l4d2-evidence/sample_candidates.json ]]; then
+            (cd p30-l4d2-evidence && sha256sum diagnostics.json sample_candidates.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L4D2_EVIDENCE_SHA_GATE
+          else
+            echo HOLD P30_L4D2_NO_EVIDENCE_FILES
+          fi
+      - name: Store isolated audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l4d2-ibon-detail-evidence
+          path: p30-l4d2-evidence/
+          if-no-files-found: warn
+          retention-days: 14
