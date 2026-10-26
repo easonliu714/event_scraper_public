@@ -72,8 +72,9 @@ def fetch_html(session,url):
                 return None,result
             result.update(httpState="HTTP200_HTML",bytes=len(data),
                           sha256=hashlib.sha256(data).hexdigest())
-            html=bytes(data).decode(res.encoding or "utf-8",errors="replace")
-            return BeautifulSoup(html,"html.parser"),result
+            # requests may default Chinese HTML to ISO-8859-1 when no charset
+            # header exists. Detect from raw bytes/meta rather than mojibake.
+            return BeautifulSoup(bytes(data),"html.parser",from_encoding="utf-8"),result
     except requests.RequestException as ex:
         return None,{"sourceUrl":url,"sourceRole":KNOWN[url],
                      "httpState":"NETWORK_HOLD","exceptionType":type(ex).__name__}
@@ -226,6 +227,8 @@ def run(parent_path,out_dir,sleep=time.sleep):
     print("NIER_L5C_PRODUCER_DETAIL",responses[ADDED_DETAIL_URL]["net"].get("status"),
           detail["detailIdentity"])
     print("NIER_L5C_SECONDARY_SALES",responses[SECONDARY_URL]["net"].get("status"),
+          "PRODUCER",result["ticketSaleEvidence"]["producer"],
+          "SECONDARY",result["ticketSaleEvidence"]["secondary"],
           result["ticketSaleEvidence"]["saleTimeConflict"])
     print("NIER_L5C_STATUS",result["status"],
           "ANNOUNCEMENT_TIMESTAMP_VERIFIED",result["announcementTimestampVerified"])
