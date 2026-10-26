@@ -1,6 +1,17 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L5-B ibon two-detail notice parity CI 40303622151（最新）**
+>
+> - GitHub 權威再次確認 Source `main@fc4f963247d68eed29425808cc14e7250f312d05`，P30-L5-A Source [Draft PR #26](https://github.com/easonliu714/event_scraper_public/pull/26) `b7e16cb39fc187cea927cf1521ee972d621f8a2a`、CI `40301911354` completed/success 22/22、ibon 原始官方詳情 2 筆／3 個活動開演候選、Android L4-C 已驗收 44（5 CKSMH＋39 TWTC）全部保留；未合併任何功能 PR 或更改正式 JSON/PWA。
+> - 新 [Source Draft PR #27](https://github.com/easonliu714/event_scraper_public/pull/27) `feat/eventradar-p30-l5b-ibon-change-notice@bd0612ee49d992cd0c4c8843ba6b0a09dd39f90d`，base PR #26 frozen HEAD，精確三新增檔：`scripts/p30_l5b_ibon_change_notice.mjs`、`tests/p30/test_l5b_ibon_change_notice.mjs`、`.github/workflows/eventradar_p30_l5b_ibon_notices.yml`。原生 GitHub Actions 下載 L5-A **同一成功 Run 40301911354** 的 SHA256SUMS 已封存 Artifact，先驗證 `session_candidates.json` 的 2 個官方詳細頁 ID／3 個原始活動開演角色／DORMANT 與零正式寫入，再使用**未修改 Chromium** 只對原 2 個 numeric-ID `https://ticket.ibon.com.tw/ActivityInfo/Details/<ID>` 官方頁做各 1 次公開 GET（至多 2 導覽、120 官方站內請求），不再任意尋找其他事件、不登入、購票、繞過驗證碼或存取非公開 API。
+> - **最終 [Run 40303622151](https://github.com/easonliu714/event_scraper_public/actions/runs/40303622151) completed/success**：20/20 正反向測試、frozen 父 HEAD + 正式 `docs/data.json`、`docs/index.html`、`scraper.py` SHA/路徑範圍 Guard、來源 Artifact 完整 SHA、自站 2/2 HTTPS200/detail exact title、**先前 L5-A 的 3/3 開演時間仍一致**、包含聆聽／入場與真實活動時間分欄邊界、輸出 JSON/ZIP SHA PASS。RUNIDRE detail 官方取樣場次相符，`NO_EXPLICIT_NOTICE_SECTION_CAPTURED_UNKNOWN` **只表示限定 DOM 範圍未找到明確公告，不是已核定「無異動」**。NieR Orchestra Concert 兩個場次相符，但公告區塊取樣得到 **`ADDITIONAL_SESSION_SIGNAL_REVIEW`（追加場）**，另外場次段內有「追加場」標記；這不等於獨立主辦方公告、也不能視為已核准追加場或可販售票券，需 `ORGANISER_CONFIRMATION_HOLD`。
+> - Artifact [12640444559](https://github.com/easonliu714/event_scraper_public/actions/runs/40303622151/artifacts/12640444559) `eventradar-p30-l5b-ibon-change-notice`，ZIP digest `sha256:c1863e7c3024f6b6e329bdce71206ec931bf3d8077c6ee69d256e62e9082a7da`，expires `2026-11-09T09:58:10Z`，包含 `change_notice_review.json`、`parent_session_candidates.json`、`README.txt`、`SHA256SUMS.txt`。所有跨來源官方身份與公告核准仍 **HOLD**，不能將 `20/20 CI PASS` 解讀成「主辦同意／活動無異動／23 件詳情完整」。
+> - Gate 分級：`P30_L5B_PINNED_SOURCE_SHA=PASS`、`P30_L5B_SAMPLED_EVENT_START_PARITY=PASS_3_OF_3`、`P30_L5B_NOTICE_SCOPE_AUDIT=PASS`、`P30_L5B_NIER_ADDITIONAL_SHOW_ORGANISER_CONFIRMATION=HOLD`、`P30_L5B_RUNIDRE_NO_CHANGE_PROVEN=FALSE`。正式 `dateStart/dateEnd=NULL`、`ticketStatus=UNKNOWN`、`price=NULL`、`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`、`SOURCE_RUNTIME=DORMANT`、`FIELD_PROMOTION=0`。
+> - **下一 Gate P30-L5-C**：核對 NieR 追加場原主辦／票務公告的可追溯 URL、發布／更新時間、時間區與原先場次之差異；對 RUNIDRE 若無最新公告只能保持未知，不能以「頁面無 notice」代表不延期。若來源內有可核准公告才建立可逆、隔離候選欄位升級，仍禁止正式 Writer。並行 FamiTicket 47 項清單詳細欄位有限抽樣，以及 StrollTimes 24 篇聚合文章的原始主辦 URL lineage；再執行 L6 G5J 去重/分類 → L7 fresh isolated JSON → L8 G5K Android/PWA。兩份治理文件**只在 Docs Draft PR #8**，尚非 main 已合併基線；PR #27 保持 Draft，不合併。
+>
+
+
 > **2026-10-26 P30-L5-A ibon 活動開演與入場時間語義 Gate PASS（最新）**
 >
 > - 最新讀回 Source `main@fc4f963247d68eed29425808cc14e7250f312d05`，前序 P30-L4-D3 Source [Draft PR #25](https://github.com/easonliu714/event_scraper_public/pull/25) `622a52221d6fded07d0829486f3877835e372da40`、CI `40299649653` PASS（FamiTicket 一筆 public Chromium 官方詳情），P30-L4-D2 ibon 詳情兩筆 HTTP200／2/2 exact title，和 P30-L4-C Android **44=5 CKSMH+39 TWTC USER_ATTESTED_PASS** 全部保留不重驗。沒有 Merge、不改正式 `docs/data.json`、`docs/index.html`、`scraper.py`。
