@@ -1,0 +1,175 @@
+name: EventRadar P30 L7-A isolated schema and SHA-bound sample JSON
+on:
+  push:
+    branches: [feat/eventradar-p30-l7a-isolated-snapshot]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l7a-isolated
+  cancel-in-progress: false
+jobs:
+  isolated-sample-candidates:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l7a-isolated-snapshot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Freeze L6B SHA, original Pages blobs and EXACT FOUR new files
+        run: |
+          set -euo pipefail
+          base=c42ee0f4125bf94c0c948a08e60cce677887e324
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l7a_snapshot.yml' \
+            'schemas/p30_l7a_isolated_candidates.schema.json' \
+            'scripts/p30_l7a_isolated_candidate_json.mjs' \
+            'tests/p30/test_l7a_isolated_candidate_json.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L7A_UNEXPECTED_SOURCE_CHANGE; exit 1; }
+          echo PASS P30_L7A_FROZEN_PARENT_EXACT_FOUR_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate source and 30 positive-negative offline cases
+        run: |
+          node --check scripts/p30_l7a_isolated_candidate_json.mjs
+          node --test tests/p30/test_l7a_isolated_candidate_json.mjs
+          echo PASS P30_L7A_OFFLINE_30_SNAPSHOT_GOVERNANCE_NEGATIVES
+      - name: Get successful exact L6B native GitHub artifact only
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l6b-g5j-cross-platform-identity
+          run-id: 40331119770
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l7a-parent
+      - name: Verify immutable four ancestry SHA manifest and parent type
+        run: |
+          set -euo pipefail
+          (cd p30-l7a-parent && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("p30-l7a-parent/cross_platform_review.json").read_text(encoding="utf-8"))
+          assert d["kind"]=="EVENTRADAR_P30_L6B_G5J_CROSS_PLATFORM_EVENT_IDENTITY_REVIEW_ONLY"
+          assert d["sourceEventRecords"]==12 and d["totalPairCount"]==66
+          assert d["crossPlatformPairCount"]==44
+          assert d["inputIbonSampledShowStartCount"]==3 and d["inputIbonDetailCount"]==2
+          assert d["firstPartyReferenceCount"]==2
+          assert not d["published"] and not d["goldenAccepted"]
+          assert not d["writerExecuted"] and not d["notifierExecuted"]
+          assert d["sourceRuntime"]=="DORMANT"
+          assert d["accepted44AndroidPreserved"] is True
+          print("PASS P30_L7A_L6B_EXACT_SOURCE_SHA_AND_PRIOR_E1_E2_FAMI_IBON_NIER_LINEAGE")
+          PY
+      - name: Transform sealed historical evidence into isolated sample candidate JSON
+        run: |
+          node scripts/p30_l7a_isolated_candidate_json.mjs \
+            --input p30-l7a-parent/cross_platform_review.json \
+            --out-dir p30-l7a-evidence
+      - name: Validate exact JSON Schema 2020-12 and no fresh/published status claims
+        run: |
+          python -m pip install 'jsonschema>=4.20,<5'
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          import jsonschema
+          root=Path('p30-l7a-evidence')
+          schema=json.loads(Path('schemas/p30_l7a_isolated_candidates.schema.json').read_text())
+          candidate=json.loads((root/'candidate_sample.json').read_text())
+          relations=json.loads((root/'relationships_review.json').read_text())
+          manifest=json.loads((root/'manifest.json').read_text())
+          jsonschema.Draft202012Validator.check_schema(schema)
+          jsonschema.Draft202012Validator(schema,format_checker=jsonschema.FormatChecker()).validate(candidate)
+          raw=Path('p30-l7a-parent/cross_platform_review.json').read_bytes()
+          sha=hashlib.sha256(raw).hexdigest()
+          assert candidate['sourceParentSHA256']==sha==manifest['parentSHA256']
+          assert candidate['runId']==relations['runId']==manifest['runId']
+          assert candidate['runId']=='P30-L7A-SNAPSHOT-'+sha[:16]
+          assert candidate['sourceParentRunId']==40331119770
+          assert candidate['candidateCount']==12
+          rows=candidate['candidateEventRecords']
+          assert len(rows)==12 and len({r['candidateId'] for r in rows})==12
+          assert [sum(r['sourcePlatform']==p for r in rows) for p in ('StrollTimes','FamiTicket','ibon')]==[6,4,2]
+          assert candidate['actualFreshHTTPRequests']==0 and candidate['evidenceAsOfUTC'] is None
+          assert candidate['sampledSourceOnly'] and not candidate['fullPlatformCoverageVerified']
+          assert all(r['sourceUrl']==r['originalSourceUrl'] and not r['assumedFresh'] for r in rows)
+          assert all(r['dateStart'] is None and r['dateEnd'] is None and
+            r['price'] is None and r['venue'] is None and r['ticketStatus']=='UNKNOWN'
+            and r['category']=='待分類' and not r['categoryVerified']
+            and not r['goldenVerified'] and not r['published']
+            and not r['mergeAllowed'] and not r['autoHideAllowed'] and not r['deleteAllowed']
+            for r in rows)
+          bitan=[r for r in rows if r['sourceUrl']=='https://strolltimes.com/events/new-taipei/261016084730/']
+          assert len(bitan)==1 and bitan[0]['dateStart'] is None
+          assert bitan[0]['sourceDateEvidence'][0]['value']==['2026-10-17','2026-12-13']
+          nier=[r for r in rows if r['sourceUrl']=='https://ticket.ibon.com.tw/ActivityInfo/Details/39974']
+          assert len(nier)==1 and nier[0]['candidateSessionCount']==2
+          assert [v['eventStartLocal'] for v in nier[0]['showSessionEvidence']]==[
+            '2027-02-20T18:00','2027-02-21T14:00']
+          assert all(x['isEventRecord'] is False for x in nier[0]['showSessionEvidence'])
+          assert sum(r['candidateSessionCount'] for r in rows)==3
+          assert sum(len(r['showSessionEvidence']) for r in rows)==2
+          assert relations['reviewedPairCount']==66 and len(relations['identities'])==66
+          assert relations['reviewedCrossPlatformPairs']==44
+          assert len({tuple(sorted((i['a'],i['b']))) for i in relations['identities']})==66
+          assert all(not i['mergeAllowed'] and not i['deleteAllowed'] and not i['hideAllowed'] for i in relations['identities'])
+          assert relations['verifiedDuplicateCount']==0 and relations['automaticMerges']==0
+          assert candidate['automaticMergeCount']==0 and candidate['automaticHideCount']==0
+          assert candidate['deletedCount']==0 and candidate['formalFieldPromotionCount']==0
+          assert candidate['formalDatePromotionCount']==0 and candidate['goldenAccepted']==0
+          assert candidate['appDataPublished'] is False and not candidate['notifierExecuted']
+          assert not candidate['schedulerExecuted'] and candidate['sourceRuntime']=='DORMANT'
+          assert candidate['existingAndroid44PassPreserved']
+          for filename,checksum in manifest['files'].items():
+            assert filename in ('candidate_sample.json','relationships_review.json')
+            assert hashlib.sha256((root/filename).read_bytes()).hexdigest()==checksum
+          print("PASS P30_L7A_JSON_SCHEMA_2020_12_12_STABLE_SOURCE_IDS_66_REVIEWS")
+          print("PASS P30_L7A_BITAN_OFFICIAL_PERIOD_EVIDENCE_ONLY_AND_NIER_SESSIONS_NOT_EVENTS")
+          print("PASS P30_L7A_DETERMINISTIC_RUNID_SHA_MANIFEST")
+          print("HOLD P30_L7A_NO_NEW_19_PLATFORM_CRAWL_NO_PRODUCTION_GOLDEN_OR_ANDROID_PREVIEW")
+          PY
+      - name: SHA seal isolated candidate files only
+        if: always()
+        run: |
+          mkdir -p p30-l7a-evidence
+          cat > p30-l7a-evidence/README.txt <<'EOF'
+          P30-L7-A is a historical SHA-pinned SAMPLE candidate schema Gate,
+          NOT a fresh crawl and NOT an all-platform activity catalog.
+          Only 12 already reviewed source event IDs: 6 StrollTimes aggregator
+          articles, 4 FamiTicket official ticket events, 2 ibon ticket events.
+          Of 3 sampled ibon shows, only 2 have producer-corroborated times
+          stored as evidence inside a single NieR activity.
+          Bitan government original event period is evidence, not dateStart.
+          App-facing formal dates, venue, prices, sales and categories stay
+          UNKNOWN/null. Only L7-B may later perform FRESH limited HTTP capture
+          into another isolated artifact after new independent validation.
+          Do NOT overwrite docs/data.json, Pages, Android 44 UAT, or cron.
+          No merge, hide, delete, Golden, notifier, runtime or publication.
+          EOF
+          if [[ -f p30-l7a-evidence/manifest.json ]]; then
+            cp schemas/p30_l7a_isolated_candidates.schema.json p30-l7a-evidence/schema.json
+            cp p30-l7a-parent/cross_platform_review.json p30-l7a-evidence/parent_l6b.json
+            (cd p30-l7a-evidence && sha256sum candidate_sample.json relationships_review.json manifest.json schema.json parent_l6b.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L7A_SEALED_CANDIDATES_SCHEMA_ANCESTRY_SHA
+          else
+            echo HOLD P30_L7A_NO_CANDIDATE_MANIFEST
+          fi
+      - name: Upload isolated sample candidate contract only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7a-isolated-sample-json
+          path: p30-l7a-evidence/
+          if-no-files-found: warn
+          retention-days: 14

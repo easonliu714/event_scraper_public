@@ -1,0 +1,456 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/easonliu714/event_scraper_public/blob/feat/eventradar-p30-l7a-isolated-snapshot/schemas/p30_l7a_isolated_candidates.schema.json",
+  "title": "EventRadar P30-L7-A pinned sample candidates (NOT fresh/NOT published)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "runId",
+    "candidateOrigin",
+    "collectionMode",
+    "evidenceAsOfUTC",
+    "actualFreshHTTPRequests",
+    "fullPlatformCoverageVerified",
+    "sampledSourceOnly",
+    "expectedSourceCoverage",
+    "sourceParentKind",
+    "sourceParentRunId",
+    "sourceParentSHA256",
+    "candidateCount",
+    "platformBreakdown",
+    "referenceCount",
+    "totalSourceEventRecords",
+    "candidateEventRecords",
+    "showStartsInPinnedInput",
+    "independentFirstPartyRefs",
+    "automaticMergeCount",
+    "automaticHideCount",
+    "deletedCount",
+    "formalDatePromotionCount",
+    "formalFieldPromotionCount",
+    "goldenAccepted",
+    "appDataPublished",
+    "notifierExecuted",
+    "schedulerExecuted",
+    "sourceRuntime",
+    "existingAndroid44PassPreserved"
+  ],
+  "properties": {
+    "kind": {
+      "const": "EVENTRADAR_P30_L7A_ISOLATED_SAMPLE_CANDIDATES_V1"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^P30-L7A-SNAPSHOT-[a-f0-9]{16}$"
+    },
+    "candidateOrigin": {
+      "const": "L7A_PINNED_HISTORICAL_EVIDENCE_NOT_FRESH"
+    },
+    "collectionMode": {
+      "const": "IMMUTABLE_UPSTREAM_ARTIFACT_TRANSFORM_OFFLINE"
+    },
+    "evidenceAsOfUTC": {
+      "type": "null"
+    },
+    "actualFreshHTTPRequests": {
+      "const": 0
+    },
+    "fullPlatformCoverageVerified": {
+      "const": false
+    },
+    "sampledSourceOnly": {
+      "const": true
+    },
+    "expectedSourceCoverage": {
+      "const": "6_AGGREGATOR_ARTICLES_4_FAMITICKET_2_IBON_EVENT_DETAILS"
+    },
+    "sourceParentKind": {
+      "const": "EVENTRADAR_P30_L6B_G5J_CROSS_PLATFORM_EVENT_IDENTITY_REVIEW_ONLY"
+    },
+    "sourceParentRunId": {
+      "const": 40331119770
+    },
+    "sourceParentSHA256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "candidateCount": {
+      "const": 12
+    },
+    "platformBreakdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "StrollTimes",
+        "FamiTicket",
+        "ibon"
+      ],
+      "properties": {
+        "StrollTimes": {
+          "const": 6
+        },
+        "FamiTicket": {
+          "const": 4
+        },
+        "ibon": {
+          "const": 2
+        }
+      }
+    },
+    "referenceCount": {
+      "const": 2
+    },
+    "totalSourceEventRecords": {
+      "const": 12
+    },
+    "candidateEventRecords": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidateId",
+          "runId",
+          "sourcePlatform",
+          "sourceRole",
+          "sourceUrl",
+          "sourceIdentityRole",
+          "title",
+          "officialLinkUrl",
+          "originalSourceUrl",
+          "firstPartyReferenceUrl",
+          "qualityState",
+          "qualityFlags",
+          "categoryHint",
+          "category",
+          "categoryVerified",
+          "dateStart",
+          "dateEnd",
+          "eventTimeZone",
+          "venue",
+          "price",
+          "ticketStatus",
+          "registrationPeriod",
+          "saleWindow",
+          "voucherValidity",
+          "sourceDateEvidence",
+          "showSessionEvidence",
+          "candidateSessionCount",
+          "sourceLineage",
+          "assumedFresh",
+          "originalOrganiserIdentityVerified",
+          "crossPlatformSameEventVerified",
+          "mergeAllowed",
+          "autoHideAllowed",
+          "deleteAllowed",
+          "goldenVerified",
+          "published"
+        ],
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "pattern": "^er7a_[a-f0-9]{24}$"
+          },
+          "runId": {
+            "type": "string",
+            "pattern": "^P30-L7A-SNAPSHOT-[a-f0-9]{16}$"
+          },
+          "sourcePlatform": {
+            "enum": [
+              "StrollTimes",
+              "FamiTicket",
+              "ibon"
+            ]
+          },
+          "sourceRole": {
+            "enum": [
+              "THIRD_PARTY_AGGREGATOR_ARTICLE",
+              "OFFICIAL_TICKET_EVENT_DETAIL"
+            ]
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "sourceIdentityRole": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          },
+          "officialLinkUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originalSourceUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "firstPartyReferenceUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qualityState": {
+            "enum": [
+              "ONE_GOV_FIRST_PARTY_EVENT_REFERENCE_REVIEW_ONLY",
+              "TICKET_DETAIL_AND_PRODUCER_SHOWS_REVIEW_ONLY",
+              "AGGREGATOR_ARTICLE_OFFICIALITY_HOLD",
+              "TICKET_DETAIL_IDENTITY_PASS_FIELDS_UNKNOWN"
+            ]
+          },
+          "qualityFlags": {
+            "type": "array",
+            "minItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "categoryHint": {
+            "type": "string"
+          },
+          "category": {
+            "const": "待分類"
+          },
+          "categoryVerified": {
+            "const": false
+          },
+          "dateStart": {
+            "type": "null"
+          },
+          "dateEnd": {
+            "type": "null"
+          },
+          "eventTimeZone": {
+            "type": "null"
+          },
+          "venue": {
+            "type": "null"
+          },
+          "price": {
+            "type": "null"
+          },
+          "ticketStatus": {
+            "const": "UNKNOWN"
+          },
+          "registrationPeriod": {
+            "type": "null"
+          },
+          "saleWindow": {
+            "type": "null"
+          },
+          "voucherValidity": {
+            "type": "null"
+          },
+          "sourceDateEvidence": {
+            "type": "array",
+            "maxItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "sourceUrl",
+                "sourceRole",
+                "dateRole",
+                "value",
+                "approval"
+              ],
+              "properties": {
+                "sourceUrl": {
+                  "type": "string",
+                  "format": "uri",
+                  "pattern": "^https://"
+                },
+                "sourceRole": {
+                  "const": "GOV_OFFICIAL_CALENDAR"
+                },
+                "dateRole": {
+                  "const": "OFFICIAL_EVENT_PERIOD_REVIEW_ONLY"
+                },
+                "value": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "approval": {
+                  "const": "ISOLATED_EVIDENCE_NOT_PROMOTED"
+                }
+              }
+            }
+          },
+          "showSessionEvidence": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "eventStartLocal",
+                "sourceUrl",
+                "role",
+                "isEventRecord"
+              ],
+              "properties": {
+                "eventStartLocal": {
+                  "type": "string",
+                  "pattern": "^20\\d\\d-\\d\\d-\\d\\dT\\d\\d:\\d\\d$"
+                },
+                "sourceUrl": {
+                  "type": "string",
+                  "format": "uri",
+                  "pattern": "^https://"
+                },
+                "role": {
+                  "const": "PRODUCER_SHOW_START_CORROBORATED_NO_FINAL_TIMEZONE"
+                },
+                "isEventRecord": {
+                  "const": false
+                }
+              }
+            }
+          },
+          "candidateSessionCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "sourceLineage": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from",
+                "to",
+                "role",
+                "verification"
+              ],
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "format": "uri",
+                  "pattern": "^https://"
+                },
+                "to": {
+                  "type": "string",
+                  "format": "uri",
+                  "pattern": "^https://"
+                },
+                "role": {
+                  "enum": [
+                    "AGGREGATOR_ARTICLE",
+                    "TICKET_DETAIL",
+                    "ONE_GOV_CALENDAR_EVENT_REFERENCE",
+                    "ORIGINAL_PRODUCER_SHOW_REFERENCE"
+                  ]
+                },
+                "verification": {
+                  "enum": [
+                    "SOURCE_URL_IDENTITY_ONLY",
+                    "INDEPENDENT_SOURCE_EVIDENCE_ONLY"
+                  ]
+                }
+              }
+            }
+          },
+          "assumedFresh": {
+            "const": false
+          },
+          "originalOrganiserIdentityVerified": {
+            "type": "boolean"
+          },
+          "crossPlatformSameEventVerified": {
+            "const": false
+          },
+          "mergeAllowed": {
+            "const": false
+          },
+          "autoHideAllowed": {
+            "const": false
+          },
+          "deleteAllowed": {
+            "const": false
+          },
+          "goldenVerified": {
+            "const": false
+          },
+          "published": {
+            "const": false
+          }
+        }
+      }
+    },
+    "showStartsInPinnedInput": {
+      "const": 3
+    },
+    "independentFirstPartyRefs": {
+      "const": 2
+    },
+    "automaticMergeCount": {
+      "const": 0
+    },
+    "automaticHideCount": {
+      "const": 0
+    },
+    "deletedCount": {
+      "const": 0
+    },
+    "formalDatePromotionCount": {
+      "const": 0
+    },
+    "formalFieldPromotionCount": {
+      "const": 0
+    },
+    "goldenAccepted": {
+      "const": 0
+    },
+    "appDataPublished": {
+      "const": false
+    },
+    "notifierExecuted": {
+      "const": false
+    },
+    "schedulerExecuted": {
+      "const": false
+    },
+    "sourceRuntime": {
+      "const": "DORMANT"
+    },
+    "existingAndroid44PassPreserved": {
+      "const": true
+    }
+  }
+}
