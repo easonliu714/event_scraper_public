@@ -67,9 +67,11 @@ jobs:
               r['price'] is None and r['ticketStatus']=='UNKNOWN' and
               r['goldenVerified'] is False and r['published'] is False
               for r in c)
-          if d['article']['state']!='AGGREGATOR_ARTICLE_TITLE_MATCH':
-              print('HOLD P30_L3BC_SAME_SITE_ARTICLE_IDENTITY',d['article']['state'])
-          else:print('PASS P30_L3BC_ONE_AGGREGATOR_ARTICLE_IDENTITY')
+          assert d['metrics']['articleHttp']==200
+          assert d['article']['state']=='AGGREGATOR_ARTICLE_TITLE_MATCH',d['article']
+          assert d['article']['originalOfficialUrl'] is None
+          assert d['article']['originalOfficialIdentityState']=='NOT_VERIFIED'
+          print('PASS P30_L3BC_ONE_AGGREGATOR_ARTICLE_IDENTITY_ONLY')
           print('PASS P30_L3BC_REAL_AGGREGATOR_LIST_ONLY',len(c))
           PY
       - name: SHA-seal diagnostics, including HOLD case
