@@ -1,0 +1,84 @@
+name: EventRadar P30 L2-B CKSMH official entry one-shot probe
+on:
+  push:
+    branches: [feat/eventradar-p30-l2b-cksmh-official]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l2b-cksmh-official
+  cancel-in-progress: false
+jobs:
+  ck-small-official-entry:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l2b-cksmh-official'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout isolated L2-B branch without persisting tokens
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify frozen runtime/source lineage and EXACT three added files
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=7fd14010f5dbc3ef383919ee67eb21283904afe2
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l2b_cksmh.yml' \
+            'scripts/p30_l2b_cksmh.py' \
+            'tests/p30/test_l2b_cksmh.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNEXPECTED_L2B_DIFF; exit 1; }
+          echo PASS P30_L2B_EXACT_THREE_ADD_AND_PAGES_UNMODIFIED
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install only parsing dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline positive and negative tests BEFORE any site GET
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l2b_cksmh.py tests/p30/test_l2b_cksmh.py
+          python -m unittest discover -s tests/p30 -p 'test_l2b_cksmh.py' -v
+          echo PASS P30_L2B_OFFLINE_SAFETY_TESTS
+      - name: One-shot official CKSMH public HTTP/HTML diagnostics
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l2b_cksmh.py --out p30-l2b-output --timeout 12 --delay 1.0
+      - name: Assert frozen no-publish state and classify live result
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-l2b-output/diagnostics.json').read_text(encoding='utf-8'))
+          c=json.loads(Path('p30-l2b-output/candidate.json').read_text(encoding='utf-8'))
+          assert d['kind']=='EVENTRADAR_P30_L2B_CKSMH_PROBE_NOT_GOLDEN'
+          assert len(d['sources'])==2
+          assert d['fetch_budget']=={'list_entries':2, 'detail_max':1, 'no_retries':True}
+          assert not d['writer_executed'] and not d['notification_executed']
+          assert not d['app_data_published'] and not d['golden_accepted']
+          assert d['auto_hidden']==0 and d['source_runtime']=='DORMANT'
+          assert len(c)==d['unique_list_candidates']
+          assert len({r['official_url'] for r in c})==len(c)
+          assert all(r['date'] is None and r['ticket_availability']=='UNKNOWN' for r in c)
+          if c:
+              print('PASS P30_L2B_LIVE_LIST_CANDIDATES_OBSERVED_NOT_GOLDEN',len(c))
+          else:
+              print('HOLD P30_L2B_LIVE_LIST_NOT_CONFIRMED_NO_FALSE_SUCCESS')
+          print('PASS P30_L2B_FAIL_CLOSED_NO_PUBLISH')
+          PY
+      - name: Preserve candidate+diagnostics as short-lived evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l2b-cksmh-official
+          path: p30-l2b-output/
+          if-no-files-found: warn
+          retention-days: 14
