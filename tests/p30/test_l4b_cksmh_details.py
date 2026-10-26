@@ -150,5 +150,39 @@ class Tests(unittest.TestCase):
             p.enrich(o,records)
 
 
+class OfficialListIdentityFallback(unittest.TestCase):
+    def test_official_list_actid_bound_date_and_venue(self):
+        r=sample("自由花蕊(免費參觀)",51331)
+        html=('''<main><div class="card"><a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=51331">自由花蕊(免費參觀)</a>
+          <p>活動地點 常設展廳</p><p>活動時間 2025/11/24 ~ 2030/12/31</p></div>
+          <div class="card"><a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=61004">其他活動</a>
+          <p>活動地點 中央通廊</p><p>活動時間 2026/09/01 ~ 2026/10/30</p></div></main>''').encode("utf-8")
+        bound=p.parse_list_bound(html,[r])
+        self.assertEqual(bound["51331"]["dateStart"],"2025-11-24")
+        self.assertEqual(bound["51331"]["dateEnd"],"2030-12-31")
+        self.assertEqual(bound["51331"]["venue"],"常設展廳")
+        self.assertNotIn("61004",bound)
+
+    def test_wrong_list_anchor_title_cannot_fill_event(self):
+        r=sample("自由花蕊(免費參觀)",51331)
+        html=b'<div><a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=51331">Other</a><p>活動時間 2025/11/24 ~ 2030/12/31</p></div>'
+        self.assertEqual(p.parse_list_bound(html,[r]),{})
+
+    def test_exact_detail_title_prerequisite_for_list_overlay(self):
+        original=parent()
+        target=original["items"][0]
+        item=response_record(target,HTML)
+        records=[item]+[{"id":x["id"],"title":x["title"],"officialUrl":x["officialUrl"],
+                         "http":{"state":"HTTP_ERROR","http_status":404},"fields":None}
+                        for x in original["items"][1:5]]
+        _,counts=p.enrich(original,records,{"61004":{"title":TANG,"actId":"61004",
+                          "dateStart":"2026-09-01","dateEnd":"2026-10-30","venue":"中央通廊"}})
+        self.assertEqual(counts["date_bound"],1)
+        records[0]["fields"]["officialTitle"]="forged"
+        with self.assertRaisesRegex(ValueError,"LIST_DETAIL_IDENTITY"):
+            p.enrich(original,records,{"61004":{"title":TANG,"actId":"61004",
+                          "dateStart":"2026-09-01","dateEnd":"2026-10-30","venue":"中央通廊"}})
+
+
 if __name__=="__main__":
     unittest.main()
