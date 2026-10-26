@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L3-B-B ibon headless JS display-only list 23（Source Draft PR #20/21）**
+>
+> - `scripts/p30_l3bb_ibon.py`（PR #20）安全純 HTTP 雙官方清單入口 → requests GET 200/200、固定 5,766 bytes JS shell，`<script>` 11、DOM link 0、visible text 8；13/13 offline tests PASS，但抽不到可驗證活動，該純 HTTP Gate **HOLD**，不嘗試非公開 API、登入或驗證碼繞過。原 Source `docs/data.json` 不變。
+> - `scripts/p30_l3bb_ibon_browser.mjs`（PR #21）為獨立的 **readonly Chromium one-page public browser rendering diagnostic**：只開 `https://ticket.ibon.com.tw/Index/entertainment`，無 stealth/代理繞過/購票/登入/憑證/Service Worker，限制 ibon HTTPS host、單次導航／90 網路請求上限、最多 80 候選，封鎖第三方及圖片/字型。公眾頁面渲染得到 DOM 70 anchors，萃取 `/ActivityInfo/Details/<numericId>` 並以 hostname+path+title 嚴格 identity（含 URL alias `/Web/`、`/WebV3/`），本次 23 unique candidates。
+> - JSON 候選欄位仍為 `platform=ibon`、`title`、`officialUrl`、`dateStart/dateEnd=NULL`、`dateRole=UNKNOWN`、`ticketStatus=UNKNOWN`、`price=NULL`、`category=待分類`、`classificationEvidence=UNVERIFIED`、`detailStatus=NOT_CHECKED`、`goldenVerified=false`。不得因官網顯示「售票中／即將開賣」標籤便推定正式票況。此 browser **沒有點入詳情**，L4/L5 顯示待驗證而非 FAIL 或 Golden。
+> - Native CI [40292155453](https://github.com/easonliu714/event_scraper_public/actions/runs/40292155453) `completed/success`、7/7 Offline security、Source main Blob Guard、23 HTTP asset requests、4 external blocked、41 passive resources skipped、0 JS errors、isolated candidate/diagnostics/SHA artifact `12635589126`。PR #20/21 均 Draft stacked；正式 Pages/UI, Android accepted 44, runtime scheduler, notifications, GitHub main HEAD `fc4f963247d68eed29425808cc14e7250f312d05` untouched。下一為 StrollTimes L3-B-C + L4/L5 來源詳情補強後，才有理由重建新 Android 來源整併候選。
+>
+
+
 > **2026-10-26 P30-L3-B-A FamiTicket isolated official list recovery source module**
 >
 > - 確認 P30-L4-C Android local `8770` 使用者截圖驗收 PASS（限來源日期角色/場地/清單/詳情/不回歸），不重新開始 L4-B/C 來源開發。新增 FamiTicket SRC[PR #19](https://github.com/easonliu714/event_scraper_public/pull/19)，分支堆疊 PR #18 `2656c43fc1fa4486fcbd8be641531e4d15220104`，三個新增檔案**無 UI/Android/formal docs 改動**。
