@@ -130,8 +130,10 @@ class DateRoles(unittest.TestCase):
         payload=LECTURE.replace("報 名 期 間".encode("utf-8"),"登記資料".encode("utf-8")).replace(
                 "報 名 期 間".encode("utf-8"),"登記資料".encode("utf-8"))
         f=m.parse_event(payload,row(61021,LECTURE_TITLE))
-        self.assertEqual(f["eventDateStart"],"2026-11-07")
-        self.assertLess(len(f["registrationWindows"]),2)
+        # Without the explicit role label, multiple date ranges are ambiguous.
+        # Fail closed rather than guessing that the first is the event date.
+        self.assertIsNone(f["eventDateStart"])
+        self.assertEqual(f["state"],"HOLD_NO_OFFICIAL_EVENT_SESSION")
 
     def test_bad_parent_flags_and_changed_id_rejected(self):
         o=parent()
