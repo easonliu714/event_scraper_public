@@ -43,6 +43,16 @@ export function titleText(raw){
   const s=normalize(raw);
   return s.length>=4&&!generic.test(s)&&!/^https?:\/\//i.test(s)?s:null;
 }
+export function articleHeadingMatches(listTitle,heading){
+  const short=normalize(listTitle),full=normalize(heading);
+  if(!short||!full)return false;
+  if(full===short)return true;
+  // Curator may append a date-only display suffix to H1. Identity-only;
+  // DO NOT promote suffix as primary-source date evidence.
+  if(!full.startsWith(short))return false;
+  const extra=full.slice(short.length);
+  return /^[（(]\s*\d{1,2}[/]\d{1,2}\s*[~～-]\s*\d{1,2}[/]\d{1,2}\s*[)）]$/.test(extra);
+}
 export function candidatesFromLinks(input){
   const rows=[],ids=new Set();
   for(const x of input){
@@ -135,7 +145,7 @@ export async function run(out,opts={}){
         const observed=await page.evaluate(articleCheck);
         // This is an aggregator article. A matching h1 supports same-site
         // page identity, not a primary event authority.
-        const exact=observed.h1.some(h=>h===pick.title);
+        const exact=observed.h1.some(h=>articleHeadingMatches(pick.title,h));
         detail={
           state:metrics.articleHttp===200&&exact?"AGGREGATOR_ARTICLE_TITLE_MATCH":"AGGREGATOR_ARTICLE_TITLE_HOLD",
           aggregatorUrl:pick.aggregatorUrl,homepageCandidateTitle:pick.title,
