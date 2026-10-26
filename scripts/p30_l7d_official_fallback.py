@@ -23,7 +23,7 @@ EVIDENCE_KIND = "EVENTRADAR_P30_L7D_OFFICIAL_INSTITUTION_ROLE_EVIDENCE"
 EVENT_ID = "28255"
 ORIGINAL_URL = f"https://twtc.com.tw/exhibition_more.aspx?id={EVENT_ID}&p=home"
 CO_ORGANIZER_URL = "https://www.tfsr.org.tw/information/187"
-FINANCIAL_INSTITUTION_URL = "https://nccc.com.tw/wps/wcm/connect/zh/home/AboutNCCC/News/200261021-1"
+FINANCIAL_INSTITUTION_URL = "https://www.nccc.com.tw/wps/wcm/connect/zh/home/AboutNCCC/News/200261021-1"
 SOURCE_URLS = (ORIGINAL_URL, CO_ORGANIZER_URL, FINANCIAL_INSTITUTION_URL)
 USER_AGENT = "EventRadar-P30-readonly/1.0 (github.com/easonliu714/event_scraper_public)"
 MAX_BYTES = 800_000
