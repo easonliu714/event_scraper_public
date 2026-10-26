@@ -1,6 +1,15 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L4-D1 / L4-D2 official detail role and stability architecture**
+>
+> - 新 Source [PR #23](https://github.com/easonliu714/event_scraper_public/pull/23) `scripts/p30_l4d1_famiticket_detail_roles.py`：匯入已驗證 `p30_l3b_a_famiticket.py` 限定 HTTPS list/detail 函式，單次首頁 JSON 標題／opaque URL 身分綁定，分隔兩次 public official detail GET。每次保存 HTTPS status、SHA256/byte、headings exact identity、明確標籤角色 `EVENT_OCCURRENCE_EVIDENCE` vs `SALE_WINDOW_NOT_EVENT`／`REGISTRATION_WINDOW_NOT_EVENT`／`VOUCHER_VALIDITY_NOT_EVENT`；嚴格四位西元年與合法日期，所有解析結果僅 `UNPROMOTED_ROLE_ONLY`。CI 40297130466 19/19 offline PASS，首頁 47、兩次詳情 HTTP200 但皆無標題，**資料品質必須 HOLD**（非平台無活動或付款狀態）。`docs/data.json`、`docs/index.html`、`scraper.py` 仍 immutable。
+> - 新 Source [PR #24](https://github.com/easonliu714/event_scraper_public/pull/24) `scripts/p30_l4d2_ibon_detail_roles.mjs` 匯入既有 `p30_l3bb_ibon_browser.mjs` 官方 domain/URL/link identity，使用 stock Chromium 渲染清單並只開 **2 筆清單出現過且 numeric ID 唯一**的 ibon 官方頁。DOM `h1/h2/h3` 精確相符才取 `roleEvidence` 與 `scheduleBlockEvidence[]`，雙型態 `【活動時間（台灣時間）】` 後相鄰欄位、`日期/時間｜YYYY.MM.DD HH:MM …`；僅有原始 `observedFullYearDates`／`rawExcerpt`，禁止將 `售票時間`、`使用期限` 或一般敘述數字推定為活動日期。**JS `fullDate` regex 已加 (?!\d) 防止 19→1、20→02 的前綴誤讀**，以 19 個 offline tests 封鎖回歸。兩筆正式 HTTP200／2/2 exact 標題、帶標籤 event-time 分別有 2026-12-19 和 2027-02-20/21 原始日期證據：最後 CI [40298499664](https://github.com/easonliu714/event_scraper_public/actions/runs/40298499664) PASS；Artifact 12638968553。
+> - schema `sample_candidates.json` 仍為 `{platform,title,officialUrl,dateStart:null,dateEnd:null,dateRole:"UNKNOWN",price:null,ticketStatus:"UNKNOWN",detailIdentity:"EXACT_LIST_DETAIL_HEADING",eventTimeVerified:false,goldenVerified:false,published:false}`；`diagnostics.json` 可有帶標籤的 `scheduleBlockEvidence`，但**診斷 evidence 不等於 accepted event schedule**，尚無欄位升級。所有新 Gate scope 僅新增 source/test/workflow 3 檔，Source main `fc4f963247d68eed29425808cc14e7250f312d05` 及 Android 44 PASS、StrollTimes aggregator originalOfficialUrl=NULL 不動。資料作業寫入、通知、排程及正式 PWA 上線仍 LOCKED。
+> - 下個可實作：`P30-L4-D3` FamiTicket public browser detail identity recovery，再依 `P30-L5-B` ibon annotated date/registration/sale/timezone/session consolidation 和 `P30-L6` source lineage + conservative G5J 去重，最後 `P30-L7/8` isolated fresh JSON + Android smoke。不得重跑已驗收 CKSMH/TWTC 的 44 Android UAT，除非新候選確有合併和回歸必要。
+>
+
+
 > **2026-10-26 P30-L3-B-C StrollTimes third-party sourceRole tree**
 >
 > - SRC `scripts/p30_l3bc_strolltimes.mjs`（Source [Draft PR #22](https://github.com/easonliu714/event_scraper_public/pull/22)）獨立 public Chromium 1x homepage `https://strolltimes.com/` + 1x same-host `/events/<city>/<12–18-digit-id>/` article；HTTPS exact hosts、limited CDN、only 100 allowed requests、no stealth/login/verification bypass/purchase/API guessing/persisted session. `tests/p30/test_l3bc_strolltimes.mjs` 11 cases for URI/CTA/role/title/provenance. CI `.github/workflows/eventradar_p30_l3bc_strolltimes.yml` GitHub-specific immutable three-file diff and production blobs; **never changes `docs/data.json`**.
