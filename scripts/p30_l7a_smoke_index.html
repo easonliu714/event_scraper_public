@@ -83,6 +83,7 @@ function openDetail(e){
  ["資訊完整度",sourceLabel(e)],["內容摘要",unknown(e.summary)],
  ["資料狀態","候選／尚未官方逐筆覆核"]];
  fields.forEach(x=>{const div=t("div",null,"detail-line");const k=t("strong",x[0]+"：");const v=t("span",x[1]);div.append(k,v);lines.append(div);});
+ if(Array.isArray(e.sessions)&&e.sessions.length){const d=t("div",null,"detail-line");d.append(t("strong","官方場次："+e.sessions.length+" 場"));for(const s of e.sessions.slice(0,20)){d.append(t("div",s.start.replace("T"," ")+" ～ "+s.end.replace("T"," ")+"（臺灣時間）","meta"));}lines.append(d);}
  if(e.scheduleStatus==="POSTPONED_PENDING_FINAL_CONFIRMATION"){const ext=e.tentativeSourceUrl||e.organizerStatusSourceUrl;const u=safeNoticeLink(ext);if(u){const outer=t("div",null,"detail-line");const notice=t("a","查看延期公告來源");notice.href=u;notice.target="_blank";notice.rel="noopener noreferrer";outer.append(notice);lines.append(outer);}}
  const link=document.getElementById("official");const url=safeLink(e.officialUrl);
  link.hidden=!url;if(url)link.href=url;else link.removeAttribute("href");
