@@ -1,6 +1,14 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L4-B 最終 Android 類型標籤修補及 Artifact 鎖定**
+>
+> - 先前 PR #17 的 CI Run `40284806144` PASS，但新增顯示語義修正：`OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE` 顯示 **「官方清單期間：YYYY-MM-DD～YYYY-MM-DD（實際開放以官方為準）」**，與詳情 `OFFICIAL_SINGLE_SESSION`、`OFFICIAL_MULTIPLE_SESSIONS_BOUNDS` 分開；`CKSMH_LIST_DATE_WITH_DETAIL_TITLE_CONFIRMED` source label 不再顯示機器碼。新 PR #17 HEAD **`d79de853c007ac965d02b56cc2e556f8ad5f1bff`**，只修改同一隔離 HTML，不觸碰正式 PWA。
+> - 最終而且唯一供 Android 實機驗收的 Run **[40285154986](https://github.com/easonliu714/event_scraper_public/actions/runs/40285154986)** `completed/success`：14/14 synthetic tests、JS syntax、五筆詳情 HTTP200 + 五筆 actId 清單綁定、5/5 dates、3/5 unambiguous venues、5/5 summary、2 multi-session，44 Id parity、39 TWTC row exact parity、所有父證據 SHA 與 Android 四檔 `sha256sum -c` PASS。**最終 Artifact [12633104025](https://github.com/easonliu714/event_scraper_public/actions/runs/40285154986/artifacts/12633104025)**，archive `sha256:84e73813897dfe1b43a731552e3af7ade7e342d0bf68f7a8b49d546114847b70`，2026-11-09T07:20:29Z 到期。**舊 Artifact 12633399655 僅作為歷史，不得視為最終交付。**
+> - 下一步：Android `127.0.0.1:8769` 真機驗證，使用者尚未回報；`P30_L4B_ANDROID_UAT=WAITING_USER`。舊已驗證 L7-D、世貿 FinTech、前兩輪 Android PASS 保留，`APP_DATA_PUBLISHED=false`，全部 PR 仍 Draft 未合併。
+>
+
+
 > **2026-10-26 P30-L4-B CKSMH 五活動詳情全數日期回填 Android UAT READY（正式候選，不是 Golden）**
 >
 > - 使用者提供 P30-L7-D Android `127.0.0.1:8768` 與世貿/聯卡中心兩官方頁的實機畫面，明確判定世貿科技展修補 PASS；因此接受 `P30_L7D_ANDROID_FINTECH_USER_SCREENSHOT_PASS`，但未取得整個 ZIP 的 Termux stdout，不擴張為全 19 平台或正式 PWA PASS。新缺口：中正紀念堂 5 筆原本只有 `LIST_ONLY`，官網已可見唐獎榮耀展 `2026/09/01 09:00～2026/10/30 18:00`／中央通廊與活動內容。
