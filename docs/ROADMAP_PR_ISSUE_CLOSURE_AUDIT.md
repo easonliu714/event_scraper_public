@@ -1,5 +1,8 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+> **L2-B 入口候選（2026-10-26）：** 已由官方公開網站的網頁索引檢視確認中正紀念堂活動可經 `https://event.culture.tw/CKSMH` 與 `https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr` 存取活動資料；原 L1 使用的 `https://event.culture.tw/mocweb/reg/CKSMH/` 曾返回 HTTP 404。上述為**合法公開候選入口**，尚未以既有 GitHub Python Runner 在相同環境重驗，故 **L2-B 候選／NOT_GATED**，不是已修復或已寫入 Parser。禁止把 404 當成全部活動失效。參考：`https://event.culture.tw/CKSMH`（官方站）、`https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr`（官方活動查詢頁）。
+>
+
 > **SRC-P30-L2-A 2026-10-26 CI 完成（候選分支 PASS；PR #9 仍 Draft）**
 >
 > - Source PR [#9](https://github.com/easonliu714/event_scraper_public/pull/9) 為**堆疊 PR**：`feat/eventradar-p30-l2a-offline-triage@7fd14010f5dbc3ef383919ee67eb21283904afe2` → PR #7 `feat/eventradar-p30-live-diagnostic@959324cb3bad8f56fb411b7cfb6de2a294f18850`；僅三新增檔，未改正式 Source、UI、JSON、通知、排程及部署，未合併。
