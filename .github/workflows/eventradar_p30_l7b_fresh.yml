@@ -1,0 +1,127 @@
+name: EventRadar P30 L7-B bounded fresh public HTTP/list/detail/fields (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l7b-fresh-acquisition
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l7b-isolated-fresh
+  cancel-in-progress: false
+jobs:
+  isolated-fresh-acquisition:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l7b-fresh-acquisition'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact isolated branch without persistent token
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen ancestry, source Pages blobs and EXACT FOUR additions
+        run: |
+          set -euo pipefail
+          base=17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l7b_fresh.yml' \
+            'schemas/p30_l7b_fresh_candidates.schema.json' \
+            'scripts/p30_l7b_fresh_acquisition.py' \
+            'tests/p30/test_l7b_fresh_acquisition.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L7B_UNEXPECTED_SOURCE_SCOPE; exit 1; }
+          echo PASS L7B_FROZEN_PARENT_PRODUCTION_BLOBS_FOUR_ADDITIONS
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parser and JSON Schema validator (no crawler runtime imports)
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5' 'jsonschema>=4.21,<5'
+      - name: Offline 34 positive/negative contracts BEFORE real website GET
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l7b_fresh_acquisition.py tests/p30/test_l7b_fresh_acquisition.py
+          python -m unittest discover -s tests/p30 -p 'test_l7b_fresh_acquisition.py' -v
+          echo PASS L7B_OFFLINE_NEGATIVE_MATRIX_34
+      - name: Fresh bounded one-shot public HTTP (nineteen named source entries)
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python scripts/p30_l7b_fresh_acquisition.py \
+            --out p30-l7b-evidence \
+            --platform-limit 19 \
+            --detail-per-platform 1 \
+            --timeout 10 \
+            --min-interval 0.7 \
+            --max-seconds 450
+      - name: Read-back JSON Schema 2020-12, fresh status, SHA, quality tiers and source safety
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          from jsonschema import Draft202012Validator,FormatChecker
+          root=Path('p30-l7b-evidence')
+          candidate=json.loads((root/'fresh_candidate.json').read_text(encoding='utf-8'))
+          diag=json.loads((root/'platform_diagnostics.json').read_text(encoding='utf-8'))
+          manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          schema=json.loads(Path('schemas/p30_l7b_fresh_candidates.schema.json').read_text(encoding='utf-8'))
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema,format_checker=FormatChecker()).validate(candidate)
+          assert candidate['runId']==diag['runId']==manifest['runId']
+          assert candidate['candidateCount']==len(candidate['candidateEventRecords'])==diag['counts']['listCandidates']
+          assert candidate['candidateOrigin']==diag['candidateOrigin']=='L7B_ACTUAL_NEW_PUBLIC_HTTP'
+          assert candidate['actualFreshHTTPRequests']==diag['actualFreshHTTPRequests']>0
+          assert diag['all19PlatformsAttempted'] and len(diag['platforms'])==19
+          assert candidate['fullPlatformCoverageVerified'] is False and diag['fullPlatformCoverageVerified'] is False
+          assert not diag['published'] and not diag['writerExecuted'] and not diag['schedulerExecuted']
+          assert not diag['notifierExecuted'] and not diag['automaticMergeCount'] and not diag['automaticHideCount']
+          assert not candidate['goldenAccepted'] and not candidate['published'] and not candidate['formalFieldPromotionCount']
+          assert len({x['candidateId'] for x in candidate['candidateEventRecords']})==candidate['candidateCount']
+          assert all(not x['mergeAllowed'] and not x['published'] and x['ticketStatus']=='UNKNOWN'
+                     and x['dateStart'] is None and x['dateEnd'] is None and x['price'] is None
+                     and x['registrationPeriod'] is None and x['saleWindow'] is None
+                     and x['voucherValidity'] is None for x in candidate['candidateEventRecords'])
+          for path, sha in manifest['filesSHA256'].items():
+              assert path in ('fresh_candidate.json','platform_diagnostics.json')
+              assert hashlib.sha256((root/path).read_bytes()).hexdigest()==sha
+          print('PASS L7B_REAL_FRESH_REQUEST_COUNT_AND_SHA_MANIFEST', candidate['actualFreshHTTPRequests'])
+          print('L7B_TIER_COUNTS',json.dumps(diag['counts'],ensure_ascii=False))
+          print('L7B_TIER_GATES',json.dumps(diag['qualityGate'],ensure_ascii=False))
+          assert diag['counts']['httpOK']>=1, 'HOLD_L7B_ALL_HTTP_FAILED'
+          assert diag['counts']['listPositive']>=1, 'HOLD_L7B_NO_FRESH_EVENT_LIST'
+          assert diag['counts']['detailIdentityVerified']>=1, 'HOLD_L7B_NO_DETAIL_IDENTITY_PROOF'
+          # Label evidence is only a review candidate, NOT field promotion / official verified truth.
+          print('PASS L7B_HTTP_LIST_DETAIL_MINIMUM_FRESH_CHAIN')
+          print('HOLD L7B_FIELD_PROMOTION_AND_COVERAGE_STILL_REVIEW_ONLY')
+          print('PASS L7B_NO_PUBLISH_NO_ANDROID_44_REGRESSION')
+          PY
+      - name: Pack isolated SHA-sealed evidence
+        if: always()
+        run: |
+          mkdir -p p30-l7b-evidence
+          if test -f p30-l7b-evidence/manifest.json; then
+            (
+              cd p30-l7b-evidence
+              sha256sum fresh_candidate.json platform_diagnostics.json manifest.json > SHA256SUMS.txt
+              sha256sum -c SHA256SUMS.txt
+            )
+            echo PASS L7B_FRESH_ISOLATED_ARCHIVE_SHA_SEALED
+          else
+            echo HOLD L7B_NO_FRESH_ARTIFACT
+          fi
+      - name: Upload new source candidates and per-platform diagnostics only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          path: p30-l7b-evidence/
+          if-no-files-found: warn
+          retention-days: 14

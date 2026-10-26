@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/easonliu714/event_scraper_public/blob/feat/eventradar-p30-l7b-fresh-acquisition/schemas/p30_l7b_fresh_candidates.schema.json",
+  "title": "EventRadar L7B Bounded Fresh Source Candidate (Isolated Only)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "schemaVersion",
+    "runId",
+    "candidateOrigin",
+    "collectedAtUTC",
+    "actualFreshHTTPRequests",
+    "fullPlatformCoverageVerified",
+    "candidateCount",
+    "candidateEventRecords",
+    "goldenAccepted",
+    "published",
+    "mergeAllowed",
+    "formalFieldPromotionCount"
+  ],
+  "properties": {
+    "kind": {
+      "const": "EVENTRADAR_P30_L7B_FRESH_BOUNDED_CANDIDATES_V1"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^P30-L7B-FRESH-[0-9]{8}-[0-9]{6}-[0-9a-f]{12}$"
+    },
+    "candidateOrigin": {
+      "const": "L7B_ACTUAL_NEW_PUBLIC_HTTP"
+    },
+    "collectedAtUTC": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actualFreshHTTPRequests": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 150
+    },
+    "fullPlatformCoverageVerified": {
+      "const": false
+    },
+    "candidateCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 760
+    },
+    "goldenAccepted": {
+      "const": 0
+    },
+    "published": {
+      "const": false
+    },
+    "mergeAllowed": {
+      "const": false
+    },
+    "formalFieldPromotionCount": {
+      "const": 0
+    },
+    "candidateEventRecords": {
+      "type": "array",
+      "maxItems": 760,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidateId",
+          "sourcePlatform",
+          "sourceRole",
+          "sourceUrl",
+          "title",
+          "listEvidence",
+          "detailStatus",
+          "detailTitle",
+          "detailIdentityVerified",
+          "fieldEvidence",
+          "dateStart",
+          "dateEnd",
+          "eventTimeZone",
+          "venue",
+          "price",
+          "ticketStatus",
+          "registrationPeriod",
+          "saleWindow",
+          "voucherValidity",
+          "category",
+          "mergeAllowed",
+          "goldenVerified",
+          "published"
+        ],
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "pattern": "^er7b_[0-9a-f]{24}$"
+          },
+          "sourcePlatform": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "sourceRole": {
+            "enum": [
+              "THIRD_PARTY_AGGREGATOR_ARTICLE",
+              "PLATFORM_LISTED_EVENT_UNVERIFIED"
+            ]
+          },
+          "sourceUrl": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https://"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 220
+          },
+          "listEvidence": {
+            "type": "object",
+            "required": [
+              "listUrl",
+              "anchorText",
+              "provenance"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "listUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "anchorText": {
+                "type": "string"
+              },
+              "provenance": {
+                "const": "FRESH_HTML_ANCHOR"
+              }
+            }
+          },
+          "detailStatus": {
+            "type": "string"
+          },
+          "detailTitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "detailIdentityVerified": {
+            "type": "boolean"
+          },
+          "detailHttp": {
+            "type": "object"
+          },
+          "fieldEvidence": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "role",
+                "label",
+                "observedValue",
+                "sourceUrl",
+                "verification"
+              ],
+              "properties": {
+                "role": {
+                  "enum": [
+                    "EVENT_PERIOD",
+                    "ADMISSION_TIME",
+                    "REGISTRATION_PERIOD",
+                    "SALE_PERIOD",
+                    "VOUCHER_VALIDITY",
+                    "VENUE",
+                    "PRICE"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "observedValue": {
+                  "type": "string",
+                  "maxLength": 110
+                },
+                "sourceUrl": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "verification": {
+                  "const": "FRESH_LABEL_OBSERVED_REVIEW_REQUIRED"
+                }
+              }
+            }
+          },
+          "dateStart": {
+            "type": "null"
+          },
+          "dateEnd": {
+            "type": "null"
+          },
+          "eventTimeZone": {
+            "type": "null"
+          },
+          "venue": {
+            "type": "null"
+          },
+          "price": {
+            "type": "null"
+          },
+          "ticketStatus": {
+            "const": "UNKNOWN"
+          },
+          "registrationPeriod": {
+            "type": "null"
+          },
+          "saleWindow": {
+            "type": "null"
+          },
+          "voucherValidity": {
+            "type": "null"
+          },
+          "category": {
+            "const": "待分類"
+          },
+          "mergeAllowed": {
+            "const": false
+          },
+          "goldenVerified": {
+            "const": false
+          },
+          "published": {
+            "const": false
+          }
+        }
+      }
+    }
+  }
+}
