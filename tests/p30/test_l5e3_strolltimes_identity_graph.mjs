@@ -45,7 +45,8 @@ test("04 article shorter parent-looking phrase only proposal",()=>{
 });
 test("05 article title with addition remains review, not same event",()=>{
  const x=lexicalIdentity(titles[3],h1[3]);
- assert.equal(x.state,"TITLE_OVERLAP_RELATIONSHIP_REVIEW");
+ assert.equal(x.state,"EDITORIAL_HEADLINE_EXTENSION_REVIEW");
+ assert.equal(x.mergeAllowed,false);
 });
 test("06 title entirely different is disjoint hold",()=>{
  const x=lexicalIdentity("2026晴空季","2026碧潭小王子展");
@@ -146,4 +147,18 @@ test("25 source graph exact edge only same aggregator article",()=>{
  for(const ed of x.edges.filter(x=>x.kind==="AGGREGATOR_LIST_CARD_POINTS_TO_SAME_ARTICLE")){
   assert.equal(ed.mergeAllowed,false);assert.equal(ed.originalOrganiserProven,false);
  }
+});
+
+test("26 short 2026 晴空季 title followed by editorial subtitle is not disjoint",()=>{
+ const x=lexicalIdentity("2026晴空季",
+   "2026晴空季：打開七萬坪神祕軍事禁地，嗨玩全台最狂文化機場（8/1~11/15）");
+ assert.equal(x.state,"EDITORIAL_HEADLINE_EXTENSION_REVIEW");
+ assert.equal(x.parentChildRelationship,"EDITORIAL_SUBTITLE_RELATIONSHIP_NOT_PROVEN");
+ assert.equal(x.mergeAllowed,false);
+});
+test("27 nonbreaking editorial spacing must never silently merge event",()=>{
+ const x=lexicalIdentity("2026新北濕地藝術季 《萌芽之境》",
+   "2026新北濕地藝術季《萌芽之境》：新海二期人工濕地20週年！");
+ assert.equal(x.state,"EDITORIAL_HEADLINE_EXTENSION_REVIEW");
+ assert.equal(x.mergeAllowed,false);
 });
