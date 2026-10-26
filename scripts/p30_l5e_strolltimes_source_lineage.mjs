@@ -11,7 +11,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {HOME,canonicalArticle,safeAssetHost,candidatesFromLinks,articleHeadingMatches} from "./p30_l3bc_strolltimes.mjs";
 export const KIND="EVENTRADAR_P30_L5E1_STROLLTIMES_ATTRIBUTED_SOURCE_LINEAGE_NOT_GOLDEN";
-export const MAX_ARTICLES=6,MAX_REQUESTS=150;
+export const MAX_ARTICLES=6,MAX_REQUESTS=300;
 const AGGREGATOR=new Set(["strolltimes.com","www.strolltimes.com"]);
 const MAPS=new Set(["maps.google.com","www.google.com","goo.gl","maps.app.goo.gl"]);
 const SOCIAL=new Set(["facebook.com","www.facebook.com","m.facebook.com","fb.watch",
