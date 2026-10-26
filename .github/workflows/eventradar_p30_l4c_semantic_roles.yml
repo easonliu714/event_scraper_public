@@ -1,0 +1,116 @@
+name: EventRadar P30 L4-C CKSMH activity versus registration
+on:
+  push:
+    branches: [feat/eventradar-p30-l4c-session-registration-roles]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  semantic-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l4c-session-registration-roles'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact source scope
+        run: |
+          set -euo pipefail
+          base=d79de853c007ac965d02b56cc2e556f8ad5f1bff
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l4c_semantic_roles.yml' 'scripts/p30_l4c_cksmh_semantic_roles.py' 'tests/p30/test_l4c_cksmh_semantic_roles.py'; printf 'M\t%s\n' 'scripts/p30_l7a_smoke_index.html')"
+          test "$(printf '%s\n' "$expected"|LC_ALL=C sort)" = "$(git diff --name-status "$base" HEAD|LC_ALL=C sort)" || { echo HOLD_PATH_DRIFT; exit 1; }
+          echo PASS P30_L4C_FROZEN_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Negative tests and Android JS syntax before HTTPS
+        run: |
+          python -m py_compile scripts/p30_l4c_cksmh_semantic_roles.py tests/p30/test_l4c_cksmh_semantic_roles.py
+          python -m unittest discover -s tests/p30 -p 'test_l4c_cksmh_semantic_roles.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/p30_l7a_smoke_index.html').read_text(encoding='utf-8')
+          for term in ('OFFICIAL_EVENT_SESSION_BOUNDS','OFFICIAL_LIST_PERIOD_UNCLASSIFIED','報名期間：','（非活動時間）','實際活動場次：','POSTPONED_PENDING_FINAL_CONFIRMATION'):
+              assert term in s,term
+          assert 'innerHTML' not in s and s.count('<script>')==1
+          Path('l4c.js').write_text(s.split('<script>')[1].split('</script>')[0],encoding='utf-8')
+          PY
+          node --check l4c.js
+          echo PASS P30_L4C_OFFLINE_SEMANTICS
+      - name: Pin and download latest L4B accepted Android Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l4b-cksmh-details-android
+          run-id: 40285154986
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l4b-parent
+      - name: Verify SHA manifest of accepted 44 candidate rows
+        run: |
+          (cd l4b-parent && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L4C_FROZEN_PARENT_SHA
+      - name: Strict five public official activity detail GETs
+        run: |
+          python scripts/p30_l4c_cksmh_semantic_roles.py --parent l4b-parent/data.json --out-dir l4c-output
+      - name: Regression for 44 IDs, registration separation, 39 TWTC unchanged
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from urllib.parse import urlsplit,parse_qs
+          old=json.loads(Path('l4b-parent/data.json').read_text(encoding='utf-8'))
+          new=json.loads(Path('l4c-output/data.json').read_text(encoding='utf-8'))
+          ev=json.loads(Path('l4c-output/semantic_evidence.json').read_text(encoding='utf-8'))
+          assert len(new['items'])==old['count']==new['count']==44
+          assert [x['id'] for x in old['items']]==[x['id'] for x in new['items']]
+          assert [x for x in old['items'] if x['platform']=='台北世貿']==[x for x in new['items'] if x['platform']=='台北世貿']
+          byact={parse_qs(urlsplit(r['officialUrl']).query)['actId'][0]:r for r in new['items'] if r['platform']=='中正紀念堂'}
+          c=new['cksmhSemanticCounts']
+          assert c['httpOK']==5 and c['eventsWithSessionTime']==4 and c['noSessionExhibitions']==1
+          assert c['eventSessionsBound']>=8 and c['registrationWindowsBound']>=6
+          assert byact['61021']['dateStart']=='2026-11-07'
+          assert byact['61024']['dateStart']=='2026-11-04'
+          assert len(byact['61021']['sessions'])>=5 and len(byact['61024']['sessions'])==2
+          assert byact['61021']['registrationWindows'][0]['start'].startswith('2026-10-16')
+          assert byact['51331']['timeRole']=='OFFICIAL_LIST_PERIOD_UNCLASSIFIED'
+          assert byact['51331']['dateStart'] is None
+          assert byact['51331']['listPeriodStart']=='2025-11-24'
+          assert byact['61004']['dateStart']=='2026-09-01'
+          for name,value in (('published',False),('goldenAccepted',False),('writerExecuted',False),('notificationExecuted',False),('autoHidden',0),('sourceRuntime','DORMANT')):
+              assert new[name]==value
+          assert len(ev['records'])==5 and ev['retries']==0 and ev['tlsValidation'] is True
+          print('PASS P30_L4C_44_PARITY_AND_CORRECT_REAL_ACTIVITY_DATES')
+          print('CKSMH_SEMANTIC_COUNTS',c)
+          PY
+      - name: SHA archive for local Android 8770 smoke
+        run: |
+          cp scripts/p30_l7a_smoke_index.html l4c-output/index.html
+          cat > l4c-output/README.txt <<'EOF'
+          P30-L4-C candidate only; not official PWA or ticket inventory.
+          Same Android Termux: cd ~/eventradar_p30_l4c_20261026
+          sha256sum -c SHA256SUMS.txt
+          python -m http.server 8770 --bind 127.0.0.1
+          Chrome http://127.0.0.1:8770/
+          44 records; CKSMH 5; TWTC 39 unchanged.
+          Check 61021 sessions Nov 7 onward, registration Oct 16 onward;
+          61024 event Nov 4 onwards, registration Oct 1 onward;
+          51331 official listing period only, no daily opening inference.
+          Ticket price/availability may still be unknown.
+          EOF
+          (cd l4c-output && sha256sum index.html data.json semantic_evidence.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L4C_PORTABLE_ANDROID_SHA
+      - name: Isolated artifact only, no deploy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l4c-semantic-android
+          path: l4c-output/
+          retention-days: 14
+          if-no-files-found: warn
