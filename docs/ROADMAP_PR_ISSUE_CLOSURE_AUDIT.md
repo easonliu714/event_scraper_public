@@ -1,6 +1,16 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
 
+> **2026-10-26 P30-L7-C FINTECH POSTPONEMENT ROLE ROOT CAUSE／使用者 L7-B 真機回報**
+>
+> - 使用者已提供 P30-L7-B Android `127.0.0.1:8767` 截圖並表示此階段驗證皆符合預期：完整年份日期（電器空調影音大展 2026/11/06～11/09、展昭世界貓咪博覽會 2026/10/08～10/11 等）、39/44 TWTC 畫面與金融科技展延期提示皆可見。記錄 `P30_L7B_ANDROID_USER_SCREENSHOT_ATTESTED_PASS`；依回報範圍認列，不擴張為全平台 Golden 或正式 G5K。
+> - 唯一原先 `LIST_DETAIL_PERIOD_CONFLICT` 不是 TWTC HTML 格式差異：官方詳情 `https://twtc.com.tw/exhibition_more.aspx?id=28255&p=home` 確實在標準「展出日期」欄顯示 **原訂 2026/10/23～10/24**，但 `https://twtc.com.tw/exhibition?p=home` 的該筆表格列改成 **延期未定**。P30-L4-A `raw_period_matches()` 遇「延期未定」直接回 False 並阻止把已失效日期寫成活動生效日期；守門合理，但原訂日期 role 被遺漏。
+> - 大會公告 `https://www.fintechtaipei.tw/Announcement/19`（2026/10/20）稱「預定延期至 12/18～12/19，確切調整時間將於 10 月底前公告」。應建模 `originalDate=2026-10-23/24`、`tentativeDate=2026-12-18/19`、`confirmedDate=NULL`、`status=POSTPONED_PENDING_FINAL_CONFIRMATION`，保留原定/暫定之來源連結與時間語義，**不得把暫定當正式確認或改成有效售票日期**。
+> - 新 Source [PR #15](https://github.com/easonliu714/event_scraper_public/pull/15) Draft stacked on PR #14，分支 `feat/eventradar-p30-l7c-postpone-dateroles`；11/11 離線日期角色／HTTP allowlist／負例測試 PASS。Run [40275813585](https://github.com/easonliu714/event_scraper_public/actions/runs/40275813585) **completed/failure = CORRECT HOLD**：TWTC 官方詳情 `HTTP_OK`，但大會公告在 GitHub Runner `NETWORK_ERROR: SSLError`，依 Fail-Closed 不產生新 Android candidate、不將日程寫入任何正式 JSON。保留只含診斷之 Artifact [12630675096](https://github.com/easonliu714/event_scraper_public/actions/runs/40275813585/artifacts/12630675096)。**絕不可關閉 TLS 驗證、代理繞過或假冒 HTTP 200 將 HOLD 當 PASS**。
+> - 下一個 L7-C Gate：以安全可讀的官方 HTTPS（或後續官方正式確認更新）補足第二來源真實證據；SSL 未解前 PR #15 DRAFT/HOLD，使用者已 PASS 的 PR #14 SHA `05b30b9d8e57848edf6190b37d3b9fa8f1f58257` 與 PR #12 7/7 均不回退。正式 PWA/Golden/通知/排程/發版/其他 Repo 退役繼續 LOCKED。
+>
+
+
 > **2026-10-26 P30-L4-A / L7-B 實際 CI 結案證據（只有候選 Gate PASS；Android L7-B 尚未實測）**
 >
 > - P30-L4-A GitHub [PR #13](https://github.com/easonliu714/event_scraper_public/pull/13) HEAD `b1651e6faf41d48eed8c42ef13e8aae91dc19702`，Run [40273199767](https://github.com/easonliu714/event_scraper_public/actions/runs/40273199767) **SUCCESS**，13/13 離線測試 PASS。原始 TWTC 39 筆候選的 39 個官方詳情皆受控 GET，經 Event ID、官方標題、完整 YYYY/MM/DD、清單 MM/DD 對照，**38 筆 DATE_VERIFIED_BY_OFFICIAL_DETAIL_CANDIDATE、1 筆 LIST_DETAIL_PERIOD_CONFLICT**。唯一 HOLD 為「2026台北金融科技展【展覽延期】」，原清單 `延期未定`，不得擅自發布活動日期。L4-A 來源證據 Artifact `12629371018`，非 Golden。
