@@ -1,0 +1,135 @@
+name: EventRadar P30 L5-B ibon official change notice parity
+on:
+  push:
+    branches: [feat/eventradar-p30-l5b-ibon-change-notice]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l5b-ibon
+  cancel-in-progress: false
+jobs:
+  notice-crosscheck:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l5b-ibon-change-notice'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen predecessor and exact three additions
+        run: |
+          set -euo pipefail
+          base=b7e16cb39fc187cea927cf1521ee972d621f8a2a
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l5b_ibon_notices.yml' 'scripts/p30_l5b_ibon_change_notice.mjs' 'tests/p30/test_l5b_ibon_change_notice.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_UNEXPECTED_SOURCE_CHANGE; exit 1; }
+          echo PASS P30_L5B_EXACT_PARENT_AND_THREE_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install standard public Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Offline notice and source parity negatives
+        run: |
+          node --check scripts/p30_l5b_ibon_change_notice.mjs
+          node --test tests/p30/test_l5b_ibon_change_notice.mjs
+          echo PASS P30_L5B_OFFLINE_NOTICE_MATRIX
+      - name: Download exact accepted L5A run artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5a-ibon-session-role-evidence
+          run-id: 40301911354
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l5b-parent
+      - name: Pin L5A manifest and governance flags
+        run: |
+          set -euo pipefail
+          (cd p30-l5b-parent && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path("p30-l5b-parent/session_candidates.json").read_text())
+          d=json.loads(Path("p30-l5b-parent/input_diagnostics.json").read_text())
+          assert p['kind']=='EVENTRADAR_P30_L5A_IBON_SESSION_ROLE_REVIEW_ONLY'
+          assert p['sessionRoleCandidateCount']==3 and p['sourceCount']==2
+          assert p['fieldPromotionCount']==0 and p['published'] is False
+          assert p['goldenAccepted'] is False and p['sourceRuntime']=='DORMANT'
+          assert d['stats']['listStatus']==200 and len(d['details'])==2
+          print('PASS P30_L5B_PINNED_L5A_PARENT')
+          PY
+      - name: Two bounded current public ibon detail pages
+        run: |
+          node scripts/p30_l5b_ibon_change_notice.mjs --parent p30-l5b-parent/session_candidates.json --out-dir p30-l5b-evidence
+      - name: Validate two title identities, schedule parity and notice uncertainty
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("p30-l5b-evidence/change_notice_review.json").read_text())
+          assert r['kind']=='EVENTRADAR_P30_L5B_IBON_CHANGE_NOTICE_CROSSCHECK_NOT_GOLDEN'
+          assert r['sourceCount']==2 and len(r['details'])==2
+          assert r['maxNavigation']==2 and r['maxRequests']==120
+          assert r['networkStats']['navigations']==2
+          assert r['scheduleParityStatus']=='TWO_SAMPLED_DETAIL_SCHEDULES_UNCHANGED'
+          assert r['additionalSessionMarkerCount']>=1
+          assert r['organiserConfirmationCount']==0
+          assert r['all23IbonVerified'] is False and r['sourceTimeZoneBackfillCount']==0
+          assert r['formalDatePromotionCount']==0
+          assert r['accepted44AndroidPreserved'] is True
+          assert r['goldenAccepted'] is False and r['published'] is False
+          assert r['writerExecuted'] is False and r['notifierExecuted'] is False
+          assert r['autoHidden']==0 and r['sourceRuntime']=='DORMANT'
+          assert r['noLogin'] and r['noCheckout'] and r['noStealth']
+          assert r['noCaptchaBypass'] and r['noPrivateAPI'] and r['noRetries']
+          assert len({x['officialUrl'] for x in r['details']})==2
+          assert all(x['httpStatus']==200 and x['scheduleParity']=='EXACT_SAMPLED_EVENT_STARTS'
+             and x['notice']['isNoChangesProven'] is False
+             and x['organiserChangeApproval']=='NOT_VERIFIED'
+             and x['dateStart'] is None and x['dateEnd'] is None
+             and x['ticketStatus']=='UNKNOWN' and x['price'] is None
+             and x['goldenVerified'] is False and x['published'] is False
+             for x in r['details'])
+          assert sum(len(x['currentSampleEventStarts']) for x in r['details'])==3
+          print('PASS P30_L5B_2_OFFICIAL_DETAILS_3_SAMPLED_SESSIONS_PARITY')
+          if r['changeNoticeStatus']=='CHANGE_SIGNAL_REQUIRES_REVIEW':
+              print('HOLD P30_L5B_CHANGE_SIGNAL_REQUIRES_ORGANISER_REVIEW')
+          else:
+              print('HOLD P30_L5B_NO_CHANGE_NOTICE_PROOF_FROM_CAPTURE')
+          print('PASS P30_L5B_BOUNDED_NOTICE_AUDIT_ZERO_OFFICIAL_WRITES')
+          PY
+      - name: SHA seal isolated audit including HOLD status
+        if: always()
+        run: |
+          mkdir -p p30-l5b-evidence
+          cat > p30-l5b-evidence/README.txt <<'EOF'
+          P30-L5-B ibon two official detail change notice parity.
+          No captured notice is not proof of no event change.
+          Additional-session marker is not independently verified.
+          Reuses exact L5A Run 40301911354 and preserves 44 Android UAT.
+          Dates, sale, price, ticket availability remain unpromoted.
+          No formal Pages, writer, notifier, scheduler or merger.
+          EOF
+          if [[ -f p30-l5b-evidence/change_notice_review.json ]]; then
+            cp p30-l5b-parent/session_candidates.json p30-l5b-evidence/parent_session_candidates.json
+            (cd p30-l5b-evidence && sha256sum change_notice_review.json parent_session_candidates.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L5B_AUDIT_SHA256_GATE
+          else
+            echo HOLD P30_L5B_MISSING_EVIDENCE
+          fi
+      - name: Upload isolated evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l5b-ibon-change-notice
+          path: p30-l5b-evidence/
+          retention-days: 14
+          if-no-files-found: warn
