@@ -72,3 +72,12 @@ test("missing list identity always HOLD",()=>{
 test("whitespace title normalization deterministic",()=>{
   assert.equal(clean("2026   ITF 台灣國際旅展  "),TITLE);
 });
+
+test("real official image-alt ITF identity beats category-only anchor text",()=>{
+  const record=selectExact([{href:URL,heading:"",label:"",text:"展覽",alt:TITLE},
+                            {href:URL,heading:"",label:"",text:"",alt:TITLE}]);
+  assert.equal(record.url,URL);
+});
+test("unrelated image alt not a false match",()=>{
+  assert.equal(selectExact([{href:URL,text:"展覽",alt:"2026 其他旅展"}]),null);
+});
