@@ -204,7 +204,23 @@ def main(argv=None):
         time.sleep(1.5)
         notice_html, notice_meta = get_html(session, ANNOUNCEMENT_URL)
     if detail_html is None or notice_html is None:
-        print("HOLD P30_L7C_OFFICIAL_HTTP_NOT_PROVEN", detail_meta["state"], notice_meta["state"])
+        dest.mkdir(parents=True, exist_ok=True)
+        partial = {"kind": KIND, "state": "OFFICIAL_HTTP_INCOMPLETE_HOLD",
+                   "twtcDetailUrl": TWTC_URL, "organizerAnnouncementUrl": ANNOUNCEMENT_URL,
+                   "twtcHttp": detail_meta, "organizerHttp": notice_meta,
+                   "sourceCount": original["count"], "dateVerifiedCount": original["dateVerifiedCount"],
+                   "goldenAccepted": False, "published": False, "autoHidden": 0,
+                   "sourceRuntime": "DORMANT", "candidateProduced": False}
+        if detail_html is not None:
+            try:
+                partial["originalRangeObserved"] = parse_original(detail_html)
+            except ValueError as e:
+                partial["originalDateStatus"] = str(e)
+        (dest / "hold_diagnostics.json").write_text(
+            json.dumps(partial, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
+        print("HOLD P30_L7C_OFFICIAL_HTTP_NOT_PROVEN", detail_meta["state"],
+              notice_meta["state"], notice_meta.get("error_type"))
+        print("PASS P30_L7C_DIAGNOSTIC_ONLY_NO_CANDIDATE_PUBLISHED")
         raise SystemExit(2)
     data, evidence = build(original, detail_html, notice_html, detail_meta, notice_meta)
     dest.mkdir(parents=True, exist_ok=True)
