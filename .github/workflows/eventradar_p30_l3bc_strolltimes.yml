@@ -1,0 +1,104 @@
+name: EventRadar P30 L3-B-C StrollTimes aggregator provenance
+on:
+  push:
+    branches: [feat/eventradar-p30-l3bc-strolltimes-aggregation]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l3bc-strolltimes
+  cancel-in-progress: false
+jobs:
+  aggregator-evidence:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l3bc-strolltimes-aggregation'
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact previous ibon Gate SHA and three new paths only
+        run: |
+          set -euo pipefail
+          base=6fa959de1613458505fec8d9813d9916be5cfcd7
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l3bc_strolltimes.yml' 'scripts/p30_l3bc_strolltimes.mjs' 'tests/p30/test_l3bc_strolltimes.mjs'|LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD|LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_SOURCE_DRIFT; exit 1; }
+          echo PASS P30_L3BC_SOURCE_FROZEN_AND_EXACT_PATHS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install standard unmodified Chromium, no stealth
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install chromium
+      - name: Offline security and provenance negative matrix
+        run: |
+          node --check scripts/p30_l3bc_strolltimes.mjs
+          node --test tests/p30/test_l3bc_strolltimes.mjs
+          echo PASS P30_L3BC_AGGREGATOR_NEGATIVE_MATRIX
+      - name: One public StrollTimes homepage and one same-site article sample
+        run: |
+          node scripts/p30_l3bc_strolltimes.mjs --out-dir p30-l3bc-out
+      - name: Require real rendered article identifiers, no official claim
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path("p30-l3bc-out/candidate.json").read_text())
+          d=json.loads(Path("p30-l3bc-out/diagnostics.json").read_text())
+          assert d['metrics']['homepageHttp']==200
+          assert len(c)>=1 and len(c)==d['counts']['uniqueAggregatorArticles']
+          assert d['sourceRole']=='THIRD_PARTY_EVENT_AGGREGATOR'
+          assert d['maxNavigation']==2 and d['maxRequests']==100
+          assert d['goldenAccepted'] is False and d['published'] is False
+          assert d['writerExecuted'] is False and d['notifierExecuted'] is False
+          assert d['autoHidden']==0 and d['sourceRuntime']=='DORMANT'
+          assert d['officialEventDataProven']==0 and d['fullCatalogProven'] is False
+          assert len({r['aggregatorUrl'] for r in c})==len(c)
+          assert all(r['originalOfficialUrl'] is None and
+              r['originalOfficialIdentityState']=='NOT_VERIFIED' and
+              r['sourceRole']=='THIRD_PARTY_EVENT_AGGREGATOR' and
+              r['dateStart'] is None and r['dateEnd'] is None and
+              r['price'] is None and r['ticketStatus']=='UNKNOWN' and
+              r['goldenVerified'] is False and r['published'] is False
+              for r in c)
+          assert d['metrics']['articleHttp']==200
+          assert d['article']['state']=='AGGREGATOR_ARTICLE_TITLE_MATCH',d['article']
+          assert d['article']['originalOfficialUrl'] is None
+          assert d['article']['originalOfficialIdentityState']=='NOT_VERIFIED'
+          print('PASS P30_L3BC_ONE_AGGREGATOR_ARTICLE_IDENTITY_ONLY')
+          print('PASS P30_L3BC_REAL_AGGREGATOR_LIST_ONLY',len(c))
+          PY
+      - name: SHA-seal diagnostics, including HOLD case
+        if: always()
+        run: |
+          mkdir -p p30-l3bc-out
+          cat > p30-l3bc-out/README.txt <<'EOF'
+          EventRadar P30-L3-B-C read-only StrollTimes public aggregation Gate.
+          This is a third-party curated aggregator, NOT an original event
+          organiser or official ticket seller. Article URL is not official.
+          Do NOT infer date, location, price, sale state, category, validity.
+          Only 1 public homepage + 1 matching aggregator article sampled.
+          No persistent browser state, login, bypass, writer, notifier or Pages.
+          Next Gate: exact original official-source lineage and de-dup;
+          then isolated Android PWA candidate only after source-quality proof.
+          EOF
+          if [[ -f p30-l3bc-out/candidate.json && -f p30-l3bc-out/diagnostics.json ]]; then
+            (cd p30-l3bc-out && sha256sum candidate.json diagnostics.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L3BC_ARTIFACT_SHA
+          else
+            echo HOLD P30_L3BC_DIAGNOSTICS_MISSING
+          fi
+      - name: Upload isolated aggregator audit, never Pages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l3bc-strolltimes-aggregation
+          path: p30-l3bc-out/
+          retention-days: 14
+          if-no-files-found: warn
