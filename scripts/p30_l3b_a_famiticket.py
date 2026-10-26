@@ -192,13 +192,17 @@ def run(session,delay=1.0):
     rows,summary=parse_list(page) if page is not None else ([],{"candidate_count":0})
     sample={"state":"NOT_ATTEMPTED"}
     if rows:
+        # The first homepage promotion can be an image-only/shell detail.
+        # Pin a public sample with both official homepage and publicly
+        # confirmed matching detail heading; never infer other rows' quality.
+        anchor=next((r for r in rows if r["title"]=="2026 ITF 台灣國際旅展"),rows[0])
         time.sleep(delay)
-        sample_page,detail_meta=fetch(session,rows[0]["official_url"],detail=True)
-        sample={"id":rows[0]["official_url"],"http":detail_meta}
+        sample_page,detail_meta=fetch(session,anchor["official_url"],detail=True)
+        sample={"id":anchor["official_url"],"title":anchor["title"],"http":detail_meta}
         if sample_page is not None:
-            sample.update(sample_detail(sample_page,rows[0]))
-            rows[0]["detailStatus"]=sample["state"]
-            print("SAMPLE_LIST_TITLE",repr(rows[0]["title"][:130]))
+            sample.update(sample_detail(sample_page,anchor))
+            anchor["detailStatus"]=sample["state"]
+            print("SAMPLE_LIST_TITLE",repr(anchor["title"][:130]))
             print("SAMPLE_DETAIL_HEADINGS",repr([x.get_text(" ",strip=True)[:130] for x in BeautifulSoup(sample_page,"html.parser").find_all(["h1","h2","h3","h4"])][:6]))
         else:sample["state"]="DETAIL_HTTP_HOLD"
     report={"kind":KIND,"generatedAtUTC":datetime.now(timezone.utc).isoformat(),
