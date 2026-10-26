@@ -1,0 +1,124 @@
+name: EventRadar P30 L7-A isolated Android candidate smoke artifact
+on:
+  push:
+    branches: [feat/eventradar-p30-l7a-android-smoke]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l7a-smoke
+  cancel-in-progress: false
+jobs:
+  build-isolated-candidate-bundle:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l7a-android-smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact Source main base no persistent credentials
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Gate exact four files and frozen original Pages/runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=fc4f963247d68eed29425808cc14e7250f312d05
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l7a_smoke.yml' \
+            'scripts/p30_l7a_build_candidate.py' \
+            'scripts/p30_l7a_smoke_index.html' \
+            'tests/p30/test_l7a_build_candidate.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_UNEXPECTED_L7A_CHANGED_PATHS; exit 1; }
+          echo PASS P30_L7A_EXACT_FOUR_FILES_NO_FORMAL_SOURCE_DATA_WRITE
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline contract and negative tests
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l7a_build_candidate.py tests/p30/test_l7a_build_candidate.py
+          python -m unittest discover -s tests/p30 -p 'test_l7a_build_candidate.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          h=Path('scripts/p30_l7a_smoke_index.html').read_text(encoding='utf-8')
+          scripts=h.split('<script>')
+          assert len(scripts)==2 and '</script>' in scripts[1]
+          Path('preview_check.js').write_text(scripts[1].split('</script>')[0],encoding='utf-8')
+          print('PASS P30_L7A_UI_SCRIPT_EXTRACTED_STATIC')
+          PY
+          node --check preview_check.js
+          echo PASS P30_L7A_OFFLINE_DATA_AND_UI_SYNTAX
+      - name: Download immutable CKSMH L2B candidate artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l2b-cksmh-official
+          run-id: 40269917573
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-input-cksmh
+      - name: Download immutable TWTC L3A candidate artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l3a-twtc
+          run-id: 40270383643
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-input-twtc
+      - name: Build isolated candidate data from pinned artifacts ONLY
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l7a_build_candidate.py \
+            --cksmh-dir p30-input-cksmh \
+            --twtc-dir p30-input-twtc \
+            --out p30-smoke/data.json
+          cp scripts/p30_l7a_smoke_index.html p30-smoke/index.html
+          cat > p30-smoke/README.txt <<'EOF'
+          EventRadar P30 L7A -- ISOLATED ANDROID SMOKE CANDIDATE (NOT LIVE/PUBLISHED)
+          Sources: GitHub Actions 40269917573 and 40270383643 (Oct 26 2026)
+          Contains a sample of CKSMH and TWTC ONLY, not full source coverage.
+          On Android Termux, unpack this GitHub Artifact to an empty folder.
+          From the folder containing index.html and data.json run:
+            python -m http.server 8766 --bind 127.0.0.1
+          Open http://127.0.0.1:8766/ in the Android browser on the same phone.
+          Check search, source/category filters, details and official links.
+          NEVER interpret candidate/event/ticket status as Golden.
+          Do not copy data.json to a public Pages directory.
+          EOF
+      - name: Fail closed if build crossed publish or schema boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('p30-smoke/data.json').read_text(encoding='utf-8'))
+          assert d['kind']=='EVENTRADAR_P30_ANDROID_SMOKE_CANDIDATE_NOT_GOLDEN'
+          assert d['schemaVersion']=='P30-CANDIDATE-1'
+          assert d['count']==44 and len(d['items'])==44
+          assert len({r['id'] for r in d['items']})==44
+          assert len(d['sources'])==2
+          assert [s['candidateCount'] for s in d['sources']]==[5,39]
+          assert d['goldenAccepted'] is False and d['published'] is False
+          assert d['writerExecuted'] is False and d['notificationExecuted'] is False
+          assert d['autoHidden']==0 and d['sourceRuntime']=='DORMANT'
+          assert d['fullPlatformCoverageProven'] is False
+          assert all(r['validity']=='UNCERTAIN' and r['ticketStatus']=='UNKNOWN' for r in d['items'])
+          print('PASS P30_L7A_REAL_ARTIFACT_PARITY_5_PLUS_39_44_CANDIDATES')
+          print('PASS P30_L7A_ANDROID_SMOKE_CANDIDATE_ONLY_NOT_PUBLISHED')
+          PY
+          (cd p30-smoke && sha256sum index.html data.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L7A_ANDROID_RELOCATABLE_SHA256_MANIFEST
+      - name: Upload download-only local Android browser smoke bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7a-android-smoke
+          path: p30-smoke/
+          if-no-files-found: error
+          retention-days: 14
