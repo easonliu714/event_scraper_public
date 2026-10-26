@@ -1,0 +1,127 @@
+name: EventRadar P30 L7-C postponed date role evidence
+on:
+  push:
+    branches: [feat/eventradar-p30-l7c-postpone-dateroles]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l7c-postpone
+  cancel-in-progress: false
+jobs:
+  postponed-date-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l7c-postpone-dateroles'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scope and accepted Android base SHA guard
+        run: |
+          set -euo pipefail
+          base=05b30b9d8e57848edf6190b37d3b9fa8f1f58257
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l7c_postpone.yml' \
+            'scripts/p30_l7c_postpone_roles.py' \
+            'tests/p30/test_l7c_postpone_roles.py'
+            printf 'M\t%s\n' 'scripts/p30_l7a_smoke_index.html')"
+          expected="$(printf '%s\n' "$expected" | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_UNEXPECTED_L7C_DIFF; exit 1; }
+          echo PASS P30_L7C_FROZEN_L7B_EXACT_FOUR_FILES
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Positive and negative semantics tests before any site GET
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l7c_postpone_roles.py tests/p30/test_l7c_postpone_roles.py
+          python -m unittest discover -s tests/p30 -p 'test_l7c_postpone_roles.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          html=Path("scripts/p30_l7a_smoke_index.html").read_text(encoding="utf-8")
+          assert "POSTPONED_TENTATIVE_UNCONFIRMED" in html
+          assert "原訂展期" in html and "預定改期" in html
+          assert "innerHTML" not in html
+          assert html.count("<script>")==1
+          Path("p30_l7c_check.js").write_text(html.split("<script>")[1].split("</script>")[0],encoding="utf-8")
+          PY
+          node --check p30_l7c_check.js
+          echo PASS P30_L7C_OFFLINE_DATE_ROLE_TESTS_AND_JS
+      - name: Download pinned 44-row accepted prior date UI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-android-date-uat
+          run-id: 40273949404
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l7b-parent
+      - name: Check SHA manifest is relocate-safe and unchanged
+        run: |
+          (cd p30-l7b-parent && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L7C_PARENT_SHA256
+      - name: Exact two legal public HTTPS GETs, one page each, no retries
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l7c_postpone_roles.py \
+            --parent p30-l7b-parent/data.json --out-dir p30-l7c-output
+      - name: Assert old 43 non-postponed event records unchanged
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          src=json.loads(Path("p30-l7b-parent/data.json").read_text(encoding="utf-8"))
+          dst=json.loads(Path("p30-l7c-output/data.json").read_text(encoding="utf-8"))
+          assert src["count"]==dst["count"]==44
+          assert src["dateVerifiedCount"]==dst["dateVerifiedCount"]==38
+          assert src["dateUnverifiedCount"]==dst["dateUnverifiedCount"]==1
+          assert [r["id"] for r in src["items"]]==[r["id"] for r in dst["items"]]
+          changed=[(a,b) for a,b in zip(src["items"],dst["items"]) if a!=b]
+          assert len(changed)==1
+          orig,new=changed[0]
+          assert "台北金融科技展" in orig["title"]
+          assert new["dateStart"] is None and new["dateEnd"] is None
+          assert new["originalDateStart"]=="2026-10-23"
+          assert new["originalDateEnd"]=="2026-10-24"
+          assert new["tentativeDateStart"]=="2026-12-18"
+          assert new["tentativeDateEnd"]=="2026-12-19"
+          assert new["confirmedDateStart"] is None and new["confirmedDateEnd"] is None
+          for f,v in (("published",False),("goldenAccepted",False),("writerExecuted",False),("notificationExecuted",False),("autoHidden",0),("sourceRuntime","DORMANT")):
+              assert dst[f]==v
+          ev=json.loads(Path("p30-l7c-output/schedule_roles.json").read_text(encoding="utf-8"))
+          assert ev["noticeStatus"]=="TENTATIVE_DATE_SUBJECT_TO_OFFICIAL_CONFIRMATION"
+          assert ev["twtcHttp"]["http_status"]==200
+          assert ev["organizerHttp"]["http_status"]==200
+          print("PASS P30_L7C_44_IDS_38_DATES_1_SEMANTIC_POSTPONEMENT")
+          print("PASS P30_L7C_ORIGINAL_VS_TENTATIVE_VS_UNCONFIRMED")
+          PY
+          cp scripts/p30_l7a_smoke_index.html p30-l7c-output/index.html
+          cat > p30-l7c-output/README.txt <<'EOF'
+          EventRadar P30 L7-C — isolated Android date semantics review.
+          44 records, 38 TWTC dates, 1 postponed pending final confirmation.
+          Checks official original TWTC detail and tentative new organizer notice.
+          Nothing published to Pages. No notification, writer, Golden or auto-hide.
+          On the same Android device:
+            unzip -o eventradar-p30-l7c-postpone-uat.zip -d ~/eventradar_p30_l7c
+            cd ~/eventradar_p30_l7c
+            sha256sum -c SHA256SUMS.txt
+            python -m http.server 8768 --bind 127.0.0.1
+          Open http://127.0.0.1:8768/ .
+          EOF
+          (cd p30-l7c-output && sha256sum index.html data.json schedule_roles.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Upload isolated mobile semantic review artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7c-postpone-uat
+          path: p30-l7c-output/
+          if-no-files-found: warn
+          retention-days: 14
