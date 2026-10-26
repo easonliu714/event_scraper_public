@@ -10,7 +10,7 @@ const data={sourceSectionFound:true,links:[
 ]};
 test("01 review only never source Golden",()=>assert.match(KIND,/NOT_GOLDEN/));
 test("02 maximum six public article details plus homepage",()=>{
- assert.equal(MAX_ARTICLES,6);assert.equal(MAX_REQUESTS,150);
+ assert.equal(MAX_ARTICLES,6);assert.equal(MAX_REQUESTS,300);
 });
 test("03 social source citation remains unverified owner",()=>{
  const e=attributedCredits(A,A+"（10/16~10/31）",data);
