@@ -82,7 +82,7 @@ class Checks(unittest.TestCase):
  def test_11_missing_original_detail_page_hold(self):
   x=m.reconcile(PARENT,m.producer_schedule(TOUR),m.producer_added_event(""),m.secondary_sale(SECONDARY))
   self.assertEqual(x["status"],"HOLD_PRODUCER_SCHEDULE_PARITY_OR_DETAIL_IDENTITY")
- def test_12_wrong_producer start not matched(self):
+ def test_12_wrong_producer_start_not_matched(self):
   bad=TOUR.replace("6:00 PM 8:30 PM","7:00 PM 9:30 PM")
   x=m.reconcile(PARENT,m.producer_schedule(bad),m.producer_added_event(DETAIL),m.secondary_sale(SECONDARY))
   self.assertEqual(x["status"],"HOLD_PRODUCER_SCHEDULE_PARITY_OR_DETAIL_IDENTITY")
