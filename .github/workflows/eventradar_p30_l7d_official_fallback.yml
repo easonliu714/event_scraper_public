@@ -1,0 +1,144 @@
+name: EventRadar P30 L7-D certified institutional fallback and Android UAT
+on:
+  push:
+    branches: [feat/eventradar-p30-l7d-official-fallback]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l7d-official-fallback
+  cancel-in-progress: false
+jobs:
+  certified-official-fallback:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l7d-official-fallback'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen L7B, strict four files, no Pages writer
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=05b30b9d8e57848edf6190b37d3b9fa8f1f58257
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l7d_official_fallback.yml' \
+            'scripts/p30_l7d_official_fallback.py' \
+            'tests/p30/test_l7d_official_fallback.py'
+            printf 'M\t%s\n' 'scripts/p30_l7a_smoke_index.html')"
+          expected="$(printf '%s\n' "$expected" | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_UNEXPECTED_PATH_DIFF; exit 1; }
+          echo PASS P30_L7D_FROZEN_PARENT_EXACT_4_DIFF
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install parser libraries (TLS validation enabled)
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline tests and JavaScript syntax before site access
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_l7d_official_fallback.py tests/p30/test_l7d_official_fallback.py
+          python -m unittest discover -s tests/p30 -p 'test_l7d_official_fallback.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('scripts/p30_l7a_smoke_index.html').read_text(encoding='utf-8')
+          assert 'POSTPONED_PENDING_FINAL_CONFIRMATION' in s
+          assert '原訂日期' in s and '預定改期' in s
+          assert 'innerHTML' not in s and '<script src=' not in s
+          assert s.count('<script>')==1
+          Path('l7d_ui.js').write_text(s.split('<script>')[1].split('</script>')[0],encoding='utf-8')
+          PY
+          node --check l7d_ui.js
+          echo PASS P30_L7D_OFFLINE_PARSER_SECURITY_AND_JS
+      - name: Download exact L7B accepted 44-row candidate Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-android-date-uat
+          run-id: 40273949404
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l7b-parent
+      - name: Require parent portable SHA before transformations
+        run: |
+          set -euo pipefail
+          (cd p30-l7b-parent && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L7D_L7B_PARENT_PARITY
+      - name: Bounded 3 public official HTTPS GET, no cert bypass, no retries
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python scripts/p30_l7d_official_fallback.py \
+            --parent p30-l7b-parent/data.json --out-dir p30-l7d-output
+      - name: Verify event identity and candidate-only temporal role contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          old=json.loads(Path('p30-l7b-parent/data.json').read_text(encoding='utf-8'))
+          new=json.loads(Path('p30-l7d-output/data.json').read_text(encoding='utf-8'))
+          ev=json.loads(Path('p30-l7d-output/schedule_roles.json').read_text(encoding='utf-8'))
+          assert old['count']==new['count']==44
+          assert old['dateVerifiedCount']==new['dateVerifiedCount']==38
+          assert old['dateUnverifiedCount']==new['dateUnverifiedCount']==1
+          assert [x['id'] for x in old['items']]==[x['id'] for x in new['items']]
+          changed=[(a,b) for a,b in zip(old['items'],new['items']) if a!=b]
+          assert len(changed)==1, 'HOLD_MORE_THAN_ONE_ROW_CHANGED'
+          before,after=changed[0]
+          assert '台北金融科技展' in before['title']
+          assert after['scheduleStatus']=='POSTPONED_PENDING_FINAL_CONFIRMATION'
+          assert after['originalDateStart']=='2026-10-23'
+          assert after['originalDateEnd']=='2026-10-24'
+          assert after['dateStart'] is None and after['dateEnd'] is None
+          assert after['confirmedDateStart'] is None and after['confirmedDateEnd'] is None
+          if after['tentativeDateStart'] is not None:
+              assert after['tentativeDateStart']=='2026-12-18'
+              assert after['tentativeDateEnd']=='2026-12-19'
+              assert after['tentativeSourceRole']=='OFFICIAL_INSTITUTION_REPORTED_UNCONFIRMED'
+          assert len(ev['http'])==3 and ev['confirmed'] is None
+          assert ev['http']['https://twtc.com.tw/exhibition_more.aspx?id=28255&p=home']['state']=='HTTP_OK'
+          for f,v in (('published',False),('goldenAccepted',False),
+                      ('writerExecuted',False),('notificationExecuted',False),
+                      ('autoHidden',0),('sourceRuntime','DORMANT')):
+              assert new[f]==v
+          assert all(x['ticketStatus']=='UNKNOWN' for x in new['items'])
+          print('PASS P30_L7D_44_IDENTITIES_38_DATES_ONE_POSTPONED')
+          print('TENTATIVE',after['tentativeDateStart'],after['tentativeDateEnd'])
+          print('PASS P30_L7D_POSTPONED_UNCONFIRMED_NOT_PUBLISHED')
+          PY
+      - name: Package standalone Android 8768 smoke, SHA verified
+        run: |
+          cp scripts/p30_l7a_smoke_index.html p30-l7d-output/index.html
+          cat > p30-l7d-output/README.txt <<'EOF'
+          EventRadar P30-L7-D Android official-institution fallback smoke.
+          Candidate-only / local Android browser. NOT the real released PWA.
+          44 candidate IDs unchanged, 38 TWTC detail-date candidates.
+          Financial Technology Exhibition is postponed: original 10/23-24,
+          tentative 12/18-19 only if certified institutional evidence exists.
+          Final confirmed date remains UNKNOWN.
+          This version does not overwrite previous L7-A/L7-B UAT or Docs/Pages.
+          On SAME Android Termux phone:
+            cd ~/eventradar_p30_l7d_20261026
+            sha256sum -c SHA256SUMS.txt
+            python -m http.server 8768 --bind 127.0.0.1
+          Chrome: http://127.0.0.1:8768/
+          Check original/tentative/confirmed label distinctions, organizer link,
+          both platform filters, 44 total, 5 CKSMH / 39 TWTC, modal, search.
+          EOF
+          (cd p30-l7d-output && sha256sum index.html data.json schedule_roles.json diagnostics.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          echo PASS P30_L7D_ANDROID_SHA_MANIFEST
+      - name: Preserve only candidate UAT artifact, no Pages publication
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7d-android-official-fallback
+          path: p30-l7d-output/
+          if-no-files-found: warn
+          retention-days: 14
