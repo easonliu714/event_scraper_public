@@ -1,0 +1,182 @@
+name: EventRadar P30 L6-B G5J cross-platform event identity review
+on:
+  push:
+    branches: [feat/eventradar-p30-l6b-cross-platform-identity]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l6b-g5j
+  cancel-in-progress: false
+jobs:
+  pinned-four-evidence-pair-review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l6b-cross-platform-identity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 11
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen Source authority, G5J parent HEAD and exactly three additions
+        run: |
+          set -euo pipefail
+          base=774e2de11580ed961658d6a6254b34ae4ded57c7
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l6b_g5j.yml' 'scripts/p30_l6b_g5j_cross_platform_identity.mjs' 'tests/p30/test_l6b_g5j_cross_platform_identity.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L6B_SCOPE_DRIFT; exit 1; }
+          echo PASS P30_L6B_PARENT_FROZEN_AND_THREE_ADDITIONS_ONLY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Offline strict 34 event/session/lineage and negative tests
+        run: |
+          node --check scripts/p30_l6b_g5j_cross_platform_identity.mjs
+          node --test tests/p30/test_l6b_g5j_cross_platform_identity.mjs
+          echo PASS P30_L6B_OFFLINE_34_SOURCE_ROLE_MATRIX
+      - name: Get accepted L6A G5J six-article review
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l6a-g5j-reversible-dedup
+          run-id: 40324420431
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l6b-input/g5j
+      - name: Get accepted L5D FamiTicket four public detail samples
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5d-famiticket-field-roles
+          run-id: 40312137162
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l6b-input/fami
+      - name: Get accepted L5A ibon two detail and three show sessions
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5a-ibon-session-role-evidence
+          run-id: 40301911354
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l6b-input/ibon
+      - name: Get accepted L5C original producer NieR two show proof
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l5c-nier-producer-source
+          run-id: 40305582187
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l6b-input/nier
+      - name: Prove FOUR upstream evidence manifests independently
+        run: |
+          set -euo pipefail
+          (cd p30-l6b-input/g5j && sha256sum -c SHA256SUMS.txt)
+          (cd p30-l6b-input/fami && sha256sum -c SHA256SUMS.txt)
+          (cd p30-l6b-input/ibon && sha256sum -c SHA256SUMS.txt)
+          (cd p30-l6b-input/nier && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          pairs=[
+            ('g5j/dedup_classification_review.json','EVENTRADAR_P30_L6A_G5J_REVERSIBLE_CLASSIFICATION_AND_DEDUP_REVIEW_ONLY'),
+            ('fami/role_evidence.json','EVENTRADAR_P30_L5D1_FAMITICKET_OFFICIAL_FIELD_ROLES_REVIEW_ONLY'),
+            ('ibon/session_candidates.json','EVENTRADAR_P30_L5A_IBON_SESSION_ROLE_REVIEW_ONLY'),
+            ('nier/cross_source_review.json','EVENTRADAR_P30_L5C_NIER_PRODUCER_CROSS_SOURCE_REVIEW_ONLY')
+          ]
+          for path,kind in pairs:
+            data=json.loads((Path('p30-l6b-input')/path).read_text(encoding='utf-8'))
+            assert data['kind']==kind and data['published'] is False
+            assert data['goldenAccepted'] is False and data['sourceRuntime']=='DORMANT'
+            print('PASS P30_L6B_UPSTREAM_PINNED',path,kind)
+          PY
+      - name: Offline build 12 event IDs, 66 pair reviews, and two original references
+        run: |
+          node scripts/p30_l6b_g5j_cross_platform_identity.mjs \
+            --g5j p30-l6b-input/g5j/dedup_classification_review.json \
+            --fami p30-l6b-input/fami/role_evidence.json \
+            --ibon p30-l6b-input/ibon/session_candidates.json \
+            --nier p30-l6b-input/nier/cross_source_review.json \
+            --out-dir p30-l6b-output
+      - name: Check exact cross-platform counts, 2 first party references, no fake same event or dates
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('p30-l6b-output/cross_platform_review.json').read_text(encoding='utf-8'))
+          assert p['kind']=='EVENTRADAR_P30_L6B_G5J_CROSS_PLATFORM_EVENT_IDENTITY_REVIEW_ONLY'
+          assert p['sourceEventRecords']==12 and len(p['candidateRecords'])==12
+          assert p['platformBreakdown']=={'StrollTimes':6,'FamiTicket':4,'ibon':2}
+          assert p['totalPairCount']==66 and len(p['examinedPairs'])==66
+          assert p['crossPlatformPairCount']==44 and p['samePlatformPairCount']==22
+          assert len({x['eventUrl'] for x in p['candidateRecords']})==12
+          assert len({tuple(sorted((x['a'],x['b']))) for x in p['examinedPairs']})==66
+          assert p['inputIbonSampledShowStartCount']==3
+          assert p['inputIbonDetailCount']==2
+          assert p['ibonShowSessionsAreNotSeparateEventRecords'] is True
+          assert p['firstPartyReferenceCount']==2
+          assert len(p['firstPartyReferenceEdges'])==2
+          assert p['firstPartySameEventCrossPlatformMatchesVerified']==0
+          assert p['actualDuplicateEventPairsVerified']==0 and p['actualParentChildLinksVerified']==0
+          assert p['sourceEventRoleIntegrity'] is True
+          assert all(x['action']=='RETAIN_SEPARATELY_REVIEW_ONLY' and x['duplicateAccepted'] is False
+                     and x['automaticMergeAllowed'] is False
+                     and x['automaticHideAllowed'] is False and x['deleteAllowed'] is False
+                     for x in p['examinedPairs'])
+          assert all(x['eventDateStart'] is None and x['eventDateEnd'] is None
+                     and x['ticketStatus']=='UNKNOWN' and x['price'] is None
+                     and x['published'] is False and x['mergeAllowed'] is False
+                     and x['categoryVerified'] is False for x in p['candidateRecords'])
+          assert all(x['mergeAllowed'] is False for x in p['firstPartyReferenceEdges'])
+          for k in ['confirmedCrossPlatformMerges','automaticMergeCount','automaticHideCount',
+                    'deleteCount','confirmedOfficialClassificationCount',
+                    'productionDatePromotionCount','productionFieldPromotionCount']:
+            assert p[k]==0,k
+          assert p['accepted44AndroidPreserved'] is True
+          assert p['reversibleWithoutWrites'] is True and p['restoredOriginalRowsRequired'] is False
+          assert p['sourceRuntime']=='DORMANT' and p['goldenAccepted'] is False
+          assert p['published'] is False and p['writerExecuted'] is False
+          assert p['notifierExecuted'] is False and p['autoHidden']==0
+          print('PASS P30_L6B_TWELVE_EVENT_IDENTIFIERS_66_PAIRS_44_CROSS_22_SAME')
+          print('PASS P30_L6B_NIER_TWO_SHOWS_ONE_EVENT_AND_TWO_SEPARATE_FIRST_PARTY_REFERENCES')
+          print('HOLD P30_L6B_NO_INDEPENDENT_SAME_EVENT_CROSS_PLATFORM_MATCHES_PROVEN')
+          print('PASS P30_L6B_ANDROID44_AND_FORMAL_PAGES_UNTOUCHED')
+          PY
+      - name: Seal cross-platform evidence with full parent SHA lineage
+        if: always()
+        run: |
+          mkdir -p p30-l6b-output
+          cat > p30-l6b-output/README.txt <<'EOF'
+          EventRadar P30-L6-B G5J immutable cross-platform REVIEW-ONLY Gate.
+          Four sealed input runs: L6A 40324420431, FamiTicket L5D 40312137162,
+          ibon L5A 40301911354 and NieR producer L5C 40305582187.
+          6 aggregator articles (only Bitan has original government proof),
+          4 FamiTicket exact ticket EVENT IDs, 2 ibon ticket EVENT IDs.
+          NieR two show starts are SESSIONS of ONE event, not duplicates.
+          66 pair reviews, 44 cross-platform; zero same-event proof because
+          no pair has independently verified matching first-party EVENT IDs.
+          Government calendar and original producer references are evidence
+          links only, NOT duplicate event records. No Golden, no writer,
+          merge, hide, delete, date, pricing, ticket status or categorisation.
+          Original 44 Android user-accepted activities remain unchanged.
+          EOF
+          if [[ -f p30-l6b-output/cross_platform_review.json ]]; then
+            cp p30-l6b-input/g5j/dedup_classification_review.json p30-l6b-output/parent_g5j.json
+            cp p30-l6b-input/fami/role_evidence.json p30-l6b-output/parent_famiticket.json
+            cp p30-l6b-input/ibon/session_candidates.json p30-l6b-output/parent_ibon.json
+            cp p30-l6b-input/nier/cross_source_review.json p30-l6b-output/parent_nier_producer.json
+            (cd p30-l6b-output && sha256sum cross_platform_review.json parent_g5j.json parent_famiticket.json parent_ibon.json parent_nier_producer.json README.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS P30_L6B_SEALED_FOUR_PARENT_SOURCE_SHA_GATE
+          else
+            echo HOLD P30_L6B_MISSING_JSON_NO_SUCCESS_CLAIM
+          fi
+      - name: Upload isolated G5J identity audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l6b-g5j-cross-platform-identity
+          path: p30-l6b-output/
+          if-no-files-found: warn
+          retention-days: 14
