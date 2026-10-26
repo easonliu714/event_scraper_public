@@ -1,6 +1,14 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-26 P30-L7-D 官方機構雙角色延期候選與 Android UI（PR #16 Draft）**
+>
+> - 新 source `scripts/p30_l7d_official_fallback.py`：三個固定 HTTPS 入口，一次一站、有限位元組、嚴格網域路徑與 redirect allowlist、不得重試與停用 TLS；`TWTC_DETAIL`=官方原訂時間與延期標題、`FINANCIAL_FEDERATION_NOTICE`=聯合主辦/金融總會延期暨正式確認未完成、`NCCC_NOTICE`=聯卡中心對預定 12/18～19 的公告。各來源 HTTP status/sha256/URL/parse 對應證據寫入隔離 `schedule_roles.json`／`diagnostics.json`。聯卡中心 canonical HTTPS host 為 `www.nccc.com.tw`；原 bare host 故障不被當成 HTML 解析問題。
+> - 僅更新 FinTech 2026 一筆候選：`scheduleStatus=POSTPONED_PENDING_FINAL_CONFIRMATION`、`originalDateStart/End=2026-10-23/24`、`tentativeDateStart/End=2026-12-18/19`、`confirmedDateStart/End=NULL`、`dateStart/End=NULL`，附上機構公告來源。其餘 43 筆與全部 44 個 id 不變，來源詳細日期 38 仍保留。Android `when()` 顯示「已延期／正式展期待確認」，modal 分列「原訂日期」、「預定改期」、「正式日期」及官方證據連結，不把預定當正式確定。
+> - 最終 GitHub Actions Run `40281136558` 3/3 HTTPS HTTP 200、13/13 Python offline、JS Node syntax、SHA immutable old UAT、精確四路徑、五檔 SHA256 全 PASS；可供 Android 本機 `127.0.0.1:8768` 煙霧測試的 Artifact `12632108815`。**Android 新版使用者實測尚未回報**，PR #16 與 PR #15 仍 Draft 未 Merge，正式 Pages/通知/排程/Writer/Golden 全未啟用。
+>
+
+
 > **2026-10-26 P30-L7-C FINTECH POSTPONEMENT SEMANTIC DATA ROLES**
 >
 > - Source TWTC 清單 `延期未定` + TWTC 詳情 `展出日期：2026/10/23～2026/10/24` 並非不同 HTML 日期格式，為同一活動**取消原訂／預定另定日期**的狀態切換。現有 P30-L4-A `raw_period_matches()` 將 `延期未定` 拒絕與正常 MM/DD 日期同等對照，產出 `LIST_DETAIL_PERIOD_CONFLICT` 防止原訂日期誤作有效日期。
