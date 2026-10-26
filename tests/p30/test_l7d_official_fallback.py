@@ -64,7 +64,7 @@ class P30L7DTests(unittest.TestCase):
                     "https://www.tfsr.org.tw/information/188",
                     "https://www.tfsr.org.tw:8080/information/187",
                     "https://www.tfsr.org.tw@evil.com/information/187",
-                    "https://nccc.com.tw/wps/wcm/connect/zh/home/AboutNCCC/News/200261021-2",
+                    "https://www.nccc.com.tw/wps/wcm/connect/zh/home/AboutNCCC/News/200261021-2",
                     "https://twtc.com.tw/exhibition_more.aspx?id=10000",
                     "file:///etc/passwd"):
             self.assertFalse(p.allow(bad,p.CO_ORGANIZER_URL))
