@@ -1,0 +1,148 @@
+name: EventRadar P30 L9-B field quality and synthetic rollback (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9b-field-quality-rollback-lab
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9b-readonly
+  cancel-in-progress: false
+jobs:
+  isolated-field-rollback:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9b-field-quality-rollback-lab'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify frozen source parent and exact three additions
+        run: |
+          set -euo pipefail
+          base=d35c3b78f09bcbeeb4da79ea3b6014330798ebfa
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9b_field_quality_rollback.yml' 'scripts/p30_l9b_field_quality_rollback.mjs' 'tests/p30/test_l9b_field_quality_rollback.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9B_SCOPE; exit 1; }
+          echo PASS L9B_FROZEN_MAIN_AND_THREE_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Thirty offline positive-negative contracts
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9b_field_quality_rollback.mjs
+          node --test tests/p30/test_l9b_field_quality_rollback.mjs
+          echo PASS L9B_OFFLINE_NEGATIVE_MATRIX_30
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          run-id: 40353636708
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9b-l7b
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7c-isolated-android-preview
+          run-id: 40436642012
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9b-l7c
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9a-readonly-release-hold
+          run-id: 40439742917
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9b-l9a
+      - name: Three immutable SHA inputs and 2020-12 source schema
+        run: |
+          set -euo pipefail
+          (cd l9b-l7b && sha256sum -c SHA256SUMS.txt)
+          (cd l9b-l7c && sha256sum -c SHA256SUMS.txt)
+          (cd l9b-l9a && sha256sum -c SHA256SUMS.txt)
+          python -m pip install 'jsonschema>=4.21,<5'
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          from jsonschema import Draft202012Validator,FormatChecker
+          l7b=Path('l9b-l7b')
+          fresh_path=l7b/'fresh_candidate.json'
+          diag_path=l7b/'platform_diagnostics.json'
+          preview_path=Path('l9b-l7c/preview-data.json')
+          release_path=Path('l9b-l9a/release_blocker_matrix.json')
+          fresh,diag,preview,release=[json.loads(p.read_text(encoding='utf8')) for p in (fresh_path,diag_path,preview_path,release_path)]
+          schema=json.loads(Path('schemas/p30_l7b_fresh_candidates.schema.json').read_text(encoding='utf8'))
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema,format_checker=FormatChecker()).validate(fresh)
+          for root in ('l9b-l7b','l9b-l9a'):
+              manifest=json.loads(Path(root,'manifest.json').read_text(encoding='utf8'))
+              for name,sha in manifest['filesSHA256'].items():
+                  assert hashlib.sha256(Path(root,name).read_bytes()).hexdigest()==sha
+          assert fresh['runId']==diag['runId']==preview['sourceRunId']==release['sourceRunId']
+          assert preview['sourceCandidateSHA256']==hashlib.sha256(fresh_path.read_bytes()).hexdigest()
+          assert release['previewSHA256']==hashlib.sha256(preview_path.read_bytes()).hexdigest()
+          assert release['diagnosticsSHA256']==hashlib.sha256(diag_path.read_bytes()).hexdigest()
+          assert fresh['candidateCount']==264 and fresh['actualFreshHTTPRequests']==34
+          assert preview['counts']['verifiedDetail']==5 and preview['counts']['listOnly']+preview['counts']['identityHold']==259
+          assert release['releaseState']=='HARD_HOLD_NO_PUBLICATION' and release['blockerCount']==10
+          print('PASS L9B_PINNED_THREE_ARTIFACT_SHA_AND_SCHEMA')
+          PY
+      - name: Produce review-only field-quality and synthetic rollback SHA manifest
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9b_field_quality_rollback.mjs \
+            --fresh l9b-l7b/fresh_candidate.json \
+            --diagnostics l9b-l7b/platform_diagnostics.json \
+            --preview l9b-l7c/preview-data.json \
+            --release l9b-l9a/release_blocker_matrix.json \
+            --out p30-l9b-evidence
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('p30-l9b-evidence')
+          x=json.loads((root/'field_quality_review.json').read_text(encoding='utf8'))
+          g=json.loads((root/'platform_adapter_gaps.json').read_text(encoding='utf8'))
+          r=json.loads((root/'rollback_simulation.json').read_text(encoding='utf8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+          assert x['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert x['fieldReview']['total']==12 and x['fieldReview']['rejected']>=1
+          assert x['sourceCounts']['candidates']==264 and x['sourceCounts']['reviewPending']==259
+          assert x['actualFreshHTTPRequestsThisGate']==0
+          assert len(g['rows'])==19
+          assert r['state']=='PASS_SYNTHETIC_ROLLBACK_ONLY'
+          assert r['baselineSHA256']==r['restoredSHA256']
+          assert r['productionRollbackVerified'] is False
+          assert not x['published'] and not x['writerExecuted']
+          for name,sha in m['outputSHA256'].items():
+              assert hashlib.sha256((root/name).read_bytes()).hexdigest()==sha
+          print('PASS L9B_FIELD_QUALITY_NEGATIVES_AND_SYNTHETIC_ROLLBACK')
+          print('HOLD L9B_REAL_RELEASE_AND_ROLLBACK_NOT_APPROVED')
+          PY
+      - name: Seal isolated artifact SHA256
+        if: always()
+        run: |
+          mkdir -p p30-l9b-evidence
+          if test -f p30-l9b-evidence/manifest.json; then
+            (cd p30-l9b-evidence && sha256sum field_quality_review.json platform_adapter_gaps.json rollback_simulation.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9B_ISOLATED_SHA256
+          else
+            echo HOLD L9B_ARTIFACT_ABSENT
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9b-quality-synthetic-rollback
+          path: p30-l9b-evidence/
+          if-no-files-found: warn
+          retention-days: 14
