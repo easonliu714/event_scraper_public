@@ -1,5 +1,27 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 SRC-P30-L9-A immutable evidence-to-release-blocker architecture — 26/26 native CI PASS, RELEASE HARD_HOLD**
+>
+> ```text
+> event_scraper_public: production main fc4f963247d (FROZEN)
+> └─ L7-C Source Draft PR #37 @ 4668dab1c7061e9d752da0cdfcd58a004e1459f1 (CI & Android CORE UI PASS)
+>    └─ L9-A Source Draft PR #38 @ d35c3b78f09bcbeeb4da79ea3b6014330798ebfa
+>       ├─ scripts/p30_l9a_release_blockers.mjs [NO NETWORK / NO APP WRITES]
+>       │  ├─ exact L7-B fresh_candidate.json + platform_diagnostics.json
+>       │  ├─ exact L7-C preview-data.json
+>       │  ├─ SHA/identity/type/role/candidate/date/ticket/full-coverage validation
+>       │  └─ release_blocker_matrix.json + manifest.json (HARD_HOLD_NO_PUBLICATION)
+>       ├─ tests/p30/test_l9a_release_blockers.mjs [26/26 positive/negative]
+>       └─ .github/workflows/eventradar_p30_l9a_release_blockers.yml [push-only read permissions]
+>          ├─ download exact L7-B fresh Artifact Run 40353636708 [SHA/Schema]
+>          ├─ download exact L7-C Android Artifact Run 40436642012 [SHA]
+>          └─ Native CI 40439742917 -> Artifact 12705887127 [SHA sealed]
+> ```
+> - CI <https://github.com/easonliu714/event_scraper_public/actions/runs/40439742917> completed/success and Job `121976963857` all steps PASS. Artifact <https://github.com/easonliu714/event_scraper_public/actions/runs/40439742917/artifacts/12705887127> ZIP SHA256 `a576ddb077342920659288392cbaf66cfcb4e24665cf5eb0a6b4e6f123c54aa3`, 2766 bytes. Exact three added files vs L7C parent; frozen runtime/Pages blobs; READONLY.
+> - `evaluate(fresh,diag,preview,raw)`: strong source SHA, run ID, typed source and 264↔5↔259 identities; reject any formal date/price/ticket promotion or cross-source title/URL drift; 10 mandatory blockers. `build(paths,out)`: destination confined to isolated workspace, output blocker JSON + SHA manifest; `releaseState=HARD_HOLD_NO_PUBLICATION`, `readyToMerge=false`, `readyToDeploy=false`, `readyToEnableWriter=false`, `readyToStartScheduler=false`, `readyToRetireRepos=false`, `approvedActions=[]`. **This is a proven deny Gate, not formal release readiness.**
+> - Android L8 user evidence remains `CORE_UI_PASS`/full E2E incomplete; original 44 user-attested PASS preserved. `PRICE/資訊` candidate snippets flagged invalid for numeric price promotion; source official date/price/venue/sale/registration/ticket data still UNVERIFIED/UNKNOWN. No production Publisher, Golden, database migration, Scheduler PR #1, notifications, repository closure or merges. Next L9-B may run isolated field quality negatives/rollback rehearsal planning, never auto-publish. Governance lives in Draft PR #8, not main.
+>
+
 > **2026-10-27 P30-L8/G5K Android loopback UAT core PASS with bounded real-device evidence**
 >
 > - Termux SHA256 verified `eventradar-p30-l7c-isolated-android-preview.zip` equals official sealed Artifact ZIP `a524f40fd46cff6ad60046c314e70eaa44499fcddab035956ae16d25cadde3b6`; inner `index.html`, `preview-data.json`, `README.txt` all passed `sha256sum -c SHA256SUMS.txt`. Original official Source `main@fc4f963247d68eed29425808cc14e7250f312d05`, Docs-only Draft PR #8, source Draft PR #37 unchanged at start.
