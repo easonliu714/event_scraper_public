@@ -1,5 +1,24 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 SRC-P30-L7-C isolated Android review UI CI PASS — architecture authority update**
+>
+> ```text
+> event_scraper_public (main fc4f963247d; UNCHANGED)
+> └─ L7-B Source PR #36 @ e680456f0033e528fb25da61a4b3b6e35aa22447 [native CI PASS]
+>    └─ L7-C Source Draft PR #37 @ 4668dab1c7061e9d752da0cdfcd58a004e1459f1
+>       ├─ scripts/p30_l7c_isolated_preview.mjs   [source SHA typed parent -> pure data converter]
+>       ├─ scripts/p30_l7c_isolated_index.html    [mobile safe DOM UI/search/platform/quality/modal/official URL]
+>       ├─ tests/p30/test_l7c_isolated_preview.mjs [18/18 CI positive-negative]
+>       └─ .github/workflows/eventradar_p30_l7c_preview.yml [user-uploaded, native push CI PASS]
+>          └─ pinned L7-B Run 40353636708 fresh evidence + SHA/2020-12 schema
+>             -> L7-C isolated index.html + preview-data.json + README.txt + SHA256SUMS.txt
+>                artifact 12704885384 SHA256 a524f40fd46cff6ad60046c314e70eaa44499fcddab035956ae16d25cadde3b6
+> ```
+> - **Gate provenance:** dedicated [GitHub Actions Run 40436642012](https://github.com/easonliu714/event_scraper_public/actions/runs/40436642012), completed/success, Job `121966765821` all steps success, exact frozen parent and four-add-only diff, 18 offline negatives PASS, HTML inline JavaScript syntax PASS, inherited source Artifacts sealed/read-back. The formerly blocked workflow publication is now resolved through user web upload; retain prior WIP/HOLD snapshot as historical evidence but mark it superseded. Docs governance still only [Draft PR #8](https://github.com/easonliu714/event_scraper_public/pull/8), no main merge.
+> - **UI and DATA:** upstream collection used **34 real GETs** over 19 public platforms: 16 HTTP OK, 12 list-positive, 264 **candidate** source IDs; only 5 of 12 sampled details pass title parity. L7-C performs **zero additional fresh site HTTP** and uses only L7-B immutable inputs, `candidateOrigin=L7C_PINNED_NEW_HTTP_ARTIFACT_PREVIEW_NOT_A_NEW_CRAWL`. Preview data counts: total 264, detail-title-parity tier 5, list-only/title-identity-HOLD 259. Search/platform/quality filter and modal original official/third-party link; external source from allowlisted HTTPS, no Javascript HTML injection or production fetch. `dateStart/dateEnd/venue/price/registrationPeriod/saleWindow/voucherValidity=null`, `ticketStatus=UNKNOWN`, no automatic merges, field Golden promotion, data writer, notifier or cloud scheduler.
+> - **Next P30-L8 G5K:** isolated same-phone Android loopback UAT **not yet performed**, requiring final Artifact SHA and internal SHA256SUMS before testing, verify category/tier behavior, five trusted detail-title-parity only (not fully official event/price verification), 259 explicitly pending, relative link/UNKNOWN text, no text overlap and normal modal close/HTTPS source navigation. Historic 44 Android records remain USER_ATTESTED_PASS without re-test. L9 controlled Writer/Publisher and L10 repository retirement remain LOCKED.
+>
+
 > **2026-10-26 L7-C new candidate mobile preview source tree: WIP / CI HOLD**
 >
 > ```text
