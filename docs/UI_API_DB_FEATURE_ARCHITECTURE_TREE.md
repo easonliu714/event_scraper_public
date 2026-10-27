@@ -1,5 +1,10 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 L9-H CI dependency correction and pending native rerun**
+>
+> - The L9-H dual-source identity architecture requires both L9-G structural Artifact `12738140163` and L9-F original title Artifact `12729277485`; original L9-G typed JSON does not include source titles, so IDs alone cannot establish current title parity. Source Draft PR #45 head `56d309a9d4d895c7adfb525723c6e2a9c4abd2cb`. Native Run `40514885666` CANCELLED at Chromium OS dependencies, Run `40515905716` failed on a literal authentication placeholder in second artifact download **after 36/36 tests PASS**; repaired workflow `github.token` and Run `40516301527` queued. No field evidence yet from this Gate. All source and Pages main fingerprints remain unchanged and formal release `HARD_HOLD_NO_PUBLICATION`.
+>
+
 > **2026-10-27 P30-L9-H source cross-binding + local DOM probe architecture checkpoint — CI RUNNING**
 >
 > ```text
