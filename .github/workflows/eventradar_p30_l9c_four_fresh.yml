@@ -1,0 +1,106 @@
+name: EventRadar P30 L9-C four-source bounded fresh adapters (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9c-four-official-fresh-adapters
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9c-fresh-official-readonly
+  cancel-in-progress: false
+jobs:
+  isolated-four-official-adapters:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9c-four-official-fresh-adapters'
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9-B parent and protected Pages/runtime blobs
+        run: |
+          set -euo pipefail
+          base=b1f831f985074e5011950403823bb1b4c41d16b4
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l9c_four_fresh.yml' \
+            'scripts/p30_l9c_four_source_fresh.py' \
+            'tests/p30/test_l9c_four_source_fresh.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9C_NONISOLATED_CHANGE; exit 1; }
+          echo PASS L9C_EXACT_PARENT_AND_THREE_ADD_ONLY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install only bounded HTTP and parser libraries
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline 25 source identity and URL safety contracts
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9c_four_source_fresh.py tests/p30/test_l9c_four_source_fresh.py
+          python -m unittest discover -s tests/p30 -p 'test_l9c_four_source_fresh.py' -v
+          echo PASS L9C_OFFLINE_25_SOURCE_NEGATIVES
+      - name: Bounded NEW official HTTPS GET (4 platforms; no retries or anti-bot bypass)
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9c_four_source_fresh.py --out p30-l9c-evidence --delay 0.7
+      - name: SHA and evidence-tier checks (zero production promotion)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('p30-l9c-evidence')
+          result=json.loads((root/'fresh_four_source_diagnostics.json').read_text(encoding='utf-8'))
+          manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          assert result['candidateOrigin']=='L9C_FRESH_PUBLIC_HTTP'
+          assert 4<=result['actualFreshHTTPRequests']<=20
+          assert result['platformsAttempted']==4
+          assert {x['platform'] for x in result['sources']}=={'中正紀念堂','台北世貿','ibon','FamiTicket'}
+          assert result['candidateCount']==sum(x['listCandidates'] for x in result['sources'])
+          assert result['detailAttempted']<=4 and result['detailTitleBound']<=result['detailAttempted']
+          assert all(x['requestCount']<=5 and x['listCandidates']<=120 for x in result['sources'])
+          assert result['formalDatePriceTicketPromotions']==0
+          assert result['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert result['published'] is False and not result['writerExecuted']
+          assert not result['schedulerExecuted'] and not result['notifierExecuted']
+          assert result['existingAndroid44Preserved'] and result['l8AndroidCorePassPreserved']
+          assert not result['fullPlatformCoverageVerified']
+          for src in result['sources']:
+              assert not src['completeCatalogVerified']
+              assert all(not row['published'] and not row['verified'] for row in src['candidates'])
+              assert all(x.get('sha256') or x.get('bodySHA256') or x.get('state')!='HTTP_OK'
+                         for x in src['listHttp'])
+              print('L9C_FRESH_TIER',src['platform'],src['listCandidates'],src['detail'].get('status'))
+          data=(root/'fresh_four_source_diagnostics.json').read_bytes()
+          assert manifest['sha256']['fresh_four_source_diagnostics.json']==hashlib.sha256(data).hexdigest()
+          print('PASS L9C_ACTUAL_NEW_FOUR_SOURCE_HTTP_AND_SHA',result['actualFreshHTTPRequests'])
+          print('QUALITY_L9C_LIST',result['listPositive'],'DETAIL_PARITY',result['detailTitleBound'])
+          print('HOLD L9C_COMPLETENESS_AND_GOLDEN_STILL_NOT_PROVEN')
+          PY
+      - name: Seal isolated evidence files only
+        if: always()
+        run: |
+          mkdir -p p30-l9c-evidence
+          if test -f p30-l9c-evidence/manifest.json; then
+            (cd p30-l9c-evidence && sha256sum fresh_four_source_diagnostics.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9C_SHA256_SEALED
+          else
+            echo HOLD L9C_NO_FRESH_OUTPUT
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9c-four-official-fresh-adapter-evidence
+          path: p30-l9c-evidence/
+          if-no-files-found: warn
+          retention-days: 14
