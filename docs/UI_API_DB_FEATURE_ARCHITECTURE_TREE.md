@@ -1,5 +1,30 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 SRC-P30-L9-I ibon 39961 official source/title drift comparison architecture — native CI PASS, historical instability OPEN**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [frozen, formal app/Pages data immutable]
+> └─ L9-H Draft PR #45 @ 56d309a9d4d895c7adfb525723c6e2a9c4abd2cb
+>    └─ L9-I Draft PR #46 @ ca60d3182172ad7f824fbcb5a2a6c9189fecc74b
+>       ├─ scripts/p30_l9i_ibon_39961_identity.mjs
+>       │  ├─ sha-pin L9-H Run 40516301527 Artifact 12740505389 [prior 39961 mismatch]
+>       │  ├─ sha-pin L9-F Run 40494326021 Artifact 12729277485 [historical source title]
+>       │  ├─ exact numeric event ID + official canonical URL / single ID uniqueness
+>       │  ├─ normal Chromium current Index/entertainment same-card list title
+>       │  ├─ normal Chromium current ActivityInfo/Details/39961 bounded headings
+>       │  ├─ adjudicate(): MISSING/FOREIGN/403/WAF/AMBIGUOUS/MISMATCH→HOLD
+>       │  ├─ matched current list+detail titles => REVIEW_ONLY_NO_RELEASE
+>       │  └─ ibon_39961_identity_adjudication.json + SHA manifest
+>       ├─ tests/p30/test_l9i_ibon_39961_identity.mjs [30/30 offline]
+>       └─ .github/workflows/eventradar_p30_l9i_ibon_39961_identity.yml [read-only push]
+>          └─ Native GitHub Actions Run 40524765567 → Artifact 12744025880
+> ```
+> - **Native verification** [Run 40524765567](https://github.com/easonliu714/event_scraper_public/actions/runs/40524765567) completed/success (Job `122261189909`) at exact L9-I head, exact 3-file additive scope, protected Source Pages/runtime SHA, 30/30 positive-negative contracts, dual upstream source digest `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` (L9-H) and `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4` (L9-F) both validated with SHA256SUMS + manifest.
+> - **Actual 39961 current UI evidence:** official Index/entertainment list HTTP200, exactly one canonical ID `39961` same-card event title candidate; official /ActivityInfo/Details/39961 HTTP200, 3 bounded detail headings, current-source same-ID list/detail title parity `true`. Original title also observed `true`, `driftObserved=false`. Decision `REVIEW_ONLY_NO_RELEASE / CURRENT_LIST_DETAIL_PARITY_REVIEW_ONLY`. This does **not erase** L9-H prior point-in-time `HOLD_TITLE_MISMATCH`; intermittent source/rendering/root cause is still unproven and formal identity reliability remains held. Count each source capture separately, not an eternal 39961 PASS.
+> - **[Artifact 12744025880](https://github.com/easonliu714/event_scraper_public/actions/runs/40524765567/artifacts/12744025880)** ZIP `sha256:19a6d802733d36bedaf164db8cdcbd0cdca25422eff7f01841f44af3ad696243` (1,889 B), contains isolated identity adjudication JSON, manifest, SHA256SUMS; GitHub runner verifies SHA. No raw HTML/screenshots, login/cookies, private source or network bodies stored.
+> - **API / DB / formal UI boundary:** L9-I only fetches public list + exact detail, does not write to `docs/data.json`, DB, API, PWA, Scheduler, Writer, notifier or Golden; `formalFieldPromotions=0`, `ticketStatus=UNKNOWN`, `goldenAccepted=0`, `releaseState=HARD_HOLD_NO_PUBLICATION`; preserve historical Android 44 PASS, L8 core UI PASS and P30-L9-A ten release blockers. Next L9-J should test *repeatability* of exact same-ID list/detail matching under separate bounded current renders and retain disagreements as HOLD, not assume an improved DOM selector fixes a transient identity problem. Both formal governance files remain exclusively on Draft PR #8.
+>
+
 > **2026-10-27 SRC-P30-L9-H dual-source official ibon local DOM hierarchical-binding architecture — native CI PASS, one current ID mismatch**
 >
 > ```text
