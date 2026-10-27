@@ -1,0 +1,139 @@
+name: EventRadar P30 L9-G ibon rendered detail structure (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9g-ibon-rendered-field-structure
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9g-source-bound-dom
+  cancel-in-progress: false
+jobs:
+  five-rendered-detail-structures:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9g-ibon-rendered-field-structure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact L9F source and three additions and frozen Pages
+        run: |
+          set -euo pipefail
+          base=d85504773108281099ec0654c5c772de243f910c
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9g_rendered_structure.yml' 'scripts/p30_l9g_ibon_rendered_field_structure.mjs' 'tests/p30/test_l9g_ibon_rendered_field_structure.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9G_UNEXPECTED_MUTATION; exit 1; }
+          echo PASS L9G_FROZEN_L9F_PARENT_EXACT_THREE_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install fixed normal Chromium runtime
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install --with-deps chromium
+      - name: 32 fully offline contract tests prior to browser navigation
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9g_ibon_rendered_field_structure.mjs
+          node --test tests/p30/test_l9g_ibon_rendered_field_structure.mjs
+          echo PASS L9G_OFFLINE_32_FIELD_ROLE_NEGATIVES
+      - name: Fetch exact SHA-sealed five source IDs from L9F only
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          run-id: 40494326021
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9g-l9f-pinned-parent
+      - name: Verify original source Artifact SHA and exact five title parity IDs
+        run: |
+          set -euo pipefail
+          (cd l9g-l9f-pinned-parent && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          import {createHash} from "node:crypto";
+          import {validateParent,SOURCE_IDS} from "./scripts/p30_l9g_ibon_rendered_field_structure.mjs";
+          const root="l9g-l9f-pinned-parent/";
+          const raw=readFileSync(root+"detail_role_review.json");
+          const report=JSON.parse(raw);
+          const manifest=JSON.parse(readFileSync(root+"manifest.json"));
+          const digest=createHash("sha256").update(raw).digest("hex");
+          if(manifest.fileSHA256["detail_role_review.json"]!==digest)throw Error("HOLD_L9G_SOURCE_SHA_MISMATCH");
+          const proof=validateParent(report,raw);
+          if(proof.rows.length!==5)throw Error("HOLD_L9G_SOURCE_NOT_FIVE");
+          console.log("PASS L9G_PARENT_L9F_SHA_TITLE_PARITY_FIVE",proof.sha256);
+          console.log("L9G_PINNED_OFFICIAL_IBON_IDS",SOURCE_IDS.join(","));
+          JS
+      - name: Read only five current normal public ibon rendered detail structures
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9g_ibon_rendered_field_structure.mjs \
+            --source l9g-l9f-pinned-parent/detail_role_review.json \
+            --out p30-l9g-evidence
+      - name: Verify field-quality review only, SHA and no production write
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib,re
+          from pathlib import Path
+          root=Path('p30-l9g-evidence')
+          report=json.loads((root/'rendered_field_structure.json').read_text(encoding='utf-8'))
+          manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          assert report['kind']=='EVENTRADAR_P30_L9G_IBON_RENDERED_FIELD_STRUCTURE_READONLY_V1'
+          assert report['parentHead']=='d85504773108281099ec0654c5c772de243f910c'
+          assert report['parentRun']==40494326021 and report['parentArtifact']==12729277485
+          assert report['sourceOrigin']=='FRESH_PUBLIC_RENDERED_DETAIL_STRUCTURE_ONLY'
+          assert report['sampleCount']==len(report['results'])==5
+          assert report['sourceTitleParityCount']<=5
+          assert report['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not report['published'] and not report['writerExecuted'] and not report['schedulerExecuted']
+          assert not report['notifierExecuted'] and not report['mergeExecuted']
+          assert report['goldenAccepted']==report['formalFieldPromotions']==report['sessionSplitCount']==0
+          assert report['existingAndroid44Preserved'] and report['l8CoreAndroidPassPreserved']
+          assert not report['fullPlatformCoverageVerified'] and not report['productionRollbackVerified']
+          assert not report['rawHtmlPersisted'] and not report['cookiesPersisted'] and not report['networkBodiesPersisted']
+          seen=set()
+          for r in report['results']:
+              m=re.fullmatch(r'https://ticket\.ibon\.com\.tw/ActivityInfo/Details/([0-9]{3,8})',r['officialUrl'])
+              assert m and r['candidateId']=='ibon:'+m[1] and r['candidateId'] not in seen
+              seen.add(r['candidateId'])
+              assert r['formalDate'] is None and r['formalPrice'] is None and r['ticketStatus']=='UNKNOWN'
+              assert not r['published'] and not r['goldenVerified'] and r['fieldPromotions']==0 and r['sessionSplitCount']==0
+              if not r['sourceTitleParity']:assert not r['fieldCandidates'] and not r['fieldRejected']
+              for e in r['fieldCandidates']+r['fieldRejected']:
+                  assert not e['promotable'] and not e['formalFieldPromoted'] and not e['verified']
+              print('L9G_SOURCE',r['candidateId'],'TITLE',r['sourceTitleParity'],'ROLE_PROBES',
+                    r['structureMetrics']['rawProbeCount'] if r['structureMetrics'] else 0,
+                    'REVIEW',len(r['fieldCandidates']),'HOLD',len(r['fieldRejected']))
+          assert len(seen)==5
+          assert hashlib.sha256((root/'rendered_field_structure.json').read_bytes()).hexdigest()==manifest['filesSHA256']['rendered_field_structure.json']
+          print('PASS L9G_SHA_PINNED_FIVE_PUBLIC_DOM_STRUCTURE_SAMPLES')
+          print('QUALITY L9G_TITLE',report['sourceTitleParityCount'],'PAIRS',report['eligibleReviewPairs'],'REJECTED',report['rejectedOrHoldPairs'])
+          print('HOLD L9G_NO_GOLDEN_NO_PUBLISH_NO_WRITER')
+          PY
+      - name: SHA seal isolated evidence only
+        if: always()
+        run: |
+          mkdir -p p30-l9g-evidence
+          if test -f p30-l9g-evidence/manifest.json; then
+            (cd p30-l9g-evidence && sha256sum rendered_field_structure.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9G_SHA256_ARTIFACT
+          else
+            echo HOLD L9G_NO_EVIDENCE
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9g-ibon-rendered-structure-readonly
+          path: p30-l9g-evidence/
+          if-no-files-found: warn
+          retention-days: 14
