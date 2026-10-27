@@ -1,0 +1,146 @@
+name: EventRadar P30 L7-C isolated Android candidate preview (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l7c-isolated-preview
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l7c-isolated-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  isolated-mobile-preview:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l7c-isolated-preview'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout without persisted credential
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen L7-B ancestry, exact three-existing plus new workflow, and Pages byte identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=e680456f0033e528fb25da61a4b3b6e35aa22447
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l7c_preview.yml' \
+            'scripts/p30_l7c_isolated_index.html' \
+            'scripts/p30_l7c_isolated_preview.mjs' \
+            'tests/p30/test_l7c_isolated_preview.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo 'HOLD_L7C_SCOPE_CHANGED'; exit 1; }
+          echo 'PASS L7C_FROZEN_PARENT_AND_FOUR_ADDITIONS'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 18 offline positive-negative tests and browser script syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l7c_isolated_preview.mjs
+          node --test tests/p30/test_l7c_isolated_preview.mjs
+          python - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          class Scripts(HTMLParser):
+              def __init__(self): super().__init__(); self.inside=False; self.js=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag=='script':
+                      assert not dict(attrs).get('src'), 'HOLD_EXTERNAL_SCRIPT'
+                      self.inside=True
+              def handle_data(self,value):
+                  if self.inside:self.js.append(value)
+              def handle_endtag(self,tag):
+                  if tag=='script':self.inside=False
+          html=Path('scripts/p30_l7c_isolated_index.html').read_text(encoding='utf-8')
+          for forbidden in ('innerHTML','outerHTML','serviceWorker.register',
+                            'navigator.serviceWorker','docs/data.json','localStorage.setItem'):
+              assert forbidden not in html, forbidden
+          p=Scripts();p.feed(html);assert len(p.js)==1
+          Path('/tmp/eventradar_l7c_inline.js').write_text(p.js[0],encoding='utf-8')
+          PY
+          node --check /tmp/eventradar_l7c_inline.js
+          echo 'PASS L7C_OFFLINE_18_AND_HTML_SCRIPT_SAFE'
+      - name: Download exact L7-B successful fresh evidence (not historical 12 snapshot)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          run-id: 40353636708
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l7c-parent
+      - name: SHA and JSON Schema verification of fresh pinned parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd p30-l7c-parent && sha256sum -c SHA256SUMS.txt)
+          python -m pip install 'jsonschema>=4.21,<5'
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          from jsonschema import Draft202012Validator,FormatChecker
+          root=Path('p30-l7c-parent')
+          candidate=json.loads((root/'fresh_candidate.json').read_text(encoding='utf-8'))
+          diagnostic=json.loads((root/'platform_diagnostics.json').read_text(encoding='utf-8'))
+          manifest=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          schema=json.loads(Path('schemas/p30_l7b_fresh_candidates.schema.json').read_text(encoding='utf-8'))
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema,format_checker=FormatChecker()).validate(candidate)
+          assert candidate['runId']==diagnostic['runId']==manifest['runId']
+          assert manifest['sourceParentSHA']=='17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8'
+          for name,sha in manifest['filesSHA256'].items():
+              assert name in ('fresh_candidate.json','platform_diagnostics.json')
+              assert hashlib.sha256((root/name).read_bytes()).hexdigest()==sha
+          assert candidate['candidateOrigin']=='L7B_ACTUAL_NEW_PUBLIC_HTTP'
+          assert candidate['actualFreshHTTPRequests']==34
+          assert candidate['candidateCount']==264 and len(candidate['candidateEventRecords'])==264
+          assert diagnostic['counts']=={
+              'platformsChecked':19,'httpOK':16,'listPositive':12,'listCandidates':264,
+              'detailAttempts':12,'detailHttpOK':12,'detailIdentityVerified':5,
+              'labelEvidenceObserved':12}
+          assert diagnostic['all19PlatformsAttempted'] and not diagnostic['published']
+          assert not diagnostic['writerExecuted'] and not diagnostic['schedulerExecuted']
+          assert not diagnostic['notifierExecuted'] and not candidate['published']
+          assert not candidate['goldenAccepted'] and not candidate['formalFieldPromotionCount']
+          print('PASS L7C_PINNED_PARENT_FRESH_34_REQUESTS_264_LIST_5_DETAIL_TITLE')
+          PY
+      - name: Build SHA-sealed mobile preview without new HTTP
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/p30_l7c_isolated_preview.mjs \
+            --input p30-l7c-parent/fresh_candidate.json \
+            --diagnostics p30-l7c-parent/platform_diagnostics.json \
+            --out p30-l7c-preview
+          (cd p30-l7c-preview && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('p30-l7c-preview/preview-data.json').read_text(encoding='utf-8'))
+          assert p['counts']['total']==264 and p['counts']['verifiedDetail']==5
+          assert p['counts']['listOnly']+p['counts']['identityHold']==259
+          assert p['sourceFreshHTTPRequests']==34 and p['actualFreshHTTPRequestsInThisGate']==0
+          assert p['published'] is False and p['previewOnly'] and p['acceptedAndroid44Preserved']
+          assert all(x['dateStart'] is None and x['price'] is None and x['ticketStatus']=='UNKNOWN'
+                     for x in p['items'])
+          print('PASS L7C_MOBILE_PREVIEW_264_CANDIDATES_5_REVIEWED_259_HOLD')
+          PY
+      - name: Archive isolated candidate mobile preview (not production)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7c-isolated-android-preview
+          path: p30-l7c-preview/
+          if-no-files-found: warn
+          retention-days: 14
