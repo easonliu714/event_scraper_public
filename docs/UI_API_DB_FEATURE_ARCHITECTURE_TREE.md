@@ -1,5 +1,25 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 SRC-P30-L9-C fresh four-official-adapter architecture — read-only live HTTP/list/detail native CI PASS**
+>
+> ```text
+> event_scraper_public main@fc4f963247d [unchanged; formal docs/data.json/Pages/runtime frozen]
+> └─ Source PR #39 L9-B @ b1f831f985074e5011950403823bb1b4c41d16b4 [PASS/HARD_HOLD]
+>    └─ Source Draft PR #40 L9-C @ ae469b52e7b7b7f16dda1eeab584be8e16d63f50
+>       ├─ scripts/p30_l9c_four_source_fresh.py [new public HTTPS; NO writer]
+>       │  ├─ CKSMH Query.list.ctr -> official actId-bound anchors -> 1 detail.sample
+>       │  ├─ TWTC exhibition?p=home -> official table rows -> exhibition_more.aspx?id
+>       │  ├─ ibon Index/entertainment + Home/MoreResult -> numeric activity ID links (0 currently)
+>       │  └─ FamiTicket Home -> official card /Home/Activity/Info IDs -> detail.sample
+>       ├─ tests/p30/test_l9c_four_source_fresh.py [25/25 mocked URL/ID/semantic negatives]
+>       └─ .github/workflows/eventradar_p30_l9c_four_fresh.yml
+>          └─ read-only native CI 40443838700 -> artifact 12707735836 [sha256 sealed]
+> ```
+> - **Actual native evidence** [Run 40443838700](https://github.com/easonliu714/event_scraper_public/actions/runs/40443838700) completed/success; per-source fresh GET **8 total**; CKSMH 5 current actId candidates/detail title 1/1 match, TWTC 40 capped current exhibition table/detail title 1/1 match, FamiTicket 40 capped card candidates/detail title 1/1 match, ibon two official HTTP200 list GET/0 candidates/detail NOT_ATTEMPTED `HOLD_LIST_ZERO_OR_HTTP`. Source list-positive 3/4, new candidate count 85; these 85 are NOT verified events nor formal field records; 3 title matches prove only sampled source/detail title parity. Internal per-platform HTTP source URLs, source role, current list/detail quality and SHA are in [Artifact 12707735836](https://github.com/easonliu714/event_scraper_public/actions/runs/40443838700/artifacts/12707735836), ZIP digest `74940280bf4df32821b39557b1b52a959ef1c2735709964efc673c889c4399da` (10,272 B).
+> - **Identity and field gates:** cksmh_list enforces `actId` official host/path, TWTC table requires recognized bounded exhibition period and canonical `exhibition_more.aspx?id`; ibon canonicalizes official ActivityInfo/Details numeric IDs and rejects outbound domain, FamiTicket admits official query-free opaque detail IDs. No title similarity auto-merge. Raw exhibition periods/venues are `REVIEW_ONLY`; event date/show time/entry/registration/sale/voucher validity/price/ticket status remain unavailable for promotion. No formal date/price/ticket promotions, Golden/Writer/Publisher/Scheduler/Notifier or current Android/data.json changes.
+> - **Roadmap and HOLD:** ibon HTTP200/list0 current (JS-specific extraction needed), CKSMH/TWTC/Fami limited detail sampling and capped lists, full 19 platform freshness/accuracy not proven, full L8 Android E2E and production rollback pending; `releaseState=HARD_HOLD_NO_PUBLICATION`. Previous 44 Android user-accepted events and new L8 core UI PASS preserved. Next L9-D is no-bypass official ibon response/DOM diagnostic and source-tier fidelity; not production schedule/writer activation. Both governance documents remain in Draft PR #8 (not main).
+>
+
 > **2026-10-27 P30-L9-B source-quality / synthetic rollback architecture — native CI PASS / publication DENIED**
 >
 > ```text
