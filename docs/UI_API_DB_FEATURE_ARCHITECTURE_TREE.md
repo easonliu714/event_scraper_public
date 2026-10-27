@@ -1,5 +1,31 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 P30-L9-B source-quality / synthetic rollback architecture — native CI PASS / publication DENIED**
+>
+> ```text
+> Source main@fc4f963247d [FROZEN]
+> └─ L9-A Source Draft PR #38 @ d35c3b78f09bcbeeb4da79ea3b6014330798ebfa [release HARD HOLD, CI PASS]
+>    └─ L9-B Source Draft PR #39 @ b1f831f985074e5011950403823bb1b4c41d16b4
+>       ├─ scripts/p30_l9b_field_quality_rollback.mjs [NO HTTP, immutable artifacts only]
+>       │  ├─ L7-B fresh_candidate.json + platform_diagnostics.json [34 upstream HTTP, NOT NEW]
+>       │  ├─ L7-C preview-data.json [264/5/259, prior Android core UAT]
+>       │  ├─ L9-A release_blocker_matrix.json [10 mandatory HOLD]
+>       │  ├─ labelQuality(e) → PRICE/資訊 REJECT; currency/venue/date REVIEW_ONLY
+>       │  ├─ review(inputs) → 12 source evidence labels + 19 platform adapter HOLD rows
+>       │  ├─ syntheticRollback(isolatedCopy) → tamper then restore SHA parity
+>       │  └─ build(inputs, isolatedOutput) → quality/gap/rollback JSON + SHA manifest
+>       ├─ tests/p30/test_l9b_field_quality_rollback.mjs [30/30 negative-positive]
+>       └─ .github/workflows/eventradar_p30_l9b_field_quality_rollback.yml
+>          ├─ Exact L9-A parent, no formal source/Pages/blob changes; three-file add-only
+>          ├─ SHA256SUMS and JSON Schema 2020-12 for L7-B/C/L9-A pinned source artifacts
+>          └─ Run 40442853866 -> Artifact 12707416716 [HARD HOLD]
+> ```
+> - **Independent native GitHub result** [Run 40442853866](https://github.com/easonliu714/event_scraper_public/actions/runs/40442853866) completed/success with all 30 positive-negative tests, SHA/Schema parent lineage, 12 actual field labels, report hash, synthetic restore. [Artifact 12707416716](https://github.com/easonliu714/event_scraper_public/actions/runs/40442853866/artifacts/12707416716) ZIP SHA256 `3906b4e9689987429040ce9508fc88e4dbb0491199fd5984e55fb469065114d0`, 6,070 bytes.
+> - **Actual quality states:** `VENUE_TEXT_REVIEW_ONLY=6`, `PRICE_TOKEN_REVIEW_ONLY=2`, `REJECT_GENERIC_NON_PRICE=2`, `TIME_ROLE_TOKEN_REVIEW_ONLY=2`. All `formalFieldPromoted=false`. Valid-looking evidence is still not source-level Golden; raw authoritative dates, identity, current ticket availability and classification remain HOLD/UNKNOWN. No newly issued public HTTP requests or platform-specific actual fresh extraction in L9-B. Adapter focus: CKSMH actId + TWTC table + ibon JS + FamiTicket detail title.
+> - **Rollback definition boundary:** malicious *synthetic* temporary file changes then copied-baseline exact byte restore, restored SHA `070a4a6eb3c0fc8a0ebccee44ed8f0016c9a31d9aa3872a2801a8497a58bf59e`; copies removed. `productionRollbackVerified=false`. Real writer, recovery rehearsal of deployed Pages and three-repository migration/retirement are not implemented. `releaseState=HARD_HOLD_NO_PUBLICATION`, Cloud Scheduler PR #1 HIGH_RISK_HOLD, Source PRs unmerged. User's original 44 Android UAT PASS and L8 preview CORE_UI_PASS are preserved.
+> - **Next P30-L9-C** bounded *new* source-specific HTTPS acquisition and parser effectiveness under exact SHA-sealed output, no bypass, no formal DATA.JSON / PWA / API / DB update until separate quality/release gates; all platform zero-lists remain HOLD absent explicit verified evidence. Governance two documents only in [Docs Draft PR #8](https://github.com/easonliu714/event_scraper_public/pull/8), not source main.
+>
+
 > **2026-10-27 SRC-P30-L9-A immutable evidence-to-release-blocker architecture — 26/26 native CI PASS, RELEASE HARD_HOLD**
 >
 > ```text
