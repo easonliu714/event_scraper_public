@@ -60,7 +60,7 @@ jobs:
           name: eventradar-p30-l9f-ibon-detail-roles-review-only
           run-id: 40494326021
           repository: easonliu714/event_scraper_public
-          github-token: TOKEN_PLACEHOLDER
+          github-token: ${{ github.token }}
           path: l9h-l9f-title-source
       - name: Verify both internal SHA manifests and cross-artifact title/ID agreement
         run: |
