@@ -1,5 +1,11 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+> **2026-10-27 P30-L9-H native CI recovery journal — current run queued, do not treat Gate as PASS yet**
+>
+> - Source Draft [PR #45](https://github.com/easonliu714/event_scraper_public/pull/45) now HEAD `56d309a9d4d895c7adfb525723c6e2a9c4abd2cb` versus L9-G frozen BASE `07cc3ce1743a56d2bc60213d345f27672cef97d5`. First native [Run 40514885666](https://github.com/easonliu714/event_scraper_public/actions/runs/40514885666) stuck at OS Chromium `--with-deps` installation and was **CANCELLED** when new workflow took over (no public site visits). Second [Run 40515905716](https://github.com/easonliu714/event_scraper_public/actions/runs/40515905716) verified exact three-file scope / browser installation / **36 of 36 offline tests PASS** and original L9-G Artifact SHA, then **FAILED** at second L9-F artifact download because workflow still had one literal `TOKEN_PLACEHOLDER`; fixed to exact `github.token` in subsequent workflow-only commit. These are CI plumbing issues, not source parser successful Gate evidence.
+> - Third repaired [Run 40516301527](https://github.com/easonliu714/event_scraper_public/actions/runs/40516301527) is QUEUED at latest check. Only it (or a later exact HEAD run) may establish `L9H_NATIVE_CI=PASS`, fresh five detail browser evidence and resulting Artifact SHA; source Title+DOM dual SHA check and source role fidelity must precede any conclusion. All production Writer/Scheduler/Notifier/Publisher, Golden, merges and original Android 44 remain unchanged; release `HARD_HOLD_NO_PUBLICATION`.
+>
+
 > **2026-10-27 P30-L9-H checkpoint — implementation submitted, native CI PENDING (do not promote to PASS until completed)**
 >
 > - Exact frozen Source main `fc4f963247d68eed29425808cc14e7250f312d05`; [Source Draft PR #45](https://github.com/easonliu714/event_scraper_public/pull/45) head `21d935e94236ef5a0becd13a0e7fd2496d5f3362`, stacked on [L9-G Draft PR #44](https://github.com/easonliu714/event_scraper_public/pull/44) base `07cc3ce1743a56d2bc60213d345f27672cef97d5`. Exactly three additive source/test/workflow files, protected Pages and runtime SHA enforced in CI.
