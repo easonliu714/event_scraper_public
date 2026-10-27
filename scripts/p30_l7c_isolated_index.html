@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>EventRadar L7-C｜新來源隔離候選預覽</title>
+<style>
+:root {font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#18283c;background:#f5f7fb;font-synthesis:none}
+*{box-sizing:border-box}
+body{margin:0;line-height:1.55}
+header{background:#172e50;color:white;padding:18px 16px 20px}
+header h1{font-size:1.35rem;margin:0 0 4px} header p{margin:3px 0;font-size:.87rem;color:#e2eaf3}
+main{max-width:940px;margin:auto;padding:15px 12px 64px}
+.notice{border:1px solid #c9d7e5;border-radius:12px;background:white;padding:13px;margin-bottom:14px;font-size:.88rem}
+.notice strong{display:block;color:#1b416e}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.stat{background:white;border:1px solid #dde4ed;border-radius:10px;padding:11px 8px;text-align:center}
+.stat b{display:block;font-size:1.5rem;font-variant-numeric:tabular-nums}.stat span{font-size:.74rem;color:#506076}
+.filters{display:grid;grid-template-columns:1fr;gap:10px;background:#fff;border:1px solid #d9e1eb;border-radius:12px;padding:12px;margin-bottom:12px}
+.filters label{font-size:.82rem;font-weight:650;color:#34465d}
+input,select,button{font:inherit}
+input,select{width:100%;border:1px solid #bac9d8;border-radius:9px;background:white;color:#162a42;padding:11px;min-height:43px}
+button{border:0;border-radius:9px;min-height:42px;padding:10px 14px;cursor:pointer;font-weight:600}
+#quality{display:flex;gap:7px;flex-wrap:wrap}
+#quality button{background:#eaf0f7;color:#263c5b;flex:1;min-width:100px}
+#quality button[aria-pressed=true]{background:#173f74;color:white}
+#count{font-size:.85rem;color:#475b73;margin:12px 0}
+.cards{display:grid;grid-template-columns:1fr;gap:10px}
+.card{border:1px solid #d8e2ec;background:#fff;border-radius:11px;padding:13px;min-width:0}
+.card h2{font-size:1.03rem;margin:6px 0 8px;overflow-wrap:anywhere}
+.card p{font-size:.83rem;margin:4px 0;color:#465974}
+.tag{display:inline-block;border-radius:30px;padding:3px 9px;background:#eff4fa;color:#244875;font-size:.73rem;font-weight:650}
+.tag.verified{background:#e2f4e8;color:#1b663d}.tag.hold{background:#fff3d9;color:#845500}
+.actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.actions button{background:#244d7d;color:white;flex:1}
+.actions a,.link{display:inline-flex;align-items:center;justify-content:center;color:#164a87;background:#ecf3fc;padding:9px;border-radius:9px;text-decoration:none;font-weight:650;font-size:.85rem;overflow-wrap:anywhere}
+.actions a{flex:1}
+dialog{border:0;border-radius:14px;padding:0;max-width:min(92vw,640px);max-height:88vh;width:100%;box-shadow:0 18px 60px #0005}
+dialog::backdrop{background:#07152ab3}
+dialog section{padding:17px;overflow-y:auto;max-height:85vh}
+dialog h2{margin:4px 0;font-size:1.2rem;overflow-wrap:anywhere}
+dialog h3{font-size:.94rem;margin:18px 0 7px}
+dialog p{font-size:.88rem;color:#40536c;overflow-wrap:anywhere}
+dialog .close{float:right;background:#e9eff6;color:#24364d}
+.evidence{border-top:1px solid #e5eaf0;padding:10px 0;font-size:.83rem}
+.evidence span{display:block;color:#65758a}
+footer{font-size:.74rem;margin-top:22px;color:#5c6b7d}
+@media(min-width:640px){.filters{grid-template-columns:1fr 1fr}.filters .wide{grid-column:1/-1}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<header><h1>活動暨售票雷達｜新來源候選</h1><p>L7-C 隔離手機預覽 · 非正式 PWA · 不更新原有 44 筆驗收成果</p></header>
+<main>
+<div class="notice"><strong>來源品質分級，非即時票況</strong>
+以下是單次新 HTTP 抓取的活動候選。只有「詳情標題吻合」通過來源身分初步比對，尚未核定日期、票價、售票狀態或官方分類。其他候選僅有清單證據或尚未核實詳情，請使用官方來源連結確認。</div>
+<div class="stats" aria-label="來源候選統計">
+ <div class="stat"><b id="stat-total">—</b><span>清單候選</span></div>
+ <div class="stat"><b id="stat-verified">—</b><span>詳情吻合</span></div>
+ <div class="stat"><b id="stat-hold">—</b><span>仍需審核</span></div>
+</div>
+<div class="filters">
+ <div><label for="search">活動關鍵字</label><input id="search" type="search" placeholder="搜尋名稱／平台" autocomplete="off"></div>
+ <div><label for="platform">來源平台</label><select id="platform"><option value="">全部來源平台</option></select></div>
+ <div class="wide"><label>證據品質</label><div id="quality" role="group" aria-label="證據品質篩選">
+  <button data-kind="verified" aria-pressed="true">詳情吻合</button>
+  <button data-kind="all" aria-pressed="false">全部候選</button>
+  <button data-kind="unverified" aria-pressed="false">待核對</button>
+ </div></div>
+</div>
+<p id="count" role="status" aria-live="polite">正在載入隔離候選資料…</p>
+<div id="cards" class="cards"></div>
+<footer id="lineage"></footer>
+</main>
+<dialog id="detail"><section>
+ <button class="close" id="close" type="button" aria-label="關閉詳情">關閉 ×</button>
+ <h2 id="detail-title"></h2>
+ <p id="detail-role"></p>
+ <p id="detail-date"></p><p id="detail-price"></p><p id="detail-ticket"></p>
+ <p id="detail-state"></p>
+ <h3>原始欄位標籤（僅供審核，不是已核實的正式日期）</h3>
+ <div id="detail-evidence"></div>
+ <h3>官方／原始來源</h3><p id="detail-link"></p>
+</section></dialog>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+let data=null,kind="verified";
+const items=()=>(data?.items||[]);
+const safeLink=(url)=>{
+ try{const u=new URL(url);return u.protocol==="https:"&&!u.username&&!u.password?u.href:null;}
+ catch{return null;}
+};
+function text(tag,content,className){
+ const el=document.createElement(tag);el.textContent=String(content??"");
+ if(className)el.className=className;
+ return el;
+}
+function sourceBadge(item){
+ if(item.qualityTier==="DETAIL_TITLE_PARITY_PASS")return {name:"詳情標題吻合｜仍非 Golden",cls:"verified"};
+ if(item.qualityTier==="LIST_ONLY_UNVERIFIED")return {name:"只有清單證據",cls:"hold"};
+ return {name:"詳情身分待核對",cls:"hold"};
+}
+function official(item){
+ const a=document.createElement("a");a.textContent="查看來源網站";
+ a.className="link";const href=safeLink(item.sourceUrl);
+ if(href){a.href=href;a.target="_blank";a.rel="noopener noreferrer";}
+ else {a.textContent="來源網址未核實";a.removeAttribute("href");}
+ return a;
+}
+function detail(item){
+ $("detail-title").textContent=item.title;
+ $("detail-role").textContent="來源："+item.sourcePlatform+
+   (item.sourceRole==="THIRD_PARTY_AGGREGATOR_ARTICLE"?"（第三方聚合，非官方主辦證明）":"（票務／活動平台候選）");
+ $("detail-date").textContent="活動日期／開演時間：未知，請以官方來源為準";
+ $("detail-price").textContent="地點與票價：未核實";
+ $("detail-ticket").textContent="票況、報名期間、售票期間、票券有效期：未知（不互相推定）";
+ $("detail-state").textContent="來源 Gate："+sourceBadge(item).name+"；詳情狀態："+item.detailStatus;
+ const ev=$("detail-evidence");ev.replaceChildren();
+ if(!item.fieldEvidence.length)ev.append(text("p","尚無可通過身分比對的欄位標籤證據。"));
+ for(const v of item.fieldEvidence){
+  const block=text("div","","evidence");
+  block.append(text("b",v.role+"／"+v.label));
+  block.append(text("span",v.observedValue));
+  block.append(text("span","來源角色證據，需人工確認；未寫入正式欄位"));
+  ev.append(block);
+ }
+ const link=$("detail-link");link.replaceChildren(official(item));
+ $("detail").showModal();
+}
+function render(){
+ const q=$("search").value.toLocaleLowerCase().trim(),platform=$("platform").value;
+ const rows=items().filter(x=>{
+  if(kind==="verified"&&x.qualityTier!=="DETAIL_TITLE_PARITY_PASS")return false;
+  if(kind==="unverified"&&x.qualityTier==="DETAIL_TITLE_PARITY_PASS")return false;
+  return (!platform||x.sourcePlatform===platform)&&(!q||(x.title+" "+x.sourcePlatform).toLocaleLowerCase().includes(q));
+ });
+ $("count").textContent="目前顯示 "+rows.length+" 筆；不表示全部已通過活動內容驗證";
+ const root=$("cards");root.replaceChildren();
+ for(const r of rows){
+  const card=text("article","","card"), b=sourceBadge(r);
+  card.append(text("span",b.name,"tag "+b.cls),text("h2",r.title));
+  card.append(text("p","來源："+r.sourcePlatform+(r.sourceRole==="THIRD_PARTY_AGGREGATOR_ARTICLE"?" · 第三方":"")));
+  card.append(text("p","日期：未知｜票況：UNKNOWN｜分類：待分類"));
+  const acts=text("div","","actions");
+  const open=text("button","查看隔離詳情");open.type="button";open.addEventListener("click",()=>detail(r));
+  acts.append(open,official(r));card.append(acts);root.append(card);
+ }
+ if(!rows.length)root.append(text("p","沒有符合此篩選條件的來源候選。"));
+}
+$("close").addEventListener("click",()=>$("detail").close());
+$("detail").addEventListener("click",e=>{if(e.target===$("detail"))$("detail").close();});
+$("search").addEventListener("input",render);
+$("platform").addEventListener("change",render);
+for(const b of document.querySelectorAll("#quality button"))b.addEventListener("click",()=>{
+ kind=b.dataset.kind;
+ for(const x of document.querySelectorAll("#quality button"))
+  x.setAttribute("aria-pressed",String(x===b));
+ render();
+});
+(async()=>{
+ try{
+  const response=await fetch("./preview-data.json",{cache:"no-store"});
+  if(!response.ok)throw Error("HTTP "+response.status);
+  const d=await response.json();
+  if(d.kind!=="EVENTRADAR_P30_L7C_ISOLATED_FRESH_REVIEW_PREVIEW_V1"||
+      d.published!==false||d.goldenAccepted!==0||d.previewOnly!==true)
+   throw Error("隔離資料來源不符合安全合約");
+  data=d;
+  $("stat-total").textContent=d.counts.total;
+  $("stat-verified").textContent=d.counts.verifiedDetail;
+  $("stat-hold").textContent=d.counts.listOnly+d.counts.identityHold;
+  for(const name of [...new Set(items().map(x=>x.sourcePlatform))].sort()){
+   const option=document.createElement("option");option.value=name;option.textContent=name;$("platform").append(option);
+  }
+  $("lineage").textContent="來源採集："+d.sourceCollectedAtUTC+
+    " · 上游 run："+d.sourceRunId+" · 此頁離線轉換，新 HTTP 請求：0 · 未發布";
+  render();
+ }catch(e){
+  $("count").textContent="HOLD：隔離候選資料讀取失敗："+e.message+
+   "。請確認從本機 HTTP 服務開啟，勿直接使用 file://。";
+ }
+})();
+</script>
+</body>
+</html>
