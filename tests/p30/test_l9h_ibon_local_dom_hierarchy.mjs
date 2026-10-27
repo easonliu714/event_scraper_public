@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {mkdtemp,readFile,rm} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {resolve} from "node:path";
-import {KIND,PARENT_KIND,PARENT_HEAD,PARENT_RUN,PARENT_ARTIFACT,IDS,HOLD,
+import {KIND,PARENT_KIND,PARENT_HEAD,PARENT_RUN,PARENT_ARTIFACT,TITLE_PARENT_KIND,IDS,HOLD,
  LABEL_ROLES,parentProof,reviewNeighbor,assessStructure,audit,validateReport,
  safeOut,emit} from "../../scripts/p30_l9h_ibon_local_dom_hierarchy.mjs";
 
@@ -27,6 +27,17 @@ function fixture(){
   }))
  };
  return{p,raw:Buffer.from(JSON.stringify(p))};
+}
+function titleFixture(parent){
+ const doc={kind:TITLE_PARENT_KIND,parentL9ERun:40449476633,
+  parentArtifactId:12709568132,parentCandidateCount:22,
+  additionalSampleSize:5,additionalTitleParity:5,formalFieldPromotions:0,
+  goldenAccepted:0,published:false,releaseState:HOLD,
+  samples:parent.results.map((row,i)=>({
+   candidateId:row.candidateId,officialUrl:row.officialUrl,
+   listTitle:eventTitle+i,titleParity:true,httpStatus:200
+  }))};
+ return {doc,raw:Buffer.from(JSON.stringify(doc))};
 }
 const neighbor=(value,relation="LABEL_NEXT_ELEMENT",over={})=>({
  value,relation,distance:1,otherRoleCount:0,interactive:false,...over});
@@ -59,28 +70,28 @@ function fakeBrowser(parent,options={}){
 test("01 task is explicitly read-only",()=>assert.match(KIND,/HIERARCHY_READONLY/));
 test("02 exact 5 known official ibon IDs",()=>assert.deepEqual(IDS,["39575","39878","39907","39961","39978"]));
 test("03 parent report includes 5 precise source matches and digest",()=>{
- const p=fixture(),o=parentProof(p.p,p.raw);
+ const p=fixture(),t=titleFixture(p.p),o=parentProof(p.p,p.raw,t.doc,t.raw);
  assert.equal(o.sha256,sha(p.raw));assert.equal(o.sources.length,5);
 });
 test("04 source cannot be historical or wrong kind",()=>{
  for(const field of ["kind","sourceOrigin"]){
-  const p=fixture();p.p[field]="L7A_HISTORICAL";assert.throws(()=>parentProof(p.p,p.raw));
+  const p=fixture();p.p[field]="L7A_HISTORICAL";assert.throws(()=>parentProof(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw));
  }
 });
 test("05 wrong source identity denied",()=>{
  const p=fixture();p.p.results[0].officialUrl="https://evil.test/Details/39575";
- assert.throws(()=>parentProof(p.p,p.raw));
+ assert.throws(()=>parentProof(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw));
 });
 test("06 forged source title parity denied",()=>{
- const p=fixture();p.p.results[0].sourceTitleParity=false;assert.throws(()=>parentProof(p.p,p.raw));
+ const p=fixture();p.p.results[0].sourceTitleParity=false;assert.throws(()=>parentProof(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw));
 });
 test("07 altered source rejection quality denied",()=>{
  const p=fixture();p.p.results[0].fieldRejected[0].quality="PRICE_REVIEW_ONLY";
- assert.throws(()=>parentProof(p.p,p.raw));
+ assert.throws(()=>parentProof(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw));
 });
 test("08 source with field promotion denied",()=>{
  for(const [k,v] of [["formalFieldPromotions",1],["published",true],["goldenAccepted",1],["writerExecuted",true]]){
-  const p=fixture();p.p[k]=v;assert.throws(()=>parentProof(p.p,p.raw));
+  const p=fixture();p.p[k]=v;assert.throws(()=>parentProof(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw));
  }
 });
 test("09 role dictionary separates sale vs actual event time",()=>{
@@ -176,9 +187,9 @@ test("31 no invented field when no DOM neighbor",()=>{
 });
 test("32 synthetic five official pages with review-only dates",async()=>{
  const p=fixture();
- p.p.results.forEach((x,i)=>{x.listTitle=eventTitle+i;});
+ 
  const b=fakeBrowser(p.p);
- const r=await audit(p.p,p.raw,b.client,{settleMs:0});
+ const r=await audit(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw,b.client,{settleMs:0});
  assert.equal(b.urls.length,5);assert.equal(r.sampleCount,5);
  assert.equal(r.titleParityCount,5);
  assert.equal(r.locallyBoundReviewPairs,5);
@@ -187,31 +198,31 @@ test("32 synthetic five official pages with review-only dates",async()=>{
  validateReport(r);
 });
 test("33 synthetic no page title parity still has zero field evidence",async()=>{
- const p=fixture();p.p.results.forEach((x,i)=>{x.listTitle=eventTitle+i;});
+ const p=fixture();
  const b=fakeBrowser(p.p,{titleMismatch:true});
- const r=await audit(p.p,p.raw,b.client,{settleMs:0});
+ const r=await audit(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw,b.client,{settleMs:0});
  assert.equal(r.titleParityCount,0);
  assert.equal(r.locallyBoundReviewPairs,0);assert.equal(r.rejectedOrHoldPairs,0);
 });
 test("34 off-origin redirect or 403 cannot generate fields",async()=>{
  for(const option of [{offHost:true},{httpStatus:403}]){
-  const p=fixture();p.p.results.forEach((x,i)=>{x.listTitle=eventTitle+i;});
+  const p=fixture();
   const b=fakeBrowser(p.p,option);
-  const r=await audit(p.p,p.raw,b.client,{settleMs:0});
+  const r=await audit(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw,b.client,{settleMs:0});
   assert.equal(r.locallyBoundReviewPairs,0);
   assert.ok(r.rows.every(x=>x.status.startsWith("HOLD")));
  }
 });
 test("35 reject metadata promoting Golden or formal prices",async()=>{
- const p=fixture();p.p.results.forEach((x,i)=>{x.listTitle=eventTitle+i;});
+ const p=fixture();
  const b=fakeBrowser(p.p,{titleMismatch:true});
- const r=await audit(p.p,p.raw,b.client,{settleMs:0});
+ const r=await audit(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw,b.client,{settleMs:0});
  r.rows[0].formalPrice=900;assert.throws(()=>validateReport(r));
 });
 test("36 SHA manifest and output confinement",async()=>{
- const p=fixture();p.p.results.forEach((x,i)=>{x.listTitle=eventTitle+i;});
+ const p=fixture();
  const b=fakeBrowser(p.p,{titleMismatch:true});
- const r=await audit(p.p,p.raw,b.client,{settleMs:0});
+ const r=await audit(p.p,p.raw,titleFixture(p.p).doc,titleFixture(p.p).raw,b.client,{settleMs:0});
  const dir=await mkdtemp(resolve("p30-l9h-test-"));
  try{
   const m=await emit(r,dir);
