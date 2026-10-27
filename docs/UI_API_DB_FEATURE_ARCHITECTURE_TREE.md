@@ -1,5 +1,19 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 P30-L9-H source cross-binding + local DOM probe architecture checkpoint — CI RUNNING**
+>
+> ```text
+> Source main@fc4f963247d [FROZEN]
+> └─ L9-G Draft PR #44 @ 07cc3ce1743a56d2bc60213d345f27672cef97d5
+>    └─ L9-H Draft PR #45 @ 21d935e94236ef5a0becd13a0e7fd2496d5f3362
+>       ├─ scripts/p30_l9h_ibon_local_dom_hierarchy.mjs [dual SHA source: L9G structure + L9F original titles]
+>       ├─ tests/p30/test_l9h_ibon_local_dom_hierarchy.mjs [36 offline tests, pending native CI]
+>       └─ .github/workflows/eventradar_p30_l9h_ibon_local_dom.yml
+>          └─ Run 40514885666 in progress at this checkpoint
+> ```
+> - Does NOT use L9-G ID-only report to recreate event titles: read both exact upstream GitHub Artifacts and cross-check SHA manifest / five source IDs / L9-F title / L9-G prior detail parity, then new normal Chromium public detail DOM neighbors. Persist limited label-bound snippets, relation type and image counts, not raw HTML/cookies/network bodies, no unbound whole-body dates. All accepted candidates are `REVIEW_ONLY` and `formalFieldPromoted=false`; `HARD_HOLD_NO_PUBLICATION`. No formal Pages/DB/API/Writer/Scheduler/Android changes. This WIP is not a CI result; supersede only after fresh native CI completion.
+>
+
 > **2026-10-27 P30-L9-G ibon detail DOM hierarchy evidence — native CI PASS, no verified role values**
 >
 > ```text
