@@ -1,0 +1,136 @@
+name: EventRadar P30 L9-A read-only release blocker matrix (HARD HOLD)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9a-readonly-release-matrix
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9a-readonly-release
+  cancel-in-progress: false
+jobs:
+  no-release-blocker-proof:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9a-readonly-release-matrix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L7C accepted parent and ZERO production mutations
+        run: |
+          set -euo pipefail
+          base=4668dab1c7061e9d752da0cdfcd58a004e1459f1
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l9a_release_blockers.yml' \
+            'scripts/p30_l9a_release_blockers.mjs' \
+            'tests/p30/test_l9a_release_blockers.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9A_SOURCE_SCOPE; exit 1; }
+          echo PASS L9A_EXACT_PARENT_THREE_ADDITIONS_NO_MAIN_CHANGE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline 26 proof and rejection cases before downloading artifacts
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9a_release_blockers.mjs
+          node --test tests/p30/test_l9a_release_blockers.mjs
+          echo PASS L9A_OFFLINE_26_DENY_RELEASE_NEGATIVES
+      - name: Read exact SHA-sealed L7B fresh artifact (not production)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          run-id: 40353636708
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l9a-l7b-parent
+      - name: Read exact SHA-sealed L7C Android isolated-preview artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7c-isolated-android-preview
+          run-id: 40436642012
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: p30-l9a-l7c-parent
+      - name: Check upstream file SHA, schema, release flags, 264:5:259 identity
+        run: |
+          set -euo pipefail
+          (cd p30-l9a-l7b-parent && sha256sum -c SHA256SUMS.txt)
+          (cd p30-l9a-l7c-parent && sha256sum -c SHA256SUMS.txt)
+          python -m pip install 'jsonschema>=4.21,<5'
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          from jsonschema import Draft202012Validator,FormatChecker
+          l7b=Path('p30-l9a-l7b-parent')
+          fresh=json.loads((l7b/'fresh_candidate.json').read_text(encoding='utf-8'))
+          diag=json.loads((l7b/'platform_diagnostics.json').read_text(encoding='utf-8'))
+          man=json.loads((l7b/'manifest.json').read_text(encoding='utf-8'))
+          schema=json.loads(Path('schemas/p30_l7b_fresh_candidates.schema.json').read_text(encoding='utf-8'))
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema,format_checker=FormatChecker()).validate(fresh)
+          for name,digest in man['filesSHA256'].items():
+              assert hashlib.sha256((l7b/name).read_bytes()).hexdigest()==digest
+          prev=json.loads(Path('p30-l9a-l7c-parent/preview-data.json').read_text(encoding='utf-8'))
+          assert prev['sourceCandidateSHA256']==hashlib.sha256((l7b/'fresh_candidate.json').read_bytes()).hexdigest()
+          assert fresh['runId']==diag['runId']==prev['sourceRunId']
+          assert prev['counts']['total']==264
+          assert prev['counts']['verifiedDetail']==5
+          assert prev['counts']['listOnly']+prev['counts']['identityHold']==259
+          assert not prev['published'] and not fresh['published'] and not diag['writerExecuted']
+          print('PASS L9A_TWO_SHA_SEALED_UPSTREAMS_SOURCE_SAME_IDENTITY')
+          PY
+      - name: Build HARD HOLD release blocker matrix, without writer or publisher
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9a_release_blockers.mjs \
+            --fresh p30-l9a-l7b-parent/fresh_candidate.json \
+            --diagnostics p30-l9a-l7b-parent/platform_diagnostics.json \
+            --preview p30-l9a-l7c-parent/preview-data.json \
+            --out p30-l9a-evidence
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('p30-l9a-evidence')
+          r=json.loads((root/'release_blocker_matrix.json').read_text(encoding='utf-8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          assert r['kind']=='EVENTRADAR_P30_L9A_RELEASE_BLOCKER_MATRIX_READONLY_V1'
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['blockerCount']==10 and all(x['value']=='HOLD' for x in r['blockers'])
+          assert r['metrics']['listCandidates']==264 and r['metrics']['detailTitleParity']==5
+          assert r['metrics']['reviewOnly']==259
+          assert not r['readyToMerge'] and not r['readyToDeploy'] and not r['readyToEnableWriter']
+          assert not r['readyToRetireRepos'] and not r['readyToStartScheduler']
+          assert not r['published'] and not r['writerExecuted'] and not r['schedulerExecuted']
+          assert hashlib.sha256((root/'release_blocker_matrix.json').read_bytes()).hexdigest()==m['filesSHA256']['release_blocker_matrix.json']
+          print('PASS L9A_RELEASE_DENIAL_AND_TEN_EXPLICIT_HOLDS')
+          PY
+      - name: ZIP evidence input identities and output digests (read only)
+        if: always()
+        run: |
+          mkdir -p p30-l9a-evidence
+          if test -f p30-l9a-evidence/manifest.json; then
+            (cd p30-l9a-evidence && sha256sum release_blocker_matrix.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9A_SHA_SEALED_NO_RELEASE
+          else
+            echo HOLD L9A_NO_READONLY_EVIDENCE
+          fi
+      - name: Upload no-release blocker evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l9a-readonly-release-hold
+          path: p30-l9a-evidence/
+          if-no-files-found: warn
+          retention-days: 14
