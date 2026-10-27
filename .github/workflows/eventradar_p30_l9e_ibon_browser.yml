@@ -1,0 +1,110 @@
+name: EventRadar P30 L9-E normal ibon public Chromium render (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9e-ibon-browser-render
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9e-readonly-browser
+  cancel-in-progress: false
+jobs:
+  ibon-browser-evidence:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9e-ibon-browser-render'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9-D accepted parent and source Pages immutability
+        run: |
+          set -euo pipefail
+          base=8836dc29a6dcf4baaabed08102ffb1b7fbed6bc3
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' \
+            '.github/workflows/eventradar_p30_l9e_ibon_browser.yml' \
+            'scripts/p30_l9e_ibon_browser_render.mjs' \
+            'tests/p30/test_l9e_ibon_browser_render.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9E_UNEXPECTED_PRODUCTION_OR_SCOPE_CHANGE; exit 1; }
+          echo PASS L9E_EXACT_L9D_PARENT_THREE_ADDITIONS_PRODUCTION_SHA
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exact public Playwright version and normal Chromium with system deps
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install --with-deps chromium
+          node -e "import('playwright').then(p=>console.log('PASS L9E_CHROMIUM_INSTALL',Boolean(p.chromium)))"
+      - name: Thirty synthetic browser and source-identity safety tests BEFORE public HTTP
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9e_ibon_browser_render.mjs
+          node --test tests/p30/test_l9e_ibon_browser_render.mjs
+          echo PASS L9E_OFFLINE_NEGATIVES_30
+      - name: ONE normal public Chromium session two official ibon entrypoints
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9e_ibon_browser_render.mjs --out p30-l9e-evidence
+      - name: Readback browser DOM source identity and strict no publish/SHA
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib,re
+          from pathlib import Path
+          root=Path('p30-l9e-evidence')
+          diag=json.loads((root/'ibon_browser_render_diagnostics.json').read_text(encoding='utf8'))
+          man=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+          assert diag['kind']=='EVENTRADAR_P30_L9E_IBON_PUBLIC_BROWSER_RENDER_DIAGNOSTICS_V1'
+          assert diag['parentL9DHead']=='8836dc29a6dcf4baaabed08102ffb1b7fbed6bc3'
+          assert diag['sourceOrigin']=='FRESH_REAL_PUBLIC_CHROMIUM_RENDERING'
+          assert diag['browserMode']=='NORMAL_HEADLESS_CHROMIUM_NO_STEALTH'
+          assert diag['navigationAttemptCount']==2 and len(diag['pages'])==2
+          assert diag['pages'][0]['entryUrl']=='https://ticket.ibon.com.tw/Index/entertainment'
+          assert diag['pages'][1]['entryUrl']=='https://ticket.ibon.com.tw/Home/MoreResult?inATAPID=105&inATAPWebType=entertainment'
+          assert diag['candidateCount']==len(diag['candidates'])<=40
+          assert diag['detailSamplesAttempted']<=1
+          assert diag['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not diag['published'] and not diag['writerExecuted'] and not diag['schedulerExecuted']
+          assert not diag['notifierExecuted'] and diag['goldenAccepted']==0 and diag['formalFieldPromotions']==0
+          assert diag['existingAndroid44Preserved'] and diag['l8CoreAndroidPassPreserved']
+          assert not diag['persistedRawHtml'] and not diag['persistedCookies'] and not diag['persistedNetworkBodies']
+          assert not diag['executedUnapprovedNetworkCalls']
+          for row in diag['candidates']:
+              assert re.fullmatch(r'https://ticket\.ibon\.com\.tw/ActivityInfo/Details/[0-9]{3,8}',row['officialUrl'])
+              assert row['formalDate'] is None and row['formalPrice'] is None and row['ticketStatus']=='UNKNOWN'
+              assert not row['published'] and not row['goldenVerified']
+          assert hashlib.sha256((root/'ibon_browser_render_diagnostics.json').read_bytes()).hexdigest()==man['sha256']['ibon_browser_render_diagnostics.json']
+          for row in diag['pages']:
+              print('IBON_L9E_BROWSER_SOURCE',row['entryUrl'],'HTTP',row['httpStatus'],
+                    'RENDERED_CANDIDATES',row['candidateCount'],'STATE',row['state'],
+                    'DOM',json.dumps(row['dom'],ensure_ascii=False,sort_keys=True),
+                    'REQUEST_COUNTS',json.dumps(row['networkObservation'],sort_keys=True))
+          print('PASS L9E_REAL_NORMAL_CHROMIUM_TWO_ENTRIES_SHA_SEAL')
+          print('QUALITY L9E_REVIEW_CANDIDATES',diag['candidateCount'],diag['sampledDetailStatus'])
+          print('HOLD L9E_GOLDEN_PUBLICATION_REMAINS_DENIED')
+          PY
+      - name: SHA seal isolated files
+        if: always()
+        run: |
+          mkdir -p p30-l9e-evidence
+          if test -f p30-l9e-evidence/manifest.json; then
+            (cd p30-l9e-evidence && sha256sum ibon_browser_render_diagnostics.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9E_SHA256_SEALED
+          else
+            echo HOLD L9E_BROWSER_ARTIFACT_ABSENT
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9e-ibon-chromium-readonly-evidence
+          path: p30-l9e-evidence/
+          if-no-files-found: warn
+          retention-days: 14
