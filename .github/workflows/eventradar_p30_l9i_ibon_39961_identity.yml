@@ -1,0 +1,135 @@
+name: EventRadar P30 L9-I official ibon 39961 identity drift (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9i-ibon-39961-identity-audit
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9i-official-readonly
+  cancel-in-progress: true
+jobs:
+  ibon-source-list-detail:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9i-ibon-39961-identity-audit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9H parent SHA and three additive changes only
+        run: |
+          set -euo pipefail
+          base=56d309a9d4d895c7adfb525723c6e2a9c4abd2cb
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9i_ibon_39961_identity.yml' 'scripts/p30_l9i_ibon_39961_identity.mjs' 'tests/p30/test_l9i_ibon_39961_identity.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9I_SOURCE_SCOPE; exit 1; }
+          echo PASS L9I_FROZEN_PARENT_THREE_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Normal Chromium fixed Playwright version
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: 30 offline ID/title drift positive-negative checks
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9i_ibon_39961_identity.mjs
+          node --test tests/p30/test_l9i_ibon_39961_identity.mjs
+          echo PASS L9I_30_OFFLINE_DRIFT_NEGATIVES
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9h-ibon-local-dom-hierarchy
+          run-id: 40516301527
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9i-l9h
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          run-id: 40494326021
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9i-l9f
+      - name: Both upstream SHA-sealed artifacts plus pinned 39961 history
+        run: |
+          set -euo pipefail
+          (cd l9i-l9h && sha256sum -c SHA256SUMS.txt)
+          (cd l9i-l9f && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          import {createHash} from "node:crypto";
+          import {verifyParents} from "./scripts/p30_l9i_ibon_39961_identity.mjs";
+          function input(folder,file){
+            const raw=readFileSync(folder+"/"+file),m=JSON.parse(readFileSync(folder+"/manifest.json"));
+            const hash=createHash("sha256").update(raw).digest("hex");
+            if(m.filesSHA256?.[file]!==hash&&m.fileSHA256?.[file]!==hash)throw Error("HOLD_PARENT_HASH");
+            return {raw,doc:JSON.parse(raw)};
+          }
+          const h=input("l9i-l9h","ibon_local_dom_hierarchy.json");
+          const f=input("l9i-l9f","detail_role_review.json");
+          const proof=verifyParents(h.doc,h.raw,f.doc,f.raw);
+          console.log("PASS L9I_DUAL_PARENT_SHA_SOURCE_DRIFT",proof.l9hSHA256,proof.l9fSHA256);
+          JS
+      - name: One new normal public ibon listing plus exact ID 39961 detail
+        run: |
+          node scripts/p30_l9i_ibon_39961_identity.mjs \
+            --l9h l9i-l9h/ibon_local_dom_hierarchy.json \
+            --l9f l9i-l9f/detail_role_review.json \
+            --out p30-l9i-evidence
+      - name: Verify bounded identity quality and no write or publication
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('p30-l9i-evidence')
+          r=json.loads((root/'ibon_39961_identity_adjudication.json').read_text(encoding='utf8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+          assert r['kind']=='EVENTRADAR_P30_L9I_IBON_39961_CURRENT_IDENTITY_AUDIT_V1'
+          assert r['sourceOrigin']=='NEW_PUBLIC_NORMAL_CHROMIUM_LIST_DETAIL_39961'
+          assert r['eventId']=='39961'
+          assert r['navigationAttemptCount']==2
+          assert r['parentL9HRun']==40516301527 and r['parentL9HArtifact']==12740505389
+          assert r['parentL9FRun']==40494326021 and r['parentL9FArtifact']==12729277485
+          assert r['list']['url']=='https://ticket.ibon.com.tw/Index/entertainment'
+          assert r['detail']['url']=='https://ticket.ibon.com.tw/ActivityInfo/Details/39961'
+          assert r['decision']['status'] in ('REVIEW_ONLY_NO_RELEASE','HOLD')
+          assert not r['currentTitleAcceptedForPublication']
+          assert r['formalFieldPromotions']==r['sessionSplits']==r['goldenAccepted']==0
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not any(r[k] for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted'))
+          assert r['existingAndroid44Preserved'] and r['l8CoreAndroidPassPreserved']
+          assert not any(r[k] for k in ('rawHtmlPersisted','screenshotPersisted','cookiesPersisted','networkBodyPersisted'))
+          assert hashlib.sha256((root/'ibon_39961_identity_adjudication.json').read_bytes()).hexdigest()==m['filesSHA256']['ibon_39961_identity_adjudication.json']
+          print('L9I_LIST',r['list']['status'],'TITLES',len(r['listTitles']))
+          print('L9I_DETAIL',r['detail']['status'],'HEADINGS',len(r['detailHeadings']))
+          print('L9I_DECISION',r['decision']['status'],r['decision']['reason'])
+          print('PASS L9I_BOUNDED_OFFICIAL_SOURCE_SHA_IDENTITY')
+          print('HOLD L9I_FORMAL_IDENTITY_AND_RELEASE_NOT_AUTOMATIC')
+          PY
+      - name: SHA seal isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9i-evidence
+          if test -f p30-l9i-evidence/manifest.json; then
+            (cd p30-l9i-evidence && sha256sum ibon_39961_identity_adjudication.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9I_OUTPUT_SHA_SEALED
+          else
+            echo HOLD L9I_NO_EVIDENCE
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9i-ibon-39961-drift-readonly
+          path: p30-l9i-evidence/
+          if-no-files-found: warn
+          retention-days: 14
