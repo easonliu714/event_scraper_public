@@ -1,5 +1,29 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 SRC-P30-L9-H dual-source official ibon local DOM hierarchical-binding architecture — native CI PASS, one current ID mismatch**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [unchanged]
+> └─ L9-G Source Draft PR #44 @ 07cc3ce1743a56d2bc60213d345f27672cef97d5
+>    └─ L9-H Source Draft PR #45 @ 56d309a9d4d895c7adfb525723c6e2a9c4abd2cb
+>       ├─ scripts/p30_l9h_ibon_local_dom_hierarchy.mjs [NO WRITE / NO GLOBAL DATE SEARCH]
+>       │  ├─ L9-G Run 40511115223 Artifact 12738140163 [structure + verified ID]
+>       │  ├─ L9-F Run 40494326021 Artifact 12729277485 [original title + ID]
+>       │  ├─ parentProof(): SHA+manifest+five official URL/ID/title cross-contract
+>       │  ├─ inspectLocalDom(): bounded only local label next-element/parent next-element/direct text
+>       │  ├─ reviewNeighbor(): DATE vs SALE vs ADMISSION vs REGISTRATION vs VOUCHER vs PRICE
+>       │  ├─ assessStructure(): role conflict, generic PRICE/資訊, image counts, no global dates
+>       │  └─ ibon_local_dom_hierarchy.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9h_ibon_local_dom_hierarchy.mjs [36/36 positive-negative]
+>       └─ .github/workflows/eventradar_p30_l9h_ibon_local_dom.yml [push-only READ]
+>          └─ final native Run 40516301527 -> Artifact 12740505389
+> ```
+> - **Actual CI:** [Run 40516301527](https://github.com/easonliu714/event_scraper_public/actions/runs/40516301527) completed/success, Job `122230984614`, exact three-add-only SHA boundary and **36/36** mocked negative/positive contracts, two independently SHA-sealed upstream artifact source reports verified. L9-G source report SHA `a1736d4b4c0148c9e74eccbe9b4c1f3ab05b6ee3f94c306bac210df1e08b7a42`, L9-F title report SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`. Source-only `main` production runtime/Pages blob fingerprints unchanged.
+> - **Five live ibon detail pages:** IDs `39575,39878,39907,39961,39978` HTTP200. **Current title parity 4/5**; `39961` is **CURRENT_TITLE_MISMATCH_HOLD** despite prior historical detail match, so current labels/field values from that record cannot be trusted. Each page has `EVENT_PERIOD` `h3` label parent `div`, but **zero** safe immediate local-value relationships, `locallyBoundReviewPairs=0`, `rejectedOrHoldPairs=0`; DOM label presence does not prove readable or valid activity dates. All formal `dateStart/dateEnd/venue/price/saleWindow/registrationPeriod/voucherValidity=null/UNKNOWN`, ticket status UNKNOWN, session splitting 0, Golden 0, writer/publisher/scheduler/notifier/merge disabled, full platform coverage/production rollback still HOLD.
+> - **Artifact** [12740505389](https://github.com/easonliu714/event_scraper_public/actions/runs/40516301527/artifacts/12740505389), ZIP SHA256 `2c4672a2b0be4f323d638455865bdf19becaed3615babdf7b6526f9b6da3c048`, 2137 bytes, SHA checked by native CI, no raw HTML/screenshots/cookies/network-body archive. Failures retained: prior Run `40514885666` cancelled at OS deps; `40515905716` failed on token placeholder after offline PASS; final `40516301527` succeeded after workflow-only fixes. Earlier 44 Android user PASS and new L8 core UI PASS unchanged.
+> - **Next P30-L9-I:** isolate single `39961` current source-list/detail title-drift adjudication before any further field semantic promotions or Android preview refresh. Review other four source-bound dates only with explicit local DOM association, not global page regex. Formal release remains `HARD_HOLD_NO_PUBLICATION`; governance is in Docs Draft PR #8, not Source main.
+>
+
 > **2026-10-27 L9-H CI dependency correction and pending native rerun**
 >
 > - The L9-H dual-source identity architecture requires both L9-G structural Artifact `12738140163` and L9-F original title Artifact `12729277485`; original L9-G typed JSON does not include source titles, so IDs alone cannot establish current title parity. Source Draft PR #45 head `56d309a9d4d895c7adfb525723c6e2a9c4abd2cb`. Native Run `40514885666` CANCELLED at Chromium OS dependencies, Run `40515905716` failed on a literal authentication placeholder in second artifact download **after 36/36 tests PASS**; repaired workflow `github.token` and Run `40516301527` queued. No field evidence yet from this Gate. All source and Pages main fingerprints remain unchanged and formal release `HARD_HOLD_NO_PUBLICATION`.
