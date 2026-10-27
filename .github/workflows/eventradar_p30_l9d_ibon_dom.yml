@@ -1,0 +1,100 @@
+name: EventRadar P30 L9-D ibon fresh DOM/JSON public diagnostics (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9d-ibon-public-dom-diagnostics
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9d-ibon-public-readonly
+  cancel-in-progress: false
+jobs:
+  ibon-public-dom-evidence:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9d-ibon-public-dom-diagnostics'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9-C parent and all formal Pages/source blobs immutable
+        run: |
+          set -euo pipefail
+          base=ae469b52e7b7b7f16dda1eeab584be8e16d63f50
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9d_ibon_dom.yml' 'scripts/p30_l9d_ibon_public_dom.py' 'tests/p30/test_l9d_ibon_dom.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9D_UNEXPECTED_SOURCE_CHANGE; exit 1; }
+          echo PASS L9D_EXACT_PARENT_AND_THREE_ADD_ONLY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install bounded public HTTP and parser dependencies
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
+      - name: Offline 28 negative/positive tests BEFORE fresh HTTP
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9d_ibon_public_dom.py tests/p30/test_l9d_ibon_dom.py
+          python -m unittest discover -s tests/p30 -p 'test_l9d_ibon_dom.py' -v
+          echo PASS L9D_28_PUBLIC_DOM_AND_SAME_OBJECT_NEGATIVES
+      - name: Fresh one-shot two ibon public list entries and max one detail
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9d_ibon_public_dom.py --out p30-l9d-evidence
+      - name: Confirm new HTTP, independent list gates, SHA, no release
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('p30-l9d-evidence')
+          f=json.loads((root/'fresh_ibon_dom_diagnostics.json').read_text(encoding='utf8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+          assert f['kind']=='EVENTRADAR_P30_L9D_IBON_PUBLIC_DOM_DIAGNOSTICS_V1'
+          assert f['candidateOrigin']=='L9D_NEW_PUBLIC_HTTP'
+          assert 2<=f['actualFreshHTTPRequests']<=9
+          assert f['listHTTPAttempts']==2 and len(f['lists'])==2
+          assert all(x['source'].startswith('https://ticket.ibon.com.tw/') for x in f['lists'])
+          assert f['candidateCount']==len(f['candidates'])<=40
+          assert all(not row['detailIdentityVerified'] and not row['goldenVerified']
+                     and not row['published'] for row in f['candidates'])
+          assert f['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not f['writerExecuted'] and not f['schedulerExecuted'] and not f['notifierExecuted']
+          assert not f['published'] and not f['fullPlatformCoverageVerified']
+          assert f['formalFieldPromotions']==f['goldenAccepted']==0
+          assert f['existingAndroid44Preserved'] and f['l8CoreAndroidPassPreserved']
+          assert all(not x['dom']['rawHtmlPersisted'] and not x['dom']['thirdPartyScriptDownloaded']
+                     for x in f['lists'] if 'scriptCount' in x['dom'])
+          assert hashlib.sha256((root/'fresh_ibon_dom_diagnostics.json').read_bytes()).hexdigest()==m['sha256']['fresh_ibon_dom_diagnostics.json']
+          for x in f['lists']:
+              print('IBON_L9D_TIER',x['source'],x['http'].get('state'),x['listState'],
+                    x['listCandidates'],json.dumps(x['dom'],ensure_ascii=False,sort_keys=True))
+          print('PASS L9D_FRESH_PUBLIC_GET_AND_EVIDENCE_SEAL',f['actualFreshHTTPRequests'])
+          print('HOLD L9D_LIST_IDENTITY_AND_GOLDEN_NOT_INFERRED')
+          PY
+      - name: Seal SHA256 only isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9d-evidence
+          if test -f p30-l9d-evidence/manifest.json; then
+            (cd p30-l9d-evidence && sha256sum fresh_ibon_dom_diagnostics.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9D_SHA_SEALED
+          else
+            echo HOLD L9D_NO_OUTPUT
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9d-ibon-public-dom-evidence
+          path: p30-l9d-evidence/
+          if-no-files-found: warn
+          retention-days: 14
