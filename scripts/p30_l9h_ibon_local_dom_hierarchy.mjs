@@ -16,6 +16,9 @@ export const PARENT_KIND="EVENTRADAR_P30_L9G_IBON_RENDERED_FIELD_STRUCTURE_READO
 export const PARENT_HEAD="07cc3ce1743a56d2bc60213d345f27672cef97d5";
 export const PARENT_RUN=40511115223;
 export const PARENT_ARTIFACT=12738140163;
+export const TITLE_PARENT_RUN=40494326021;
+export const TITLE_PARENT_ARTIFACT=12729277485;
+export const TITLE_PARENT_KIND="EVENTRADAR_P30_L9F_IBON_PINNED_DETAIL_ROLE_REVIEW_V1";
 export const IDS=Object.freeze(["39575","39878","39907","39961","39978"]);
 export const HOLD="HARD_HOLD_NO_PUBLICATION";
 const ROOT="https://ticket.ibon.com.tw/ActivityInfo/Details/";
@@ -40,7 +43,8 @@ export const LABEL_ROLES=Object.freeze({
 export const RELATIONS=Object.freeze([
  "LABEL_NEXT_ELEMENT","LABEL_PARENT_NEXT_ELEMENT","SAME_PARENT_TEXT_AFTER_LABEL"
 ]);
-export function parentProof(p,raw){
+export function parentProof(p,raw,titleSource,titleRaw){
+ assert.deepEqual(JSON.parse(raw),p,"HOLD_L9H_UNSEALED_STRUCTURE_INPUT");
  assert.equal(p?.kind,PARENT_KIND,"HOLD_L9H_PARENT_KIND");
  assert.equal(p.parentHead,"d85504773108281099ec0654c5c772de243f910c");
  assert.equal(p.parentRun,40494326021);
@@ -71,7 +75,38 @@ export function parentProof(p,raw){
   assert.equal(item.ticketStatus,"UNKNOWN");assert.equal(item.published,false);
  }
  assert.equal(found.size,5);
- return {sha256:digest(raw),sources:p.results.slice().sort((a,b)=>Number(MATCH.exec(a.officialUrl)[1])-Number(MATCH.exec(b.officialUrl)[1]))};
+ assert.equal(titleSource?.kind,TITLE_PARENT_KIND,"HOLD_L9H_TITLE_SOURCE_KIND");
+ assert.deepEqual(JSON.parse(titleRaw),titleSource,"HOLD_L9H_UNSEALED_TITLE_INPUT");
+ assert.equal(titleSource.parentL9ERun,40449476633);
+ assert.equal(titleSource.parentArtifactId,12709568132);
+ assert.equal(titleSource.parentCandidateCount,22);
+ assert.equal(titleSource.additionalSampleSize,5);
+ assert.equal(titleSource.additionalTitleParity,5);
+ assert.equal(titleSource.samples?.length,5);
+ assert.equal(titleSource.formalFieldPromotions,0);
+ assert.equal(titleSource.goldenAccepted,0);
+ assert.equal(titleSource.published,false);
+ assert.equal(titleSource.releaseState,HOLD);
+ const byId=new Map();
+ for(const row of titleSource.samples){
+  const id=MATCH.exec(row.officialUrl)?.[1];
+  assert.ok(id&&IDS.includes(id)&&row.candidateId==="ibon:"+id);
+  assert.equal(row.titleParity,true);
+  assert.equal(row.httpStatus,200);
+  assert.ok(short(row.listTitle).length>=4);
+  assert.ok(!byId.has(id),"HOLD_L9H_DUPLICATE_TITLE_SOURCE_ID");
+  byId.set(id,row);
+ }
+ assert.equal(byId.size,5);
+ return {sha256:digest(raw),titleSHA256:digest(titleRaw),
+  sources:p.results.slice()
+   .sort((a,b)=>Number(MATCH.exec(a.officialUrl)[1])-Number(MATCH.exec(b.officialUrl)[1]))
+   .map(x=>{
+    const id=MATCH.exec(x.officialUrl)[1],titleRow=byId.get(id);
+    assert.ok(titleRow&&titleRow.officialUrl===x.officialUrl,
+      "HOLD_L9H_CROSS_ARTIFACT_URL_IDENTITY");
+    return {...x,listTitle:titleRow.listTitle};
+   })};
 }
 function typedRole(label){return LABEL_ROLES[short(label).replace(/[：:]\s*$/u,"")]??null;}
 export function reviewNeighbor(neighbor,labelRole){
@@ -196,8 +231,8 @@ function inspectLocalDom(){
   labelContexts:contexts,tagCounts};
 }
 const normTitle=x=>short(x).replace(/[，,。．.\-–—_·•]/gu,"").toLowerCase();
-export async function audit(parent,raw,browser=chromium,opts={}){
- const source=parentProof(parent,raw);
+export async function audit(parent,raw,titleSource,titleRaw,browser=chromium,opts={}){
+ const source=parentProof(parent,raw,titleSource,titleRaw);
  const driver=await browser.launch({headless:true,args:["--no-sandbox"]});
  const results=[];
  try{
@@ -234,7 +269,8 @@ export async function audit(parent,raw,browser=chromium,opts={}){
  }finally{await driver.close();}
  const output={kind:KIND,sourceOrigin:"L9H_NEW_NORMAL_PUBLIC_DETAIL_DOM_HIERARCHY",
   parentHead:PARENT_HEAD,parentRun:PARENT_RUN,parentArtifactId:PARENT_ARTIFACT,
-  sourceReportSHA256:source.sha256,sourceEventIds:IDS.slice(),
+  sourceReportSHA256:source.sha256,titleSourceSHA256:source.titleSHA256,
+  titleSourceRun:TITLE_PARENT_RUN,titleSourceArtifact:TITLE_PARENT_ARTIFACT,sourceEventIds:IDS.slice(),
   sampleCount:5,titleParityCount:results.filter(x=>x.titleParity).length,
   localLabels:results.reduce((n,x)=>n+x.labelCount,0),
   locallyBoundReviewPairs:results.reduce((n,x)=>n+x.reviewPairs.length,0),
@@ -254,6 +290,7 @@ export async function audit(parent,raw,browser=chromium,opts={}){
 export function validateReport(r){
  assert.equal(r.kind,KIND);assert.equal(r.parentHead,PARENT_HEAD);
  assert.equal(r.parentRun,PARENT_RUN);assert.equal(r.parentArtifactId,PARENT_ARTIFACT);
+ assert.equal(r.titleSourceRun,TITLE_PARENT_RUN);assert.equal(r.titleSourceArtifact,TITLE_PARENT_ARTIFACT);
  assert.deepEqual(r.sourceEventIds,IDS);
  assert.equal(r.sampleCount,5);assert.equal(r.rows.length,5);
  assert.equal(r.titleParityCount,r.rows.filter(x=>x.titleParity).length);
@@ -303,6 +340,8 @@ export async function emit(report,out){
  const manifest={kind:"EVENTRADAR_P30_L9H_SHA256_MANIFEST_V1",
   parentRun:PARENT_RUN,parentArtifact:PARENT_ARTIFACT,
   parentInputSHA256:report.sourceReportSHA256,
+  titleSourceRun:TITLE_PARENT_RUN,titleSourceArtifact:TITLE_PARENT_ARTIFACT,
+  titleInputSHA256:report.titleSourceSHA256,
   filesSHA256:{"ibon_local_dom_hierarchy.json":digest(buf)},
   releaseState:HOLD,published:false};
  await writeFile(dir+"/manifest.json",stable(manifest));
@@ -310,10 +349,12 @@ export async function emit(report,out){
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const args={};for(let i=2;i<process.argv.length;i+=2)args[process.argv[i]]=process.argv[i+1];
- if(!args["--source"]||!args["--out"]){console.error("HOLD_L9H_SOURCE_AND_OUTPUT_REQUIRED");process.exitCode=2;}
+ if(!args["--source"]||!args["--title-source"]||!args["--out"]){console.error("HOLD_L9H_SOURCE_AND_OUTPUT_REQUIRED");process.exitCode=2;}
  else{
   safeOut(args["--out"]);
-  const raw=await readFile(args["--source"]),report=await audit(JSON.parse(raw),raw);
+  const raw=await readFile(args["--source"]);
+  const titleRaw=await readFile(args["--title-source"]);
+  const report=await audit(JSON.parse(raw),raw,JSON.parse(titleRaw),titleRaw);
   await emit(report,args["--out"]);
   for(const row of report.rows)console.log("L9H_BOUND_FIELD_STRUCTURE",JSON.stringify({
    id:row.candidateId,http:row.httpStatus,title:row.titleParity,
