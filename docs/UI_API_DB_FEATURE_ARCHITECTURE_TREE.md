@@ -1,5 +1,27 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 P30-L9-E ibon live browser rendering architecture — 22 REVIEW candidates, native CI PASS**
+>
+> ```text
+> Source main@fc4f963247d [FROZEN, no formal Pages/data/runtime mutation]
+> └─ L9-D Source Draft PR #41 @ 8836dc29a6dcf4baaabed08102ffb1b7fbed6bc3 [HTTP-only ibon HTML 200/list0 verified]
+>    └─ L9-E Source Draft PR #42 @ 63a079c1bee7111b1ef7b04431607d9845fe3b9f
+>       ├─ scripts/p30_l9e_ibon_browser_render.mjs
+>       │  ├─ Chromium Playwright 1.55.0: normal, nonstealth public browser, ephemeral context
+>       │  ├─ exactly 2 official ibon list navigations, normal first/third-party page resources
+>       │  ├─ rendered DOM anchors + same-card heading to canonical numeric activity ID
+>       │  ├─ 22 list candidate IDs, sample 1 exact official detail title-parity
+>       │  └─ no raw HTML, cookies, request bodies, headless stealth, WAF bypass or publisher
+>       ├─ tests/p30/test_l9e_ibon_browser_render.mjs [30/30 mocked positive-negatives]
+>       └─ .github/workflows/eventradar_p30_l9e_ibon_browser.yml [push-only contents:read]
+>          └─ Actions Run 40449476633 -> Artifact 12709568132 [SHA-sealed]
+> ```
+> - **Verified run** [40449476633](https://github.com/easonliu714/event_scraper_public/actions/runs/40449476633) completed/success, Job `122008564226` completed/success, immutable L9-D parent and exact three new files source guard, Playwright normal Chromium installed, 30/30 tests PASS. First public `/Index/entertainment` rendered HTTP200 with 67 anchors, 16 script elements, body text 1690 chars and **22** same-card/numeric ibon official detail URL candidates. 64 page resource requests observed, 54 first-party; these are browser resources, **not 64 sampled details**. Second official `/Home/MoreResult?inATAPID=105&inATAPWebType=entertainment` rendered HTTP200 with 34 anchors, 16 scripts, body text 509 chars, **0** bounded event candidates, remains HOLD. 38 page resource requests, 30 first-party. One bounded detail sample `DETAIL_TITLE_PARITY_PASS`, other 21 untested. Artifact [12709568132](https://github.com/easonliu714/event_scraper_public/actions/runs/40449476633/artifacts/12709568132) ZIP SHA256 `866c8b935d47fe391a4fdf8f69eae2a33664d67b6ef0650707a594993a2ccfef` (3020 bytes), contains report JSON, Manifest and SHA256SUMS; independent GitHub readback.
+> - **Semantics:** `RENDERED_SOURCE_CANDIDATES_REVIEW_ONLY` is SOURCE/URL/TITLE candidate not guaranteed active event, published schedule, exact multi-session identity or real-time stock. `DETAIL_TITLE_PARITY_PASS` for only one means title agreement not Golden. All candidates have `formalDate=null`, `formalPrice=null`, `ticketStatus=UNKNOWN`, `goldenVerified=false`, `published=false`. No field roles promoted. Original L9-D 0 candidate is for **unrendered raw HTML** and is retained as historically accurate; no prior Gate reimplementation.
+> - **Isolation boundary:** L9-E normal browser may request official and standard third-party page scripts as part of rendering, but deliberately records only aggregate source/network data, canonical public event URLs/titles, no arbitrary API endpoint guesses or activity transactions, no cookies, full DOM, logged-in session or private tokens; never changes `docs/data.json`, published PWA, API, DB, scheduler, notifier, Writer, source main or historic Android 44 user PASS. Release remains `HARD_HOLD_NO_PUBLICATION`, L8 core Android PASS with full E2E pending, L9-A ten blockers still active.
+> - **Next isolated P30-L9-F:** SHA-pin L9E fresh report and sample **3–5** further official detail pages via approved normal browser, strict identity parity, date-role and PRICE meaningful-token review-only evidence, fail closed on 403/WAF/mismatch, output evidence-only JSON. Do not grant Golden/Publisher/Cloud Scheduler PR #1 or retire repositories; two governance docs live solely on Draft PR #8, not main.
+>
+
 > **2026-10-27 SRC-P30-L9-D ibon public fresh DOM diagnostic architecture — CI PASS / zero list**
 >
 > ```text
