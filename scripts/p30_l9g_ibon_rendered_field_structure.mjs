@@ -91,9 +91,9 @@ export function evaluateProbe(probe){
  if(!r)return null;
  const origin=String(probe.structure??"");
  const allowed=new Set(["TH_TD","DT_DD","LOCAL_SIBLING","SAME_NODE_COLON"]);
- if(!allowed.has(origin))return {role:r,label,structure:origin,quality:"HOLD_UNBOUND_DOM_STRUCTURE",promotable:false};
+ if(!allowed.has(origin))return {role:r,label,structure:origin,quality:"HOLD_UNBOUND_DOM_STRUCTURE",promotable:false,verified:false,formalFieldPromoted:false};
  const value=tidy(probe.value);
- if(!value||value.length>120)return {role:r,label,structure:origin,quality:"REJECT_EMPTY_OR_OVERSIZE",promotable:false};
+ if(!value||value.length>120)return {role:r,label,structure:origin,quality:"REJECT_EMPTY_OR_OVERSIZE",promotable:false,verified:false,formalFieldPromoted:false};
  let quality="REVIEW_ONLY";
  if(r==="PRICE"){
   quality=CURRENCY.test(value)?"PRICE_TOKEN_REVIEW_ONLY":
