@@ -1,5 +1,12 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 P30-L8/G5K Android loopback UAT core PASS with bounded real-device evidence**
+>
+> - Termux SHA256 verified `eventradar-p30-l7c-isolated-android-preview.zip` equals official sealed Artifact ZIP `a524f40fd46cff6ad60046c314e70eaa44499fcddab035956ae16d25cadde3b6`; inner `index.html`, `preview-data.json`, `README.txt` all passed `sha256sum -c SHA256SUMS.txt`. Original official Source `main@fc4f963247d68eed29425808cc14e7250f312d05`, Docs-only Draft PR #8, source Draft PR #37 unchanged at start.
+> - Observed via provided Android screenshots: same-phone Chrome on `http://127.0.0.1:8766/index.html`, 264 total/5 detail title parity/259 review-only summary, default five cards, Event Go platform filter exactly one card, modal content and controls for four sampled cards (Event Go, UDN, iNDIEVOX, 華山1914), event/venue/price/ticket/date roles kept as labeled source evidence only; responsive screen no obvious overprint. Mark `ANDROID_L8_CORE_UI_USER_ATTESTED_PASS`. Do not claim keyword typing, five individual modal interactions, actual source HTTP navigation or all 259 rows user-verified; `ANDROID_L8_FULL_E2E_HOLD_PARTIAL_EVIDENCE`.
+> - Formal field promotion prohibited: review snippet `PRICE/資訊` on Event Go/UDN is ambiguous, not a numeric price; UI labels `UNKNOWN`, `未核實`, `非 Golden` correctly disclose uncertainty. User-authorized next isolated Gate is **P30-L9-A read-only Release Blocker Matrix**, with explicit blocker statuses and SHA-sealed diagnostics, no Writer, Publisher, PR merge, repo retirement or Cloud Scheduler. Historical Android original 44 remain USER_ATTESTED_PASS.
+>
+
 > **2026-10-27 SRC-P30-L7-C isolated Android review UI CI PASS — architecture authority update**
 >
 > ```text
