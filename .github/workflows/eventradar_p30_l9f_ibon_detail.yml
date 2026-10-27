@@ -1,0 +1,119 @@
+name: EventRadar P30 L9-F five pinned ibon details (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9f-ibon-detail-role-audit
+permissions:
+  contents: read
+  actions: read
+jobs:
+  detail-review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9f-ibon-detail-role-audit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9E parent, three additions and frozen Pages blobs
+        run: |
+          set -euo pipefail
+          base=63a079c1bee7111b1ef7b04431607d9845fe3b9f
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9f_ibon_detail.yml' 'scripts/p30_l9f_ibon_detail_role_review.mjs' 'tests/p30/test_l9f_ibon_detail_role_review.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9F_NONISOLATED_MODIFICATION; exit 1; }
+          echo PASS L9F_EXACT_PARENT_THREE_ADD_ONLY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright 1.55 normal Chromium
+        run: |
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Thirty offline negatives before public website
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9f_ibon_detail_role_review.mjs
+          node --test tests/p30/test_l9f_ibon_detail_role_review.mjs
+          echo PASS L9F_30_NEGATIVE_CONTRACTS
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9e-ibon-chromium-readonly-evidence
+          run-id: 40449476633
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9f-pinned-l9e
+      - name: Verify source SHA / exact 22 and five unreviewed IDs
+        run: |
+          set -euo pipefail
+          (cd l9f-pinned-l9e && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          import {createHash} from "node:crypto";
+          import {validateSource,chooseAdditional} from "./scripts/p30_l9f_ibon_detail_role_review.mjs";
+          const root="l9f-pinned-l9e/";
+          const raw=readFileSync(root+"ibon_browser_render_diagnostics.json");
+          const data=JSON.parse(raw);
+          const manifest=JSON.parse(readFileSync(root+"manifest.json"));
+          const hash=createHash("sha256").update(raw).digest("hex");
+          if(manifest.sha256["ibon_browser_render_diagnostics.json"]!==hash)throw Error("HOLD_SOURCE_SHA");
+          const proof=validateSource(data,raw),selected=chooseAdditional(data,5);
+          if(selected.length!==5||new Set(selected.map(x=>x.candidateId)).size!==5)throw Error("HOLD_SELECTION");
+          console.log("PASS L9F_FRESH_UPSTREAM_PINNED_SHA_22_OLD_PARITY",proof.sourceSHA256);
+          console.log("FIVE_SOURCE_IDS",selected.map(x=>x.candidateId).join(","));
+          JS
+      - name: Five NEW normal browser ibon detail visits (review only)
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9f_ibon_detail_role_review.mjs --source l9f-pinned-l9e/ibon_browser_render_diagnostics.json --out p30-l9f-evidence
+      - name: Assert no Golden/Writer/date or price promotion and inspect SHA
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib,re
+          from pathlib import Path
+          root=Path('p30-l9f-evidence')
+          r=json.loads((root/'detail_role_review.json').read_text(encoding='utf8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+          assert r['kind']=='EVENTRADAR_P30_L9F_IBON_PINNED_DETAIL_ROLE_REVIEW_V1'
+          assert r['additionalSampleSize']==len(r['samples'])==5 and r['parentCandidateCount']==22
+          assert r['previousDetailTitleParity']==1 and r['additionalTitleParity']<=5
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION' and not r['sourceCatalogComplete']
+          assert r['goldenAccepted']==r['formalFieldPromotions']==r['sessionSplits']==0
+          assert not any(r[k] for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted'))
+          assert r['existingAndroid44Preserved'] and r['l8CoreAndroidPassPreserved']
+          for s in r['samples']:
+              u=re.fullmatch(r'https://ticket\.ibon\.com\.tw/ActivityInfo/Details/([0-9]{3,8})',s['officialUrl'])
+              assert u and s['candidateId']=='ibon:'+u[1]
+              assert s['formalDate'] is None and s['formalPrice'] is None and s['ticketStatus']=='UNKNOWN'
+              assert s['fieldPromotions']==0 and s['sessionSplitCount']==0 and not s['published']
+              if not s['titleParity']: assert not s['roleEvidence'] and not s['rejectedEvidence']
+              assert all(not e['verified'] and not e['formalFieldPromoted'] for e in s['roleEvidence']+s['rejectedEvidence'])
+              print('L9F_DETAIL',s['candidateId'],s['httpStatus'],s['detailState'],len(s['roleEvidence']),len(s['rejectedEvidence']))
+          assert hashlib.sha256((root/'detail_role_review.json').read_bytes()).hexdigest()==m['fileSHA256']['detail_role_review.json']
+          print('PASS L9F_FIVE_FRESH_DETAILS_SHA_AND_DENY_RELEASE')
+          print('QUALITY L9F_PARITY',r['additionalTitleParity'],'FIELDS',r['additionalRoleEvidenceCount'],'REJECT',r['additionalRejectedEvidenceCount'])
+          PY
+      - name: SHA256 seal of isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9f-evidence
+          if test -f p30-l9f-evidence/manifest.json; then
+            (cd p30-l9f-evidence && sha256sum detail_role_review.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9F_ARTIFACT_SHA256_SEALED
+          else
+            echo HOLD L9F_NO_EVIDENCE
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          path: p30-l9f-evidence/
+          if-no-files-found: warn
+          retention-days: 14
