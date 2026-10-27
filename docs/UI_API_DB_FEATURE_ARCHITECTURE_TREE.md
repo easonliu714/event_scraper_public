@@ -1,5 +1,27 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 SRC-P30-L9-D ibon public fresh DOM diagnostic architecture — CI PASS / zero list**
+>
+> ```text
+> Source main@fc4f963247d (unchanged, protected formal Pages/source blobs)
+> └─ L9-C Source Draft PR #40 @ ae469b52e7b7b7f16dda1eeab584be8e16d63f50 [native PASS]
+>    └─ L9-D Source Draft PR #41 @ 8836dc29a6dcf4baaabed08102ffb1b7fbed6bc3
+>       ├─ scripts/p30_l9d_ibon_public_dom.py [NEW public HTTP only]
+>       │  ├─ audited ibon.LISTS: Index/entertainment and Home/MoreResult
+>       │  ├─ GET: same-host redirects/HTTPS, <=2 list + 1 strict detail if ID candidate
+>       │  ├─ analyze(): direct anchor, JSON-LD Event, same-object public JSON hydration
+>       │  ├─ DOM script counts/malformed JSON/body text/render hints, no JS execution
+>       │  └─ fresh_ibon_dom_diagnostics.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9d_ibon_dom.py [28/28 mock negatives]
+>       └─ .github/workflows/eventradar_p30_l9d_ibon_dom.yml [push only/read only]
+>          └─ Run 40447833667 → Artifact 12708438784 [SHA sealed]
+> ```
+> - **Native result:** [Actions Run 40447833667](https://github.com/easonliu714/event_scraper_public/actions/runs/40447833667) completed/success, Job `122003220447` complete success, exact 3 new paths and source/Pages integrity gate, 28/28 offline tests and **2 new actual HTTPS GETs**. [Artifact 12708438784](https://github.com/easonliu714/event_scraper_public/actions/runs/40447833667/artifacts/12708438784) ZIP SHA256 `e4ec2a8a849abbfaabd76aea7b5117cbed0bd8f04d5f86ae1f47083241c5fb9a`, 1852 B, unexpired/read back; internal manifest and SHA checks PASS.
+> - **Actual ibon response architecture:** both official list URLs returned `HTTP_OK/200`, **0 anchors, 0 direct activity IDs, 0 JSON-LD / hydration candidates, visible text length=8, scripts=11** (5 official script source tags, 2 other-host scripts, 4 non-JSON inline scripts). No first-party JS bundle content fetched, no JS runtime executed, so **DO NOT CLAIM hidden API identified or ibon no activities**. L9-C `ibon=HTTP200/list0` remains valid and more precisely diagnosed as `HOLD_PUBLIC_HTML_NO_BOUND_EVENT_ID`. This makes full browser-rendered DOM evidence the next falsifiable dependency, not speculation about cancellation.
+> - **Boundaries:** `candidateOrigin=L9D_NEW_PUBLIC_HTTP`, `actualFreshHTTPRequests=2`, `formalFieldPromotions=goldenAccepted=0`, `published=false`, `releaseState=HARD_HOLD_NO_PUBLICATION`; no auto merge/hide/delete, source runtime/Writer/Scheduler/Notifier untouched. Report stores safe HTTP/page SHA and DOM counts only, no raw HTML or downloaded remote third-party scripts, no credentials, no browser automation, no WAF evasion. Any future candidate needs official same-card/same-object identity and detail verification before even REVIEW ONLY field evidence; formal dates/ticket status/price remain NULL/UNKNOWN.
+> - **Next P30-L9-E:** regular public-browser rendering in strict read-only isolated CI without anti-bot/login/stealth, capture only DOM safe evidence and bounded link/title roles; if site blocks/returns empty, HOLD. History: 44 Android USER_ATTESTED_PASS, L8 new Android CORE_UI_USER_ATTESTED_PASS unchanged; L9A ten release blockers retained. Formal two governance documents remain exclusively Docs Draft PR #8, not main.
+>
+
 > **2026-10-27 SRC-P30-L9-C fresh four-official-adapter architecture — read-only live HTTP/list/detail native CI PASS**
 >
 > ```text
