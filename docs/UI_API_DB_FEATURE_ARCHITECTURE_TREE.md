@@ -1,5 +1,28 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 SRC-P30-L9-F SHA-pinned ibon real detail/role review architecture — five matches, zero eligible field pairs**
+>
+> ```text
+> Source main@fc4f963247d [unchanged]
+> └─ L9-E Draft PR #42 @ 63a079c1bee7111b1ef7b04431607d9845fe3b9f [22 new rendered ibon candidate IDs]
+>    └─ L9-F Draft PR #43 @ d85504773108281099ec0654c5c772de243f910c
+>       ├─ scripts/p30_l9f_ibon_detail_role_review.mjs
+>       │  ├─ validateSource(): SHA-pinned exact 22 candidate IDs + 1 prior parity
+>       │  ├─ chooseAdditional(): deterministic 5 distinct untested numeric ibon IDs
+>       │  ├─ Chromium normal public detail: exact source URL/ID/title parity, no login/checkout
+>       │  ├─ DOM: same-row th/td, adjacent dt/dd, direct label: value only
+>       │  ├─ classifyField(): EVENT vs ENTRY vs SALE vs REGISTRATION vs VOUCHER
+>       │  ├─ PRICE/資訊 reject, SESSION review-only/no extra records
+>       │  └─ detail_role_review.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9f_ibon_detail_role_review.mjs [30/30 negative-positive]
+>       └─ .github/workflows/eventradar_p30_l9f_ibon_detail.yml [readonly push CI]
+>          └─ Actions Run 40494326021 -> Artifact 12729277485
+> ```
+> - **Native source proof:** [Run 40494326021](https://github.com/easonliu714/event_scraper_public/actions/runs/40494326021), job `122155815270`, 30/30 offline tests PASS; pinned [L9-E Artifact 12709568132](https://github.com/easonliu714/event_scraper_public/actions/runs/40449476633/artifacts/12709568132) source JSON SHA256 `d24a41262f362fc749c14c48a74dd5e85d27007d634309be6c72f30a8f1fc9ee`. New official ibon detail ID `39575,39878,39907,39961,39978` all HTTP200 and exact title parity. Total tested `6/22`, `16/22` remain without sampled detail. [Artifact 12729277485](https://github.com/easonliu714/event_scraper_public/actions/runs/40494326021/artifacts/12729277485) ZIP SHA256 `811e1b133c253f3cde33c31a203a9ed4bfbfab7418822a9b3a59c00fdd9cf884`, 1842 B; internal JSON/Manifest/SHA256SUMS sealed.
+> - **Crucial UI/semantics observation:** current strictly typed label/value DOM extractor yielded **0 eligible adjacent role evidence pairs**, **0 rejected pairs** across five matched rendered pages. This is a **source parser structure limitation**, NOT evidence that ibon events have no dates/tickets/venues. Do not infer the global body date as EVENT_PERIOD, do not promote sale/registration/admission to event-show dates, do not confuse multi-session times with new event IDs. Formal `dateStart/price/salePeriod/registrationPeriod/voucherValidity=null`, `ticketStatus=UNKNOWN`, field promotion 0, Golden 0, Writer/Scheduler/Notifier/Publisher and merge 0.
+> - **Next P30-L9-G:** bounded noninteractive normal public-browser DOM layout diagnostic for those five known IDs; identify source-labeled date/price/venue roles or clear HOLD when no bound pairs, add negative fixtures and independent SHA. Avoid raw HTML, personal tokens, arbitrary endpoint guessing, WAF bypass. Main Pages/runtime and original 44 Android PASS plus L8 new core UI PASS remain unchanged; L9-A ten release blockers still mandatory. Two formal governance documents only under Draft PR #8, unmerged.
+>
+
 > **2026-10-27 P30-L9-E ibon live browser rendering architecture — 22 REVIEW candidates, native CI PASS**
 >
 > ```text
