@@ -301,6 +301,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
    status:item.renderState,roleHits:item.structureMetrics?.recognizedLabelNodes??0,
    probes:item.structureMetrics?.rawProbeCount??0,
    review:item.fieldCandidates.length,rejected:item.fieldRejected.length,
+   rejectReasons:item.fieldRejected.map(x=>({role:x.role,quality:x.quality,structure:x.structure})),
    tags:item.structureMetrics?.domTagCounts??{}}));
   console.log("PASS L9G_BOUND_PUBLIC_DETAIL_DOM_FIVE",report.sampleCount);
   console.log("QUALITY L9G_TITLE",report.sourceTitleParityCount,
