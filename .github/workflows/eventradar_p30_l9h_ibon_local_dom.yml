@@ -8,7 +8,7 @@ permissions:
   actions: read
 concurrency:
   group: eventradar-p30-l9h-local-dom-readonly
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   five-pinned-ibon-local-hierarchies:
     if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9h-ibon-local-dom-hierarchy'
@@ -39,7 +39,7 @@ jobs:
         run: |
           set -euo pipefail
           npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
-          ./node_modules/.bin/playwright install --with-deps chromium
+          ./node_modules/.bin/playwright install chromium
       - name: Offline 36 DOM-source and role-safety negative contracts
         run: |
           set -euo pipefail
