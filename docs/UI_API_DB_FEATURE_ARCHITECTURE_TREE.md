@@ -1,5 +1,28 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-27 P30-L9-G ibon detail DOM hierarchy evidence — native CI PASS, no verified role values**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [frozen, production blobs immutable]
+> └─ Source Draft PR #43 L9-F @ d85504773108281099ec0654c5c772de243f910c
+>    └─ Source Draft PR #44 L9-G @ 07cc3ce1743a56d2bc60213d345f27672cef97d5
+>       ├─ scripts/p30_l9g_ibon_rendered_field_structure.mjs
+>       │  ├─ exact L9F Artifact 12729277485 source SHA and five title-parity IDs
+>       │  ├─ normal ephemeral Playwright Chromium five public details
+>       │  ├─ bounded DOM probes th/td, dt/dd, same-parent sibling, leaf label: value
+>       │  ├─ typed roles EVENT/ADMISSION/SALE/REGISTRATION/VOUCHER/PRICE/VENUE/SESSION
+>       │  ├─ reject EVENT_PERIOD neighbor without time token; reject generic PRICE/資訊
+>       │  └─ rendered_field_structure.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9g_ibon_rendered_field_structure.mjs [32/32 offline]
+>       └─ .github/workflows/eventradar_p30_l9g_rendered_structure.yml
+>          └─ GitHub Run 40511115223 → Artifact 12738140163
+> ```
+> - **Source evidence and architecture effect:** [Run 40511115223](https://github.com/easonliu714/event_scraper_public/actions/runs/40511115223) completed/success, Job `122212973983`, actual normal Chromium each of five ibon Event IDs `39575/39878/39907/39961/39978`: HTTP200, strict official title parity PASS. DOM structures: no `table/tr/th/td` and no `dl/dt/dd`, extensive `strong`/`b` elements; each page yielded exactly 1 recognized `EVENT_PERIOD` label and same-parent sibling probe with `REJECT_MISSING_DATE_TIME`. Total 5 source title parity, 5 rejected label/value associations, **zero accepted review pairs and zero formal promotions**. Do not assert activities lack true show dates or that another section is safe to parse. Original 6/22 ibon cumulative sampled title-parity figure remains unchanged because these are the *same previously verified five*, not five additional distinct activities.
+> - **Artifact** [12738140163](https://github.com/easonliu714/event_scraper_public/actions/runs/40511115223/artifacts/12738140163), ZIP SHA256 `769a138757c35711c9b55332e169966fdc0c4a4bd2ffb70166a304610fb3ba42` (2054 bytes), JSON+SHA manifest, verified and unexpired. No raw page HTML, screenshots, cookies, request bodies or private browser state stored. Both source input SHA and output SHA verified by native Actions.
+> - **Data gate:** all official `dateStart/dateEnd/price/registrationPeriod/saleWindow/voucherValidity/venue` remain NULL/UNKNOWN, `ticketStatus=UNKNOWN`, `goldenAccepted=0`, `published=false`, Writer/Scheduler/Notifier/merge disabled, `releaseState=HARD_HOLD_NO_PUBLICATION`; no official Pages/data.json/API/DB writes. Prior Android original 44 user attestations and L8 new core UI PASS remain intact. Next **P30-L9-H** bounded DOM section-neighbor/child structure discovery of existing five titles before writing any role parser; avoids global text dates, cross-role promotion and false "price" parsing.
+> - Governance remains in two canonical documents on Docs Draft PR #8 only; no production main merge/Preview/ShowNews retirement.
+>
+
 > **2026-10-27 SRC-P30-L9-F SHA-pinned ibon real detail/role review architecture — five matches, zero eligible field pairs**
 >
 > ```text
