@@ -1,0 +1,154 @@
+name: EventRadar P30 L9-H ibon local DOM hierarchy source-bound (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9h-ibon-local-dom-hierarchy
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9h-local-dom-readonly
+  cancel-in-progress: false
+jobs:
+  five-pinned-ibon-local-hierarchies:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9h-ibon-local-dom-hierarchy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9-G parent plus only three additions, formal assets unchanged
+        run: |
+          set -euo pipefail
+          base=07cc3ce1743a56d2bc60213d345f27672cef97d5
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9h_ibon_local_dom.yml' 'scripts/p30_l9h_ibon_local_dom_hierarchy.mjs' 'tests/p30/test_l9h_ibon_local_dom_hierarchy.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9H_SCOPE_OR_PRODUCTION_DRIFT; exit 1; }
+          echo PASS L9H_FROZEN_PARENT_EXACT_THREE_ADD_ONLY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install normal Chromium fixed Playwright (no stealth)
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install --with-deps chromium
+      - name: Offline 36 DOM-source and role-safety negative contracts
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9h_ibon_local_dom_hierarchy.mjs
+          node --test tests/p30/test_l9h_ibon_local_dom_hierarchy.mjs
+          echo PASS L9H_36_OFFLINE_SOURCE_BOUND_NEGATIVES
+      - name: Read SHA-pinned L9-G structure identity Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9g-ibon-rendered-structure-readonly
+          run-id: 40511115223
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9h-l9g-parent
+      - name: Read SHA-pinned L9-F title/ID Artifact (missing in L9-G)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          run-id: 40494326021
+          repository: easonliu714/event_scraper_public
+          github-token: TOKEN_PLACEHOLDER
+          path: l9h-l9f-title-source
+      - name: Verify both internal SHA manifests and cross-artifact title/ID agreement
+        run: |
+          set -euo pipefail
+          (cd l9h-l9g-parent && sha256sum -c SHA256SUMS.txt)
+          (cd l9h-l9f-title-source && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          import {createHash} from "node:crypto";
+          import {parentProof} from "./scripts/p30_l9h_ibon_local_dom_hierarchy.mjs";
+          const inputs=[
+           ["l9h-l9g-parent/rendered_field_structure.json","l9h-l9g-parent/manifest.json","rendered_field_structure.json"],
+           ["l9h-l9f-title-source/detail_role_review.json","l9h-l9f-title-source/manifest.json","detail_role_review.json"]
+          ];
+          const objects=inputs.map(([file,manifest,key])=>{
+           const raw=readFileSync(file),m=JSON.parse(readFileSync(manifest));
+           const digest=createHash("sha256").update(raw).digest("hex");
+           if(m.filesSHA256?.[key]!==digest&&m.fileSHA256?.[key]!==digest)
+            throw Error("HOLD_L9H_UPSTREAM_BLOB_SHA");
+           return {doc:JSON.parse(raw),raw};
+          });
+          const proof=parentProof(objects[0].doc,objects[0].raw,objects[1].doc,objects[1].raw);
+          console.log("PASS L9H_TWO_SHA_PINNED_UPSTREAMS_SOURCE_CROSS_BIND",proof.sha256,proof.titleSHA256);
+          console.log("L9H_FIVE_SOURCE_EVENT_IDS",proof.sources.map(x=>x.candidateId).join(","));
+          JS
+      - name: Five new bounded normal Chromium public ibon detail DOM hierarchy inspections
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9h_ibon_local_dom_hierarchy.mjs \
+            --source l9h-l9g-parent/rendered_field_structure.json \
+            --title-source l9h-l9f-title-source/detail_role_review.json \
+            --out p30-l9h-evidence
+      - name: Strict output SHA, five IDs, review-only fields and release HARD HOLD
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          root=Path('p30-l9h-evidence')
+          r=json.loads((root/'ibon_local_dom_hierarchy.json').read_text(encoding='utf-8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          assert r['kind']=='EVENTRADAR_P30_L9H_IBON_LOCAL_DOM_HIERARCHY_READONLY_V1'
+          assert r['sourceOrigin']=='L9H_NEW_NORMAL_PUBLIC_DETAIL_DOM_HIERARCHY'
+          assert r['parentHead']=='07cc3ce1743a56d2bc60213d345f27672cef97d5'
+          assert r['parentRun']==40511115223 and r['parentArtifactId']==12738140163
+          assert r['titleSourceRun']==40494326021 and r['titleSourceArtifact']==12729277485
+          assert r['sampleCount']==len(r['rows'])==5
+          assert r['sourceEventIds']==['39575','39878','39907','39961','39978']
+          assert r['titleParityCount']<=5
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['formalFieldPromotions']==r['sessionSplits']==r['goldenAccepted']==0
+          assert not any(r[k] for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted'))
+          assert r['existingAndroid44Preserved'] and r['l8CoreAndroidPassPreserved']
+          assert not r['rawHtmlPersisted'] and not r['screenshotsPersisted'] and not r['cookiesPersisted']
+          assert not r['networkBodiesPersisted'] and not r['fullPlatformCoverageVerified'] and not r['productionRollbackVerified']
+          ids=set()
+          for row in r['rows']:
+              x=re.fullmatch(r'https://ticket\.ibon\.com\.tw/ActivityInfo/Details/([0-9]{3,8})',row['officialUrl'])
+              assert x and row['candidateId']=='ibon:'+x[1] and row['candidateId'] not in ids
+              ids.add(row['candidateId'])
+              assert row['formalDate'] is None and row['formalPrice'] is None and row['ticketStatus']=='UNKNOWN'
+              assert not row['published'] and not row['goldenVerified']
+              if not row['titleParity']:assert not row['reviewPairs'] and not row['rejections']
+              for pair in row['reviewPairs']+row['rejections']:
+                  assert pair['formalFieldPromoted'] is False and pair['verified'] is False and pair['promotable'] is False
+              print('L9H_HIERARCHY',row['candidateId'],'HTTP',row['httpStatus'],'title',row['titleParity'],
+                    'labels',row['labelCount'],'review',len(row['reviewPairs']),'hold',len(row['rejections']),
+                    'images',row['imageNearLabels'])
+          assert len(ids)==5
+          assert hashlib.sha256((root/'ibon_local_dom_hierarchy.json').read_bytes()).hexdigest()==m['filesSHA256']['ibon_local_dom_hierarchy.json']
+          print('PASS L9H_FIVE_PUBLIC_DOM_HIERARCHIES_PINNED_TWO_PARENT_SHA')
+          print('QUALITY L9H_BOUND_REVIEW',r['locallyBoundReviewPairs'],'HOLD',r['rejectedOrHoldPairs'],'IMAGE',r['imagesNearLabels'])
+          print('HOLD L9H_FORMAL_DATE_PRICE_GOLDEN_RELEASE_DENIED')
+          PY
+      - name: SHA seal isolated evidence only
+        if: always()
+        run: |
+          mkdir -p p30-l9h-evidence
+          if test -f p30-l9h-evidence/manifest.json; then
+            (cd p30-l9h-evidence && sha256sum ibon_local_dom_hierarchy.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9H_SHA_SEALED
+          else
+            echo HOLD L9H_NO_EVIDENCE
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9h-ibon-local-dom-hierarchy
+          path: p30-l9h-evidence/
+          if-no-files-found: warn
+          retention-days: 14
