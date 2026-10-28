@@ -1,5 +1,29 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-29 P30-L9-X 寬宏原始 parser 同次來源階段對照 — 10 URL-pattern → 10 selector → 10 PRODUCT_ID → 10 anchor text，尚非活動驗證**
+> ```text
+> Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 published snapshot]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-W Draft PR62 @9bc37d326ee6e1b698e36061f8323e0894c98ad6
+> └─ L9-X Draft PR63 @b90a6af4f6bb2bab4a6570a025e7068cd1c69093 [UNMERGED]
+>    ├─ scripts/p30_l9x_kham_original_parser_parity.py [one Chromium navigation; BeautifulSoup static/rendered]
+>    │  ├─ exact frozen scraper.py blob 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+>    │  ├─ static 44 anchors / broad UTK0201 10 / original selector 10
+>    │  ├─ original PRODUCT_ID gate PASS 10 / unique 10 / anchor text nonempty 10
+>    │  ├─ rendered three passive snapshots each 10/10/10 pre-event stages
+>    │  └─ create_event_obj NOT EXECUTED; identity/fields/Golden/publish all 0
+>    ├─ tests/p30/test_l9x_kham_original_parser_parity.py [36/36 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9x_kham_original_parser_parity.yml
+>       └─ native CI #40784134457 SUCCESS -> Artifact #12858063173
+>          └─ ZIP SHA256 c259d931c6c8b9c3b2bb8f5e398e6675231202fd718e136cf9c185d9bd6a4c5f
+> Formal status Draft PR53 [CI FAIL/security-blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - **Interpretation:** 2026-10-29 07:00 Taiwan current Kham original selector and PRODUCT_ID gate do not explain the earlier L7-B 2026-10-26 generic zero. Cross-time page drift, the remaining `create_event_obj` title/noise stage, and other category behavior remain unresolved. Do not equate 10 links with 10 verified events. Next P30-L9-Y targets exact post-selector title/noise filter and event-object boundary under bounded source evidence; no main/Pages/production mutation.
+>
+
 > **2026-10-29 P30-L9-W 寬宏清單邊界：當前 static/rendered URL-pattern 10；歷史 generic list=0，尚非 parser 根因證明**
 >
 > ```text
