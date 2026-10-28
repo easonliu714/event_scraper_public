@@ -1,5 +1,30 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-29 P30-L9-W 寬宏清單邊界：當前 static/rendered URL-pattern 10；歷史 generic list=0，尚非 parser 根因證明**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 snapshot]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages run 40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-V Draft PR61 @46dd6ddade398603cca4fc6f8dbb8f644ce64d3c
+> └─ L9-W Draft PR62 @9bc37d326ee6e1b698e36061f8323e0894c98ad6 [UNMERGED]
+>    ├─ scripts/p30_l9w_kham_list_boundary.mjs
+>    │  ├─ SHA-pinned L7-B + formal status, one normal Chromium official category navigation
+>    │  ├─ HTTP200, redirects0, static 44 anchors / 10 unique same-host UTK0201-pattern
+>    │  ├─ rendered four snapshots 10/10/10/10; ready interactive→interactive→complete→complete
+>    │  ├─ review CURRENT link presence vs HISTORIC 0; no parser root-cause assertion
+>    │  └─ no raw source persistence, detail identity 0, fields 0, Golden 0, publish 0
+>    ├─ tests/p30/test_l9w_kham_list_boundary.mjs [39/39 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9w_kham_list_boundary.yml
+>       └─ exact-head CI #40775864493 SUCCESS -> Artifact #12854207689
+>          └─ ZIP SHA256 2ba90bf6d5e080443b5e01309ae877f3057f9915082b9c3b303c130f0051fa61
+> Formal status Draft PR53 [CI FAIL/security-blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - **Interpretation:** Current 10 URL-pattern matches are not 10 confirmed events. The L7-B 2026-10-26 generic zero and 2026-10-29 current 10 were observed at different times; neither a static-parser bug nor JS-only source is proven. Next L9-X: bounded same-session original generic parser vs structural anchor/card/title association, then exact ID/detail parity if justified. Preserve ibon 39961 historic mismatch OPEN and CKSMH 5/TWTC 39 Android USER_ATTESTED_PASS + L8 UI PASS.
+>
+
 
 > **2026-10-29 P30-L9-V — 19-platform SHA-pinned HTTP/list blocker classification, one safe BeClass probe**
 > ```text
