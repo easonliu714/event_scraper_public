@@ -1,0 +1,111 @@
+name: EventRadar P30 L9-V 19-source blocker matrix and BeClass GET (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9v-19source-blocker-matrix]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9v-isolated
+  cancel-in-progress: true
+jobs:
+  blocker-matrix-evidence:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen parent, formal main and exactly three ADD-only files
+        run: |
+          set -euo pipefail
+          base=2b26e27bee40f3bff7dc08b1a3fec1c1a9f5d96d
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9v_19source_blocker_triage.yml' 'scripts/p30_l9v_19source_blocker_triage.py' 'tests/p30/test_l9v_19source_blocker_triage.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9V_UNEXPECTED_DIFF; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/p30_l9v_status.json
+          echo PASS_L9V_FROZEN_PRODUCTION_THREE_ADDITIONS
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax and 34 offline contracts BEFORE public GET
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9v_19source_blocker_triage.py tests/p30/test_l9v_19source_blocker_triage.py
+          python -m unittest discover -s tests/p30 -p 'test_l9v_19source_blocker_triage.py' -v 2>&1 | tee /tmp/l9v-tests.log
+          grep -Eq '^Ran 34 tests' /tmp/l9v-tests.log
+          grep -Eq '^OK$' /tmp/l9v-tests.log
+          echo PASS_L9V_34_OFFLINE_CONTRACTS
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          run-id: 40353636708
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l7b
+      - name: L7-B immutable artifact digest and internal SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12665097220" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="e680456f0033e528fb25da61a4b3b6e35aa22447";assert a["digest"]=="sha256:8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6";assert not a["expired"];print("PASS_L9V_L7B_ARTIFACT_DIGEST")'
+          (cd pinned-l7b && sha256sum -c SHA256SUMS.txt)
+          echo "e07c01a5d36ab0c950c45fb26e5fdd270103b4013bbf62a00c48291fee5f595a  pinned-l7b/platform_diagnostics.json" | sha256sum -c -
+          echo PASS_L9V_L7B_REPORT_SHA
+      - name: 19 platform matrix and ONE public BeClass GET, no redirects
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9v_19source_blocker_triage.py --status /tmp/p30_l9v_status.json --l7b pinned-l7b/platform_diagnostics.json --manifest pinned-l7b/manifest.json --out p30-l9v-evidence --live-beclass
+      - name: Independent SHA, 19-source and no-publication readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          root=Path('p30-l9v-evidence')
+          raw=(root/'blocker_matrix.json').read_bytes()
+          r=json.loads(raw);m=json.loads((root/'manifest.json').read_bytes())
+          assert r['kind']=='EVENTRADAR_P30_L9V_19SOURCE_BLOCKER_MATRIX_V1'
+          assert m['filesSHA256']['blocker_matrix.json']==hashlib.sha256(raw).hexdigest()
+          assert r['sourceStatusBlob']=='e19ca37c4c80c10b7278d0813b8ff1047535d124'
+          assert r['sourceL7BReportSHA256']=='e07c01a5d36ab0c950c45fb26e5fdd270103b4013bbf62a00c48291fee5f595a'
+          assert len(r['matrix'])==sum(r['counts'].values())==19
+          assert [r['counts'][k] for k in ('HTTP403_ACCESS_HOLD','HTTP200_ZERO_GENERIC_LIST','HTTP200_ZERO_WITH_INDEPENDENT_SOURCE','LIST_POSITIVE_DETAIL_IDENTITY_HOLD','LIST_POSITIVE_FIELD_ROLE_HOLD')]==[3,1,3,7,5]
+          assert r['freshSourcesProbed']==r['beclassOneShot']['requested']==1 and r['otherSourcesReprobed']==r['beclassOneShot']['followedRedirects']==0
+          assert not r['beclassOneShot']['rawBodySaved'] and not r['beclassOneShot']['rawUrlSaved']
+          assert all(not x['sourceCauseProven'] and not x['freshSourceReverified'] for x in r['matrix'])
+          assert r['formalFieldPromotions']==r['goldenAccepted']==0 and r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not any(r[k] for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted','productionModified'))
+          assert 'https://' not in raw.decode() and '<html' not in raw.decode()
+          print('PASS_L9V_INDEPENDENT_19_SOURCE_AND_ONE_GET_SHA_HARD_HOLD')
+          print('L9V_PROBE',json.dumps(r['beclassOneShot'],sort_keys=True))
+          PY
+      - name: Seal isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9v-evidence
+          if test -f p30-l9v-evidence/manifest.json; then
+            (cd p30-l9v-evidence && sha256sum blocker_matrix.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9V_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9v-19source-blocker-matrix
+          path: p30-l9v-evidence/
+          retention-days: 14
+          if-no-files-found: warn
