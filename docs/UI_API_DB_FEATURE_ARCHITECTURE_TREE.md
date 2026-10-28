@@ -1,5 +1,32 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+
+> **2026-10-29 P30-L9-U ibon 39961 exact list/detail heading identity — native CI 46/46 PASS, historical mismatch OPEN**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> └─ Pages #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-T Draft PR59 @7923ede339b219a2264127f4163eb6d75e31a66b
+> └─ L9-U Draft PR60 @2b26e27bee40f3bff7dc08b1a3fec1c1a9f5d96d [UNMERGED]
+>    ├─ scripts/p30_l9u_ibon_39961_heading_identity.mjs
+>    │  ├─ pinned L9-K cross-window report + L9-H historic mismatch, both SHA checked
+>    │  ├─ one normal public list + one exact detail navigation, HTTP200/200
+>    │  ├─ exact 39961 same-card list title 1; no ambiguous same-ID candidate
+>    │  ├─ twelve passive H1/H2 observations / 500ms; first complete/match index1
+>    │  ├─ stable current H1/H2 match tail; historic L9-H mismatch remains OPEN
+>    │  └─ no raw title/HTML/links/cookies/screenshots persisted; fields 0
+>    ├─ tests/p30/test_l9u_ibon_39961_heading_identity.mjs [46/46 PASS]
+>    └─ .github/workflows/eventradar_p30_l9u_ibon_39961_heading_identity.yml
+>       └─ native CI #40759836065 SUCCESS, Artifact 12846208917
+>          └─ ZIP SHA256 2144b4f1b8d2837a626690e914a28c65d4c4864aa25a18b7cf86506ae07fcfd2
+> Formal PWA status Draft PR53 [CI FAIL/security-blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - Current 39961 source title alignment is **REVIEW ONLY** and does not explain the prior L9-H `HOLD_TITLE_MISMATCH`; formal identity is not certified. K report SHA `87eef831253a7dea00f53100ea7f0b5c914d6b9cfa62b63906d8d1a846af50a9`, H report SHA `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` verified. Next L9-V prioritizes 19-platform 403/302/0 HTTP/list blocker matrix, no redundant short-window 39961 retry. Docs canonical only on Draft PR8. Existing CKSMH 5/TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, and formal status visual screenshots retained; no 19-source E2E claim.
+>
+
 > **2026-10-29 P30-L9-T ibon 39907 exact heading readiness — native CI 32/32 PASS, field HOLD**
 >
 > Formal PWA Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 UNCHANGED; docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 IMMUTABLE; docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 PUBLISHED PR51; Pages #40683700243 SUCCESS, NO NEW DEPLOY.
