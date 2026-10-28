@@ -1,0 +1,156 @@
+name: EventRadar P30 L9-K ibon 39961 cross-time-window source (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9k-ibon-39961-cross-window
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9k-39961-unique-readonly
+  cancel-in-progress: true
+jobs:
+  cross-window-public-identity:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9k-ibon-39961-cross-window'
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9-J parent and three ADD-only changes; protect source Pages and data
+        run: |
+          set -euo pipefail
+          base=727aea8aa673b29cd4a589c0a9ca68836fac4b92
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9k_ibon_cross_window.yml' 'scripts/p30_l9k_ibon_39961_cross_window.mjs' 'tests/p30/test_l9k_ibon_39961_cross_window.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9K_SOURCE_SCOPE; exit 1; }
+          echo PASS L9K_FROZEN_PARENT_AND_THREE_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install fixed Playwright normal Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: 30 synthetic negative/positive contracts before any fresh official network
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9k_ibon_39961_cross_window.mjs
+          node --test tests/p30/test_l9k_ibon_39961_cross_window.mjs
+          echo PASS L9K_30_OFFLINE_SOURCE_CLOCK_AND_HOLD_TESTS
+      - name: Download exact archived L9-J two independent rounds
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9j-ibon-39961-repeated-readonly
+          run-id: 40619619643
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9k-pinned-l9j
+      - name: Download historical L9-H contradiction source, never rewrite old mismatch
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9h-ibon-local-dom-hierarchy
+          run-id: 40516301527
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9k-pinned-l9h
+      - name: Verify SHA256SUMS and exact manifest + nested source history before browser
+        run: |
+          set -euo pipefail
+          (cd l9k-pinned-l9j && sha256sum -c SHA256SUMS.txt)
+          (cd l9k-pinned-l9h && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          import {createHash} from "node:crypto";
+          import {provenance,minimumWindow} from "./scripts/p30_l9k_ibon_39961_cross_window.mjs";
+          function get(dir,file){
+            const raw=readFileSync(dir+"/"+file);
+            const m=JSON.parse(readFileSync(dir+"/manifest.json"));
+            const expected=m.fileSHA256?.[file]??m.filesSHA256?.[file];
+            if(createHash("sha256").update(raw).digest("hex")!==expected)throw Error("HOLD_L9K_PARENT_FILE_SHA");
+            return {doc:JSON.parse(raw),raw};
+          }
+          const j=get("l9k-pinned-l9j","ibon_39961_repeatability.json");
+          const h=get("l9k-pinned-l9h","ibon_local_dom_hierarchy.json");
+          const p=provenance(j.doc,j.raw,h.doc,h.raw);
+          const age=minimumWindow(p.lastCaptureUtc,new Date().toISOString());
+          console.log("PASS L9K_PARENT_J_H_SHA_PRIOR_CONTRADICTION",p.jSHA256,p.hSHA256);
+          console.log("PASS L9K_4H_WINDOW_PREFLIGHT",Number((age/3600000).toFixed(2)),"hours");
+          JS
+      - name: ONE fresh normal Chromium list + exact detail, in distinct >=4h time window
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9k_ibon_39961_cross_window.mjs \
+            --j l9k-pinned-l9j/ibon_39961_repeatability.json \
+            --h l9k-pinned-l9h/ibon_local_dom_hierarchy.json \
+            --out p30-l9k-evidence
+      - name: Strict cross-time-window results, provenance SHA and no-release readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('p30-l9k-evidence')
+          r=json.loads((root/'ibon_39961_cross_window.json').read_text(encoding='utf8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+          assert r['kind']=='EVENTRADAR_P30_L9K_IBON_39961_CROSS_WINDOW_SOURCE_V1'
+          assert r['sourceOrigin']=='L9K_ONE_NEW_PUBLIC_NORMAL_BROWSER_DISTINCT_TIME_WINDOW'
+          assert r['parentJHead']=='727aea8aa673b29cd4a589c0a9ca68836fac4b92'
+          assert r['parentJRun']==40619619643 and r['parentJArtifact']==12786507149
+          assert r['historicHRun']==40516301527 and r['historicHArtifact']==12740505389
+          assert r['eventId']=='39961'
+          assert r['minWindowGapMs']==4*60*60*1000
+          assert r['preflightGapMs']>=r['minWindowGapMs'] and r['observedGapMs']>=r['minWindowGapMs']
+          assert r['newBrowserProcesses']==1 and r['newTopLevelNavigationsAttempted']==2
+          assert len(r['priorTwoRoundsSummary'])==2
+          assert r['decision']['historicalMismatchRetained'] is True
+          assert r['decision']['priorRootCauseStillUnknown'] is True
+          assert r['decision']['formalIdentityCertified'] is False
+          assert r['decision']['formalReleaseEligible'] is False
+          assert r['decision']['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['decision']['crossWindowStatus'] in (
+            'CROSS_WINDOW_THREE_MATCHES_REVIEW_ONLY',
+            'CROSS_WINDOW_SOURCE_MISMATCH_OR_INCOMPLETE_HOLD')
+          x=r['currentRound']
+          assert x['list']['url']=='https://ticket.ibon.com.tw/Index/entertainment'
+          assert x['detail']['url']=='https://ticket.ibon.com.tw/ActivityInfo/Details/39961'
+          assert x['decision']['status'] in ('HOLD','REVIEW_ONLY_NO_RELEASE')
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['goldenAccepted']==r['formalFieldPromotions']==r['sessionSplits']==0
+          assert r['formalEventDate'] is None and r['formalPrice'] is None and r['ticketStatus']=='UNKNOWN'
+          assert not any(r[k] for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted'))
+          assert not any(r[k] for k in ('rawHtmlPersisted','cookiesPersisted','screenshotsPersisted','networkBodiesPersisted'))
+          assert not r['fullPlatformCoverageVerified'] and not r['productionRollbackVerified']
+          assert r['previousAndroid44UserAttestedPassPreserved'] and r['l8CoreAndroidUserAttestedPassPreserved']
+          assert hashlib.sha256((root/'ibon_39961_cross_window.json').read_bytes()).hexdigest()==m['fileSHA256']['ibon_39961_cross_window.json']
+          print('L9K_NEW_WINDOW_UTC',x['startedUtc'],'HOURS_AFTER_LAST',round(r['observedGapMs']/3600000,3))
+          print('L9K_OFFICIAL_LIST_DETAIL_HTTP',x['list']['httpStatus'],x['detail']['httpStatus'])
+          print('L9K_SOURCE_ID_TITLE_RESULT',x['decision']['reason'],r['decision']['crossWindowStatus'])
+          print('PASS L9K_NEW_CROSS_WINDOW_EVIDENCE_SHA_AND_NO_RELEASE')
+          print('HOLD L9K_HISTORIC_39961_ANOMALY_OPEN_FORMAL_FIELDS_LOCKED')
+          PY
+      - name: Seal isolated output only
+        if: always()
+        run: |
+          mkdir -p p30-l9k-evidence
+          if test -f p30-l9k-evidence/manifest.json; then
+            (cd p30-l9k-evidence && sha256sum ibon_39961_cross_window.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9K_SHA256_SEALED
+          else
+            echo HOLD L9K_NO_ARTIFACT
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9k-ibon-39961-cross-window-readonly
+          path: p30-l9k-evidence/
+          if-no-files-found: warn
+          retention-days: 14
