@@ -50,10 +50,10 @@ class Contracts(unittest.TestCase):
         d = m.stages(html(text=""))
         self.assertEqual((d["passedProductIdGate"], d["titleTextEmpty"]), (1, 1))
     def test_16_alt_is_not_original_anchor_text(self):
-        d = m.stages(b'<a href="/UTK0201_.aspx?PRODUCT_ID=A"><img alt="活動名稱"></a>')
+        d = m.stages('<a href="/UTK0201_.aspx?PRODUCT_ID=A"><img alt="活動名稱"></a>'.encode())
         self.assertEqual((d["imageAltPresent"], d["titleTextEmpty"]), (1, 1))
     def test_17_title_attr_not_original_anchor_text(self):
-        d = m.stages(b'<a title="活動" href="/UTK0201_.aspx?PRODUCT_ID=A"></a>')
+        d = m.stages('<a title="活動" href="/UTK0201_.aspx?PRODUCT_ID=A"></a>'.encode())
         self.assertEqual((d["titleAttributePresent"], d["titleTextEmpty"]), (1, 1))
     def test_18_duplicate(self):
         d = m.stages(html() + html())
@@ -88,7 +88,7 @@ class Contracts(unittest.TestCase):
         self.assertEqual(m.sha(b"test"), hashlib.sha256(b"test").hexdigest())
     def test_32_blob(self):
         b=b"test"
-        self.assertEqual(m.git_blob(b), hashlib.sha1(b"blob 4\\0".replace(b"\\0", b"\0") + b).hexdigest())
+        self.assertEqual(m.git_blob(b), "30d74d258442c7c65512eafab474568dd706c430")
     def test_33_status_bad(self):
         with self.assertRaisesRegex(ValueError, "HOLD_STATUS_BLOB"):
             m.verify_parents(b"{}", b"{}", b"{}")
