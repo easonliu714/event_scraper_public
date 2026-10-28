@@ -158,11 +158,11 @@ export async function oneNavigation(browserType) {
         try{
           const body=await response.text();
           if(body.length<=1500000){
-            html=await page.evaluate((raw,max)=>{
+            html=await page.evaluate(({raw,max})=>{
               const d=new DOMParser().parseFromString(raw,'text/html');
               return Array.from(d.querySelectorAll('a[href]')).slice(0,max)
                 .map(x=>x.getAttribute('href')||'');
-            },body,MAX_LINKS);
+            },{raw:body,max:MAX_LINKS});
             staticAvailable=true;
           }
         }catch{/* static response unavailable is a HOLD, never guessed */}
