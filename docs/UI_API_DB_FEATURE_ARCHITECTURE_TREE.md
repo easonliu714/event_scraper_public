@@ -1,5 +1,31 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-28 P30-STATUS official PWA status-only public diagnostics architecture — Pages deployment SUCCESS, event-feed immutable**
+>
+> ```text
+> Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [NEW after USER-authorized status-only PR #51]
+> ├─ docs/data.json [UNMODIFIED Git Blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+> ├─ docs/index.html [single new header anchor → platform-status.html; prior fetch(data.json) unchanged]
+> ├─ docs/platform_status.json [19 individual platform status rows; L7B SHA provenance + overlays]
+> │  ├─ baseline: 2026-10-26 15:53:41 UTC, 19 attempts, 16 HTTP200 / 3 403, 264 list candidates
+> │  ├─ per-source: HTTP → LIST → DETAIL → FIELD ROLES → Android → EVENT PUBLISH
+> │  ├─ CKSMH: 5 independent activity/Android PASS; TWTC: 39 Android PASS / 38 date candidates / 1 postponed conflict
+> │  ├─ ibon: normal Chromium 22 distinct list candidates; 39961 drift review; L9-M 4 titles parity and 0 field promotions
+> │  └─ all status fields evidence-only; counts from different Gates NOT summed; event publication HARD_HOLD
+> ├─ docs/platform-status.html [mobile responsive; loads ./platform_status.json with no-store]
+> │  ├─ per-platform card, search and stage filters, GitHub evidence links, explicit timestamps
+> │  ├─ safe DOM textContent / no HTML injection, site links only to github.com
+> │  └─ read-only, no notifications, background scheduler, login, checkout or event feed rewrites
+> ├─ tests/p30/test_public_platform_status_readonly.py [19/19 count/identity checks against 3 real artifacts]
+> └─ .github/workflows/eventradar_public_platform_status.yml [source-only read permissions]
+>    └─ CI 40683470517 SUCCESS + PR CI 40683520120 SUCCESS
+>       └─ GitHub Pages Build/Deploy Run 40683700243 SUCCESS
+> ```
+> - PR #51 status-only merged as requested; independent readback Source main new HEAD `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, `docs/platform_status.json` Git blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`, `docs/platform-status.html` Git blob `63264fb19991123aceb929a17427e7ef10313a12`, index Git blob `d752332f4d4e8074fef9ceb56d12560caf25b8df`, `docs/data.json` unchanged. Actual external GitHub Pages HTTP and mobile screenshot verification not available to assistant at this checkpoint; user front-end inspection remains PENDING, but Pages native deploy SUCCESS.
+> - P30-L9-M source-specific detail diagnostic remains separate Draft PR #50, no main merge; four ibon HTTP200/title 4/4, local pair reason `AMBIGUOUS_OR_INTERACTIVE` 4/4, accepted role value 0. Status publication must NEVER be conflated with event Golden/PWA candidate publication. Only previously attested Android 44 (CKSMH 5/TWTC 39) plus L8 core-preview UAT are PASS; site-specific Android for remaining 17 platforms NOT tested/attested.
+> - Two canonical governance files continue exclusively on Docs Draft PR #8. Source main now has read-only progress page, not governance doc updates. Do not change Writer/Notifier/Scheduler, do not merge stalled source PRs, do not retire Preview/ShowNews; event feed release remains `HARD_HOLD_NO_PUBLICATION`.
+>
+
 > **2026-10-28 P30-L9-L source-only four official ibon details semantic review architecture — CI PASS / field evidence 0**
 >
 > ```text
