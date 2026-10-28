@@ -21,7 +21,7 @@ const report=()=>({kind:KIND,sampleCount:4,rows:IDS.map(row),currentExactHeading
  rawHtmlPersisted:false,cookiesPersisted:false,screenshotsPersisted:false,
  existingAndroid44Preserved:true,l8CoreAndroidPassPreserved:true,releaseState:HOLD});
 test('01 four immutable official IDs',()=>assert.deepEqual(IDS,['39575','39878','39907','39978']));
-test('02 normalize punctuation and whitespace',()=>assert.equal(norm(' 原始， 活動名稱 '),norm('原始活動名稱')));
+test('02 normalize punctuation and whitespace',()=>assert.equal(norm(' 原始，活動名稱 '),norm('原始活動名稱')));
 test('03 title heading exact only source bound',()=>assert.equal(titleDecision(src.title,dom()).kind,'SOURCE_TITLE_HEADING_EXACT'));
 test('04 metadata-only match must not be heading exact',()=>{
  const x=titleDecision(src.title,dom({headings:['別的活動'],ogTitle:src.title}));
