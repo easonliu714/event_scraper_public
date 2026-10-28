@@ -52,11 +52,11 @@ test('16 max links cap',()=>{
 });
 test('17 JS rendered anchor evidence is review only',()=>{
  const p=probe(0,2);
- assert.equal(decide(p.http,p.staticLinks,p.snapshots,true,true),'REVIEW_JS_RENDERED_DETAIL_ANCHORS');
+ assert.equal(decide(p.http,p.staticLinks,p.snapshots,true,true),'REVIEW_CURRENT_JS_DETAIL_LINKS_HISTORIC_ZERO');
 });
 test('18 static anchor generic-parser gap is review only',()=>{
  const p=probe(2,2);
- assert.equal(decide(p.http,p.staticLinks,p.snapshots,true,true),'REVIEW_STATIC_DETAIL_ANCHORS_GENERIC_PARSER_GAP');
+ assert.equal(decide(p.http,p.staticLinks,p.snapshots,true,true),'REVIEW_CURRENT_STATIC_DETAIL_LINKS_HISTORIC_ZERO');
 });
 test('19 static links removed hold',()=>{
  const p=probe(2,0);
@@ -92,7 +92,7 @@ test('26 unstable tail hold',()=>{
 });
 test('27 incomplete ready tail hold',()=>{
  const p=probe(0,3);p.snapshots[3].ready='interactive';
- assert.equal(decide(p.http,p.staticLinks,p.snapshots,true,true),'HOLD_RENDER_NOT_STABLE');
+ assert.equal(decide(p.http,p.staticLinks,p.snapshots,true,true),'HOLD_RENDER_NOT_COMPLETE');
 });
 test('28 report never publishes',()=>{
  const r=report(historical,probe(0,2));
@@ -131,4 +131,9 @@ test('38 production file immutable by contract',()=>{
  const r=report(historical,probe(0,2));
  assert.equal(r.historicalObservationIsNotCurrent,true);
  assert.equal(r.sourceEntryId,'KHAM_CATEGORY_205');
+});
+test('39 prior interactive tail with latest complete and stable anchor count is review only',()=>{
+ const p=probe(10,10);p.snapshots[2].ready='interactive';
+ assert.equal(decide(p.http,p.staticLinks,p.snapshots,true,true),
+   'REVIEW_CURRENT_STATIC_DETAIL_LINKS_HISTORIC_ZERO');
 });
