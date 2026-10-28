@@ -26,7 +26,7 @@ jobs:
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
-          test "$(git rev-parse HEAD:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
           git merge-base --is-ancestor "$base" HEAD
           expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9y_kham_event_object_boundary.yml' 'scripts/p30_l9y_kham_event_object_boundary.py' 'tests/p30/test_l9y_kham_event_object_boundary.py' | LC_ALL=C sort)"
           actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
