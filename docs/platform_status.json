@@ -1,0 +1,520 @@
+{
+  "kind": "EVENTRADAR_PUBLIC_PLATFORM_ENGINEERING_STATUS_V1",
+  "schemaVersion": "1.0.0",
+  "reportDate": "2026-10-28",
+  "timezone": "Asia/Taipei",
+  "scope": "公開工程進度診斷；非正式活動清單、非即時售票、非活動可售狀態",
+  "sourceAuthority": {
+    "repo": "easonliu714/event_scraper_public",
+    "sourceMainBeforeStatus": "fc4f963247d68eed29425808cc14e7250f312d05",
+    "governanceBranch": "docs/eventradar-p30-live-roadmap-20261025",
+    "governanceDocuments": [
+      "docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md",
+      "docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md"
+    ],
+    "baselineSourceRun": 40353636708,
+    "baselineArtifact": 12665097220,
+    "baselineSha256": "8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6",
+    "l9bArtifact": 12707416716,
+    "l9bSha256": "3906b4e9689987429040ce9508fc88e4dbb0491199fd5984e55fb469065114d0",
+    "l9mRun": 40682420113,
+    "l9mArtifact": 12813381760,
+    "l9mSha256": "490b6aedb0e28a4e1a07ac2f3782456a138358386b94b62099469c18f0b8c7a5"
+  },
+  "baselineSummary": {
+    "platformsChecked": 19,
+    "http200Platforms": 16,
+    "blocked403Platforms": 3,
+    "positiveListPlatforms": 12,
+    "listCandidates": 264,
+    "detailAttempts": 12,
+    "detailTitleMatches": 5,
+    "baselineCapturedAtUTC": "2026-10-26T15:53:41Z",
+    "canonicalEventCount": 0
+  },
+  "separateEvidence": {
+    "androidPlatformSpecificPass": 44,
+    "androidCKSMH": 5,
+    "androidTWTC": 39,
+    "androidL8CoreUiPass": true,
+    "ibonNormalBrowserListCandidates": 22,
+    "ibonSampledDetailTitleMatchHistoric": 6,
+    "ibonL9MCurrentTitleMatch": 4,
+    "ibonL9MCurrentSampleCount": 4,
+    "ibonL9MFieldCandidatesAccepted": 0,
+    "ibonL9MRefusals": 4,
+    "caution": "各 Gate 使用不同時間及不同採集方式，不能把候選數直接相加、不能宣稱 19 平台已完成"
+  },
+  "production": {
+    "eventDataFile": "docs/data.json",
+    "eventDataModifiedByThisReport": false,
+    "sourceMainEventDataSHA256GitBlob": "7fc4fe32567a57fd504483eeb9a8b9e10b568ea4",
+    "eventFeedReleaseState": "HARD_HOLD_NO_PUBLICATION",
+    "goldenAccepted": 0,
+    "eventCandidatesPublishedFromL7BL9M": 0,
+    "writerEnabled": false,
+    "schedulerEnabled": false,
+    "notifierEnabled": false,
+    "fullAndroidE2EAttested": false
+  },
+  "platforms": [
+    {
+      "id": "01",
+      "platform": "KKTIX",
+      "baseline": {
+        "httpStatus": 403,
+        "listCandidates": 0,
+        "detailAttempted": 0,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "阻擋／待合法來源檢查",
+      "blocker": "官方入口 HTTP403；不能以此判定無活動",
+      "stages": {
+        "response": "HTTP403_BLOCKED",
+        "list": "HOLD_ZERO_OR_UNPARSED",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "02",
+      "platform": "ACCUPASS",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 25,
+        "detailAttempted": 1,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "清單候選／詳情待核",
+      "blocker": "25 筆限量搜尋候選；詳情抽樣標題未核實；活動日與報名日不能混用",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "03",
+      "platform": "拓元售票",
+      "baseline": {
+        "httpStatus": 403,
+        "listCandidates": 0,
+        "detailAttempted": 0,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "阻擋／待合法來源檢查",
+      "blocker": "官方入口 HTTP403；需依正常公開存取方式重驗",
+      "stages": {
+        "response": "HTTP403_BLOCKED",
+        "list": "HOLD_ZERO_OR_UNPARSED",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "04",
+      "platform": "寬宏",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 0,
+        "detailAttempted": 0,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "清單解析 HOLD",
+      "blocker": "HTTP200 但列表解析 0；可能是入口或 HTML 結構差異",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "HOLD_ZERO_OR_UNPARSED",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "05",
+      "platform": "OPENTIX",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 40,
+        "detailAttempted": 1,
+        "detailTitleMatches": 1,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情抽樣／欄位 HOLD",
+      "blocker": "單次抽樣標題一致，但跨節目集合、身障票特殊入口與多場次日期須分離",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "SAMPLED_TITLE_MATCH_NOT_GOLDEN",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "06",
+      "platform": "UDN售票網",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 6,
+        "detailAttempted": 1,
+        "detailTitleMatches": 1,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情抽樣／欄位 HOLD",
+      "blocker": "單次詳情標題吻合，票價／售票角色及完整清單尚未核實",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "SAMPLED_TITLE_MATCH_NOT_GOLDEN",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "07",
+      "platform": "FamiTicket",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 40,
+        "detailAttempted": 1,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情身分 HOLD",
+      "blocker": "清單候選已取得，活動詳情路徑／標題對位未過",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "08",
+      "platform": "年代售票",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 28,
+        "detailAttempted": 1,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情身分 HOLD",
+      "blocker": "HTTP 和清單可讀，抽樣詳情標題未核實，另有來源阻擋提示",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "09",
+      "platform": "TixFun售票網",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 24,
+        "detailAttempted": 1,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情身分 HOLD",
+      "blocker": "清單候選可讀，抽樣詳情身分不符或未證，尚無日期／票況",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "10",
+      "platform": "Event Go",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 38,
+        "detailAttempted": 1,
+        "detailTitleMatches": 1,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情抽樣／欄位 HOLD",
+      "blocker": "抽樣詳情身分通過；內容摘要及活動／報名角色仍待驗證",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "SAMPLED_TITLE_MATCH_NOT_GOLDEN",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "11",
+      "platform": "BeClass",
+      "baseline": {
+        "httpStatus": 403,
+        "listCandidates": 0,
+        "detailAttempted": 0,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "阻擋／轉址 HOLD",
+      "blocker": "本輪 HTTP403；另有其他 Gate 曾見 302，兩種存取差異尚未解決",
+      "stages": {
+        "response": "HTTP403_BLOCKED",
+        "list": "HOLD_ZERO_OR_UNPARSED",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "12",
+      "platform": "ibon",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 0,
+        "detailAttempted": 0,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "瀏覽器候選／欄位 HOLD",
+      "blocker": "純 HTML 初始清單 0；正常 Chromium 後取得 22 筆候選，詳情身分有歷史間歇性不一致；日期值與 h3 標籤局部關係不明",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "HOLD_ZERO_OR_UNPARSED",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": {
+        "gate": "P30-L9E~L9M",
+        "listCandidates": 22,
+        "detailTitleMatchesSampled": 6,
+        "detailSampleScope": "累計抽樣非全 22 筆",
+        "detailCurrentL9M": 4,
+        "detailCurrentTitleMatched": 4,
+        "semanticAccepted": 0,
+        "semanticRefused": 4,
+        "refusalReason": "AMBIGUOUS_OR_INTERACTIVE",
+        "identityReview": "39961 曾發生標題不符；L9K 跨時間 3/3 相符仍 REVIEW_ONLY",
+        "androidUserPass": 0,
+        "notes": "索引需正常 Chromium 執行 JS；詳情時間／票價尚未有可接受來源欄位；純 HTTP 清單 0 與 Chromium 清單 22 為不同採集方式，不能相加",
+        "evidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40682420113"
+      }
+    },
+    {
+      "id": "13",
+      "platform": "華山1914",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 7,
+        "detailAttempted": 1,
+        "detailTitleMatches": 1,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情抽樣／欄位 HOLD",
+      "blocker": "7 筆清單候選、1 筆抽樣詳情標題吻合；日期／價錢尚待來源確認",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "SAMPLED_TITLE_MATCH_NOT_GOLDEN",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "14",
+      "platform": "松山文創",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 1,
+        "detailAttempted": 1,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情身分 HOLD",
+      "blocker": "1 筆候選；抽樣詳情身分未核實，清單覆蓋不足",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "15",
+      "platform": "KidsClub",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 33,
+        "detailAttempted": 1,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "來源類型／日期 HOLD",
+      "blocker": "含課程／商品目錄，不能當成 33 場活動；課程日曆與起迄日期待查",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "16",
+      "platform": "台北世貿",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 0,
+        "detailAttempted": 0,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "獨立詳情 Gate／延期 HOLD",
+      "blocker": "通用 HTML parser 表格解析 0；獨立 TWTC Gate 取得 39 筆，38 筆詳情日期候選，另 1 筆延期衝突",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "HOLD_ZERO_OR_UNPARSED",
+        "detail": "INDEPENDENT_SOURCE_ID_MATCH_REVIEW_ONLY",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "PLATFORM_SPECIFIC_USER_PASS_39",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": {
+        "gate": "P30-L3A/L4A/L4D/Android",
+        "listCandidates": 39,
+        "detailTitleMatches": 39,
+        "dateRoleCandidates": 38,
+        "dateConflictHolds": 1,
+        "androidUserPass": 39,
+        "notes": "39 筆詳情檢查；38 筆日期候選有來源對位，一筆金融科技展延期資訊衝突，不能用原訂日期冒充當前日期",
+        "evidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40270383643"
+      }
+    },
+    {
+      "id": "17",
+      "platform": "中正紀念堂",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 0,
+        "detailAttempted": 0,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "獨立詳情 Gate／場次 HOLD",
+      "blocker": "通用 HTML parser 卡片解析 0；獨立 CKSMH Gate 以 actId 取得 5 筆，日期 5/5，場地單一 3/5，多場次需分開",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "HOLD_ZERO_OR_UNPARSED",
+        "detail": "INDEPENDENT_SOURCE_ID_MATCH_REVIEW_ONLY",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "PLATFORM_SPECIFIC_USER_PASS_5",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": {
+        "gate": "P30-L4B/L4C/Android",
+        "listCandidates": 5,
+        "detailTitleMatches": 5,
+        "dateRoleCandidates": 5,
+        "venueSingleVerified": 3,
+        "androidUserPass": 5,
+        "notes": "5 個 actId 清單與詳情同一來源；部分活動為多場次，未完成全來源正式發布",
+        "evidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40269917573"
+      }
+    },
+    {
+      "id": "18",
+      "platform": "iNDIEVOX",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 19,
+        "detailAttempted": 1,
+        "detailTitleMatches": 1,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "詳情抽樣／欄位 HOLD",
+      "blocker": "19 筆限量清單候選、抽樣詳情標題吻合；活動時間／票價仍未驗",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "SAMPLED_TITLE_MATCH_NOT_GOLDEN",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    },
+    {
+      "id": "19",
+      "platform": "StrollTimes",
+      "baseline": {
+        "httpStatus": 200,
+        "listCandidates": 3,
+        "detailAttempted": 1,
+        "detailTitleMatches": 0,
+        "observedAtUTC": "2026-10-26T15:53:41Z"
+      },
+      "phase": "聚合來源／身分 HOLD",
+      "blocker": "聚合文章而非官方售票頁；3 筆候選、抽樣未對位官方詳情",
+      "stages": {
+        "response": "HTTP200_OBSERVED",
+        "list": "CANDIDATES_NOT_GOLDEN",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
+        "publication": "HARD_HOLD_NO_EVENT_RELEASE"
+      },
+      "independentGate": null
+    }
+  ],
+  "glossary": {
+    "http": "指有界 HTTP 稽核當時回應，不代表現在 HTTP 或整站覆蓋",
+    "list": "僅取得活動連結候選，不代表已核實活動／未售罄",
+    "detail": "抽樣標題與 URL 身分對位，不能推定所有清單活動都正確",
+    "fields": "EVENT、SALE、ADMISSION、REGISTRATION、VOUCHER、PRICE、VENUE 分別核對，未核實保留 UNKNOWN",
+    "android": "僅 CKSMH 5 與 TWTC 39 具原本逐平台用戶實機 PASS，其他未宣稱完整實機",
+    "publication": "工程狀態頁可公開展示；活動卡片/Golden/Writer/即時庫存仍 LOCKED"
+  }
+}
