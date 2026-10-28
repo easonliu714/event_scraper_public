@@ -1,0 +1,134 @@
+name: EventRadar P30 L9-X Kham original parser stage parity (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9x-kham-original-parser-parity]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9x-kham-original-parser
+  cancel-in-progress: true
+jobs:
+  kham-original-parser-parity:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact frozen parent, source, production blobs and three ADD-only paths
+        run: |
+          set -euo pipefail
+          base=9bc37d326ee6e1b698e36061f8323e0894c98ad6
+          test "$(git rev-parse HEAD^:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          git merge-base --is-ancestor "$base" HEAD
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9x_kham_original_parser_parity.yml' 'scripts/p30_l9x_kham_original_parser_parity.py' 'tests/p30/test_l9x_kham_original_parser_parity.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9X_SCOPE; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/l9x-status.json
+          python - <<'PY'
+          from pathlib import Path
+          s=Path("scraper.py").read_text()
+          a=s[s.index("def fetch_kham(session):"):s.index("def fetch_opentix(session):")]
+          for line in ('soup.select(\'a[href*="UTK0201_"]\')', 'if "PRODUCT_ID" not in full_url: continue',
+                       'title = safe_get_text(link)', 'ev = create_event_obj(title, full_url, "寬宏", None)'):
+              assert line in a, "HOLD_L9X_ORIGINAL_PARSER_CONTRACT"
+          print("PASS_L9X_EXACT_SOURCE_SELECTOR_GATE_AND_SCOPE")
+          PY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned BeautifulSoup and Playwright
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: 36 offline fail-closed contracts BEFORE live source
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9x_kham_original_parser_parity.py tests/p30/test_l9x_kham_original_parser_parity.py
+          python -m unittest discover -s tests/p30 -p test_l9x_kham_original_parser_parity.py -v 2>&1 | tee /tmp/l9x-tests.log
+          grep -q 'Ran 36 tests' /tmp/l9x-tests.log
+          grep -q '^OK$' /tmp/l9x-tests.log
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          run-id: 40353636708
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l7b
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9w-kham-list-boundary
+          run-id: 40775864493
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9w
+      - name: Parent artifact digest and inner manifest independent readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          for d in ('pinned-l7b','pinned-l9w'):
+              base=Path(d)
+              manifest=json.loads((base/'manifest.json').read_text())
+              for name,digest in manifest['filesSHA256'].items():
+                  assert hashlib.sha256((base/name).read_bytes()).hexdigest()==digest, 'HOLD_L9X_PARENT_MANIFEST'
+          assert hashlib.sha256(Path('pinned-l7b/platform_diagnostics.json').read_bytes()).hexdigest()=='e07c01a5d36ab0c950c45fb26e5fdd270103b4013bbf62a00c48291fee5f595a'
+          print('PASS_L9X_PARENT_REPORT_SHA')
+          PY
+          for pair in '12665097220 sha256:8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6' '12854207689 sha256:2ba90bf6d5e080443b5e01309ae877f3057f9915082b9c3b303c130f0051fa61'; do
+            set -- $pair
+            curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/$1" | python -c 'import json,sys; a=json.load(sys.stdin); assert a["digest"]==sys.argv[1] and not a["expired"],"HOLD_L9X_PARENT_ZIP_DIGEST"' "$2"
+          done
+      - name: One bounded Kham navigation and original parser stage parity
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9x_kham_original_parser_parity.py --status /tmp/l9x-status.json --l7b pinned-l7b/platform_diagnostics.json --w pinned-l9w/kham_list_boundary.json --out p30-l9x-evidence --live-kham
+      - name: Independent SHA and no-publication readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          raw=Path('p30-l9x-evidence/kham_original_parser_parity.json').read_bytes()
+          r=json.loads(raw)
+          m=json.loads(Path('p30-l9x-evidence/manifest.json').read_bytes())
+          assert r['kind']=='EVENTRADAR_P30_L9X_KHAM_ORIGINAL_PARSER_PARITY_V1'
+          assert r['parentHead']=='9bc37d326ee6e1b698e36061f8323e0894c98ad6'
+          assert r['statusBlob']=='e19ca37c4c80c10b7278d0813b8ff1047535d124'
+          assert r['historical']=={'historicList':0,'l9wStaticUrlPattern':10}
+          assert r['navigationCount']==1 and len(r['frames'])<=3
+          assert r['verifiedEventIdentity']==r['acceptedFields']==r['goldenAccepted']==0
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted','productionModified','rawHtmlPersisted','rawUrlsPersisted','rawTitlesPersisted','cookiesPersisted','screenshotsPersisted'):
+              assert r[k] is False,k
+          assert b'https://' not in raw and b'<html' not in raw
+          assert hashlib.sha256(raw).hexdigest()==m['filesSHA256']['kham_original_parser_parity.json']
+          print('PASS_L9X_SHA_AND_HARD_HOLD',r['decision'])
+          PY
+      - name: Seal isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9x-evidence
+          if test -f p30-l9x-evidence/manifest.json; then
+            (cd p30-l9x-evidence && sha256sum kham_original_parser_parity.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9X_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9x-kham-original-parser-parity
+          path: p30-l9x-evidence/
+          retention-days: 14
+          if-no-files-found: warn
