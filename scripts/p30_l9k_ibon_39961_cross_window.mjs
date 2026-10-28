@@ -10,7 +10,8 @@ import {createHash} from "node:crypto";
 import {readFile,writeFile,mkdir} from "node:fs/promises";
 import {resolve,sep} from "node:path";
 import {fileURLToPath} from "node:url";
-import {capture,validateReport as validateJ,normalize,LIST_URL,DETAIL_URL,EVENT_ID} from "./p30_l9j_ibon_39961_repeatability.mjs";
+import {capture,validateReport as validateJ,LIST_URL,DETAIL_URL,EVENT_ID} from "./p30_l9j_ibon_39961_repeatability.mjs";
+import {normalize} from "./p30_l9i_ibon_39961_identity.mjs";
 
 export const KIND="EVENTRADAR_P30_L9K_IBON_39961_CROSS_WINDOW_SOURCE_V1";
 export const SOURCE_J_KIND="EVENTRADAR_P30_L9J_IBON_39961_SAME_RUN_REPEATABILITY_V1";
