@@ -23,7 +23,7 @@ export const RUN_H=40516301527;
 export const ARTIFACT_H=12740505389;
 export const MIN_GAP_MS=4*60*60*1000;
 export const RELEASE="HARD_HOLD_NO_PUBLICATION";
-const sha=b=>createHash("sha256").update(b).digest("hex");
+export const sha=b=>createHash("sha256").update(b).digest("hex");
 const serial=x=>JSON.stringify(x,null,2)+"\n";
 
 export function provenance(j,jBytes,h,hBytes){
