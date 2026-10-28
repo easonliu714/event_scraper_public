@@ -1,5 +1,31 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-28 SRC-P30-L9-J ibon 39961 independent source repeatability architecture — CI PASS 2/2 SAME RUN, past mismatch held**
+>
+> ```text
+> Source main@fc4f963247d [unchanged / Pages/runtime/data protected]
+> └─ L9-I Source Draft PR #46 @ ca60d3182172ad7f824fbcb5a2a6c9189fecc74b
+>    └─ L9-J Source Draft PR #47 @ 727aea8aa673b29cd4a589c0a9ca68836fac4b92
+>       ├─ scripts/p30_l9j_ibon_39961_repeatability.mjs
+>       │  ├─ L9-I Run 40524765567 Artifact 12744025880 [last point-in-time 39961 title parity]
+>       │  ├─ L9-H Run 40516301527 Artifact 12740505389 [prior 39961 TITLE_MISMATCH]
+>       │  ├─ validateParents() exact original title/event ID/source report SHA
+>       │  ├─ capture() two ephemeral normal browser instances (not one shared context)
+>       │  │  ├─ 1 official ibon Index/entertainment per round, numeric same-card ID 39961
+>       │  │  └─ 1 exact ibon ActivityInfo/Details/39961 per round, bounded headings
+>       │  ├─ 8-second minimum gap; individual UTC timestamps, HTTP and HOLD reasons
+>       │  ├─ grade() 2/2 match still REVIEW_ONLY; historical mismatch mandatory
+>       │  └─ ibon_39961_repeatability.json + manifest.json + SHA256SUMS.txt
+>       ├─ tests/p30/test_l9j_ibon_39961_repeatability.mjs [30/30 offline negatives]
+>       └─ .github/workflows/eventradar_p30_l9j_ibon_39961_repeat.yml
+>          └─ native Run 40619619643 -> Artifact 12786507149 [SHA PASS]
+> ```
+> - **Actual native source Gate:** [Run 40619619643](https://github.com/easonliu714/event_scraper_public/actions/runs/40619619643) Job `122590202592` completed SUCCESS at Source Draft PR #47 head `727aea8aa673b29cd4a589c0a9ca68836fac4b92`, exact 3 additive paths / Git blob freeze / 30 offline tests PASS, source reports SHA `73eaec24fbe591d5bd39e2ba4704f5d0693e45f802d57fd4b9ecf013d6cd44fb` (L9-I) and `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` (L9-H) independently SHA-verified with manifests. Run #1 initial `40619506719` FAILED on missing exported source constants before browser access; repaired through new script only and successful second run, no change to prior Gates.
+> - **Observed first-party public DOM:** Round 1 `2026-10-28T02:13:33.400Z` to `02:13:38.431Z`; Round 2 `02:13:46.435Z` to `02:13:51.393Z`, **two separate Chromium processes, four top-level list/detail navigations**. Each round list HTTP200/exactly one official numeric source ID title, detail HTTP200/three headings, source same-card title equals official detail heading and original title. Thus `sameRunTitleMatches=2/2`, `currentTwoRoundObservation=TWO_SEPARATE_BROWSER_MATCHES_REVIEW_ONLY`. This is short-window reproducibility, not evidence that L9-H mismatch was false or cause fixed. Explicit `historicalMismatchRetained=true`, `unexplainedPriorMismatch=true`, `formalIdentityReleaseEligible=false` and overall `HARD_HOLD_NO_PUBLICATION`.
+> - **[Artifact 12786507149](https://github.com/easonliu714/event_scraper_public/actions/runs/40619619643/artifacts/12786507149)** ZIP SHA256 `20a8e664f3431cf6f6a90267577cdc455915350ba6784d02a4694a01a9d25348`, 2218 bytes, source report + Manifest + SHA256SUMS native sealed. Stores bounded official URLs, titles, per-round times, HTTP and quality only; no full HTML, images, cookies, network bodies, JS bundles, private tokens, no independent verified formal event date, price, ticket status or multi-session split. `formalFieldPromotions=0`, `goldenAccepted=0`, Writer/Scheduler/Notifier/Publisher/merge 0, protected Pages/API/DB/preview untouched.
+> - **Next L9-K data assurance:** use a distinct later time-window source-only Gate to compare 39961 with these pinned rounds, enforce regression/mismatch HOLD and no automatic schedule. Separately work on clearly source-bound event period parsing for the four unaffected official IDs. Historical Android 44 USER_ATTESTED_PASS, L8 new core Android PASS and L9-A ten release blockers unchanged. Both canonical governance docs remain Docs Draft PR #8, not merged to Source main.
+>
+
 > **2026-10-27 SRC-P30-L9-I ibon 39961 official source/title drift comparison architecture — native CI PASS, historical instability OPEN**
 >
 > ```text
