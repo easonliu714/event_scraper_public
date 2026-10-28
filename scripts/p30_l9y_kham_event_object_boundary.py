@@ -49,7 +49,7 @@ def parent_check(status_bytes, parent_bytes):
     if status["production"]["eventFeedReleaseState"] != RELEASE or status["production"]["goldenAccepted"] != 0:
         raise ValueError("HOLD_PRODUCTION_RELEASE")
     p = json.loads(parent_bytes)
-    if p["kind"] != "EVENTRADAR_P30_L9X_KHAM_ORIGINAL_PARSER_PARITY_V1":
+    if p.get("kind") != "EVENTRADAR_P30_L9X_KHAM_ORIGINAL_PARSER_PARITY_V1":
         raise ValueError("HOLD_PARENT_KIND")
     if p["releaseState"] != RELEASE or p["decision"] != "REVIEW_CURRENT_PRE_EVENT_CANDIDATES_HISTORIC_ZERO":
         raise ValueError("HOLD_PARENT_DECISION")
