@@ -1,6 +1,33 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-28 P30-L9-Q ibon 39878 passive hydration/identity Gate — native 36/36 PASS; fields HOLD**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 PUBLISHED]
+> └─ Pages build/deploy #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-P Draft PR55 @158b13cf3d45b9e1fe377bda4182a4da5e5864c8
+> └─ L9-Q Draft PR56 @59152fb83cb396924a6935f36681fac7fb0079f9 [UNMERGED]
+>    ├─ scripts/p30_l9q_ibon_hydration.mjs [one official 39878 page, six passive snapshots at 700ms]
+>    │  ├─ per-snapshot exact source title parity boolean + DOM readyState
+>    │  ├─ direct H3 活動日期 count, immediate sibling control counts, direct text presence boolean
+>    │  └─ first-label index, hydration transition, last-three topology stability
+>    ├─ tests/p30/test_l9q_ibon_hydration.mjs [36/36 fail-closed contracts]
+>    └─ .github/workflows/eventradar_p30_l9q_ibon_hydration.yml
+>       └─ CI #40721117824 SUCCESS, artifact 12829898767
+>          ├─ HTTP200; H3 absent snapshot 0 -> first present snapshot 1
+>          ├─ last-three local topology stable; widget controls remain untyped
+>          ├─ titleAll=false and allReadyComplete=false -> identity/timing HOLD
+>          └─ accepted fields 0, Golden 0, Publisher/Writer 0, HARD_HOLD
+> Governance Docs Draft PR #8 only [NOT MAIN]
+> Formal PWA status Draft PR53 [CI FAIL, security-blocked, UNMERGED]
+> ```
+> - Exact-head CI #40721117824 job 122931962543 SUCCESS, parent L9-P ZIP digest `24fbff9dc7d6a2723731a7968e4e13a8740dc1d1cb766ed86f089ddba4cb3f03`, parent report SHA `4c6a920d23c3f47bbee07fc102513d002fda62eeed69715beb4d63aae40188c3`, L9-F source SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`, new Artifact ZIP SHA `0e07aec0a6c8a0524457c58e782906d799e3a7f773d084e876bcf1aaddd3ab48`. `titleAll=false` alone does not prove wrong event; missing/not-ready heading is possible. Next L9-R isolates title hydration versus mismatch with no raw text persistence. No date/price/field promotions, Golden, event publication, new PWA deployment or release from HOLD.
+>
+
+
 > **2026-10-28 P30-L9-P ibon interactive widget topology — native 36/36 PASS, formal source-field extraction still HOLD**
 >
 > ```text
