@@ -59,11 +59,11 @@ jobs:
           path: pinned-l9f
       - name: Pinned exact-head SHA lineage
         env:
-          GH_${{ github.token }}: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error -H "Authorization: Bearer $GH_${{ github.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12838189367" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="cf8250a16d9e59df8957e82000fa8ef5e02ae230";assert a["digest"]=="sha256:3b53e69770add8a1c30324e7276ee7d931caf158b53b5c354213c5c074a0c169";assert not a["expired"];print("PASS_L9T_S_ARTIFACT")'
-          curl --fail --silent --show-error -H "Authorization: Bearer $GH_${{ github.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12729277485" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="d85504773108281099ec0654c5c772de243f910c";assert a["digest"]=="sha256:811e1b133c253f3cde33c31a203a9ed4bfbfab7418822a9b3a59c00fdd9cf884";assert not a["expired"];print("PASS_L9T_F_ARTIFACT")'
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12838189367" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="cf8250a16d9e59df8957e82000fa8ef5e02ae230";assert a["digest"]=="sha256:3b53e69770add8a1c30324e7276ee7d931caf158b53b5c354213c5c074a0c169";assert not a["expired"];print("PASS_L9T_S_ARTIFACT")'
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12729277485" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="d85504773108281099ec0654c5c772de243f910c";assert a["digest"]=="sha256:811e1b133c253f3cde33c31a203a9ed4bfbfab7418822a9b3a59c00fdd9cf884";assert not a["expired"];print("PASS_L9T_F_ARTIFACT")'
           (cd pinned-l9s && sha256sum -c SHA256SUMS.txt)
           (cd pinned-l9f && sha256sum -c SHA256SUMS.txt)
           node --input-type=module <<'JS'
