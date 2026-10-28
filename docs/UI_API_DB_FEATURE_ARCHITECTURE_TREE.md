@@ -1,5 +1,34 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+
+> **2026-10-28 P30-L9-P ibon interactive widget topology — native 36/36 PASS, formal source-field extraction still HOLD**
+>
+> \`\`\`text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> ├─ docs/platform-status.html [Owner Android visual PASS; no new deployment]
+> └─ GitHub Pages native deployment 40683700243 SUCCESS
+> L9-O Source Draft PR54 @96748095bbe8084d302bf74b3a7c0aa119039ca2
+> └─ L9-P Source Draft PR55 @158b13cf3d45b9e1fe377bda4182a4da5e5864c8 [UNMERGED]
+>    ├─ scripts/p30_l9p_ibon_control_types.mjs [four exact official details, 2 passive DOM snapshots]
+>    │  ├─ label: direct H3 活動日期 only; nextElementSibling controls only
+>    │  ├─ anchor/button/form/input/select/role-button counts, no URL/text/date extraction
+>    │  └─ compare source-title identity + control type/count drift across snapshots
+>    ├─ tests/p30/test_l9p_ibon_control_types.mjs [36/36 fail-closed]
+>    └─ .github/workflows/eventradar_p30_l9p_ibon_control_types.yml
+>       └─ Run 40711541169 SUCCESS, artifact 12826851317
+>          ├─ all four HTTP200, 4/4 title both snapshots
+>          ├─ 39575/39907/39978: stable 2 button + 2 input controls
+>          ├─ 39878: first H3 label missing -> second H3 with 2 button + 2 input
+>          ├─ 3/4 control topology stable; 1/4 same-page hydration drift
+>          └─ 0 accepted dates/prices/fields, 0 Golden, 0 publishing, HARD HOLD
+> Formal PWA status Draft PR53 [UNMERGED; old test CI FAIL and safety write blocker]
+> \`\`\`
+> - Source L9-O report SHA256 \`767900155ebf408886db68d8c89d4fd9a1e2044994bbf7c560ac7e7d91e14d32\` and original L9-F SHA \`81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4\` verified from exact pinned GitHub artifacts; L9-P artifact ZIP digest \`24fbff9dc7d6a2723731a7968e4e13a8740dc1d1cb766ed86f089ddba4cb3f03\`. Source P30-L9-P Run \`40711541169\` completed SUCCESS; CI 36/36. The two-button/two-input widget is **not** typed date evidence. No click, no purchase, no screenshot, no raw HTML, no link URL, no source text persisted.
+> - Next P30-L9-Q: passive hydration-ready stabilization and exact source-bound label/value role diagnostics; do not infer date from interactive widget or force fields Golden. Historic 44 Android user PASS, L8 Core UI PASS retained. Governance docs only on Draft PR #8; main has unchanged official status page. No new main merge or Event Writer/Scheduler/Notifier/Golden activation.
+>
+
 > **2026-10-28 P30-L9-O source UI topology — four current interactive label HOLD, native CI PASS**
 >
 > ```text
