@@ -1,5 +1,33 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-29 P30-L9-S three-source title readiness — native CI 30/30 PASS; 39907 complete-state nonmatch HOLD**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> └─ Pages deploy #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-R Draft PR57 @3f473d6b377650cf15b84e83d2481f8790347cac
+> └─ L9-S Draft PR58 @cf8250a16d9e59df8957e82000fa8ef5e02ae230 [UNMERGED]
+>    ├─ scripts/p30_l9s_ibon_three_title_readiness.mjs
+>    │  ├─ 3 SHA-pinned ibon IDs 39575/39907/39978, one normal navigation each
+>    │  ├─ 8 passive title/readyState snapshots at 600ms per ID
+>    │  ├─ complete-state unmatched candidate vs stable matched tail
+>    │  └─ no click, title/date text, HTML, links, screenshots or cookies persisted
+>    ├─ tests/p30/test_l9s_ibon_three_title_readiness.mjs [30/30 PASS]
+>    └─ .github/workflows/eventradar_p30_l9s_ibon_three_title_readiness.yml
+>       └─ Native CI #40740745592 SUCCESS, Artifact 12838189367
+>          ├─ 39575: HTTP200, title first index2, complete first index3, REVIEW only
+>          ├─ 39907: HTTP200, complete first index1, title first index2,
+>          │         one complete-state nonmatch, HOLD_COMPLETE_NONMATCH_BEFORE_STABLE_TAIL
+>          ├─ 39978: HTTP200, complete/title first index1, REVIEW only
+>          └─ formal fields 0, Golden 0, Publish 0, HARD_HOLD_NO_PUBLICATION
+> Docs Draft PR8 only [NOT MAIN]
+> Formal PWA status Draft PR53 [CI FAIL / security-blocked / UNMERGED]
+> ```
+> - L9-S native job `123001351188` passed exact three ADD-only path gate, 30 deterministic tests, parent R/F exact-head artifact SHA, and independent report SHA readback. Artifact ZIP SHA256 `3b53e69770add8a1c30324e7276ee7d931caf158b53b5c354213c5c074a0c169`, R report SHA `ef8a897497a789061141d1fd44116b4b268f38107e087b84085ecadbe287b838`, original F report SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`. `document.readyState=complete` is not sufficient for correct source title identity (39907). Stable title tail is REVIEW, not Golden. Next L9-T: independently disambiguate 39907 completed-document candidate mismatch vs delayed SPA hydration. Existing CKSMH 5/TWTC 39/L8 Core Android PASS and 11 formal PWA screenshots retained without full E2E claims.
+>
+
 > **2026-10-29 P30-L9-R exact-head title readiness — ibon 39878 delayed heading proven, no field promotion**
 >
 > ```text
