@@ -1,5 +1,26 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-28 P30-L9-N and formal Android status-page visual confirmation — new source diagnostics CI PASS, public status update DRAFT HOLD**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json [current published PR #51 snapshot; 19 platform cards / 264 list candidates]
+> ├─ docs/platform-status.html [current published PR #51; Android 11 screenshot VISUAL USER_PASS]
+> └─ docs/data.json [unchanged blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+> Source L9-M Draft PR #50 @4597385dbf216dc358c3e432e6ccc560caf9f1f2
+> └─ L9-N Draft PR #52 @768e2ee1d6982b3e690c48d98d0be0f4e16a6944 [UNMERGED]
+>    ├─ scripts/p30_l9n_ibon_local_root_cause.mjs [4 official details / direct h3 local]
+>    ├─ tests/p30/test_l9n_ibon_local_root_cause.mjs [22/22 offline]
+>    └─ .github/workflows/eventradar_p30_l9n_ibon_root_causes.yml
+>       └─ Native Run 40686039228 SUCCESS -> Artifact 12814702732
+> Formal PWA Refresh Draft PR #53 @4381c01d3132634a8ec6535abddedcfeaaffcb40 [HOLD]
+> ├─ docs/platform_status.json [records L9-M 4/4 historical, L9-N current 3/4 and zero accepted fields]
+> └─ docs/platform-status.html [human Chinese stage labels, raw codes expandable]
+> ```
+> - The latest L9-N actual HTTP200 title matches **3 of 4**; ID `39575` source title mismatch, other 3 current matches but zero recognized local date labels. No `EVENT_PERIOD` value read from the source; all formal price/date/session/ticket status unknown, Golden 0. Earlier L9-M 4 of 4 title matches and four AMBIGUOUS_OR_INTERACTIVE remain valid as historical observations only, not continuous proof. Artifact ZIP SHA256 `a049545092f6a508791f3a12b5c05395de7b4eb975efbb3d9b8813319ec1a5c9`, native CI Run `40686039228` completed SUCCESS, 22/22 offline negatives.
+> - Formal status PWA owner Android visual 11 screenshots PASS as user attestation only. Draft #53 must remain unmerged because required test extension linking status JSON to new L9-N SHA was blocked by platform security; do not bypass the block. The deployed PR #51 Source main formal PWA status still valid as its dated snapshot. EventRadar hourly sole scheduled Writer enabled for safe future Gate work, Pokémon Sleep tasks not touched, no release from HOLD without Owner and evidence.
+>
+
 > **2026-10-28 P30-STATUS official PWA status-only public diagnostics architecture — Pages deployment SUCCESS, event-feed immutable**
 >
 > ```text
