@@ -76,12 +76,13 @@ export function decide(http,staticStats,frames,finalAllowed,staticAvailable) {
   if(frames.length!==N)return 'HOLD_INCOMPLETE_RENDER_SNAPSHOTS';
   const latest=frames.at(-1);
   const tail=frames.slice(-2);
-  if(!tail.every(x=>x.ready==='complete'&&x.links.detailUnique===latest.links.detailUnique))
+  if(latest.ready!=='complete')return 'HOLD_RENDER_NOT_COMPLETE';
+  if(!tail.every(x=>x.links.detailUnique===latest.links.detailUnique))
     return 'HOLD_RENDER_NOT_STABLE';
   if(staticStats.detailUnique===0&&latest.links.detailUnique>0)
-    return 'REVIEW_JS_RENDERED_DETAIL_ANCHORS';
+    return 'REVIEW_CURRENT_JS_DETAIL_LINKS_HISTORIC_ZERO';
   if(staticStats.detailUnique>0&&latest.links.detailUnique>0)
-    return 'REVIEW_STATIC_DETAIL_ANCHORS_GENERIC_PARSER_GAP';
+    return 'REVIEW_CURRENT_STATIC_DETAIL_LINKS_HISTORIC_ZERO';
   if(staticStats.detailUnique>0&&latest.links.detailUnique===0)
     return 'HOLD_STATIC_DETAIL_ANCHORS_REMOVED';
   if(latest.forms>0||latest.onclickElements>0||latest.frames>0)
