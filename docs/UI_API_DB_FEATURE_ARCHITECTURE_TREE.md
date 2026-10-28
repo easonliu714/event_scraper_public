@@ -1,6 +1,31 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
 
+> **2026-10-29 P30-L9-V — 19-platform SHA-pinned HTTP/list blocker classification, one safe BeClass probe**
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 published]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages Run 40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-U Draft PR60 @2b26e27bee40f3bff7dc08b1a3fec1c1a9f5d96d
+> └─ L9-V Draft PR61 @46dd6ddade398603cca4fc6f8dbb8f644ce64d3c [UNMERGED]
+>    ├─ scripts/p30_l9v_19source_blocker_triage.py [SHA-pinned original L7B report + published status]
+>    │  ├─ 3 HTTP403 (KKTIX/拓元/BeClass); 1 HTTP200 zero generic (寬宏)
+>    │  ├─ 3 HTTP200 zero but separate source adapters (ibon/TWTC/CKSMH)
+>    │  ├─ 7 list-positive detail identity HOLD; 5 list-positive field role HOLD
+>    │  ├─ BeClass one bounded public GET => HTTP403, 0 redirect follows, 0 retries
+>    │  └─ no raw URLs/HTML/cookies; no current root-cause claim for other 18 sources
+>    ├─ tests/p30/test_l9v_19source_blocker_triage.py [34/34 offline]
+>    └─ .github/workflows/eventradar_p30_l9v_19source_blocker_triage.yml
+>       └─ CI Run 40768439655 SUCCESS -> Artifact 12852485007
+>          └─ ZIP SHA256 4bf89a060381e1fd1093bc4a24c3878d7ee41a4c99fa01bfdec23f7035d07a06
+> Formal status Draft PR53 [CI FAIL/security blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - Historical 19-platform evidence is not a live 19-platform E2E assertion. L7-B Artifact 12665097220 digest `8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6` and report SHA `e07c01a5d36ab0c950c45fb26e5fdd270103b4013bbf62a00c48291fee5f595a` verified. One new BeClass 403 observation does not resolve earlier 302. Next L9-W: focus 寬宏 public list=0 parser boundary, or BeClass normal public redirect discrepancy. Keep ibon 39961 historic mismatch OPEN, original Android 44 USER_ATTESTED_PASS and L8 UI PASS, Docs Draft PR8 sole canonical authority; no publication.
+
+
+
 > **2026-10-29 P30-L9-U ibon 39961 exact list/detail heading identity — native CI 46/46 PASS, historical mismatch OPEN**
 >
 > ```text
