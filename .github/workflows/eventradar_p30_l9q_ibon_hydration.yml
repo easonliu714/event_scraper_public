@@ -1,0 +1,138 @@
+name: EventRadar P30 L9-Q ibon 39878 hydration stability (READ ONLY)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9q-ibon-hydration-stability
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9q-ibon-hydration-stability
+  cancel-in-progress: true
+jobs:
+  source-hydration-diagnostics:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen L9-P exact source parent and three isolated paths only
+        run: |
+          set -euo pipefail
+          base=158b13cf3d45b9e1fe377bda4182a4da5e5864c8
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9q_ibon_hydration.yml' 'scripts/p30_l9q_ibon_hydration.mjs' 'tests/p30/test_l9q_ibon_hydration.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9Q_UNEXPECTED_DIFF; exit 1; }
+          echo PASS_L9Q_EXACT_THREE_PATHS_FROZEN_PRODUCTION
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install standard Chromium without stealth
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: Syntax and 36 independent fail-closed contracts
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9q_ibon_hydration.mjs
+          node --test tests/p30/test_l9q_ibon_hydration.mjs | tee /tmp/l9q-tests.log
+          grep -Eq '^# tests 36$' /tmp/l9q-tests.log
+          echo PASS_L9Q_36_OFFLINE_GUARDS
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9p-ibon-control-types-readonly
+          run-id: 40711541169
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9p
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          run-id: 40494326021
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9f
+      - name: Verify pinned exact-head ZIP, source report and manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12826851317" \
+            | python -c 'import json,sys; a=json.load(sys.stdin); assert a["id"]==12826851317; assert a["workflow_run"]["head_sha"]=="158b13cf3d45b9e1fe377bda4182a4da5e5864c8"; assert a["digest"]=="sha256:24fbff9dc7d6a2723731a7968e4e13a8740dc1d1cb766ed86f089ddba4cb3f03"; assert not a["expired"]; print("PASS_L9Q_L9P_EXACT_HEAD_ZIP_PIN")'
+          (cd pinned-l9p && sha256sum -c SHA256SUMS.txt)
+          (cd pinned-l9f && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {parents} from './scripts/p30_l9q_ibon_hydration.mjs';
+          const pb=readFileSync('pinned-l9p/ibon_local_control_types.json');
+          const fb=readFileSync('pinned-l9f/detail_role_review.json');
+          const p=parents(JSON.parse(pb),pb,JSON.parse(fb),fb);
+          console.log('PASS_L9Q_PARENT_REPORT_SHA',p.pSha,p.fSha);
+          JS
+      - name: One official source, six bounded passive hydration observations
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9q_ibon_hydration.mjs \
+            --l9p pinned-l9p/ibon_local_control_types.json \
+            --l9f pinned-l9f/detail_role_review.json \
+            --out p30-l9q-evidence
+      - name: Independent report, source identity, SHA and no-publication readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          p=Path('p30-l9q-evidence')
+          r=json.loads((p/'ibon_39878_hydration.json').read_text(encoding='utf-8'))
+          m=json.loads((p/'manifest.json').read_text(encoding='utf-8'))
+          assert r['kind']=='EVENTRADAR_P30_L9Q_IBON_39878_HYDRATION_V1'
+          assert r['sourceId']=='39878'
+          assert r['sourceUrl']=='https://ticket.ibon.com.tw/ActivityInfo/Details/39878'
+          assert r['http']==200 and r['sampleCount']==6 and r['intervalMs']==700
+          assert len(r['timeline'])==6
+          assert [x['index'] for x in r['timeline']]==list(range(6))
+          assert r['parentL9PRun']==40711541169 and r['parentL9PArtifact']==12826851317
+          assert r['parentL9PZipSHA256']=='24fbff9dc7d6a2723731a7968e4e13a8740dc1d1cb766ed86f089ddba4cb3f03'
+          assert r['parentL9FFileSHA256']=='81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4'
+          assert r['analysis']['acceptedFields']==0 and r['analysis']['decision'].startswith('HOLD_')
+          assert r['formalDate'] is None and r['formalPrice'] is None and r['ticketStatus']=='UNKNOWN'
+          assert r['formalFieldPromotions']==r['goldenAccepted']==0
+          assert r['published'] is False and r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not any(r[k] for k in ('writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted','rawHtmlPersisted','sourceTextPersisted','linkUrlsPersisted','screenshotsPersisted','cookiesPersisted'))
+          assert r['existingAndroid44Preserved'] and r['l8CoreAndroidPassPreserved']
+          for x in r['timeline']:
+            assert isinstance(x['titleMatch'],bool)
+            assert 0<=x['labelCount']<=250 and 0<=x['controlCount']<=32
+            assert not any(z in k.lower() for k in x for z in ('href','url','html','cookie','price','date'))
+          assert hashlib.sha256((p/'ibon_39878_hydration.json').read_bytes()).hexdigest()==m['filesSHA256']['ibon_39878_hydration.json']
+          print('L9Q_QUALITY',json.dumps(r['analysis'],sort_keys=True))
+          print('PASS_L9Q_REPORT_MANIFEST_SHA_AND_SOURCE_BOUNDARY')
+          print('HOLD_L9Q_NO_TYPED_DATE_PRICE_GOLDEN_PUBLICATION')
+          PY
+      - name: Seal isolated artifact
+        if: always()
+        run: |
+          mkdir -p p30-l9q-evidence
+          if test -f p30-l9q-evidence/manifest.json; then
+            (cd p30-l9q-evidence && sha256sum ibon_39878_hydration.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9Q_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9q-ibon-39878-hydration-readonly
+          path: p30-l9q-evidence/
+          retention-days: 14
+          if-no-files-found: warn
