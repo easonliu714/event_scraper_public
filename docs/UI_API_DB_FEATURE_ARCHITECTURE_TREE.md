@@ -1,5 +1,30 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-29 P30-L9-R exact-head title readiness — ibon 39878 delayed heading proven, no field promotion**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> └─ Pages deploy #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-Q Draft PR56 @59152fb83cb396924a6935f36681fac7fb0079f9
+> └─ L9-R Draft PR57 @3f473d6b377650cf15b84e83d2481f8790347cac [UNMERGED]
+>    ├─ scripts/p30_l9r_ibon_title_state.mjs [39878, 8 passive snapshots, 650ms]
+>    │  ├─ no raw title text, HTML, links, dates, screenshots or click persistence
+>    │  ├─ absent/not-ready vs exact heading match vs stable unmatched H1/H2 candidate
+>    │  └─ snapshot 2 first complete and exact match, tail 3 stable exact matches
+>    ├─ tests/p30/test_l9r_ibon_title_state.mjs [36/36 fail-closed]
+>    └─ .github/workflows/eventradar_p30_l9r_ibon_title_state.yml
+>       └─ CI #40731815454 SUCCESS, artifact 12835237400
+>          ├─ first two CI runs FAILED missing test exports; corrected in Draft branch
+>          ├─ source HTTP200, nonmatch after complete 0, no stable wrong-title proof
+>          └─ formal fields 0, Golden 0, Writer 0, Publish 0, HARD HOLD
+> Governance Docs Draft PR #8 only [NOT MAIN]
+> Formal PWA status Draft PR #53 [CI FAIL/security-blocked; UNMERGED]
+> ```
+> - Parent Q report SHA `235d7bc2ef20d6550da12da7bc6aee4d212fa0dcf6821936d7446df802108c1d`; original F report SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`; new artifact ZIP `sha256:cce75aa2bd82d4a695b58019db8e6c0cee5e703052039f3cb80210dfa70df96a`. L9-R proves transient title hydration in the latest bounded capture, **not** that all prior mismatches were timing-related. No date/price/session/SALE field Golden; no source production modification or new PWA deploy. Next L9-S: apply strict title readiness to bounded source samples while preserving fail-closed publication boundary.
+>
+
 
 > **2026-10-28 P30-L9-Q ibon 39878 passive hydration/identity Gate — native 36/36 PASS; fields HOLD**
 >
