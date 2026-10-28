@@ -1,0 +1,113 @@
+name: EventRadar P30 L9-W Kham static vs rendered list boundary (READ ONLY)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9w-kham-static-vs-rendered]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9w-kham-one-source
+  cancel-in-progress: true
+jobs:
+  kham-list-boundary:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen parent, production blobs and exactly three additions
+        run: |
+          set -euo pipefail
+          base=46dd6ddade398603cca4fc6f8dbb8f644ce64d3c
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9w_kham_list_boundary.yml' 'scripts/p30_l9w_kham_list_boundary.mjs' 'tests/p30/test_l9w_kham_list_boundary.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9W_SCOPE; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/l9w_status.json
+          echo PASS_L9W_THREE_ADD_ONLY_AND_FROZEN_PRODUCTION
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and 39 offline fail-closed tests BEFORE source navigation
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9w_kham_list_boundary.mjs
+          node --check tests/p30/test_l9w_kham_list_boundary.mjs
+          node --test tests/p30/test_l9w_kham_list_boundary.mjs | tee /tmp/l9w-tests.log
+          grep -Eq '^# tests 39$' /tmp/l9w-tests.log
+          grep -Eq '^# fail 0$' /tmp/l9w-tests.log
+          echo PASS_L9W_39_OFFLINE
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          run-id: 40353636708
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l7b
+      - name: Parent artifact exact-head digest and report SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12665097220" | node -e 'let s="";process.stdin.on("data",x=>s+=x).on("end",()=>{let a=JSON.parse(s);if(a.workflow_run.head_sha!=="e680456f0033e528fb25da61a4b3b6e35aa22447"||a.digest!=="sha256:8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6"||a.expired)process.exit(1);console.log("PASS_L9W_PARENT_ARTIFACT")})'
+          (cd pinned-l7b && sha256sum -c SHA256SUMS.txt)
+          echo "e07c01a5d36ab0c950c45fb26e5fdd270103b4013bbf62a00c48291fee5f595a  pinned-l7b/platform_diagnostics.json" | sha256sum -c -
+      - name: Install normal public Chromium (no bypass)
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: One bounded Kham navigation, static vs four rendered DOM snapshots
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9w_kham_list_boundary.mjs --status /tmp/l9w_status.json --l7b pinned-l7b/platform_diagnostics.json --manifest pinned-l7b/manifest.json --out p30-l9w-evidence --live-kham
+      - name: Independent SHA, source-scope, no-publication readback
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          const raw=readFileSync('p30-l9w-evidence/kham_list_boundary.json');
+          const r=JSON.parse(raw);
+          const m=JSON.parse(readFileSync('p30-l9w-evidence/manifest.json'));
+          assert.equal(r.kind,'EVENTRADAR_P30_L9W_KHAM_LIST_BOUNDARY_V1');
+          assert.equal(r.parentHead,'46dd6ddade398603cca4fc6f8dbb8f644ce64d3c');
+          assert.equal(r.sourceL7BReportSHA256,'e07c01a5d36ab0c950c45fb26e5fdd270103b4013bbf62a00c48291fee5f595a');
+          assert.equal(r.publishedStatusBlob,'e19ca37c4c80c10b7278d0813b8ff1047535d124');
+          assert.equal(r.historicalHTTP,200);assert.equal(r.historicalList,0);
+          assert.equal(r.navigationsAttempted,1);assert.ok(r.redirectCount<=4);
+          assert.equal(r.snapshots.length,4);
+          assert.equal(r.listEventIdentityVerified,0);
+          assert.equal(r.acceptedFields,0);assert.equal(r.goldenAccepted,0);
+          assert.equal(r.releaseState,'HARD_HOLD_NO_PUBLICATION');
+          for(const k of ['published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted','productionModified','rawHtmlPersisted','rawUrlsPersisted','rawTitlesPersisted','cookiesPersisted','screenshotsPersisted','networkBodiesPersisted'])assert.equal(r[k],false,k);
+          assert.equal(m.filesSHA256['kham_list_boundary.json'],createHash('sha256').update(raw).digest('hex'));
+          assert.ok(!raw.toString().includes('https://')&&!raw.toString().includes('<html'));
+          console.log('PASS_L9W_SHA_SCOPE_AND_HARD_HOLD',JSON.stringify({http:r.http,decision:r.decision,static:r.staticLinks.detailUnique,rendered:r.snapshots.map(x=>x.links.detailUnique)}));
+          JS
+      - name: Seal isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9w-evidence
+          if test -f p30-l9w-evidence/manifest.json; then
+            (cd p30-l9w-evidence && sha256sum kham_list_boundary.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9W_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9w-kham-list-boundary
+          path: p30-l9w-evidence/
+          retention-days: 14
+          if-no-files-found: warn
