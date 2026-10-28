@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from urllib.error import HTTPError
+from unittest.mock import patch
 
 PATH = Path(__file__).resolve().parents[2] / "scripts/p30_l9v_19source_blocker_triage.py"
 spec = importlib.util.spec_from_file_location("l9v", PATH)
@@ -64,6 +65,8 @@ class FakeOpener:
         self.calls += 1
         self.request = request
         assert timeout == 9
+        if isinstance(self.response, HTTPError):
+            raise self.response
         return self.response
 
 class Tests(unittest.TestCase):
@@ -165,8 +168,9 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"STATUS_BLOB"):
             m.validate({},b"{}",{},b"{}",{})
     def test_31_no_unpinned_l7b_report(self):
-        with self.assertRaisesRegex(ValueError,"L7B_REPORT_SHA"):
-            m.validate({},b"{}",{},b"{}",{})
+        with patch.object(m,"STATUS_BLOB",m.git_blob(b"{}")):
+            with self.assertRaisesRegex(ValueError,"L7B_REPORT_SHA"):
+                m.validate({},b"{}",{},b"{}",{})
     def test_32_isolated_artifact_and_sha(self):
         a,b=rows();r=m.build_report(a,b,sample_probe())
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temp:
