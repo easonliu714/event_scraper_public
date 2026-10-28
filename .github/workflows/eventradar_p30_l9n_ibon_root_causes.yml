@@ -1,0 +1,129 @@
+name: EventRadar P30 L9-N ibon exact local rejection disambiguation (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9n-ibon-interactive-vs-role
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9n-ibon-diagnostics
+  cancel-in-progress: true
+jobs:
+  source-local-root-cause:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9-M parent and immutable production assets
+        run: |
+          set -euo pipefail
+          base=4597385dbf216dc358c3e432e6ccc560caf9f1f2
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9n_ibon_root_causes.yml' 'scripts/p30_l9n_ibon_local_root_cause.mjs' 'tests/p30/test_l9n_ibon_local_root_cause.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9N_UNEXPECTED_SCOPE; exit 1; }
+          echo PASS L9N_FROZEN_PRODUCTION_THREE_NEW_PATHS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install normal fixed Chromium (no stealth)
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: Verify syntax and 22 deterministic negative contracts
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9n_ibon_local_root_cause.mjs
+          node --test tests/p30/test_l9n_ibon_local_root_cause.mjs
+          echo PASS L9N_22_OFFLINE_GUARD_TESTS
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9m-ibon-neighbor-reasons
+          run-id: 40682420113
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9m
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          run-id: 40494326021
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9f
+      - name: Verify exact original SHA artifacts, complete identity contract
+        run: |
+          set -euo pipefail
+          (cd pinned-l9m && sha256sum -c SHA256SUMS.txt)
+          (cd pinned-l9f && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {parentEvidence} from './scripts/p30_l9n_ibon_local_root_cause.mjs';
+          const a=readFileSync('pinned-l9m/ibon_neighbor_reasons.json');
+          const b=readFileSync('pinned-l9f/detail_role_review.json');
+          const proof=parentEvidence(JSON.parse(a),a,JSON.parse(b),b);
+          if(proof.rows.length!==4)throw Error('HOLD_L9N_SOURCE_IDS');
+          console.log('PASS L9N_TWO_PINNED_SOURCE_SHA_FOUR_ID_ORIGINAL_TITLE',proof.msha,proof.fsha);
+          JS
+      - name: Four bounded normal official ibon public detail diagnostics
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9n_ibon_local_root_cause.mjs \
+            --l9m pinned-l9m/ibon_neighbor_reasons.json \
+            --l9f pinned-l9f/detail_role_review.json \
+            --out p30-l9n-evidence
+      - name: Readback source quality and no formal field promotion
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          p=Path('p30-l9n-evidence')
+          r=json.loads((p/'ibon_local_root_cause.json').read_text(encoding='utf-8'))
+          m=json.loads((p/'manifest.json').read_text(encoding='utf-8'))
+          assert r['kind']=='EVENTRADAR_P30_L9N_IBON_SPLIT_LOCAL_CAUSE_V1'
+          assert r['sampleCount']==len(r['rows'])==4
+          assert [x['id'] for x in r['rows']]==['39575','39878','39907','39978']
+          assert r['parentL9MRun']==40682420113 and r['parentL9MArtifact']==12813381760
+          assert r['parentL9FRun']==40494326021 and r['parentL9FArtifact']==12729277485
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['formalFieldPromotions']==r['goldenAccepted']==0
+          assert r['published'] is False and not any(r[k] for k in ('writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted'))
+          assert r['existingAndroid44Preserved'] and r['l8CoreAndroidPassPreserved']
+          assert r['currentTitleMatchCount']<=4
+          for x in r['rows']:
+            assert x['url']=='https://ticket.ibon.com.tw/ActivityInfo/Details/'+x['id']
+            assert x['formalDate'] is None and x['formalPrice'] is None
+            assert x['ticketStatus']=='UNKNOWN'
+            if not x['sourceTitleMatched']:assert x['categories']==[]
+            for c in x['categories']:assert c['fieldPromoted'] is False
+            print('L9N_DETAIL',x['id'],x['http'],x['sourceTitleMatched'],[z['category'] for z in x['categories']])
+          assert hashlib.sha256((p/'ibon_local_root_cause.json').read_bytes()).hexdigest()==m['filesSHA256']['ibon_local_root_cause.json']
+          print('PASS L9N_FOUR_OFFICIAL_DOM_ROOT_CAUSES_SHA')
+          print('QUALITY L9N_LOCAL_REVIEW_CANDIDATES',r['reviewOnlyCandidates'])
+          print('HOLD L9N_DATE_PRICE_STOCK_GOLDEN_PUBLISHING')
+          PY
+      - name: Seal isolated artifact
+        if: always()
+        run: |
+          mkdir -p p30-l9n-evidence
+          if test -f p30-l9n-evidence/manifest.json; then
+            (cd p30-l9n-evidence && sha256sum ibon_local_root_cause.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD L9N_EVIDENCE_ABSENT
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9n-ibon-root-causes-readonly
+          path: p30-l9n-evidence/
+          retention-days: 14
+          if-no-files-found: warn
