@@ -1,5 +1,29 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-28 P30-L9-O source UI topology — four current interactive label HOLD, native CI PASS**
+>
+> ```text
+> Formal PWA main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json [published PR51 snapshot; 19 platforms; Owner Android visual PASS]
+> └─ docs/platform-status.html [published PR51, not PR53 draft]
+> L9-N Draft PR52 @768e2ee1d6982b3e690c48d98d0be0f4e16a6944
+> └─ L9-O Draft PR54 @96748095bbe8084d302bf74b3a7c0aa119039ca2
+>    ├─ scripts/p30_l9o_ibon_label_topology.mjs [normal Chromium, 4 exact detail IDs, H3 vs L9-M selector]
+>    ├─ tests/p30/test_l9o_ibon_label_topology.mjs [29/29 negative contracts]
+>    └─ .github/workflows/eventradar_p30_l9o_ibon_label_topology.yml
+>       └─ CI Run 40702378377 SUCCESS -> Artifact 12820574944
+>          ├─ 4/4 HTTP200 + exact title heading parity (including ID 39575)
+>          ├─ 4/4 H3 活動日期 local labels; L9-M selector also 4/4
+>          ├─ 4/4 adjacent region HOLD_INTERACTIVE_LOCAL
+>          └─ 0 formal fields / Golden / Writer / Publish; release HARD_HOLD
+> Formal PWA status Draft PR53 @4381c01d3132634a8ec6535abddedcfeaaffcb40
+> └─ CI 40686748311 FAILURE: ibon field status vs existing exact-contract assertion
+>    └─ required test extension write blocked by platform safety; NO BYPASS, NO MERGE
+> ```
+> - L9-O native Run `40702378377` exact-head SHA, 29/29 offline tests, four live details and independent SHA readback PASS. Evidence ZIP SHA256 `c0f03e2448ae90388f113164388a254808656d5f274a75e2eaad66c2a530b8d3`. L9-N parent report SHA `2033f232423a212698d94e023042656407e93e8d16bfe62f42252613a2071024`, parent ZIP metadata SHA verified. Earlier L9-N 3/4 titles + zero labels remains historical; later L9-O 4/4 titles + four H3 labels shows time-varying observations, not a proven selector bug or formal fix. All four adjacent label regions contain interactive controls and remain unbound, not dates. The next L9-P should inspect control type and local source role without activation, with deterministic negative tests; no source field promotion.
+>
+
 > **2026-10-28 P30-L9-N and formal Android status-page visual confirmation — new source diagnostics CI PASS, public status update DRAFT HOLD**
 >
 > ```text
