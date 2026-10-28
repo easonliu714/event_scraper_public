@@ -1,5 +1,16 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-29 P30-L9-T ibon 39907 exact heading readiness — native CI 32/32 PASS, field HOLD**
+>
+> Formal PWA Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 UNCHANGED; docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 IMMUTABLE; docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 PUBLISHED PR51; Pages #40683700243 SUCCESS, NO NEW DEPLOY.
+>
+> - L9-S Draft PR58 HEAD cf8250a16d9e59df8957e82000fa8ef5e02ae230 -> **L9-T Draft PR59 HEAD 7923ede339b219a2264127f4163eb6d75e31a66b**, unmerged.
+> - scripts/p30_l9t_ibon_39907_heading_states.mjs: one normal public Chromium navigation to ibon 39907; twelve passive 500ms snapshots. Distinguishes complete + no headings, complete + H3/H4-only, complete + H1/H2 nonmatch candidate. Actual HTTP200, document complete index1, exact title index3, two pre-match complete H3/H4-only states, zero nonmatching H1/H2 candidates, stable matched final three. Decision HOLD_TRANSIENT_HEADING_ABSENCE.
+> - tests/p30/test_l9t_ibon_39907_heading_states.mjs: 32/32 deterministic fail-closed tests PASS.
+> - .github/workflows/eventradar_p30_l9t_ibon_39907_heading_states.yml: first CI #40749594278 FAIL due to token env typo, corrected in isolated branch; final exact-head CI #40749692079 SUCCESS, Artifact 12842508760 ZIP SHA256 f1f99035f316b61adc2d208a844e349ae5312ddc173d0b1cdc14b29abd324fcd; parent L9-S report SHA 337668d7b805e4102f69cf9faa6da73cdf34e4ac54f4add8a45c66b39083e0a2 and original L9-F report SHA 81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4 independently checked.
+> - No raw source text/HTML/links/cookies/screenshots persisted. Fields 0 / Golden 0 / publication 0 / HARD_HOLD_NO_PUBLICATION. Docs canonical only on Draft PR8, NOT main; formal status Draft PR53 remains CI FAIL/security-blocked and unmerged. Existing CKSMH 5/TWTC 39 Android PASS, L8 Core UI PASS and 11 formal PWA screenshots retained without full 19-source E2E claims. Next L9-U: bounded exact ID/title H1/H2 evidence for historical ibon 39961 or first unresolved source identity.
+
+
 > **2026-10-29 P30-L9-S three-source title readiness — native CI 30/30 PASS; 39907 complete-state nonmatch HOLD**
 >
 > ```text
