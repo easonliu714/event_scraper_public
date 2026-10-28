@@ -13,7 +13,7 @@ import {fileURLToPath} from 'node:url';
 import {validate as validateQ, KIND as Q_KIND, ID, URL, HOLD} from './p30_l9q_ibon_hydration.mjs';
 import {norm,safeOut} from './p30_l9p_ibon_control_types.mjs';
 // Re-export the inherited hard publication hold for isolated test contracts.
-export {HOLD};
+export {ID,URL,HOLD};
 export const KIND='EVENTRADAR_P30_L9R_IBON_39878_TITLE_STATE_V1';
 export const Q_RUN=40721117824,Q_ART=12829898767;
 export const Q_ZIP='0e07aec0a6c8a0524457c58e782906d799e3a7f773d084e876bcf1aaddd3ab48';
