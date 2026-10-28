@@ -1,0 +1,99 @@
+name: EventRadar public 19-platform status evidence-only validation
+on:
+  push:
+    branches:
+      - feat/eventradar-public-platform-status-20261028
+  pull_request:
+    paths:
+      - docs/platform_status.json
+      - docs/platform-status.html
+      - docs/index.html
+      - tests/p30/test_public_platform_status_readonly.py
+      - .github/workflows/eventradar_public_platform_status.yml
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-public-status-20261028
+  cancel-in-progress: false
+jobs:
+  readonly-status-contract:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Only approved status documents + isolated tests; official data untouched
+        run: |
+          set -euo pipefail
+          base=fc4f963247d68eed29425808cc14e7250f312d05
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' \
+              '.github/workflows/eventradar_public_platform_status.yml' \
+              'docs/platform-status.html' \
+              'docs/platform_status.json' \
+              'tests/p30/test_public_platform_status_readonly.py'; printf 'M\t%s\n' 'docs/index.html' | cat)" 
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(printf '%s\n' "$expected" | LC_ALL=C sort)" = "$actual" || { echo HOLD_UNAPPROVED_PRODUCTION_SCOPE; exit 1; }
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          former=subprocess.check_output(['git','show','fc4f963247d68eed29425808cc14e7250f312d05:docs/index.html']).decode()
+          new=Path('docs/index.html').read_text()
+          marker='<h1>📡 活動雷達</h1>'
+          assert former.count(marker)==1
+          assert new.replace('\n        <a href="platform-status.html" style="color:#93c5fd;font-size:0.82rem;border:1px solid #496179;border-radius:8px;padding:5px 9px;text-decoration:none;white-space:nowrap;" aria-label="查看19平台抓取、解析及實機驗證狀態">平台進度／19站</a>','')==former
+          print('PASS_EXACT_ONE_INDEX_HEADER_STATUS_LINK_ONLY')
+          PY
+          echo PASS_OFFICIAL_EVENT_JSON_BLOB_FROZEN_STATUS_ONLY
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l7b-fresh-http-list-detail
+          run-id: 40353636708
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l7b
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9b-quality-synthetic-rollback
+          run-id: 40442853866
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9b
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9m-ibon-neighbor-reasons
+          run-id: 40682420113
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9m
+      - name: Validate all 3 source artifacts SHA before platform data comparisons
+        run: |
+          set -euo pipefail
+          for folder in pinned-l7b pinned-l9b pinned-l9m; do
+            (cd "$folder" && sha256sum -c SHA256SUMS.txt)
+          done
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          zipnames={'l7b':('platform_diagnostics.json',None),
+                    'l9b':('platform_adapter_gaps.json',None),
+                    'l9m':('ibon_neighbor_reasons.json',None)}
+          for key,(file,_) in zipnames.items():
+              b=(Path('pinned-'+key)/file).read_bytes()
+              print('PASS_SOURCE_ARTIFACT_'+key.upper()+'_FILE_SHA256',hashlib.sha256(b).hexdigest())
+          PY
+      - name: Compare all 19 exact platform rows plus Android and ibon evidence boundaries
+        run: |
+          set -euo pipefail
+          python tests/p30/test_public_platform_status_readonly.py \
+            --l7b pinned-l7b/platform_diagnostics.json \
+            --l9b pinned-l9b/platform_adapter_gaps.json \
+            --l9m pinned-l9m/ibon_neighbor_reasons.json
+          echo PASS_PUBLIC_PLATFORM_STATUS_CANDIDATE_REVIEW_NO_WRITER_NO_GOLDEN

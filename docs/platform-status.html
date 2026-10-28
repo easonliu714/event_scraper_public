@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10151e">
+<title>平台進度｜活動雷達</title>
+<style>
+:root{color-scheme:dark;--bg:#10151e;--card:#1b2430;--line:#344354;--text:#eef3f9;--muted:#a8b8c8;--accent:#80baff;--warn:#ffc68a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Noto Sans TC",sans-serif}
+header{position:sticky;top:0;z-index:4;background:#121923ee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav,.wrap{max-width:1060px;margin:auto;padding:12px 16px}
+nav{display:flex;align-items:center;gap:14px;flex-wrap:wrap}nav a{color:var(--accent);text-decoration:none}
+h1{font-size:1.16rem;margin:0}h2{font-size:1.05rem;margin:6px 0}
+p{margin:8px 0;color:var(--muted)}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(142px,1fr));gap:10px;margin:14px 0}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+.metric strong{font-size:1.7rem;display:block;line-height:1.3}
+.metric small{color:var(--muted)}
+.note{padding:12px 14px;border:1px solid #65523c;border-radius:10px;background:#27251f;color:#ffe1b9}
+.note strong{color:#fff}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+.controls input,.controls select{background:#1b2430;border:1px solid #526174;color:var(--text);border-radius:9px;padding:10px;min-height:44px;font:inherit}
+.controls input{flex:2;min-width:190px}.controls select{flex:1;min-width:145px}
+#cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:12px}
+.platform{padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--card);min-width:0}
+.platform h3{font-size:1.06rem;margin:0}
+.header-row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.phase{color:var(--warn);font-size:.78rem}
+.stats{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.stat{border:1px solid #415163;border-radius:7px;padding:4px 7px;font-size:.81rem}
+.stages{display:grid;grid-template-columns:92px 1fr;gap:4px 10px;font-size:.82rem;margin:10px 0}
+.stages dt{color:var(--muted)}.stages dd{margin:0;overflow-wrap:anywhere}
+.stages .pass{color:#9fe2bd}.stages .hold{color:#ffd5a6}.stages .unknown{color:#b9c5d3}
+.platform .blocker{padding:8px 0;line-height:1.6}
+.platform .sub{font-size:.82rem;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.platform a,.links a{color:var(--accent);overflow-wrap:anywhere}
+footer{border-top:1px solid var(--line);margin:30px 0 0;padding:14px 0;color:var(--muted);font-size:.85rem}
+#error{color:#ffb7b7}#status{font-size:.85rem;color:var(--muted)}
+:focus-visible{outline:3px solid #9cc7ff;outline-offset:2px}
+</style>
+</head>
+<body>
+<header><nav><a href="./index.html" aria-label="返回活動雷達首頁">← 活動雷達</a><h1>19 平台工程進度／品質雷達</h1></nav></header>
+<main class="wrap">
+<div class="note"><strong>工程稽核版｜不是即時售票活動資料</strong><div>HTTP、清單、詳情、欄位、Android 與正式發布分別列出。數字是指定 Gate 的有界樣本，不能當成平台全部活動、即時有票或已過驗收。正式活動卡片資料檔 <code>data.json</code> 不因本頁變更。</div></div>
+<div class="summary" id="summary" aria-label="稽核摘要"></div>
+<p id="status" role="status">讀取 platform_status.json 中…</p>
+<div class="controls"><input id="search" type="search" placeholder="搜尋平台、困難點或 Gate" aria-label="搜尋平台"><select id="filter" aria-label="依抓取階段篩選"><option value="all">所有平台</option><option value="403">HTTP 403</option><option value="list">已抓到清單候選</option><option value="detail">抽樣詳情已對位</option><option value="android">有平台別 Android PASS</option><option value="overlay">有獨立專用 Gate</option></select></div>
+<div id="cards" aria-live="polite"></div>
+<section class="links"><h2>判讀說明與證據</h2><p id="asof">來源日期讀取中…</p><p>即使清單候選數大於零，也不代表全部可售；HTTP403 只代表該次存取方式受阻，不能推定該平台沒有活動。正式活動欄位仍需逐筆核對官方時間、場地與票券角色。</p><p><a href="https://github.com/easonliu714/event_scraper_public/pull/8" target="_blank" rel="noopener noreferrer">兩份正式治理文件（Draft PR #8）</a> · <a href="https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708" target="_blank" rel="noopener noreferrer">19 平台基本稽核 CI</a> · <a href="https://github.com/easonliu714/event_scraper_public/actions/runs/40682420113" target="_blank" rel="noopener noreferrer">ibon L9-M 最新稽核</a></p></section>
+<footer>本頁僅發布來源品質與開發驗證現況；不會發通知、接受購票、排程重抓或變更活動 Golden。若 PWA 仍顯示舊資料，請確認頁面上方日期與瀏覽器快取。</footer>
+</main>
+<script>
+"use strict";
+let rows=[];
+const el=(name,cls,txt)=>{const e=document.createElement(name);if(cls)e.className=cls;if(txt!==undefined)e.textContent=String(txt);return e;};
+const append=(root,...nodes)=>{for(const n of nodes)root.append(n);return root;};
+const state=(txt)=>{const s=String(txt);return s.startsWith("HTTP200")||s.includes("USER_PASS")||s.includes("MATCH")?"pass":s.includes("HOLD")||s.includes("403")?"hold":"unknown";};
+const stageNames=[["response","官方回應"],["list","清單解析"],["detail","詳情身分"],["fields","欄位語意"],["android","Android"],["publication","正式發布"]];
+function link(root,url,label){
+ try{const u=new URL(url);if(u.protocol!=="https:"||u.hostname!=="github.com")return;
+ const a=el("a","",label);a.href=u.href;a.target="_blank";a.rel="noopener noreferrer";root.append(a);
+ }catch{}
+}
+function metric(n,label){const e=el("div","metric");append(e,el("strong","",n),el("small","",label));return e;}
+function drawSummary(d){
+ const root=document.getElementById("summary");root.replaceChildren(
+ metric(d.baselineSummary.platformsChecked,"已稽核平台"),
+ metric(d.baselineSummary.http200Platforms+"/19","當次 HTTP200"),
+ metric(d.baselineSummary.positiveListPlatforms+"/19","清單有候選"),
+ metric(d.baselineSummary.listCandidates,"有界列表候選／非 Golden"),
+ metric(d.separateEvidence.androidPlatformSpecificPass,"原 Android 平台別 PASS"),
+ metric("HOLD","活動資料正式發布")
+ );
+ document.getElementById("asof").textContent="基本稽核 "+d.baselineSummary.baselineCapturedAtUTC+"（UTC）；最近補充 Gate 見各平台。報告日期 "+d.reportDate+"（Asia/Taipei）。";
+}
+function makeCard(x){
+ const box=el("article","platform");
+ const title=el("h3","",x.platform),phase=el("span","phase",x.phase);
+ append(box,append(el("div","header-row"),title,phase));
+ const stats=el("div","stats");
+ const b=x.baseline;
+ for(const t of ["HTTP "+b.httpStatus,"舊基線候選 "+b.listCandidates,
+ "詳情抽樣 "+b.detailTitleMatches+"/"+b.detailAttempted])stats.append(el("span","stat",t));
+ if(x.independentGate?.listCandidates!==undefined)
+ stats.append(el("span","stat","獨立 Gate 候選 "+x.independentGate.listCandidates));
+ append(box,stats);
+ const dl=el("dl","stages");
+ for(const [key,name] of stageNames){append(dl,el("dt","",name),el("dd",state(x.stages[key]),x.stages[key]));}
+ append(box,dl);
+ append(box,el("p","blocker",x.blocker));
+ if(x.independentGate){
+  const g=x.independentGate;
+  const detail=el("p","sub",g.gate+"："+g.notes);
+  box.append(detail);
+  if(g.semanticRefused!==undefined)box.append(el("p","sub","日期／價格欄位：安全接受 "+g.semanticAccepted+"；拒絕 "+g.semanticRefused+"；原因 "+g.refusalReason));
+  if(g.evidence){const p=el("p","sub");link(p,g.evidence,"查看此平台獨立 CI 證據");box.append(p);}
+ }
+ return box;
+}
+function render(){
+ const q=document.getElementById("search").value.trim().toLowerCase();
+ const filter=document.getElementById("filter").value;
+ const visible=rows.filter(x=>{
+  if(q&&!JSON.stringify([x.platform,x.blocker,x.phase,x.independentGate?.notes]).toLowerCase().includes(q))return false;
+  if(filter==="403")return x.baseline.httpStatus===403;
+  if(filter==="list")return x.baseline.listCandidates>0||x.independentGate?.listCandidates>0;
+  if(filter==="detail")return x.baseline.detailTitleMatches>0||x.independentGate?.detailTitleMatches>0||x.independentGate?.detailTitleMatchesSampled>0;
+  if(filter==="android")return (x.independentGate?.androidUserPass??0)>0;
+  if(filter==="overlay")return !!x.independentGate;
+  return true;
+ });
+ document.getElementById("cards").replaceChildren(...visible.map(makeCard));
+ document.getElementById("status").textContent="已載入 "+rows.length+" 平台，顯示 "+visible.length+"；報告為來源稽核快照，非即時重抓。";
+}
+document.getElementById("search").addEventListener("input",render);
+document.getElementById("filter").addEventListener("change",render);
+(async()=>{
+ try{
+  const res=await fetch("./platform_status.json?v="+Date.now(),{cache:"no-store"});
+  if(!res.ok)throw Error("HTTP "+res.status);
+  const d=await res.json();
+  if(d.kind!=="EVENTRADAR_PUBLIC_PLATFORM_ENGINEERING_STATUS_V1"||
+     d.platforms?.length!==19||d.production?.eventFeedReleaseState!=="HARD_HOLD_NO_PUBLICATION")
+   throw Error("狀態檔格式或正式發布保護檢查失敗");
+  rows=d.platforms;drawSummary(d);render();
+ }catch(e){document.getElementById("status").textContent="讀取失敗："+String(e.message||e);
+  document.getElementById("status").id="error";}
+})();
+</script>
+</body>
+</html>
