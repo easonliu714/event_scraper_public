@@ -59,6 +59,17 @@ const el=(name,cls,txt)=>{const e=document.createElement(name);if(cls)e.classNam
 const append=(root,...nodes)=>{for(const n of nodes)root.append(n);return root;};
 const state=(txt)=>{const s=String(txt);return s.startsWith("HTTP200")||s.includes("USER_PASS")||s.includes("MATCH")?"pass":s.includes("HOLD")||s.includes("403")?"hold":"unknown";};
 const stageNames=[["response","官方回應"],["list","清單解析"],["detail","詳情身分"],["fields","欄位語意"],["android","Android"],["publication","正式發布"]];
+const stageText=(key,raw)=>{
+ const value=String(raw||'');
+ if(key==="response")return value==="HTTP200_OBSERVED"?"當次可正常取得回應":value==="HTTP403_BLOCKED"?"當次 HTTP 403，無法判定是否有活動":"來源尚未確認";
+ if(key==="list")return value==="CANDIDATES_NOT_GOLDEN"?"已找到活動候選，尚未逐筆驗證":"該輪未取得可解析清單";
+ if(key==="detail")return value.startsWith("HOLD_L9N_CURRENT")?"最新抽樣 3/4 標題吻合；39575 不符（較早為 4/4）":value==="SAMPLED_TITLE_MATCH_NOT_GOLDEN"?"抽樣標題吻合，非全清單驗證":value==="INDEPENDENT_SOURCE_ID_MATCH_REVIEW_ONLY"?"獨立 Gate 來源身分抽驗通過，待正式驗證":"尚未通過詳情身分檢查";
+ if(key==="fields")return value.startsWith("HOLD_L9N_")?"本次無可安全綁定日期標籤，欄位待核實":"日期、場地、票價、售票等欄位尚未正式核實";
+ if(key==="android")return value.startsWith("PLATFORM_SPECIFIC_USER_PASS_")?"已通過平台別 Android 實機 "+value.split("_").at(-1)+" 筆":"尚無此平台專屬 Android 驗收";
+ if(key==="publication")return "活動資料尚未正式發布（安全保留）";
+ return value;
+};
+
 function link(root,url,label){
  try{const u=new URL(url);if(u.protocol!=="https:"||u.hostname!=="github.com")return;
  const a=el("a","",label);a.href=u.href;a.target="_blank";a.rel="noopener noreferrer";root.append(a);
@@ -88,7 +99,7 @@ function makeCard(x){
  stats.append(el("span","stat","獨立 Gate 候選 "+x.independentGate.listCandidates));
  append(box,stats);
  const dl=el("dl","stages");
- for(const [key,name] of stageNames){append(dl,el("dt","",name),el("dd",state(x.stages[key]),x.stages[key]));}
+ for(const [key,name] of stageNames){const raw=x.stages[key];const dd=el("dd",state(raw),stageText(key,raw));dd.title="原始狀態："+raw;append(dl,el("dt","",name),dd);}
  append(box,dl);
  append(box,el("p","blocker",x.blocker));
  if(x.independentGate){
@@ -97,6 +108,12 @@ function makeCard(x){
   box.append(detail);
   if(g.semanticRefused!==undefined)box.append(el("p","sub","日期／價格欄位：安全接受 "+g.semanticAccepted+"；拒絕 "+g.semanticRefused+"；原因 "+g.refusalReason));
   if(g.evidence){const p=el("p","sub");link(p,g.evidence,"查看此平台獨立 CI 證據");box.append(p);}
+  if(g.l9nEvidence){const p=el("p","sub");link(p,g.l9nEvidence,"查看 ibon L9-N 最新來源證據");box.append(p);}
+  const details=el("details","sub");
+  details.append(el("summary","","展開機器狀態代碼（稽核用）"));
+  const raw=el("pre","",stageNames.map(([key,name])=>name+"："+x.stages[key]).join("\n"));
+  raw.style.whiteSpace="pre-wrap";raw.style.overflowWrap="anywhere";details.append(raw);box.append(details);
+
  }
  return box;
 }

@@ -19,7 +19,10 @@
     "l9bSha256": "3906b4e9689987429040ce9508fc88e4dbb0491199fd5984e55fb469065114d0",
     "l9mRun": 40682420113,
     "l9mArtifact": 12813381760,
-    "l9mSha256": "490b6aedb0e28a4e1a07ac2f3782456a138358386b94b62099469c18f0b8c7a5"
+    "l9mSha256": "490b6aedb0e28a4e1a07ac2f3782456a138358386b94b62099469c18f0b8c7a5",
+    "l9nRun": 40686039228,
+    "l9nArtifact": 12814702732,
+    "l9nSha256": "a049545092f6a508791f3a12b5c05395de7b4eb975efbb3d9b8813319ec1a5c9"
   },
   "baselineSummary": {
     "platformsChecked": 19,
@@ -43,7 +46,11 @@
     "ibonL9MCurrentSampleCount": 4,
     "ibonL9MFieldCandidatesAccepted": 0,
     "ibonL9MRefusals": 4,
-    "caution": "各 Gate 使用不同時間及不同採集方式，不能把候選數直接相加、不能宣稱 19 平台已完成"
+    "caution": "各 Gate 使用不同時間及不同採集方式，不能把候選數直接相加、不能宣稱 19 平台已完成",
+    "ibonL9NCurrentTitleMatches": 3,
+    "ibonL9NCurrentFourSamples": 4,
+    "ibonL9NCurrentLocalLabelCount": 0,
+    "ibonL9NCurrentReviewFields": 0
   },
   "production": {
     "eventDataFile": "docs/data.json",
@@ -310,18 +317,18 @@
         "detailTitleMatches": 0,
         "observedAtUTC": "2026-10-26T15:53:41Z"
       },
-      "phase": "瀏覽器候選／欄位 HOLD",
-      "blocker": "純 HTML 初始清單 0；正常 Chromium 後取得 22 筆候選，詳情身分有歷史間歇性不一致；日期值與 h3 標籤局部關係不明",
+      "phase": "瀏覽器可取得清單／跨時間詳情身分漂移 HOLD",
+      "blocker": "正常 Chromium 曾取得 22 筆清單候選；L9-M 四筆標題 4/4，但 L9-N 最新相同四筆僅 3/4（39575 當前不吻合），且此次四筆均未辨識到可安全綁定的日期標籤。官方來源或渲染結構存在時間差異，必須保留歷史證據，不能宣稱日期／票價已修復",
       "stages": {
         "response": "HTTP200_OBSERVED",
         "list": "HOLD_ZERO_OR_UNPARSED",
-        "detail": "HOLD_NOT_VERIFIED",
-        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
+        "detail": "HOLD_L9N_CURRENT_3_OF_4_TITLE_MATCH_HISTORIC_L9M_4_OF_4",
+        "fields": "HOLD_L9N_NO_LOCAL_LABELS_NO_SAFE_FIELD_VALUES",
         "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
         "publication": "HARD_HOLD_NO_EVENT_RELEASE"
       },
       "independentGate": {
-        "gate": "P30-L9E~L9M",
+        "gate": "P30-L9E~L9N",
         "listCandidates": 22,
         "detailTitleMatchesSampled": 6,
         "detailSampleScope": "累計抽樣非全 22 筆",
@@ -332,8 +339,19 @@
         "refusalReason": "AMBIGUOUS_OR_INTERACTIVE",
         "identityReview": "39961 曾發生標題不符；L9K 跨時間 3/3 相符仍 REVIEW_ONLY",
         "androidUserPass": 0,
-        "notes": "索引需正常 Chromium 執行 JS；詳情時間／票價尚未有可接受來源欄位；純 HTTP 清單 0 與 Chromium 清單 22 為不同採集方式，不能相加",
-        "evidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40682420113"
+        "notes": "L9-M（較早）四筆標題 4/4，活動日期相鄰元素皆因 AMBIGUOUS_OR_INTERACTIVE 拒絕；L9-N（最新）四筆 HTTP200，但 39575 標題不吻合，另外三筆未找到符合安全規則的活動日期標籤。先前與本輪結果皆保留，不互相覆蓋；場次／票價／日期／庫存皆 UNKNOWN。",
+        "evidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40682420113",
+        "l9nRun": 40686039228,
+        "l9nArtifact": 12814702732,
+        "l9nZipSHA256": "a049545092f6a508791f3a12b5c05395de7b4eb975efbb3d9b8813319ec1a5c9",
+        "l9nCurrentTitleMatches": 3,
+        "l9nCurrentSampleCount": 4,
+        "l9nTitleMismatch": [
+          "39575"
+        ],
+        "l9nLocallyRecognizedLabels": 0,
+        "l9nNewReviewCandidates": 0,
+        "l9nEvidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40686039228"
       }
     },
     {
@@ -516,5 +534,7 @@
     "fields": "EVENT、SALE、ADMISSION、REGISTRATION、VOUCHER、PRICE、VENUE 分別核對，未核實保留 UNKNOWN",
     "android": "僅 CKSMH 5 與 TWTC 39 具原本逐平台用戶實機 PASS，其他未宣稱完整實機",
     "publication": "工程狀態頁可公開展示；活動卡片/Golden/Writer/即時庫存仍 LOCKED"
-  }
+  },
+  "statusRevision": "2026-10-28-L9N",
+  "statusRevisionMeaning": "source status correction only; historic L9M 4/4 retained, latest L9N 3/4 and 0 label observations"
 }
