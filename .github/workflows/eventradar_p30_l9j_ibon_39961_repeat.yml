@@ -1,0 +1,148 @@
+name: EventRadar P30 L9-J ibon 39961 independent repeats (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9j-ibon-39961-repeatability
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9j-39961-repeat-readonly
+  cancel-in-progress: true
+jobs:
+  ibon-repeatability-no-release:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.ref == 'refs/heads/feat/eventradar-p30-l9j-ibon-39961-repeatability'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact L9-I parent SHA, immutable Pages and three new files
+        run: |
+          set -euo pipefail
+          base=ca60d3182172ad7f824fbcb5a2a6c9189fecc74b
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9j_ibon_39961_repeat.yml' 'scripts/p30_l9j_ibon_39961_repeatability.mjs' 'tests/p30/test_l9j_ibon_39961_repeatability.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9J_SOURCE_SCOPE_UNSAFE; exit 1; }
+          echo PASS L9J_FROZEN_PARENT_THREE_ADD_ONLY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install only normal Playwright Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: Run thirty offline source lineage and mismatch-fail safety tests first
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9j_ibon_39961_repeatability.mjs
+          node --test tests/p30/test_l9j_ibon_39961_repeatability.mjs
+          echo PASS L9J_THIRTY_OFFLINE_SOURCE_SAFETY_TESTS
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9i-ibon-39961-drift-readonly
+          run-id: 40524765567
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9j-pinned-l9i
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9h-ibon-local-dom-hierarchy
+          run-id: 40516301527
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9j-pinned-l9h
+      - name: Verify exact two upstream SHA + historical mismatch provenance
+        run: |
+          set -euo pipefail
+          (cd l9j-pinned-l9i && sha256sum -c SHA256SUMS.txt)
+          (cd l9j-pinned-l9h && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          import {createHash} from "node:crypto";
+          import {validateParents} from "./scripts/p30_l9j_ibon_39961_repeatability.mjs";
+          function get(folder,file){
+            const bytes=readFileSync(folder+"/"+file);
+            const manifest=JSON.parse(readFileSync(folder+"/manifest.json"));
+            if(manifest.filesSHA256?.[file]!==createHash("sha256").update(bytes).digest("hex"))
+             throw Error("HOLD_L9J_PARENT_MANIFEST_DIGEST");
+            return {bytes,doc:JSON.parse(bytes)};
+          }
+          const i=get("l9j-pinned-l9i","ibon_39961_identity_adjudication.json");
+          const h=get("l9j-pinned-l9h","ibon_local_dom_hierarchy.json");
+          const checked=validateParents(i.doc,i.bytes,h.doc,h.bytes);
+          console.log("PASS L9J_PINNED_I_H_SHA_AND_HISTORIC_MISMATCH",checked.iSHA256,checked.hSHA256);
+          JS
+      - name: Two new browser processes x one official list plus one exact detail, gap eight seconds
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9j_ibon_39961_repeatability.mjs \
+            --l9i l9j-pinned-l9i/ibon_39961_identity_adjudication.json \
+            --l9h l9j-pinned-l9h/ibon_local_dom_hierarchy.json \
+            --out p30-l9j-evidence
+      - name: SHA readback; historical mismatch and publication denial remain mandatory
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('p30-l9j-evidence')
+          r=json.loads((root/'ibon_39961_repeatability.json').read_text(encoding='utf8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf8'))
+          assert r['kind']=='EVENTRADAR_P30_L9J_IBON_39961_SAME_RUN_REPEATABILITY_V1'
+          assert r['sourceOrigin']=='TWO_NEW_INDEPENDENT_NORMAL_BROWSER_PROCESSES_SAME_RUN'
+          assert r['eventId']=='39961'
+          assert r['parentL9IHead']=='ca60d3182172ad7f824fbcb5a2a6c9189fecc74b'
+          assert r['parentL9IRun']==40524765567 and r['parentL9IArtifact']==12744025880
+          assert r['parentL9HRun']==40516301527 and r['parentL9HArtifact']==12740505389
+          assert r['roundCount']==len(r['rounds'])==r['independentBrowserProcesses']==2
+          assert r['minimumRoundGapMs']>=8000
+          assert r['topLevelNavigationsAttempted']==4
+          assert r['grade']['historicalMismatchRetained'] and r['grade']['unexplainedPriorMismatch']
+          assert r['grade']['formalIdentityReleaseEligible'] is False
+          assert r['grade']['sameRunTitleMatches']<=2
+          assert r['grade']['currentTwoRoundObservation'] in (
+              'TWO_SEPARATE_BROWSER_MATCHES_REVIEW_ONLY',
+              'REPEATABILITY_FAILURE_OR_INCOMPLETE_HOLD')
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['goldenAccepted']==r['formalFieldPromotions']==r['sessionSplits']==0
+          assert not any(r[k] for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted'))
+          assert not any(r[k] for k in ('rawHtmlPersisted','cookiesPersisted','screenshotsPersisted','networkBodiesPersisted'))
+          assert r['formalEventDate'] is None and r['formalPrice'] is None and r['formalTicketStatus']=='UNKNOWN'
+          assert r['existingAndroid44Preserved'] and r['l8CoreAndroidPassPreserved']
+          for x in r['rounds']:
+            assert x['list']['url']=='https://ticket.ibon.com.tw/Index/entertainment'
+            assert x['detail']['url']=='https://ticket.ibon.com.tw/ActivityInfo/Details/39961'
+            assert x['decision']['status'] in ('REVIEW_ONLY_NO_RELEASE','HOLD')
+            print('L9J_ROUND',x['index'],x['startedUtc'],x['endedUtc'],x['list']['httpStatus'],
+                x['detail']['httpStatus'],x['decision']['status'],x['decision']['reason'])
+          assert hashlib.sha256((root/'ibon_39961_repeatability.json').read_bytes()).hexdigest()==m['fileSHA256']['ibon_39961_repeatability.json']
+          print('PASS L9J_TWO_INDEPENDENT_PUBLIC_ROUNDS_AND_SHA')
+          print('QUALITY L9J_MATCHES',r['grade']['sameRunTitleMatches'],'OUT_OF',2)
+          print('HOLD L9J_HISTORIC_DRIFT_AND_GOLDEN_RELEASE_NOT_CLEARED')
+          PY
+      - name: Seal only isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9j-evidence
+          if test -f p30-l9j-evidence/manifest.json; then
+            (cd p30-l9j-evidence && sha256sum ibon_39961_repeatability.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9J_SHA256_SEALED
+          else
+            echo HOLD L9J_NO_EVIDENCE
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9j-ibon-39961-repeated-readonly
+          path: p30-l9j-evidence/
+          if-no-files-found: warn
+          retention-days: 14
