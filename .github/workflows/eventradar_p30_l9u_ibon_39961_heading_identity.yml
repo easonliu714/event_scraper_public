@@ -1,0 +1,138 @@
+name: EventRadar P30 L9-U ibon 39961 historical heading identity (READ ONLY)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9u-ibon-39961-heading-identity
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9u-39961-unique-readonly
+  cancel-in-progress: true
+jobs:
+  historic-identity-proof:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact frozen L9-T parent and three ADD-only files
+        run: |
+          set -euo pipefail
+          base=7923ede339b219a2264127f4163eb6d75e31a66b
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9u_ibon_39961_heading_identity.yml' 'scripts/p30_l9u_ibon_39961_heading_identity.mjs' 'tests/p30/test_l9u_ibon_39961_heading_identity.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9U_UNEXPECTED_DIFF; exit 1; }
+          echo PASS_L9U_FROZEN_PRODUCTION_AND_THREE_ADD_ONLY
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install normal public Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: Syntax and 46 offline fail-closed contracts
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9u_ibon_39961_heading_identity.mjs
+          node --check tests/p30/test_l9u_ibon_39961_heading_identity.mjs
+          node --test tests/p30/test_l9u_ibon_39961_heading_identity.mjs | tee /tmp/l9u-tests.log
+          grep -Eq '^# tests 46$' /tmp/l9u-tests.log
+          grep -Eq '^# fail 0$' /tmp/l9u-tests.log
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9k-ibon-39961-cross-window-readonly
+          run-id: 40673236521
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9k
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9h-ibon-local-dom-hierarchy
+          run-id: 40516301527
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9h
+      - name: Exact-head artifact digest and historical contradiction readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12809656497" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="30aa18a9fbe4dc7b46f9b4b2cf41a51b70f0b11a";assert a["digest"]=="sha256:c20ac82e7bd0c5a8e87530bbe126a81741fae2776058dd9394a8291c737118de";assert not a["expired"];print("PASS_L9U_K_ARTIFACT")'
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12740505389" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="56d309a9d4d895c7adfb525723c6e2a9c4abd2cb";assert a["digest"]=="sha256:2c4672a2b0be4f323d638455865bdf19becaed3615babdf7b6526f9b6da3c048";assert not a["expired"];print("PASS_L9U_H_ARTIFACT")'
+          (cd pinned-l9k && sha256sum -c SHA256SUMS.txt)
+          (cd pinned-l9h && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {createHash} from 'node:crypto';
+          import {parents} from './scripts/p30_l9u_ibon_39961_heading_identity.mjs';
+          const get=(dir,name)=>{
+            const raw=readFileSync(dir+'/'+name);
+            const m=JSON.parse(readFileSync(dir+'/manifest.json'));
+            const digest=m.fileSHA256?.[name]??m.filesSHA256?.[name];
+            if(createHash('sha256').update(raw).digest('hex')!==digest)throw Error('HOLD_L9U_PARENT_FILE_SHA');
+            return raw;
+          };
+          const kb=get('pinned-l9k','ibon_39961_cross_window.json');
+          const hb=get('pinned-l9h','ibon_local_dom_hierarchy.json');
+          const p=parents(JSON.parse(kb),kb,JSON.parse(hb),hb);
+          console.log('PASS_L9U_K_H_SHA_AND_HISTORIC_MISMATCH',p.kSha,p.hSha);
+          JS
+      - name: One official list/detail pair and twelve passive H1/H2 observations
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9u_ibon_39961_heading_identity.mjs --l9k pinned-l9k/ibon_39961_cross_window.json --l9h pinned-l9h/ibon_local_dom_hierarchy.json --out p30-l9u-evidence
+      - name: Independent SHA, source-scope and hard-HOLD readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('p30-l9u-evidence')
+          b=(root/'identity_heading_states.json').read_bytes()
+          r=json.loads(b);m=json.loads((root/'manifest.json').read_bytes())
+          assert r['kind']=='EVENTRADAR_P30_L9U_IBON_39961_HISTORIC_IDENTITY_V1'
+          assert r['sourceId']=='39961' and r['sampleCount']==12 and r['intervalMs']==500
+          assert r['navigationsAttempted'] in (1,2)
+          assert r['parentL9KRun']==40673236521 and r['parentL9HRun']==40516301527
+          assert r['historicMismatchRetained'] and not r['formalIdentityCertified']
+          if r['timeline']:
+            assert len(r['timeline'])==12 and r['listHTTP']==r['detailHTTP']==200
+            assert r['listFinal'] and r['detailFinal']
+            assert r['analysis']['historicalL9HMismatchStillOpen']
+            assert r['analysis']['acceptedFields']==0
+          else:
+            assert r['analysis'] is None
+            assert r['listState'].startswith('HOLD_') or r['detailState'].startswith('HOLD_')
+          assert r['formalFieldPromotions']==r['goldenAccepted']==0 and not r['published']
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not any(r[x] for x in ('writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted','rawHtmlPersisted','sourceTextPersisted','linkUrlsPersisted','screenshotsPersisted','cookiesPersisted','networkBodiesPersisted'))
+          assert m['filesSHA256']['identity_heading_states.json']==hashlib.sha256(b).hexdigest()
+          assert m['parentL9HFileSHA256']=='e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b'
+          print('PASS_L9U_INDEPENDENT_SHA_HISTORIC_CONFLICT_HARD_HOLD')
+          print('L9U_SOURCE_SUMMARY',json.dumps({'listHTTP':r['listHTTP'],'detailHTTP':r['detailHTTP'],'listState':r['listState'],'detailState':r['detailState'],'analysis':r['analysis']}))
+          PY
+      - name: Seal isolated SHA evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9u-evidence
+          if test -f p30-l9u-evidence/manifest.json; then
+            (cd p30-l9u-evidence && sha256sum identity_heading_states.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9U_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9u-ibon-39961-historic-heading-readonly
+          path: p30-l9u-evidence/
+          retention-days: 14
+          if-no-files-found: warn
