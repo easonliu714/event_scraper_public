@@ -1,0 +1,117 @@
+name: EventRadar P30 L9-T ibon 39907 heading states (READ ONLY)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9t-ibon-39907-heading-states
+permissions:
+  contents: read
+  actions: read
+jobs:
+  heading-state-proof:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Frozen base and exactly three ADD-only files
+        run: |
+          set -euo pipefail
+          base=cf8250a16d9e59df8957e82000fa8ef5e02ae230
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9t_ibon_39907_heading_states.yml' 'scripts/p30_l9t_ibon_39907_heading_states.mjs' 'tests/p30/test_l9t_ibon_39907_heading_states.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9T_UNEXPECTED_DIFF; exit 1; }
+          echo PASS_L9T_FROZEN_PRODUCTION
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install normal Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: Syntax and 32 offline tests
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9t_ibon_39907_heading_states.mjs
+          node --test tests/p30/test_l9t_ibon_39907_heading_states.mjs | tee /tmp/l9t-tests.log
+          grep -Eq '^# tests 32$' /tmp/l9t-tests.log
+          grep -Eq '^# fail 0$' /tmp/l9t-tests.log
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9s-three-ibon-title-readiness-readonly
+          run-id: 40740745592
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9s
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          run-id: 40494326021
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9f
+      - name: Pinned exact-head SHA lineage
+        env:
+          GH_${{ github.token }}: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_${{ github.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12838189367" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="cf8250a16d9e59df8957e82000fa8ef5e02ae230";assert a["digest"]=="sha256:3b53e69770add8a1c30324e7276ee7d931caf158b53b5c354213c5c074a0c169";assert not a["expired"];print("PASS_L9T_S_ARTIFACT")'
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_${{ github.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12729277485" | python -c 'import json,sys;a=json.load(sys.stdin);assert a["workflow_run"]["head_sha"]=="d85504773108281099ec0654c5c772de243f910c";assert a["digest"]=="sha256:811e1b133c253f3cde33c31a203a9ed4bfbfab7418822a9b3a59c00fdd9cf884";assert not a["expired"];print("PASS_L9T_F_ARTIFACT")'
+          (cd pinned-l9s && sha256sum -c SHA256SUMS.txt)
+          (cd pinned-l9f && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from 'node:fs';
+          import {parents} from './scripts/p30_l9t_ibon_39907_heading_states.mjs';
+          const sb=readFileSync('pinned-l9s/three_title_readiness.json');
+          const fb=readFileSync('pinned-l9f/detail_role_review.json');
+          const p=parents(JSON.parse(sb),sb,JSON.parse(fb),fb);
+          console.log('PASS_L9T_EXACT_39907_PARENT',p.sSha,p.fSha);
+          JS
+      - name: One official page twelve passive heading observations
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9t_ibon_39907_heading_states.mjs --l9s pinned-l9s/three_title_readiness.json --l9f pinned-l9f/detail_role_review.json --out p30-l9t-evidence
+      - name: Independent SHA and no-publication readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          p=Path('p30-l9t-evidence');b=(p/'heading_states.json').read_bytes()
+          r=json.loads(b);m=json.loads((p/'manifest.json').read_bytes())
+          assert r['kind']=='EVENTRADAR_P30_L9T_IBON_39907_HEADING_STATES_V1'
+          assert r['sourceId']=='39907' and r['sampleCount']==12
+          if r['state']=='HOLD_REVIEW_ONLY':
+            assert r['http']==200 and r['finalUrlExact'] and len(r['timeline'])==12
+            assert r['analysis']['acceptedFields']==0
+          else: assert r['state'].startswith('HOLD_') and not r['timeline']
+          assert r['formalFieldPromotions']==r['goldenAccepted']==0 and not r['published']
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert not any(r[x] for x in ('writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted','rawHtmlPersisted','sourceTextPersisted','linkUrlsPersisted','screenshotsPersisted','cookiesPersisted'))
+          assert m['filesSHA256']['heading_states.json']==hashlib.sha256(b).hexdigest()
+          print('PASS_L9T_INDEPENDENT_SHA_HARD_HOLD')
+          print('L9T_SUMMARY',json.dumps({'http':r['http'],'state':r['state'],'analysis':r['analysis']}))
+          PY
+      - name: Seal SHA evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9t-evidence
+          if test -f p30-l9t-evidence/manifest.json; then
+            (cd p30-l9t-evidence && sha256sum heading_states.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9T_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9t-ibon-39907-heading-states-readonly
+          path: p30-l9t-evidence/
+          retention-days: 14
+          if-no-files-found: warn
