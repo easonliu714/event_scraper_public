@@ -1,0 +1,115 @@
+name: EventRadar P30 L9-Y Kham frozen event-object boundary (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9y-kham-event-object-boundary]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9y-kham-object
+  cancel-in-progress: true
+jobs:
+  kham-event-object-boundary:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact parent, source, immutable production and three ADD-only paths
+        run: |
+          set -euo pipefail
+          base=b90a6af4f6bb2bab4a6570a025e7068cd1c69093
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git merge-base --is-ancestor "$base" HEAD
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9y_kham_event_object_boundary.yml' 'scripts/p30_l9y_kham_event_object_boundary.py' 'tests/p30/test_l9y_kham_event_object_boundary.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9Y_SCOPE; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/l9y-status.json
+          echo PASS_L9Y_FROZEN_SOURCE_AND_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned BeautifulSoup and Playwright
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: 38 offline fail-closed contracts before live source
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9y_kham_event_object_boundary.py tests/p30/test_l9y_kham_event_object_boundary.py
+          python -m unittest discover -s tests/p30 -p test_l9y_kham_event_object_boundary.py -v 2>&1 | tee /tmp/l9y-tests.log
+          grep -q 'Ran 38 tests' /tmp/l9y-tests.log
+          grep -q '^OK$' /tmp/l9y-tests.log
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9x-kham-original-parser-parity
+          run-id: 40784134457
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9x
+      - name: Parent artifact GitHub digest and SHA manifest readback
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12858063173" | python -c 'import json,sys; a=json.load(sys.stdin); assert a["digest"]=="sha256:c259d931c6c8b9c3b2bb8f5e398e6675231202fd718e136cf9c185d9bd6a4c5f" and not a["expired"],"HOLD_PARENT_DIGEST"'
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          base=Path("pinned-l9x")
+          manifest=json.loads((base/"manifest.json").read_text())
+          for name,digest in manifest["filesSHA256"].items():
+              assert hashlib.sha256((base/name).read_bytes()).hexdigest()==digest, "HOLD_PARENT_MANIFEST"
+          print("PASS_L9Y_PARENT_MANIFEST")
+          PY
+      - name: One bounded official navigation and exact frozen event-object stage
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9y_kham_event_object_boundary.py --status /tmp/l9y-status.json --parent pinned-l9x/kham_original_parser_parity.json --scraper scraper.py --out p30-l9y-evidence --live-kham
+      - name: Independent SHA, structural accounting and no-publication readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          raw=Path("p30-l9y-evidence/kham_event_object_boundary.json").read_bytes()
+          r=json.loads(raw)
+          m=json.loads(Path("p30-l9y-evidence/manifest.json").read_bytes())
+          assert r["kind"]=="EVENTRADAR_P30_L9Y_KHAM_EVENT_OBJECT_BOUNDARY_V1"
+          assert r["parentHead"]=="b90a6af4f6bb2bab4a6570a025e7068cd1c69093"
+          assert r["navigationCount"]==1 and r["releaseState"]=="HARD_HOLD_NO_PUBLICATION"
+          assert r["verifiedEventIdentity"]==r["acceptedFields"]==r["goldenAccepted"]==0
+          for k in ("published","writerExecuted","schedulerExecuted","notifierExecuted","mergeExecuted","productionModified","rawHtmlPersisted","rawUrlsPersisted","rawTitlesPersisted","cookiesPersisted","screenshotsPersisted"):
+              assert r[k] is False,k
+          for stage in ("static","rendered"):
+              if r[stage] is not None:
+                  d=r[stage]
+                  assert d["preObject"]==d["acceptedObjects"]+d["rejectedObjects"]
+                  assert d["allAnchors"]<=1200
+          assert b"https://" not in raw and b"<html" not in raw and b"PRODUCT_ID=" not in raw
+          assert hashlib.sha256(raw).hexdigest()==m["filesSHA256"]["kham_event_object_boundary.json"]
+          print("PASS_L9Y_SHA_NO_PUBLICATION",r["decision"])
+          PY
+      - name: Seal isolated evidence
+        if: always()
+        run: |
+          mkdir -p p30-l9y-evidence
+          if test -f p30-l9y-evidence/manifest.json; then
+            (cd p30-l9y-evidence && sha256sum kham_event_object_boundary.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9Y_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9y-kham-event-object-boundary
+          path: p30-l9y-evidence/
+          retention-days: 14
+          if-no-files-found: warn
