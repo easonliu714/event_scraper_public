@@ -1,5 +1,29 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-29 P30-L9-Y 寬宏 original create_event_obj 邊界 — 10 provisional objects, identity 0, NO PUBLISH**
+> ```text
+> Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED ENGINEERING STATUS ONLY]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages #40683700243 build/deploy SUCCESS [NO NEW DEPLOY]
+> L9-X Draft PR63 @b90a6af4f6bb2bab4a6570a025e7068cd1c69093
+> └─ L9-Y Draft PR64 @b8bd1905a875d62d131cd8db1fec814437b2fcb5 [UNMERGED]
+>    ├─ scripts/p30_l9y_kham_event_object_boundary.py [AST-isolated frozen scraper functions]
+>    │  ├─ one normal public Chromium category205 navigation; HTTP200
+>    │  ├─ static/rendered each 44 anchors → 10 selector → 10 PRODUCT_ID → 10 pre-object
+>    │  ├─ exact create_event_obj accepted provisional 10 / rejected 0 / normalized 0
+>    │  ├─ duplicate-after-acceptance 0 / unsafe link 0; no raw source persisted
+>    │  └─ verified identity 0 / accepted fields 0 / Golden 0 / published 0
+>    ├─ tests/p30/test_l9y_kham_event_object_boundary.py [38/38 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9y_kham_event_object_boundary.yml
+>       └─ final exact-head CI #40790894717 SUCCESS → Artifact #12860709898
+>          └─ ZIP SHA256 436199dd5cf7b8f18c552f6fd128b4a5654b8fd421042de2adcc798e22186568
+> Formal PR53 [CI FAIL/security blocked, DRAFT/UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - **Interpretation:** the original `create_event_obj` title/noise/normalization stage did not remove any of ten current category205 URL-pattern links in this capture. This does **not** explain historical L7-B generic zero (different source time), nor verify activity identity/detail, dates, price, venue, sessions or publication. First CI failed wrong branch status lookup, second failed malformed-parent KeyError; both corrected on isolated branch before final PASS. Next L9-Z: limited same-Event-ID official list/detail identity validation, retain source lineage and HOLD.
+
+
 > **2026-10-29 P30-L9-X 寬宏原始 parser 同次來源階段對照 — 10 URL-pattern → 10 selector → 10 PRODUCT_ID → 10 anchor text，尚非活動驗證**
 > ```text
 > Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
