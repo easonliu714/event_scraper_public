@@ -1,0 +1,142 @@
+name: EventRadar P30 L9-M source-bound DOM refusal diagnostics (NO PUBLISH)
+on:
+  push:
+    branches:
+      - feat/eventradar-p30-l9m-ibon-neighbor-reasons
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9m-ibon-local-structure
+  cancel-in-progress: true
+jobs:
+  bounded-iban-neighbor-proofs:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact frozen parent plus only three additive paths
+        run: |
+          set -euo pipefail
+          base=627a8175b1095c42d878219d95935357457d35e5
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/index.html)" = 8167aa329f6958a076736166bcaf321da1c8e4ee
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/manifest.json)" = 6fca76fd65958c6ab2381bf949e061aa7f8fb551
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9m_ibon_neighbor_reasons.yml' 'scripts/p30_l9m_ibon_neighbor_reasons.mjs' 'tests/p30/test_l9m_ibon_neighbor_reasons.mjs' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual" || { echo HOLD_L9M_NONISOLATED_CHANGE; exit 1; }
+          echo PASS L9M_FROZEN_SOURCE_THREE_ADDITIONS
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install normal fixed Chromium
+        run: |
+          set -euo pipefail
+          npm install --no-save --ignore-scripts --no-audit --no-fund playwright@1.55.0
+          ./node_modules/.bin/playwright install chromium
+      - name: 31 offline role, exact-source and output-gate negative tests before network
+        run: |
+          set -euo pipefail
+          node --check scripts/p30_l9m_ibon_neighbor_reasons.mjs
+          node --test tests/p30/test_l9m_ibon_neighbor_reasons.mjs
+          echo PASS L9M_31_OFFLINE_NEGATIVES
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9l-ibon-four-field-semantics
+          run-id: 40681114004
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9m-l9l-source
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9f-ibon-detail-roles-review-only
+          run-id: 40494326021
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: l9m-l9f-titles
+      - name: Independently hash two upstream reports with exact four identities and original titles
+        run: |
+          set -euo pipefail
+          (cd l9m-l9l-source && sha256sum -c SHA256SUMS.txt)
+          (cd l9m-l9f-titles && sha256sum -c SHA256SUMS.txt)
+          node --input-type=module <<'JS'
+          import {readFileSync} from "node:fs";
+          import {createHash} from "node:crypto";
+          import {parents} from "./scripts/p30_l9m_ibon_neighbor_reasons.mjs";
+          function read(folder,name){
+            const b=readFileSync(folder+"/"+name),m=JSON.parse(readFileSync(folder+"/manifest.json"));
+            const h=createHash("sha256").update(b).digest("hex");
+            if((m.sha256?.[name]??m.fileSHA256?.[name])!==h)throw Error("HOLD_L9M_SOURCE_SHA");
+            return {b,value:JSON.parse(b)};
+          }
+          const a=read("l9m-l9l-source","ibon_four_field_semantics.json");
+          const b=read("l9m-l9f-titles","detail_role_review.json");
+          const proof=parents(a.value,a.b,b.value,b.b);
+          console.log("PASS L9M_TWO_PARENT_SHA_FOUR_TITLE_BOUND",proof.l9lSha,proof.l9fSha);
+          JS
+      - name: Read four exact official ibon detail DOM local hierarchy reason codes
+        run: |
+          set -euo pipefail
+          node scripts/p30_l9m_ibon_neighbor_reasons.mjs \
+            --l9l l9m-l9l-source/ibon_four_field_semantics.json \
+            --l9f l9m-l9f-titles/detail_role_review.json \
+            --out p30-l9m-evidence
+      - name: Strict SHA readback and mandatory no promotion
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path('p30-l9m-evidence')
+          r=json.loads((root/'ibon_neighbor_reasons.json').read_text(encoding='utf-8'))
+          m=json.loads((root/'manifest.json').read_text(encoding='utf-8'))
+          assert r['kind']=='EVENTRADAR_P30_L9M_IBON_NEIGHBOR_REASON_DIAGNOSTICS_V1'
+          assert r['parentL9LHead']=='627a8175b1095c42d878219d95935357457d35e5'
+          assert r['parentL9LRun']==40681114004 and r['parentL9LArtifact']==12812317856
+          assert r['parentL9FRun']==40494326021 and r['parentL9FArtifact']==12729277485
+          assert r['sampleCount']==len(r['rows'])==4
+          assert [v['id'] for v in r['rows']]==['39575','39878','39907','39978']
+          assert r['titleParityCount']<=4 and r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['formalFieldPromotions']==r['sessionSplits']==r['goldenAccepted']==0
+          assert not any(r[k] for k in ('published','writerExecuted','schedulerExecuted','notifierExecuted','mergeExecuted'))
+          assert r['existingAndroid44Preserved'] and r['l8CoreAndroidPassPreserved']
+          assert not any(r[k] for k in ('rawHtmlPersisted','cookiesPersisted','screenshotsPersisted','networkBodiesPersisted'))
+          for row in r['rows']:
+            assert row['url']=='https://ticket.ibon.com.tw/ActivityInfo/Details/'+row['id']
+            assert row['formalDate'] is None and row['formalPrice'] is None
+            assert row['ticketStatus']=='UNKNOWN'
+            if not row['titleParity']:assert not row['diagnostics']
+            for d in row['diagnostics']:
+              assert not d['verified'] and not d['fieldPromotion']
+            print('L9M_DETAIL',row['id'],'HTTP',row['http'],'TITLE',row['titleParity'],
+                  'LABELS',row['labelsVisible'],'REVIEW',row['reviewCandidateCount'],
+                  'REASONS',json.dumps(row['reasonCounts'],ensure_ascii=False,sort_keys=True))
+          raw=(root/'ibon_neighbor_reasons.json').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()==m['sha256']['ibon_neighbor_reasons.json']
+          print('PASS L9M_TWO_PINNED_ARTIFACTS_FOUR_DETAILS_SHA')
+          print('QUALITY L9M_REVIEW_CANDIDATES',r['localReviewCount'])
+          print('HOLD L9M_GOLDEN_WRITER_PUBLISHER_DATE_PRICE')
+          PY
+      - name: SHA seal evidence only
+        if: always()
+        run: |
+          mkdir -p p30-l9m-evidence
+          if test -f p30-l9m-evidence/manifest.json; then
+            (cd p30-l9m-evidence && sha256sum ibon_neighbor_reasons.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+            echo PASS L9M_EVIDENCE_SEALED
+          else
+            echo HOLD L9M_EVIDENCE_ABSENT
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9m-ibon-neighbor-reasons
+          path: p30-l9m-evidence/
+          retention-days: 14
+          if-no-files-found: warn
