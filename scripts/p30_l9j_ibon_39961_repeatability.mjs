@@ -10,6 +10,7 @@ import {readFile,writeFile,mkdir} from "node:fs/promises";
 import {resolve,sep} from "node:path";
 import {fileURLToPath} from "node:url";
 import {adjudicate,currentListCandidates,normalize,clip,LIST_URL,DETAIL_URL,EVENT_ID} from "./p30_l9i_ibon_39961_identity.mjs";
+export {LIST_URL,DETAIL_URL,EVENT_ID};
 
 export const KIND="EVENTRADAR_P30_L9J_IBON_39961_SAME_RUN_REPEATABILITY_V1";
 export const PARENT_J_KIND="EVENTRADAR_P30_L9I_IBON_39961_CURRENT_IDENTITY_AUDIT_V1";
