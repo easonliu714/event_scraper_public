@@ -37,15 +37,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Syntax and 38 offline fail-closed tests BEFORE source navigation
+      - name: Syntax and 39 offline fail-closed tests BEFORE source navigation
         run: |
           set -euo pipefail
           node --check scripts/p30_l9w_kham_list_boundary.mjs
           node --check tests/p30/test_l9w_kham_list_boundary.mjs
           node --test tests/p30/test_l9w_kham_list_boundary.mjs | tee /tmp/l9w-tests.log
-          grep -Eq '^# tests 38$' /tmp/l9w-tests.log
+          grep -Eq '^# tests 39$' /tmp/l9w-tests.log
           grep -Eq '^# fail 0$' /tmp/l9w-tests.log
-          echo PASS_L9W_38_OFFLINE
+          echo PASS_L9W_39_OFFLINE
       - uses: actions/download-artifact@v4
         with:
           name: eventradar-p30-l7b-fresh-http-list-detail
