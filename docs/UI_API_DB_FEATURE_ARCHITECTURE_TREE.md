@@ -1,5 +1,25 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-28 P30-L9-L source-only four official ibon details semantic review architecture — CI PASS / field evidence 0**
+>
+> ```text
+> Source main@fc4f963247d [unchanged]
+> └─ L9-K Draft PR #48 @ 30aa18a9fbe4dc7b46f9b4b2cf41a51b70f0b11a [already PASS, no rework]
+>    └─ L9-L Draft PR #49 @ 627a8175b1095c42d878219d95935357457d35e5
+>       ├─ scripts/p30_l9l_ibon_four_field_semantics.mjs [normal public Chromium, 4 IDs]
+>       │  ├─ L9-F Run 40494326021 Artifact 12729277485 pinned SHA
+>       │  ├─ ids 39575/39878/39907/39978, strict official URL/source title parity
+>       │  ├─ typed EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION
+>       │  ├─ only DIRECT_SIBLING / LOCAL_PARENT / SAME_NODE source-binding
+>       │  └─ ibon_four_field_semantics.json + manifest.json + SHA256SUMS.txt
+>       ├─ tests/p30/test_l9l_ibon_four_field_semantics.mjs [30/30 negatives]
+>       └─ .github/workflows/eventradar_p30_l9l_ibon_four_fields.yml [readonly push]
+>          └─ GitHub Actions Run 40681114004 → Artifact 12812317856
+> ```
+> - Native [Run 40681114004](https://github.com/easonliu714/event_scraper_public/actions/runs/40681114004) Job `122791739707` success, exact 3 add-only paths and formal Pages/runtime Git blob SHA PASS, 30/30 offline tests, actual pinned source L9-F JSON SHA256 `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`. Four new ibon public detail HTTP200/title parity PASS, one recognized label and one rejected role per page, **0 accepted field pairs**. Formal date/price/ticket/venue/event session remain NULL/UNKNOWN and no role or session promotion.
+> - [SHA Artifact 12812317856](https://github.com/easonliu714/event_scraper_public/actions/runs/40681114004/artifacts/12812317856) ZIP `a4b2716566504c0f0c8fbffc364b632e10483b2a47d3d44055f2d7326cdc74de` (1654 B), read-only semantic report + SHA. `HARD_HOLD_NO_PUBLICATION`, Writer/Publisher/Scheduler/Notifier/merges/retirement prohibited, Android 44 original PASS, L8 core UI PASS and L9-K 39961 historic mismatch HOLD preserved. Next L9-M should diagnose *why* local sibling is rejected without promoting unbound global body dates; update only these two governance docs in Docs Draft PR #8.
+>
+
 > **2026-10-28 P30-L9-K official ibon 39961 cross-window source identity assurance architecture — native PASS 3/3 across 2 time windows, RELEASE HARD HOLD**
 >
 > ```text
