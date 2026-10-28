@@ -1,5 +1,30 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-28 P30-L9-K official ibon 39961 cross-window source identity assurance architecture — native PASS 3/3 across 2 time windows, RELEASE HARD HOLD**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [immutable Pages/data/runtime]
+> └─ L9-J Source Draft PR #47 @ 727aea8aa673b29cd4a589c0a9ca68836fac4b92
+>    └─ L9-K Source Draft PR #48 @ 30aa18a9fbe4dc7b46f9b4b2cf41a51b70f0b11a
+>       ├─ scripts/p30_l9k_ibon_39961_cross_window.mjs [readonly]
+>       │  ├─ pinned L9-J Run 40619619643 Artifact 12786507149 [2/2 current short-window PASS]
+>       │  ├─ pinned L9-H Run 40516301527 Artifact 12740505389 [prior 39961 mismatch]
+>       │  ├─ provenance(): double SHA and historical mismatch mandatory
+>       │  ├─ minimumWindow(): >=4 hours after latest upstream sample before ANY public fetch
+>       │  ├─ capture(): one NEW ephemeral standard Chromium official list + exact 39961 detail
+>       │  ├─ crossWindowDecision(): compare 3 captures over 2 time windows
+>       │  └─ ibon_39961_cross_window.json + SHA manifest (no production writes)
+>       ├─ tests/p30/test_l9k_ibon_39961_cross_window.mjs [30/30 fail-closed]
+>       └─ .github/workflows/eventradar_p30_l9k_ibon_cross_window.yml [read-only push]
+>          └─ Actions Run 40673236521 -> Artifact 12809656497
+> ```
+> - **GitHub native source evidence:** [Run 40673236521](https://github.com/easonliu714/event_scraper_public/actions/runs/40673236521) job `122765043788` completed SUCCESS at `30aa18a9fbe4dc7b46f9b4b2cf41a51b70f0b11a`; exact 3 source ADD-only files and official Pages/`docs/data.json`/`scraper.py` SHA gates PASS, 30/30 offline tests PASS; upstream SHA-pinned report `27bb5cf2450d1aed03e51c0954a3b785acc88d94518787ff3f12861fa1f88159` (L9-J) and `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` (L9-H) independently validated with GitHub Artifacts + SHA256SUMS + manifests. Initial [Run 40673115086](https://github.com/easonliu714/event_scraper_public/actions/runs/40673115086) failed before any new website request due missing test helper `sha` export; only L9-K script repaired, final native CI PASS.
+> - **Current first-party UI fact:** Last L9-J sampled `2026-10-28T02:13:51.393Z`; new L9-K `2026-10-28T10:35:05.675Z` (**8.354h gap**). One new normal browser process and 2 public top-level navigations: ibon `Index/entertainment` HTTP200 with one directly bound canonical numeric `39961` list card, ibon `ActivityInfo/Details/39961` HTTP200 with 3 detail headings and exact source/list-title agreement. Cumulative **3 of 3 source title matches across 2 observation windows** yields `CROSS_WINDOW_THREE_MATCHES_REVIEW_ONLY`. Historical L9-H `HOLD_TITLE_MISMATCH` must remain `OPEN_UNEXPLAINED`, `formalIdentityCertified=false` and `formalReleaseEligible=false`; do not treat finite-time reproducibility as permanent official activity identity validity.
+> - **Sealed [Artifact 12809656497](https://github.com/easonliu714/event_scraper_public/actions/runs/40673236521/artifacts/12809656497)** name `eventradar-p30-l9k-ibon-39961-cross-window-readonly`, ZIP `sha256:c20ac82e7bd0c5a8e87530bbe126a81741fae2776058dd9394a8291c737118de`, 2416 bytes. `ibon_39961_cross_window.json` + `manifest.json` + `SHA256SUMS.txt` verified by native CI; no full HTML/screenshots/cookies/network bodies, no custom anti-bot behaviors, no credential use beyond GitHub artifact readonly token.
+> - **UI/API/DB boundary:** `formalEventDate=null`, `formalPrice=null`, `ticketStatus=UNKNOWN`, `formalFieldPromotions=0`, `goldenAccepted=0`, `published=false`; `Writer/Scheduler/Notifier/Publisher/mergeExecuted=false`, no change to Source main, Preview main, ShowNews main, data.json, App, API, DB, Android. Original 44 Android USER_ATTESTED_PASS and L8 new core UI USER_ATTESTED_PASS preserved. P30-L9-A ten mandatory release blockers still active, 19-source completeness not established.
+> - **Next P30-L9-L:** isolate the four previously matched ibon detail IDs `39575,39878,39907,39978` for **official label-to-date/venue/price/SESSION semantic binding evidence**. Use bounded visual/text DOM structures with correct EVENT vs SALE vs ADMISSION vs REGISTRATION vs VOUCHER period roles, no undocumented API guessing, no whole-page date regex, no automatic Golden/Writer promotion. Keep 39961 intermittent mismatch under review instead of scheduling unapproved automated monitoring; two authoritative governance docs continue on Docs Draft PR #8 only.
+>
+
 > **2026-10-28 SRC-P30-L9-J ibon 39961 independent source repeatability architecture — CI PASS 2/2 SAME RUN, past mismatch held**
 >
 > ```text
