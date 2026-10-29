@@ -1,0 +1,70 @@
+name: EventRadar P30 L9-AK heading-near offline (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9aj-live-sibling-20261029]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9ak-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  heading-near:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9ak-heading-near-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head three-file scope and frozen formal blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent=48b353a1467f6aaab8748de2737a1657f6265cac
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$parent" HEAD)" = "$parent"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ak_heading_near.yml' 'scripts/p30_l9ak_accupass_heading_near.py' 'tests/p30/test_l9ak_accupass_heading_near.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$parent" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Install pinned parser
+        run: python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2'
+      - name: Frozen sibling tests and new heading negatives
+        run: |
+          python -m py_compile scripts/p30_l9ak_accupass_heading_near.py tests/p30/test_l9ak_accupass_heading_near.py
+          python -m unittest discover -s tests/p30 -p test_l9ai_accupass_sibling_roles.py -v
+          python -m unittest discover -s tests/p30 -p test_l9ak_accupass_heading_near.py -v
+      - name: SHA manifest and no-publication contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p p30-l9ak-evidence
+          python - <<'PY'
+          import json,hashlib,pathlib,sys
+          sys.path.insert(0,'scripts')
+          import p30_l9ak_accupass_heading_near as m
+          p=pathlib.Path('p30-l9ak-evidence')
+          r=m.offline_contract()
+          assert r['httpRequests']==0 and r['published'] is False and r['acceptedFields']==0
+          r['exactHead']='${{ github.event.pull_request.head.sha }}'
+          raw=(json.dumps(r,sort_keys=True,indent=2)+'\n').encode()
+          (p/'contract.json').write_bytes(raw)
+          manifest={'releaseState':m.RELEASE,'filesSHA256':{'contract.json':hashlib.sha256(raw).hexdigest()}}
+          (p/'manifest.json').write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
+          assert hashlib.sha256((p/'contract.json').read_bytes()).hexdigest()==manifest['filesSHA256']['contract.json']
+          print('PASS_L9AK_OFFLINE_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-l9ak-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9ak-heading-near-offline
+          path: p30-l9ak-evidence/
+          if-no-files-found: ignore
