@@ -1,5 +1,45 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+## 2026-10-29 18:53 — Owner-approved P0 Taipei/New Taipei venue queue and source identity graph (Draft PR #8 only)
+
+```text
+A / P30-L9-AH [#75 CI PASS 30/30] → L9-AI bounded local sibling labels [NEXT]
+  official list 25 distinct paths; 2/2 same-path detail title REVIEW
+  dt/dd + th/td bounded topology 0/2; eight role fields HOLD; Golden=0
+B / P30-VENUE-01B [#74 CI PASS 20/20 + exactly one official GET]
+  Taipei Arena DataSN announcements 8 [venue IDs only, ticket Event IDs 0]
+  VENUE-01C title/body date conflict + source detail parity [NEXT]
+  P0 Taipei City [highest priority]
+    Existing 19-platform sources [REUSE, NO DUPLICATE ADAPTER]
+      #17 CKSMH / P0-06 [5/5 Android PASS; add session/venue provenance only]
+      #14 Songshan / P0-09 [LIST=1 historical; DETAIL HOLD]
+      #13 Huashan / P0-10 [LIST=7 historical; 1 detail REVIEW; FIELD HOLD]
+      #16 TWTC / P0-11 [39 detail Android PASS; one postponed date HOLD]
+    Distinct venue discovery [DISCOVERY/UNKNOWN, not LIST_PASS]
+      Taipei Arena official news + OpenData [VENUE-01]
+      Taipei Dome, Taipei Music Center, NTCH (separate from OPENTIX #05)
+      TICC, TPAC, Nangang Exhibition Center
+      Taipei mass-event permit review [review is NOT approval/event sale]
+  P0 New Taipei City [next priority; all DISCOVERY/UNKNOWN]
+    Zepp New Taipei, New Taipei Arts Center, Xinzhuang Arts Center
+    Shulin Arts Center, Cloud Gate Theater, Fuzhong 15, Yingge Museum
+  P1 Other North [Keelung, Taoyuan, Hsinchu, Miaoli]
+  P2 Central [Taichung National Theater retained, not Taipei; then others]
+  P3 South [Kaohsiung Arena retained, not P0; then others]
+  P4 East [Yilan, Hualien, Taitung]; islands deferred
+  VENUE-04 [venue DataSN != ticket Event ID; exact session evidence edges]
+  VENUE-05 [PWA/Android Golden and publication HOLD]
+Formal 19-platform registry: docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124
+Production data/status/Pages/Golden/Writer/Publisher/Scheduler/Notifier UNCHANGED
+HARD_HOLD_NO_PUBLICATION
+```
+
+**Candidate URL discovery manifest (not verified LIST/DETAIL):** Taipei Arena `https://www.arena.taipei/News.aspx?n=2E1489AFE4B1BEA1&sms=F9A95D3F5A5C2C68`; Taipei Dome `https://www.taipeidome.com.tw/Web/dome/`; Taipei Music Center `https://www.tmc.taipei/tw/blog/show`; NTCH `https://npac-ntch.org/programs`; TPAC `https://tpac.org.taipei/program`; TICC `https://ticc.com.tw/wSite/sp?bId=6853&ctNode=385&mp=2&xdUrl=%2FwSite%2Fap%2Fcp_Activity.jsp`; CKSMH `https://event.culture.tw/CKSMH` [#17]; Songshan `https://www.songshanculturalpark.org/exhibition` [#14]; Huashan `https://www.huashan1914.com/exhibition` [#13]; TWTC `https://twtc.com.tw/exhibition?p=home` [#16]; Nangang `https://www.tainex.com.tw/event`; permit review `https://majorevent.gov.taipei/News.aspx?_CSN=DC8B1134D3826039&n=3D3E2948CDA72DD8&sms=E2A80B3BD6378AB0` [application not approval]. New Taipei: Zepp `https://www.zepp.co.jp/hall/newtaipei/schedule/`; NTPC Arts `https://www.culture.ntpc.gov.tw/artcenter_chi/sitesearch`; Xinzhuang `https://www.xzcac.ntpc.gov.tw/`; Shulin `https://www.culture.ntpc.gov.tw/shulin_artcenter_chi/xmdoc?XsmSId=0J080506169482009359`; Cloud Gate `https://www.cloudgate.org.tw/cgt`; Fuzhong15 `https://www.fuzhong15.ntpc.gov.tw/xcmovie?XsmSId=0M361641875264878260`; Yingge `https://www.ceramics.ntpc.gov.tw/xmdoc?XsmSId=0J148497613881029302`. Every untested URL is `DISCOVERY/UNKNOWN`.
+
+**Source identity contract:** Canonical platform ID is authoritative for existing #13/#14/#16/#17; venue aliases are subordinate identities, not new platform records. NTCH venue source is distinct from OPENTIX #05; similar titles cannot create an automatic identity merge. Every venue/ticket field must have independent `source`, `observed_at`, `role`, `decision`; conflicting dates stay UNKNOWN/HOLD. Owner geographical priority supersedes older Taichung/Kaohsiung order without deleting history. A line proceeds concurrently; neither CI success nor venue HTTP200 equals Golden or production publication.
+
+---
+
 ## 2026-10-29 17:56 — P30 dual-workstream architecture update (Draft only)
 
 ```text
