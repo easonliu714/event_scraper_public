@@ -1,0 +1,67 @@
+name: EventRadar P30 L9-AH ACCUPASS bounded local field roles (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9ag-accupass-detail-parity]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9ah-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  accupass-local-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9ah-local-role-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact head, parent and formal blob guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=adbbe114c27259b80f5db80dcfee94204da09979
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ah_accupass_roles.yml' 'scripts/p30_l9ah_accupass_field_roles.py' 'tests/p30/test_l9ah_accupass_field_roles.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git show origin/main:docs/platform_status.json > /tmp/l9ah-status.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pinned browser and parser
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: Thirty offline field-role positive and negative tests
+        run: |
+          python -m py_compile scripts/p30_l9ah_accupass_field_roles.py tests/p30/test_l9ah_accupass_field_roles.py
+          python -m unittest discover -s tests/p30 -p test_l9ah_accupass_field_roles.py -v
+      - name: One public list and maximum two same-path detail reviews
+        run: |
+          python scripts/p30_l9ah_accupass_field_roles.py --live --status /tmp/l9ah-status.json --out p30-l9ah-evidence
+      - name: SHA manifest and no-publication evidence
+        run: |
+          python - <<'PY'
+          import hashlib,json,pathlib
+          p=pathlib.Path('p30-l9ah-evidence')
+          r=json.loads((p/'accupass_roles.json').read_text())
+          m=json.loads((p/'manifest.json').read_text())
+          assert hashlib.sha256((p/'accupass_roles.json').read_bytes()).hexdigest()==m['filesSHA256']['accupass_roles.json']
+          assert r['published'] is False and r['acceptedFields']==0 and r['goldenAccepted']==0
+          assert not r['rawFieldValuesPersisted'] and not r['rawHtmlPersisted']
+          print('PASS_L9AH_EVIDENCE_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-l9ah-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9ah-local-role-evidence
+          path: p30-l9ah-evidence/
+          if-no-files-found: ignore
