@@ -7,21 +7,21 @@
 > ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [NO CHANGE]
 > └─ Pages #40683700243 build/deploy SUCCESS [NO NEW DEPLOY]
 > L9-Z Draft PR65 @18d9a28c4b3235a5aa7b722b447f7588a707911d [UNMERGED]
-> └─ L9-AA Draft PR66 @c6efa2fb4f63ffd6be6f00e4ccd714c3ebe1c26a [UNMERGED]
+> └─ L9-AA Draft PR66 @86ef4fffb67824f9981bba984ecadb62eca93631 [UNMERGED]
 >    ├─ scripts/p30_l9aa_kham_title_topology.py [1 list + <=2 same-ID details, 6 passive frames each]
->    │  ├─ 10 provisional list objects / 2 details HTTP200 / exact title-region matches 0
+>    │  ├─ 10 provisional list objects / 2 details HTTP200 / evaluated exact title-region matches 0 (over-cap zone unassessed)
 >    │  ├─ sample0 iframe 1→4, scoped text 214, HOLD_NO_EXACT_REGION_IFRAME_PRESENT
->    │  ├─ sample1 iframe 1→4, scoped text >250 cap, HOLD_REGION_CAP
+>    │  ├─ sample1 iframe 1→4, scoped text >250 cap / match null (unassessed), HOLD_REGION_CAP
 >    │  └─ no title/HTML/URL/ID retained; formal identity0, fields0, Golden0, publish0
 >    ├─ tests/p30/test_l9aa_kham_title_topology.py [48/48 PASS after 3 head-fixture repairs]
 >    └─ .github/workflows/eventradar_p30_l9aa_kham_title_topology.yml
->       └─ exact-head push CI #40803769767 SUCCESS -> Artifact #12867680187
->          └─ ZIP SHA256 bf467022f0b865ce1d047288d31d12e0e7a7749d1fe5dc5a6317054879f72e6d
+>       └─ exact-PR-head CI #40803982844 SUCCESS -> Artifact #12866284781
+>          └─ ZIP SHA256 4b1b9d830cf947202798f9c601d9c69c194af35c4b64c3320dbe5fd04d4a9075
 > Formal status PR53 [CI FAIL, DRAFT/UNMERGED]; ibon39961 historic mismatch OPEN
 > Next L9-AB [iframe origin/accessibility and narrowed over-cap DOM, no source bypass]
 > HARD_HOLD_NO_PUBLICATION / Source Writer Publisher Scheduler Notifier untouched
 > ```
-> - Exact full-title NFC equality is bounded to named DOM zones; metadata/image hints are non-authoritative. iframe presence alone is **not** proof of title inside frame. Original Android CKSMH5/TWTC39 PASS, L8 Core UI PASS and 11 formal PWA status screenshots retained as scoped attestations, not full-platform E2E. Only formal PWA remains front-end acceptance entry.
+> - Exact full-title NFC equality is bounded to named DOM zones; metadata/image hints are non-authoritative; over-cap regions are null/unassessed rather than false zero. iframe presence alone is **not** proof of title inside frame. Original Android CKSMH5/TWTC39 PASS, L8 Core UI PASS and 11 formal PWA status screenshots retained as scoped attestations, not full-platform E2E. Only formal PWA remains front-end acceptance entry.
 
 
 
