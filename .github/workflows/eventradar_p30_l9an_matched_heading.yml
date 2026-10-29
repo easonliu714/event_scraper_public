@@ -1,0 +1,74 @@
+name: EventRadar P30 L9-AN exact matched heading local roles (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9am-live-heading-20261029-2256]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9an-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  accupass-matched-heading-review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9an-matched-heading-20261030-0100'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head, isolated scope and formal blob guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=8a25ccb73d37ea2084fdc46212c49722effe8414
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9an_matched_heading.yml' 'scripts/p30_l9an_accupass_matched_heading.py' 'tests/p30/test_l9an_accupass_matched_heading.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git show origin/main:docs/platform_status.json > /tmp/l9an-status.json
+      - name: Normal public Chromium and bounded HTML parser
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: Frozen heading regressions and exact-anchor negatives
+        run: |
+          python -m py_compile scripts/p30_l9an_accupass_matched_heading.py tests/p30/test_l9an_accupass_matched_heading.py
+          python -m unittest discover -s tests/p30 -p test_l9ak_accupass_heading_near.py -v
+          python -m unittest discover -s tests/p30 -p test_l9am_accupass_live_heading.py -v
+          python -m unittest discover -s tests/p30 -p test_l9an_accupass_matched_heading.py -v
+      - name: One normal public list and at most two exact-path details
+        run: |
+          python scripts/p30_l9an_accupass_matched_heading.py --live --status /tmp/l9an-status.json --out p30-l9an-evidence
+      - name: Independent SHA manifest and no publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, pathlib
+          p = pathlib.Path('p30-l9an-evidence')
+          r = json.loads((p/'matched_heading_review.json').read_text())
+          m = json.loads((p/'manifest.json').read_text())
+          assert hashlib.sha256((p/'matched_heading_review.json').read_bytes()).hexdigest() == m['filesSHA256']['matched_heading_review.json']
+          assert r['releaseState'] == 'HARD_HOLD_NO_PUBLICATION'
+          assert r['detailCount'] <= 2 and r['maxDetails'] == 2
+          assert r['acceptedFields'] == r['goldenAccepted'] == 0
+          assert r['published'] is False
+          assert not r['rawHtmlPersisted'] and not r['rawTitlesPersisted'] and not r['rawEventIdsPersisted']
+          print('PASS_L9AN_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-l9an-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9an-matched-heading-review
+          path: p30-l9an-evidence/
+          if-no-files-found: ignore
