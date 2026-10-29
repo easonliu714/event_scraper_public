@@ -1,0 +1,43 @@
+name: Event Radar PR1 G4B - Source Evidence (NO Publish)
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-pr1-g4b-source-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  source-evidence:
+    if: >-
+      github.event.pull_request.number == 1 &&
+      github.event.pull_request.head.repo.full_name == 'easonliu714/event_scraper_public' &&
+      github.event.pull_request.head.ref == 'fix/event-radar-v44-cloud-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      EVENT_RADAR_ACTIONS: '0'
+      EVENT_RADAR_TELEGRAM: '0'
+      EVENT_RADAR_TERMUX: '0'
+    steps:
+      - name: Checkout PR merge candidate without Git credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install source-parser dependency
+        run: python -m pip install 'beautifulsoup4>=4.12,<5'
+      - name: Read only source-bound sampled detail pages
+        run: python scripts/pr1_source_probe.py --run
+      - name: Upload sanitized evidence even on HOLD
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-pr1-g4b-source-evidence
+          path: ${{ runner.temp }}/eventradar_pr1_g4b_probe/evidence/
+          if-no-files-found: warn
+          retention-days: 7

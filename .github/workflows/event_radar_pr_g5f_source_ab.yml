@@ -1,0 +1,45 @@
+name: Event Radar PR1 G5F - Equal-target network AB (NO Publish)
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-pr1-g5f-probe-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  source-ab:
+    if: >-
+      github.event.pull_request.number == 1 &&
+      github.event.pull_request.draft == true &&
+      github.event.pull_request.head.repo.full_name == 'easonliu714/event_scraper_public' &&
+      github.event.pull_request.head.ref == 'fix/event-radar-v44-cloud-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      EVENT_RADAR_TERMUX: '0'
+      EVENT_RADAR_TELEGRAM: '0'
+    steps:
+      - name: Checkout PR test source (read-only)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 11 equal-contract public HTTP probes; no HTML/data publish
+        run: |
+          python scripts/g5f_probe.py \
+            --environment cloud \
+            --manifest fixtures/g5f_probe_targets.json \
+            --output "$RUNNER_TEMP/g5f_evidence/cloud.json"
+      - name: Upload bounded status-only evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-pr1-g5f-source-ab
+          path: ${{ runner.temp }}/g5f_evidence/cloud.json
+          if-no-files-found: warn
+          retention-days: 7
