@@ -1,0 +1,63 @@
+name: EventRadar venue02h bounded source-quality and exact-head CI (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02g-tainex-parity-20261030-0555]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-venue02h-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  tainex-live-identity:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02h-tainex-live-identity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head immutable base, ADD-only scope and production guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=daeb78277f693e6c83146dfebf23a6c5678831ca
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue02h.yml' 'scripts/p30_venue02h_tainex_live_identity.py' 'tests/p30/test_venue02h_tainex_live_identity.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen tests and new fail-closed regressions
+        run: |
+          python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
+          python -m py_compile scripts/p30_venue02h_tainex_live_identity.py tests/p30/test_venue02h_tainex_live_identity.py
+          python -m unittest discover -s tests/p30 -p test_venue02g_tainex_parity.py -v
+          python -m unittest discover -s tests/p30 -p test_venue02h_tainex_live_identity.py -v
+      - name: Bounded official GET with sanitized audit and SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p venue02h-evidence
+          python scripts/p30_venue02h_tainex_live_identity.py --live-two --out venue02h-evidence/audit.json
+          python - <<'PY'
+          import hashlib,json,pathlib
+          d=pathlib.Path('venue02h-evidence')
+          p=d/'audit.json'; obj=json.loads(p.read_text())
+          assert obj['acceptedFields']==0 and obj['goldenAccepted']==0
+          assert obj['published'] is False and obj['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert 'rawHtml' not in obj and 'cookies' not in obj
+          (d/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(p.read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd venue02h-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-venue02h-source-quality
+          path: venue02h-evidence/
+          if-no-files-found: ignore
