@@ -1,0 +1,71 @@
+name: EventRadar P30 L9-AJ bounded live sibling review (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9ai-bounded-sibling-20261029]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9aj-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  accupass-live-siblings:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9aj-live-sibling-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head isolated three-file scope and frozen formal blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=ed7e3d15a2fb76161ec95bad460d0003f46c8b19
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9aj_accupass_live.yml' 'scripts/p30_l9aj_accupass_live_siblings.py' 'tests/p30/test_l9aj_accupass_live_siblings.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git show origin/main:docs/platform_status.json > /tmp/l9aj-status.json
+      - name: Install pinned read-only parser and normal browser
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: Twenty-four isolated plus thirty-two frozen sibling regressions
+        run: |
+          python -m py_compile scripts/p30_l9aj_accupass_live_siblings.py tests/p30/test_l9aj_accupass_live_siblings.py
+          python -m unittest discover -s tests/p30 -p test_l9ai_accupass_sibling_roles.py -v
+          python -m unittest discover -s tests/p30 -p test_l9aj_accupass_live_siblings.py -v
+      - name: One public list and maximum two same-path detail field reviews
+        run: |
+          python scripts/p30_l9aj_accupass_live_siblings.py --live --status /tmp/l9aj-status.json --out p30-l9aj-evidence
+      - name: Independent evidence SHA and no-publication contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib,pathlib
+          p=pathlib.Path('p30-l9aj-evidence')
+          r=json.loads((p/'accupass_sibling_roles.json').read_text())
+          m=json.loads((p/'manifest.json').read_text())
+          assert m['filesSHA256']['accupass_sibling_roles.json']==hashlib.sha256((p/'accupass_sibling_roles.json').read_bytes()).hexdigest()
+          assert r['published'] is False and r['acceptedFields']==0 and r['goldenAccepted']==0
+          assert not r['rawHtmlPersisted'] and not r['rawEventIdsPersisted'] and not r['rawFieldValuesPersisted']
+          assert r['detailCount']<=2 and len(r['details'])<=2
+          print('PASS_L9AJ_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-l9aj-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9aj-live-sibling-review
+          path: p30-l9aj-evidence/
+          if-no-files-found: ignore
