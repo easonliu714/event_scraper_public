@@ -1,0 +1,97 @@
+name: EventRadar P30 L9-AD ACCUPASS bounded identity (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9ad-accupass-identity]
+  pull_request:
+    branches: [feat/eventradar-p30-l9ac-kham-top-level-title]
+    paths:
+      - .github/workflows/eventradar_p30_l9ad_accupass_identity.yml
+      - scripts/p30_l9ad_accupass_identity.py
+      - tests/p30/test_l9ad_accupass_identity.py
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9ad-accupass
+  cancel-in-progress: false
+jobs:
+  accupass-identity:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Frozen parent and production blobs; exact three ADD-only paths
+        run: |
+          set -euo pipefail
+          base=3b6b64ff4803a1a156e5774a23850f756d31e799
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git merge-base --is-ancestor "$base" HEAD
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ad_accupass_identity.yml' 'scripts/p30_l9ad_accupass_identity.py' 'tests/p30/test_l9ad_accupass_identity.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9AD_SCOPE; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/l9ad-status.json
+          echo PASS_L9AD_FROZEN_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned parser and normal Chromium
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: 36 offline source-bound negative and positive tests
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9ad_accupass_identity.py tests/p30/test_l9ad_accupass_identity.py
+          python -m unittest discover -s tests/p30 -p test_l9ad_accupass_identity.py -v 2>&1 | tee /tmp/l9ad-tests.log
+          grep -q 'Ran 36 tests' /tmp/l9ad-tests.log
+          grep -q '^OK$' /tmp/l9ad-tests.log
+      - name: One public ACCUPASS list and at most one same-ID detail
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9ad_accupass_identity.py --status /tmp/l9ad-status.json --out p30-l9ad-evidence --live-accupass
+      - name: Independent privacy, release HOLD and SHA readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path("p30-l9ad-evidence")
+          raw=(root/"accupass_identity.json").read_bytes()
+          r=json.loads(raw)
+          manifest=json.loads((root/"manifest.json").read_bytes())
+          assert r["kind"]=="EVENTRADAR_P30_L9AD_ACCUPASS_IDENTITY_V1"
+          assert r["parentHead"]=="3b6b64ff4803a1a156e5774a23850f756d31e799"
+          assert r["releaseState"]=="HARD_HOLD_NO_PUBLICATION"
+          assert 1<=r["navigationCount"]<=2
+          assert 0<=r["listCandidates"]<=30
+          assert r["formalVerifiedEventIdentity"]==r["acceptedFields"]==r["goldenAccepted"]==0
+          for key in ("published","productionModified","writerExecuted","schedulerExecuted","notifierExecuted","mergeExecuted","rawHtmlPersisted","rawUrlsPersisted","rawTitlesPersisted","rawEventIdsPersisted","cookiesPersisted","screenshotsPersisted"):
+              assert r[key] is False,key
+          assert b"https://" not in raw and b"<html" not in raw.lower()
+          assert hashlib.sha256(raw).hexdigest()==manifest["filesSHA256"]["accupass_identity.json"]
+          assert manifest["releaseState"]=="HARD_HOLD_NO_PUBLICATION" and manifest["published"] is False
+          print("PASS_L9AD_SHA_PRIVACY_HOLD",r["listHttp"],r["listCandidates"],(r["detail"] or {}).get("decision"))
+          PY
+      - name: Seal SHA256SUMS
+        if: always()
+        run: |
+          mkdir -p p30-l9ad-evidence
+          if test -f p30-l9ad-evidence/manifest.json; then
+            (cd p30-l9ad-evidence && sha256sum accupass_identity.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9AD_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9ad-accupass-identity
+          path: p30-l9ad-evidence/
+          retention-days: 14
+          if-no-files-found: warn
