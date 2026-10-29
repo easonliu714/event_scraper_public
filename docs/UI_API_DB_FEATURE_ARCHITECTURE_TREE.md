@@ -2,7 +2,7 @@
 
 
 > **2026-10-29 P30-L9-Z 寬宏同 Product ID 清單／詳情身分：HTTP 200/200，H1/H2 無候選，正式身分 HOLD**
-> \`\`\`text
+> ```text
 > Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
 > ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [STATUS ONLY]
 > ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
@@ -22,7 +22,7 @@
 >          └─ ZIP SHA256 f6508155661459bb0538fc40bf5c584eeb49bec436db4e15c130e262af1c89aa
 > Formal PR53 [CI FAIL/security blocked, DRAFT/UNMERGED]
 > Formal fields UNKNOWN / Golden0 / Publish0 / HARD_HOLD_NO_PUBLICATION
-> \`\`\`
+> ```
 > - First L9-Z CI #40797873931 passed 44 offline tests but misclassified a live navigation exception as unsafe-final; atomic error-category fix and five new tests produced 49/49 final CI PASS. The second capture obtained HTTP200 and exact same-ID detail routing but found no H1/H2 title candidates; this is a structural gap, not an activity identity pass. Next L9-AA: source-bound title region topology with fail-closed exact matching, no raw retention or publication. CKSMH5/TWTC39 Android PASS and L8 Core UI PASS preserved.
 
 
