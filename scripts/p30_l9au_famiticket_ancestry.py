@@ -40,7 +40,7 @@ def inspect_ancestry(html):
     if len(heads)!=1 or len(marks)!=1:
         return dict(out,decision="HOLD_NONUNIQUE_ANCHORS")
     hchain,mchain=ancestor_chain(heads[0]),ancestor_chain(marks[0])
-    matches=[(node,hchain.index(node),mchain.index(node)) for node in hchain if node in mchain]
+    matches=[(node,hi,mi) for hi,node in enumerate(hchain) for mi,other in enumerate(mchain) if node is other]
     if not matches:
         return dict(out,decision="HOLD_NO_COMMON_VISIBLE_CONTAINER")
     node,hh,mh=min(matches,key=lambda v:(max(v[1],v[2]),v[1]+v[2]))
