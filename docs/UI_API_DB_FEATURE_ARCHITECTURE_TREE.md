@@ -1,4 +1,29 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
+
+## 2026-10-29 17:56 — P30 dual-workstream architecture update (Draft only)
+
+```text
+A / ACCUPASS P30-L9-AH [PR #75 exact-head CI PASS, 30/30]
+  ├─ scripts/p30_l9ah_accupass_field_roles.py [new, one list + max 2 details, scoped dt/dd and th/td]
+  ├─ tests/p30/test_l9ah_accupass_field_roles.py [new, 30 positive/negative offline]
+  ├─ .github/workflows/eventradar_p30_l9ah_accupass_roles.yml [new, exact-head SHA]
+  └─ official details 2/2 title REVIEW; 2 scoped roots each, 0 local pairs [NEXT L9-AI]
+B / Taipei Arena VENUE-01B [PR #74 exact-head CI PASS, 20/20]
+  ├─ scripts/p30_venue01_live_shape.py [new, one real GET via frozen adapter]
+  ├─ tests/p30/test_venue01b_live_shape.py [new, 20 offline negative tests]
+  ├─ .github/workflows/eventradar_p30_venue01b_live.yml [new, PR-only GET]
+  ├─ 8 venue announcements; claimed ticket platforms 4+2+1+1; ticket IDs=0
+  └─ date title/body mismatch [NEXT VENUE-01C, HOLD]
+VENUE-02/03 official program/detail [OPEN]; VENUE-04 provenance [OPEN]; VENUE-05 Golden/PWA/Android [HOLD]
+Production data/status/Pages/PWA/Golden/Writer/Publisher/Scheduler/Notifier [UNCHANGED; HARD_HOLD_NO_PUBLICATION]
+```
+
+- **A P30-L9-AH** [Draft PR #75](https://github.com/easonliu714/event_scraper_public/pull/75), base #72 HEAD `adbbe114c27259b80f5db80dcfee94204da09979`, exact HEAD `1a64ae6e258367c89856d5cd2b3cf558cc14ac00`, 3 ADD-only engineering files; [native PR CI #40853357012](https://github.com/easonliu714/event_scraper_public/actions/runs/40853357012) SUCCESS 30/30 offline tests; [artifact #12888381080](https://github.com/easonliu714/event_scraper_public/actions/runs/40853357012/artifacts/12888381080) ZIP SHA256 `b0986523c46d7f874b73c7bc73d16398b14b9a57f92dffcd5cb5d0c9bf7b2044`, independent ZIP CRC/manifest PASS. One ACCUPASS official list HTTP200 and 2/2 same-path details HTTP200/H1-H2 title REVIEW; scoped main/article/[role=main]/#event-detail 2 roots per detail, **0 explicit dt/dd or th/td label/value pairs**. Eight semantic field roles all HOLD; accepted fields=0. NEXT A: L9-AI investigate alternative bounded local DOM label topology, no global regex.
+- **B P30-VENUE-01B** [Draft PR #74](https://github.com/easonliu714/event_scraper_public/pull/74), base #73 HEAD `52655204dd3ac6fddd12347411fad849eb77a288`, exact HEAD `f2654b0ed7284eb67403bd969ba84dd68c751d2a`, 3 ADD-only engineering files; [native PR CI #40853246928](https://github.com/easonliu714/event_scraper_public/actions/runs/40853246928) SUCCESS 20/20 offline tests and **one actual HTTPS GET through existing VENUE-01 Adapter**, no redirects/retries. Eight official announcements, eight unique venue source hashes, explicit venue-claimed platform counts Ticket Plus/遠大=4, 拓元=2, ibon=1, KKTIX=1; [artifact #12887408810](https://github.com/easonliu714/event_scraper_public/actions/runs/40853246928/artifacts/12887408810) ZIP SHA256 `a7c811a4c5991f1eace8307140638462039e1322bd2e6e464c7890da2e733c11`, independent ZIP CRC/manifest PASS. `REVIEW_LIVE_OFFICIAL_SOURCE_SHAPE_ONLY`: DataSN is venue announcement identity, platform name is a claim not ticket Event ID. Official title 2027/1/16–17 vs labeled body 2027/1/26–27 date discrepancy remains HOLD. NEXT B: VENUE-01C bounded date-role conflict refusal and official detail parity.
+- No Source/Preview/ShowNews main writes, no formal data/status/Pages/PWA/Golden/Publisher/Writer/Scheduler/Notifier changes, no merge. `HARD_HOLD_NO_PUBLICATION` stays. Preserve CKSMH 5, TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, formal status UI 11 screenshot PASS, ibon 39961 mismatch OPEN, PR #53 HOLD. CI success ≠ Golden/Android E2E/production publication.
+
+---
+
 > **2026-10-29 P30-VENUE architecture addendum — Owner approved, VENUE-01 offline CI PASS / live source REVIEW.** Existing primary P30-L9-AH remains OPEN/NEXT. This parallel tree is source-only, not PWA publication.
 
 ```text
