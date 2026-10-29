@@ -49,11 +49,11 @@ class Contracts(unittest.TestCase):
     def test_25_missing_title(self): self.assertEqual(m.inspect(anchor(title="x"))["missingLocalTitleOnQueryAnchors"],1)
     def test_26_duplicate_paths(self): self.assertEqual(m.inspect(anchor()*2)["duplicateEventPaths"],1)
     def test_27_query_review_not_identity(self):
-        self.assertEqual(decision(anchor()),"REVIEW_TRACKING_NAMES_ONLY_NOT_CANONICAL_IDENTITY")
+        self.assertEqual(decision(anchor()),"REVIEW_TRACKING_NAMES_AND_LOCAL_PATH_TITLES_NOT_DETAIL_IDENTITY")
     def test_28_unknown_hold(self): self.assertEqual(decision(anchor("?token=secret")),"HOLD_QUERY_SEMANTICS_UNKNOWN")
     def test_29_semantic_hold(self): self.assertEqual(decision(anchor("?event_id=123")),"HOLD_QUERY_SEMANTICS_UNKNOWN")
     def test_30_id_shape_hold(self): self.assertEqual(decision(anchor(url="https://www.accupass.com/event/123")),"HOLD_EVENT_ID_PATH_SHAPE")
-    def test_31_title_hold(self): self.assertEqual(decision(anchor(title="x")),"HOLD_ANCHOR_LOCAL_TITLE_MISSING")
+    def test_31_title_hold(self): self.assertEqual(decision(anchor(title="x")),"HOLD_EVENT_PATH_WITHOUT_LOCAL_TITLE")
     def test_32_malformed_hold(self): self.assertEqual(decision(anchor("?bad=%FF")),"HOLD_QUERY_MALFORMED_OR_CAP")
     def test_33_no_query_not_promoted(self): self.assertEqual(decision(anchor(query="")),"HOLD_EVENT_PATH_NOT_ACCEPTED")
     def test_34_external_hold(self): self.assertEqual(decision(anchor(url="https://evil.org/event/260101010101000001")),"HOLD_NO_EVENT_PATH")
@@ -71,6 +71,24 @@ class Contracts(unittest.TestCase):
     def test_46_percent_encoded_name(self): self.assertEqual(m.query_roles("utm%5Fsource=x")["tracking"]["utm_source"],1)
     def test_47_invalid_key(self): self.assertEqual(m.query_roles("bad-key=x")["unknown"],1)
     def test_48_uppercase_tracking(self): self.assertEqual(m.query_roles("UTM_SOURCE=x")["tracking"]["utm_source"],1)
+
+    def test_49_duplicate_mixed_title_not_global_hold(self):
+        s=anchor()+anchor(title="x")
+        self.assertEqual(m.inspect(s)["uniquePathsWithLocalTitle"],1)
+        self.assertEqual(m.inspect(s)["mixedTitlePresencePaths"],1)
+        self.assertEqual(decision(s),"REVIEW_TRACKING_NAMES_AND_LOCAL_PATH_TITLES_NOT_DETAIL_IDENTITY")
+    def test_50_conflicting_local_titles_hold(self):
+        s=anchor()+anchor(title="不同的測試音樂會")
+        self.assertEqual(m.inspect(s)["conflictingTitlePaths"],1)
+        self.assertEqual(decision(s),"HOLD_CONFLICTING_ANCHOR_LOCAL_TITLES")
+    def test_51_distinct_path_missing_hold(self):
+        s=anchor()+anchor(title="x",url="https://www.accupass.com/event/260101010101000002")
+        self.assertEqual(m.inspect(s)["uniquePathsWithoutLocalTitle"],1)
+        self.assertEqual(decision(s),"HOLD_EVENT_PATH_WITHOUT_LOCAL_TITLE")
+    def test_52_path_title_aggregation_private(self):
+        s=anchor()+anchor(title="x")
+        self.assertNotIn(TITLE,json.dumps(m.inspect(s),ensure_ascii=False))
+        self.assertNotIn("260101010101000001",json.dumps(m.inspect(s)))
 
 if __name__ == "__main__":
     unittest.main()
