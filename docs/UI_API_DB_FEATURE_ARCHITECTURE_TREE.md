@@ -2631,3 +2631,23 @@ Source main/data/status and Preview/ShowNews main UNCHANGED
 CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS PRESERVED
 ```
 - Both workflows are offline-only safety Gates, not live adapter source-quality or formal PWA/Android release evidence. Next A/B require bounded official source DOM/identity and field-level provenance before promotion.
+
+
+### 2026-10-30 03:03 — VENUE-02E final-head TPAC date-role conflict correction
+```text
+B / TPAC P0 Taipei VENUE-02E Draft PR #92 [same isolated branch]
+  final HEAD e5aac6b09d668de782de416e5e01b4f4f30b7ad4
+  changed files remain 3 ADD-only; compare_date_ranges() + 4 regressions
+  official list card 2026-10-28..2026-10-31
+  official detail 2026-10-29..2026-11-01
+  five session rows / two explicitly canceled [independent public read]
+  HOLD_LIST_DETAIL_DATE_RANGE_CONFLICT; rangeRole UNKNOWN; accepted fields 0
+  final exact-head CI #40936359223 SUCCESS 17/17 OFFLINE
+  artifact #12923619565 ZIP c2558342... CRC/manifest independent PASS
+  prior HEAD 641db6d7... / CI #40936004898 historical, not final
+A / FamiTicket L9-AQ #91 HEAD be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+  CI #40935997678 SUCCESS 22/22; artifact #12924981165 independently PASS
+CI live official GET A=0/B=0; independent source observations REVIEW/HOLD
+Formal FIELD 0 / Golden 0 / PWA release HARD_HOLD_NO_PUBLICATION
+```
+- TPAC index/date role conflict must remain reversible and field-provenance UNKNOWN; never override source detail or promote canceled sessions. A/B offline CI PASS is not a source adapter live PASS. CKSMH/TWTC/L8 Android PASS retained.
