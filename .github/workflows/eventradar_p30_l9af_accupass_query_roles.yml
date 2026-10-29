@@ -45,12 +45,12 @@ jobs:
           set -euo pipefail
           python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
           python -m playwright install chromium
-      - name: Forty-eight synthetic query and privacy tests
+      - name: Fifty-two synthetic query and privacy tests
         run: |
           set -euo pipefail
           python -m py_compile scripts/p30_l9af_accupass_query_roles.py tests/p30/test_l9af_accupass_query_roles.py
           python -m unittest discover -s tests/p30 -p test_l9af_accupass_query_roles.py -v 2>&1 | tee /tmp/l9af-tests.log
-          grep -q 'Ran 48 tests' /tmp/l9af-tests.log
+          grep -q 'Ran 52 tests' /tmp/l9af-tests.log
           grep -q '^OK$' /tmp/l9af-tests.log
       - name: One normal public search and four passive snapshots
         run: |
