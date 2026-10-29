@@ -19,7 +19,7 @@ class Tests(unittest.TestCase):
         v=self.check("<div>"+H+M+L+"</div>","REVIEW_BOUNDED_COMMON_ANCESTRY_NO_FIELDS")
         self.assertEqual(v["commonAncestorTag"],"div")
     def test_unrelated_regions(self):
-        self.check("<div>"+H+"</div><div>"+M+L+"</div>","HOLD_REGION_SIZE_OR_GLOBAL_WRAPPER")
+        self.check("<div>"+H+"</div><div>"+M+L+"</div>","HOLD_NO_COMMON_VISIBLE_CONTAINER")
     def test_other_heading(self):
         self.check("<div>"+H+M+L+"<h4>其他活動</h4></div>","HOLD_OTHER_HEADINGS_IN_REGION")
     def test_refund(self):
