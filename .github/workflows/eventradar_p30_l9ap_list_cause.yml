@@ -1,0 +1,66 @@
+name: EventRadar P30 L9-AP ACCUPASS list cause review (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9ao-ancestor-role-20261030-0112]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9ap-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  accupass-list-cause:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9ap-list-error-class-20261030-0155'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head three add-only paths and frozen formal blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=115fd3bc9309c0dfc59467808a1e5e879ba7b2af
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ap_list_cause.yml' 'scripts/p30_l9ap_accupass_list_cause.py' 'tests/p30/test_l9ap_accupass_list_cause.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git show origin/main:docs/platform_status.json > /tmp/l9ap-status.json
+      - name: Frozen parser and safe classification tests
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+          python -m py_compile scripts/p30_l9ap_accupass_list_cause.py tests/p30/test_l9ap_accupass_list_cause.py
+          python -m unittest discover -s tests/p30 -p test_l9ap_accupass_list_cause.py -v
+      - name: One bounded official list attempt and no retry
+        run: python scripts/p30_l9ap_accupass_list_cause.py --live --status /tmp/l9ap-status.json --out p30-l9ap-evidence
+      - name: SHA and no-publication readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,pathlib
+          p=pathlib.Path('p30-l9ap-evidence')
+          r=json.loads((p/'list_cause.json').read_text())
+          m=json.loads((p/'manifest.json').read_text())
+          assert hashlib.sha256((p/'list_cause.json').read_bytes()).hexdigest()==m['filesSHA256']['list_cause.json']
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION' and r['acceptedFields']==r['goldenAccepted']==0
+          assert r['published'] is False and r['detailCount']<=2 and r['listAttemptMax']==1
+          assert not r['rawHtmlPersisted'] and not r['rawUrlsPersisted'] and not r['rawTitlesPersisted']
+          print('PASS_L9AP_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-l9ap-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9ap-list-cause
+          path: p30-l9ap-evidence/
+          if-no-files-found: ignore
