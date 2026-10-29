@@ -1,5 +1,34 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+## 2026-10-29 21:59 — SOURCE-FIRST A/B partial official evidence (no new engineering CI)
+
+```text
+A / ACCUPASS P30-L9-AL [SOURCE_REVIEW_PARTIAL; new PR/CI 0]
+  ├─ official search → original-query same-path detail, exact title 1/1
+  ├─ source detail: overview range and two explicitly described sessions
+  ├─ web reader text-only; raw DOM/400-container algorithm UNVERIFIED
+  ├─ prior L9-AJ 2/2 HOLD_CONTAINER_CAP still OPEN; formal fields 0
+  └─ NEXT bounded live L9-AK DOM check max one identity-bound detail
+B / Taipei Arena VENUE-01E [SOURCE_REVIEW_PARTIAL; new PR/CI 0]
+  ├─ official OpenData DataSN 9576400 → News_Content official detail
+  ├─ title exact 1/1, two explicit performance dates with separate admission
+  ├─ OpenData 日期時間 is publication metadata, not performance time
+  ├─ Ticket Plus label/link is venue claim, NOT ticket Event ID identity
+  ├─ web reader text-only; adapter execution/HTTP code UNVERIFIED
+  └─ NEXT one controlled adapter detail parity or next P0 Taipei discovery
+Both lines: source-quality +1 bounded observation each; engineering PR/CI +0
+Prior #81/#80 exact-head CI SUCCESS; no new Artifact; no formal FIELD/Golden
+19-platform dedup #17/#14/#13/#16 REUSE; NTCH venue ≠ OPENTIX #05
+P0 Taipei → P0 New Taipei → P1 North → P2 Central → P3 South → P4 East
+Formal data/status/Pages/PWA/Writer/Publisher/Scheduler/Notifier unchanged
+HARD_HOLD_NO_PUBLICATION; no merge or main write
+```
+
+- Official observations: [ACCUPASS list](https://www.accupass.com/search), [ACCUPASS detail](https://www.accupass.com/event/2610130920421573278644?utm_campaign=accu_e_&utm_medium=search_result_&utm_source=web), [Taipei Arena OpenData](https://www.arena.taipei/OpenData.aspx?SN=DDA0CF2A5B65EBFE), [Taipei Arena detail](https://www.arena.taipei/News_Content.aspx?n=2E1489AFE4B1BEA1&s=44EFCD82A9D43986). No raw page or private values stored. Observed source role relationships are REVIEW only, not CI-run adapter evidence. Source/Preview/ShowNews main and formal data/status blobs remain frozen.
+
+---
+
+
 ## 2026-10-29 20:55 — A/B isolated offline topology and venue identity boundary (Draft only)
 
 ```text
