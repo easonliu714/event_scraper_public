@@ -2486,3 +2486,42 @@ Formal PWA https://easonliu714.github.io/event_scraper_public/
 - Next A: first read sanitized per-detail local HOLD subdecision; test heading-only-wrapper versus role-bearing ancestor, fail closed on multiple candidate ancestors, no field promotion; rotate platform on persistent HOLD. Next B: inspect sanitized list/detail HOLD subdecision, correct demonstrable parser defect or move to nonduplicate Taipei Dome/TICC/TPAC source discovery. No repeated empty GET or synthetic-only gate loop.
 - Dedup contract: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 reuse existing platform source IDs. NTCH venue != OPENTIX #05 ticket source. Venue DataSN != ticket Event ID; each field needs source/observed_at/role/decision. P0 Taipei -> P0 New Taipei -> P1 other North -> P2 Central -> P3 South -> P4 East.
 - CI artifact ZIP digests from runner logs, independent CRC/download readback still UNVERIFIED this cycle. Both streams new live SOURCE_QUALITY HOLD, offline-only streak 0; accepted fields/Golden/publication 0.
+
+
+## 2026-10-30 01:20 — L9-AO / VENUE-02C verified engineering and source identity graph
+
+```text
+A / ACCUPASS platform #02 [Draft PR #88, no publication]
+  base #86 23af881cbbc207e42522c460b1de0dae65a065ce
+  HEAD 115fd3bc9309c0dfc59467808a1e5e879ba7b2af
+  scripts/p30_l9ao_accupass_role_ancestor.py [ADD]
+    nearest heading-only wrapper -> bounded role-bearing ancestor
+    exact heading, hidden/script/form/iframe and 400-container guards
+    conflicting role values or divergent ancestor scope => HOLD
+  tests/p30/test_l9ao_accupass_role_ancestor.py [ADD, 12 new]
+  .github/workflows/eventradar_p30_l9ao_role_ancestor.yml [ADD]
+  CI #40919876024 SUCCESS 48/48 after first true test-fixture repair
+  Artifact #12917138725 ZIP/CRC/SHA/manifest independent PASS
+  LIVE listHttp=null; details=0; source quality=0; HOLD
+B / TAIPEI_MUSIC_CENTER_OFFICIAL [Draft PR #87, P0 Taipei]
+  base #85 4b7792066dbec130d21e4db01d082363fc6ca031
+  HEAD fb82a5456ab0138680fee8f0a5e818a5d035bb10
+  scripts/p30_venue02c_tmc_card_heading.py [ADD]
+    official list card: category + title + date + venue [NOT a title]
+    one visible H2/H3/H4 within same official card -> exact detail H1/H2
+    hidden/ambiguous/redirect/other host -> HOLD
+  tests/p30/test_venue02c_tmc_card_heading.py [ADD, 13 new]
+  .github/workflows/eventradar_p30_venue02c_tmc_card_heading.yml [ADD]
+  CI #40919589752 SUCCESS 46/46; Artifact #12918066003 verified
+  LIVE list HTTP200 11 distinct paths -> detail HTTP200 same official path
+  exact card title == 1 of 2 detail headings -> REVIEW identity, not Golden
+Formal registry 19 platforms [NO CHANGE]
+  #17 CKSMH, #14 Songshan, #13 Huashan, #16 TWTC REUSE
+  NTCH venue distinct from OPENTIX #05 ticket source
+Formal PWA / docs/data.json / docs/platform_status.json / Pages [NO WRITE]
+  source fields=0, Golden=0, published=false, Android full E2E unverified
+  HARD_HOLD_NO_PUBLICATION
+```
+
+- Next A: classify missing list HTTP with safe enum on next permitted cycle or rotate to next platform; do not repeat failed GET or infer HTTP status. Next B: bounded source-local field roles and external ticket link provenance for one exact TMC event, retaining title identity REVIEW only; alternatively continue next P0 Taipei venue. Ticket platform claim is not a verified ticket Event ID. Field edges require `source`, `observed_at`, `role`, `decision`.
+- CI runner SHA artifacts independently read back, but source identity REVIEW is not accepted EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION, and neither PR can be merged without new Owner authorization. Existing Android CKSMH/TWTC and L8 UI PASS unchanged.
