@@ -1,5 +1,31 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+
+> **2026-10-29 P30-L9-Z 寬宏同 Product ID 清單／詳情身分：HTTP 200/200，H1/H2 無候選，正式身分 HOLD**
+> \`\`\`text
+> Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [STATUS ONLY]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages #40683700243 build/deploy SUCCESS [NO NEW DEPLOY]
+> L9-Y Draft PR64 @b8bd1905a875d62d131cd8db1fec814437b2fcb5
+> └─ L9-Z Draft PR65 @18d9a28c4b3235a5aa7b722b447f7588a707911d [UNMERGED]
+>    ├─ scripts/p30_l9z_kham_list_detail_identity.py [bounded 1 list + 2 details]
+>    │  ├─ frozen original scraper.py blob 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+>    │  ├─ list HTTP200 / 44 anchors / 10 provisional objects
+>    │  ├─ two canonical same-Product-ID detail HTTP200/200, redirects0/0
+>    │  ├─ 4 passive H1/H2 snapshots each: heading candidates 0/8; title parity 0/2
+>    │  ├─ detail1 final complete; detail2 final interactive -> HOLD (not wrong-title proof)
+>    │  └─ no raw source persisted; verified identity0 / accepted fields0 / Golden0 / publish0
+>    ├─ tests/p30/test_l9z_kham_list_detail_identity.py [49/49 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9z_kham_list_detail_identity.yml
+>       └─ exact-head CI #40798083288 SUCCESS -> Artifact #12864821858
+>          └─ ZIP SHA256 f6508155661459bb0538fc40bf5c584eeb49bec436db4e15c130e262af1c89aa
+> Formal PR53 [CI FAIL/security blocked, DRAFT/UNMERGED]
+> Formal fields UNKNOWN / Golden0 / Publish0 / HARD_HOLD_NO_PUBLICATION
+> \`\`\`
+> - First L9-Z CI #40797873931 passed 44 offline tests but misclassified a live navigation exception as unsafe-final; atomic error-category fix and five new tests produced 49/49 final CI PASS. The second capture obtained HTTP200 and exact same-ID detail routing but found no H1/H2 title candidates; this is a structural gap, not an activity identity pass. Next L9-AA: source-bound title region topology with fail-closed exact matching, no raw retention or publication. CKSMH5/TWTC39 Android PASS and L8 Core UI PASS preserved.
+
+
 > **2026-10-29 P30-L9-Y 寬宏 original create_event_obj 邊界 — 10 provisional objects, identity 0, NO PUBLISH**
 > ```text
 > Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
