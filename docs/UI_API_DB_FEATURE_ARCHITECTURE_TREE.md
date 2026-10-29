@@ -1,5 +1,34 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+## 2026-10-29 18:57 — Dual-line exact-scope engineering architecture and CI boundary
+
+```text
+A / P30-L9-AI [Draft PR #76; HEAD ed7e3d15a2fb76161ec95bad460d0003f46c8b19]
+  ├─ scripts/p30_l9ai_accupass_sibling_roles.py [ADD-only, OFFLINE]
+  │   ├─ max semantic roots=8 / local containers=400 / direct sibling pairs=80
+  │   ├─ exact label whitelist EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION
+  │   └─ conflict/hidden/interactive/oversize reject; no raw value persistence
+  ├─ tests/p30/test_l9ai_accupass_sibling_roles.py [32/32 offline PASS]
+  ├─ .github/workflows/eventradar_p30_l9ai_accupass_siblings.yml [exact-head CI PASS]
+  └─ official GET=0, source field acceptance=0, Golden=0 [NEXT L9-AJ live bounded topology]
+B / P30-VENUE-01C [Draft PR #77; HEAD 4169d37e6fe16d7ec4b03df7e9f782eb805efef9]
+  ├─ scripts/p30_venue01c_date_conflict.py [ADD-only, OFFLINE]
+  │   ├─ title date vs explicit 活動日期/時間, 活動日期, 演出日期 label
+  │   └─ conflict/ambiguity/announcement timestamp reject; event date never accepted
+  ├─ tests/p30/test_venue01c_date_conflict.py [28 synthetic cases proposed, NOT CI verified]
+  └─ .github/workflows/eventradar_p30_venue01c_date_conflict.yml [NOT COMMITTED]
+      └─ connector write safety block → CI HOLD; controlled review/write needed
+P0 geography & source dedup: see preceding section; 19 platform IDs unchanged
+Production main/data/status/Pages/PWA/Golden/Writer/Publisher/Scheduler/Notifier UNCHANGED
+HARD_HOLD_NO_PUBLICATION
+```
+
+- A [PR #76](https://github.com/easonliu714/event_scraper_public/pull/76), base #75 exact HEAD `1a64ae6e258367c89856d5cd2b3cf558cc14ac00`, native [CI #40861443416](https://github.com/easonliu714/event_scraper_public/actions/runs/40861443416) SUCCESS 32/32 with all job steps success. [Artifact #12892060990](https://github.com/easonliu714/event_scraper_public/actions/runs/40861443416/artifacts/12892060990) ZIP SHA256 `b3c7c0a01641aa7266fdd6248138b79ca52557198abf7a3aca11b31af8e7a7d0`, independently checked CRC/manifest SHA. This is offline parser quality only, not official detail FIELD PASS.
+- B [PR #77](https://github.com/easonliu714/event_scraper_public/pull/77), base #74 exact HEAD `f2654b0ed7284eb67403bd969ba84dd68c751d2a`, two ADD-only files, CI HOLD because the proposed isolated workflow was blocked by write safety checks; 28 tests are **not yet verified**, and official GET=0 this Gate. Do not bypass the block or claim an exact-head CI.
+- Both canonical docs updated sequentially on Draft PR #8; P0 Taipei → New Taipei and canonical source identity dedup remain in effect. Venue-01 previous one-GET eight-announcement REVIEW remains valid, not repeated. CKSMH5/TWTC39 Android USER_ATTESTED_PASS, L8 Core UI, formal PWA visual PASS preserved; ibon39961 OPEN, Golden=0, no publication.
+
+---
+
 ## 2026-10-29 18:53 — Owner-approved P0 Taipei/New Taipei venue queue and source identity graph (Draft PR #8 only)
 
 ```text
