@@ -2702,3 +2702,46 @@ Source main fbf4ca02... [FROZEN, no production/Pages/JSON writes]
 
 - **Contract:** Both classifiers are bounded, deterministic, review-only and fail closed; CI does not fetch official websites, does not verify full DOM, and does not imply that an indexed calendar cell is a published event or one FamiTicket detail text is a verified session/price record. Official text retrieval may be cached. Preserve independent `source/observed_at/role/decision` per field before future promotion. No iframe following, login, anti-bot bypass, payment, or raw sensitive page storage.
 - **NEXT A L9-AS:** bounded one exact official FamiTicket detail HTML DOM + same-source identity/role verification, or source block HOLD and rotate. **NEXT B VENUE-02G:** one official Dome calendar card and at most one genuine same-origin detail, identity vs occupancy vs multi-event decision; if detail inaccessible, HOLD and rotate another nonduplicate P0 Taipei source. No endless synthetic Gate chain.
+
+### 2026-10-30 05:55 Asia/Taipei — L9-AS and VENUE-02G exact-head source-first closure
+
+```text
+Source main fbf4ca02... [FROZEN]
+├─ A / formal FamiTicket platform #07 [REUSE]
+│  └─ P30-L9-AS Draft #95 HEAD 0d86f69f10dc56966bbdbdd30bf8981c945398e1
+│     ├─ base Draft #93 HEAD 7767c74779c6323214b12f4ffe663378428254dd
+│     ├─ scripts/p30_l9as_famiticket_live_dom.py [ADD, one official GET only]
+│     │  ├─ HTML200 / 128352B / 1 visible exact heading / 1 visible info marker / iframe 0
+│     │  ├─ hidden/duplicate/iframe/body cap/network -> HOLD
+│     │  └─ identity REVIEW; accepted FIELD=0; ticket ID=NULL
+│     ├─ tests/p30/test_l9as_famiticket_live_dom.py [ADD, 13]
+│     ├─ workflow [ADD, exact-head] CI #40962223044 SUCCESS 27/27
+│     └─ Artifact #12935433816 ZIP 2d6d8980... CRC/SHA PASS
+├─ B / new P0 Taipei TAINEX venue [NOT one of 19 ticket platforms]
+│  └─ P30-VENUE-02G Draft #96 HEAD daeb78277f693e6c83146dfebf23a6c5678831ca
+│     ├─ base Draft #94 HEAD faac5d180359cb5bebcdbda6bc4c5dd52e03b440
+│     ├─ official list /event: 7 visible candidates [independent web]
+│     ├─ official detail /event/690: exact title, 2026-11-13~16, 1館, floor venue
+│     ├─ scripts/p30_venue02g_tainex_parity.py [ADD, offline]
+│     │  ├─ venueLocalIdReview=690 ≠ ticketEventId
+│     │  ├─ exhibitionPeriod ≠ show/session timestamp
+│     │  ├─ organizerLink ≠ verified ticket URL
+│     │  └─ field provenance source/observed_at/role/decision REVIEW only
+│     ├─ tests/p30/test_venue02g_tainex_parity.py [ADD, 14]
+│     ├─ workflow [ADD, exact-head] CI #40962313405 SUCCESS 29/29
+│     └─ Artifact #12936486973 ZIP 5add619d... CRC/SHA PASS
+├─ Docs Draft #8 [serial append, not main]
+│  ├─ ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+│  └─ UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+└─ Formal release boundary [unchanged]
+   ├─ data.json blob 7fc4fe... / platform_status.json e19ca37...
+   ├─ CKSMH #17, Songshan #14, Huashan #13, TWTC #16 REUSE
+   ├─ NTCH venue != OPENTIX #05; TAINEX new venue source
+   ├─ A CI official GET=1; B CI official GET=0
+   ├─ accepted FIELD=0 / Golden=0 / published=false
+   └─ HARD_HOLD_NO_PUBLICATION; Android CKSMH5/TWTC39 and L8 PASS
+```
+
+- **Next A L9-AT:** unique source-local DOM role association only after exact visible title and marker; avoid global dates and role conflation, no promotion.
+- **Next B VENUE-02H:** one bounded official TAINEX list/detail adapter observation, venue identity + per-field evidence; HOLD on ambiguity and rotate P0 Taipei/New Taipei.
+- **No production change:** Source/Preview/ShowNews main and formal JSON untouched, Pages live deploy UNVERIFIED. Exact-head CI and independent ZIP SHA/CRC/manifest readback are engineering evidence, not official publication or Android E2E.
