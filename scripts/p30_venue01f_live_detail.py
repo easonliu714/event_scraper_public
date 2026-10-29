@@ -67,7 +67,7 @@ def assess_html(body: object, status: int, final_url: str, redirected: bool) -> 
     headings = [" ".join("".join(h).split()) for h in parser.headings]
     headings = [h for h in headings if h]
     local = " ".join(parser.parts)
-    counts = {k: len(re.findall(re.escape(k) + r"\\s*[:：]", local)) for k in LABELS}
+    counts = {k: len(re.findall(re.escape(k) + r"\s*[:：]", local)) for k in LABELS}
     # No date extraction or role promotion; labels are not enough to prove values.
     decision = "REVIEW_HTTP200_DETAIL_STRUCTURE_NOT_IDENTITY" if headings else "HOLD_NO_DETAIL_HEADING"
     return dict(base, decision=decision, detailUrlValid=True, headingCount=len(headings),
@@ -102,11 +102,11 @@ def main():
         raise ValueError("HOLD_OUTPUT_SCOPE")
     report=fetch_once()
     out.mkdir(exist_ok=True)
-    raw=(json.dumps(report, sort_keys=True, ensure_ascii=False, indent=2)+"\\n").encode()
+    raw=(json.dumps(report, sort_keys=True, ensure_ascii=False, indent=2)+"\n").encode()
     (out/"detail_review.json").write_bytes(raw)
     (out/"manifest.json").write_text(json.dumps({"kind":KIND,"releaseState":RELEASE,
         "filesSHA256":{"detail_review.json":hashlib.sha256(raw).hexdigest()}},
-        sort_keys=True, indent=2)+"\\n")
+        sort_keys=True, indent=2)+"\n")
     print("VENUE01F_DECISION="+report["decision"])
     print("VENUE01F_HTTP="+str(report.get("http")))
     print("HOLD_NO_FORMAL_FIELD_GOLDEN_PUBLICATION")
