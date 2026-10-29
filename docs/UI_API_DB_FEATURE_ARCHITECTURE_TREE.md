@@ -2579,3 +2579,8 @@ FORMAL: data/status unchanged; HARD_HOLD_NO_PUBLICATION; Android PASS retained
 ```
 
 - SOURCE_QUALITY live new evidence A/B both YES; offline-only streak 0/0. Artifact ZIPs independently CRC/SHA checked against runner digests and manifest. CI PASS != FIELD/GOLDEN/PWA publication PASS.
+
+### 2026-10-30 02:03 — VENUE-02D final-head safety correction
+
+- B Draft PR #90 final HEAD `1084ac72ec45143117f6f22a81ac74d3e061f5f8` (replaces earlier `6351af3...` within same PR), 3 ADD-only paths. `inspect`: visible H1/H2 with hidden ancestor -> HOLD; hidden role region -> HOLD; no field promotion. New regression test #10.
+- Exact-head CI #40926982220 SUCCESS (13 frozen + 10 new), artifact #12919848906 ZIP SHA256 `3981aa794a80483954c010a49ecf479ab7c89b399db419bc1e2b21a2fa62e440`, independent CRC/manifest PASS. B official title identity REVIEW; FIELD `HOLD_FIELD_NO_BOUNDED_TITLE_REGION`. A #89 exact-head CI #40926608319 SUCCESS and artifact #12920103177 CRC/manifest PASS. Formal FIELD 0/Golden 0/Publication HOLD; next B P0 Taipei new venue discovery.
