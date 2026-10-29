@@ -1,0 +1,83 @@
+name: EventRadar P30 VENUE-01 official OpenData offline review (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-venue01-readonly-20261029]
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue01-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  venue01-offline:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.head_ref == 'feat/eventradar-p30-venue01-readonly-20261029')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact source main ancestor and three-file ADD-only scope
+        run: |
+          set -euo pipefail
+          BASE=fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git merge-base "$BASE" HEAD)" = "$BASE"
+          actual="$(git diff --name-status "$BASE" HEAD | LC_ALL=C sort)"
+          expected="$(printf 'A\t.github/workflows/eventradar_p30_venue01_readonly.yml\nA\tscripts/p30_venue01_taipei_arena_readonly.py\nA\ttests/p30/test_venue01_taipei_arena_readonly.py\n' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          echo PASS_VENUE01_EXACT_SCOPE
+      - name: Offline syntax, 20 positive/negative tests and no-network contract
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python -m py_compile scripts/p30_venue01_taipei_arena_readonly.py tests/p30/test_venue01_taipei_arena_readonly.py
+          python -m unittest discover -s tests/p30 -p 'test_venue01_taipei_arena_readonly.py' -v
+          python - <<'PY'
+          from pathlib import Path
+          s = Path("scripts/p30_venue01_taipei_arena_readonly.py").read_text()
+          assert "if not args.live:" in s
+          assert "NoRedirect" in s
+          assert "MAX_BYTES" in s and "MAX_ITEMS" in s
+          assert "ticket_event_id" in s and "ticket_event_url" in s
+          assert "HOLD_SEMANTIC_ROLES_NOT_VERIFIED" in s
+          assert "hard_hold_no_publication" in s
+          print("PASS_VENUE01_OFFLINE_NO_PUBLICATION")
+          PY
+      - name: SHA256 manifest and provenance (no raw official data)
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          sha256sum .github/workflows/eventradar_p30_venue01_readonly.yml scripts/p30_venue01_taipei_arena_readonly.py tests/p30/test_venue01_taipei_arena_readonly.py > evidence/SHA256SUMS.txt
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          Path("evidence/manifest.json").write_text(json.dumps({
+            "gate": "P30-VENUE-01",
+            "head_sha": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+            "base_sha": "fbf4ca02b91159f2423caf3d79fb0ca4bb747069",
+            "offline_tests": 20,
+            "official_get_in_ci": 0,
+            "ticket_identity_accepted": 0,
+            "golden_accepted": 0,
+            "published": False,
+            "decision": "REVIEW_ADAPTER_OFFLINE_ONLY",
+          }, sort_keys=True, indent=2) + "\n")
+          PY
+          sha256sum -c evidence/SHA256SUMS.txt
+          echo PASS_VENUE01_MANIFEST
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-venue01-offline-evidence
+          path: evidence/
+          if-no-files-found: error
