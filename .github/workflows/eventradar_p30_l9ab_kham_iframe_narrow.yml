@@ -25,7 +25,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Frozen L9-Z parent, main blobs and exact three ADD-only paths
+      - name: Frozen L9-AA parent, main blobs and exact three ADD-only paths
         run: |
           set -euo pipefail
           base=86ef4fffb67824f9981bba984ecadb62eca93631
@@ -66,7 +66,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12866284781" | python -c 'import json,sys; a=json.load(sys.stdin); assert a["digest"]=="sha256:4b1b9d830cf947202798f9c601d9c69c194af35c4b64c3320dbe5fd04d4a9075" and not a["expired"],"HOLD_L9Z_DIGEST"'
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12866284781" | python -c 'import json,sys; a=json.load(sys.stdin); assert a["digest"]=="sha256:4b1b9d830cf947202798f9c601d9c69c194af35c4b64c3320dbe5fd04d4a9075" and not a["expired"],"HOLD_L9AA_DIGEST"'
           (cd pinned-l9aa && sha256sum -c SHA256SUMS.txt)
           python - <<'PY'
           from pathlib import Path
@@ -93,7 +93,7 @@ jobs:
           raw=(root/"kham_iframe_narrow.json").read_bytes()
           r=json.loads(raw)
           manifest=json.loads((root/"manifest.json").read_bytes())
-          assert r["kind"]=="EVENTRADAR_P30_L9AB_KHAM_TITLE_TOPOLOGY_V1"
+          assert r["kind"]=="EVENTRADAR_P30_L9AB_KHAM_IFRAME_NARROW_V1"
           assert r["parentHead"]=="86ef4fffb67824f9981bba984ecadb62eca93631"
           assert r["releaseState"]=="HARD_HOLD_NO_PUBLICATION"
           assert 1<=r["navigationCount"]<=3 and len(r["samples"])<=2
