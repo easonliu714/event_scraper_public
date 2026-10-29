@@ -2525,3 +2525,39 @@ Formal PWA / docs/data.json / docs/platform_status.json / Pages [NO WRITE]
 
 - Next A: classify missing list HTTP with safe enum on next permitted cycle or rotate to next platform; do not repeat failed GET or infer HTTP status. Next B: bounded source-local field roles and external ticket link provenance for one exact TMC event, retaining title identity REVIEW only; alternatively continue next P0 Taipei venue. Ticket platform claim is not a verified ticket Event ID. Field edges require `source`, `observed_at`, `role`, `decision`.
 - CI runner SHA artifacts independently read back, but source identity REVIEW is not accepted EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION, and neither PR can be merged without new Owner authorization. Existing Android CKSMH/TWTC and L8 UI PASS unchanged.
+
+## 2026-10-30 02:00 — isolated A/B source-first Gate architecture (PR #89 / #90)
+
+```text
+SOURCE MAIN fbf4ca02... [FROZEN; data blob 7fc4fe32; status blob e19ca37c]
+├─ A / ACCUPASS platform #02
+│  └─ L9-AP Draft PR #89 HEAD 4a888374a24e5515e6c1c98e33b0428b112d4fec
+│     ├─ base #88 115fd3bc9309c0dfc59467808a1e5e879ba7b2af
+│     ├─ scripts/p30_l9ap_accupass_list_cause.py [ADD]
+│     │  └─ intercept AH listDecision; safe enum; same one bounded GET; no raw persistence
+│     ├─ tests/p30/test_l9ap_accupass_list_cause.py [ADD; 8 tests]
+│     ├─ .github/workflows/eventradar_p30_l9ap_list_cause.yml [ADD]
+│     ├─ exact-head CI #40926608319 [STARTED; FINAL UNVERIFIED]
+│     └─ prior #88 listHttp=null/details=0; no assumed HTTP status or formal fields
+├─ B / TAIPEI_MUSIC_CENTER_OFFICIAL (P0 Taipei, not in 19 platform IDs)
+│  └─ VENUE-02D Draft PR #90 HEAD 6351af3f2cbdfe383b0a02d906ce7c9725358d18
+│     ├─ base #87 fb82a5456ab0138680fee8f0a5e818a5d035bb10
+│     ├─ scripts/p30_venue02d_tmc_field_provenance.py [ADD]
+│     │  ├─ one official list + <=1 same-path detail
+│     │  ├─ exact visible card heading == detail H1/H2 prerequisite
+│     │  └─ title-local explicit dt/dd or th/td; source/observed_at/role/decision
+│     ├─ tests/p30/test_venue02d_tmc_field_provenance.py [ADD; 9 tests]
+│     ├─ .github/workflows/eventradar_p30_venue02d_tmc_field_provenance.yml [ADD]
+│     ├─ exact-head CI #40926619059 [STARTED; FINAL UNVERIFIED]
+│     └─ prior #87 list HTTP200/11 paths; one detail exact title REVIEW; not Golden
+├─ Governance Draft PR #8 [DOCS ONLY; append-only, no main write]
+│  ├─ docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+│  └─ docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+└─ Formal PWA https://easonliu714.github.io/event_scraper_public/
+   ├─ docs/data.json + docs/platform_status.json [NO WRITE]
+   ├─ Android CKSMH 5 / TWTC 39 and L8 UI [HISTORICAL PASS PRESERVED]
+   └─ accepted fields=0 / Golden=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+- Engineering changes are not SOURCE_QUALITY acceptance. New live CI results and artifact independent SHA/CRC readback are PENDING; no PR may be merged or promoted. A list navigation failure must be classified before retry; B role ambiguity must HOLD and move to next nonduplicate P0 Taipei venue rather than generate endless synthetic PRs.
+- Source identity dedup remains binding: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 reuse; NTCH venue != OPENTIX #05. DataSN != ticket Event ID; announcement date != performance date; claimed ticket platform != verified ticket URL/ID.
