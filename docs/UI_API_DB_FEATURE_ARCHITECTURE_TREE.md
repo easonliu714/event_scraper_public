@@ -1,4 +1,34 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
+> **2026-10-29 P30-VENUE architecture addendum — Owner approved, VENUE-01 offline CI PASS / live source REVIEW.** Existing primary P30-L9-AH remains OPEN/NEXT. This parallel tree is source-only, not PWA publication.
+
+```text
+P30 venue source (isolated Draft PR #73, exact HEAD 52655204dd3ac6fddd12347411fad849eb77a288)
+├── VENUE-01 Taipei Arena official OpenData [ADAPTER + OFFLINE CI PASS; LIVE ADAPTER PENDING]
+│   ├── scripts/p30_venue01_taipei_arena_readonly.py [NEW; Python stdlib; --live explicit]
+│   │   ├── one HTTPS GET; no redirect/retry/login/bypass; max 2 MB / 40 items
+│   │   ├── official JSON DataSN + Source URL + title shape [REVIEW SOURCE ANNOUNCEMENT]
+│   │   ├── venue_source_key_hash [VENUE namespace; ticket_event_id = null]
+│   │   ├── explicit 售票系統： label [CLAIMED_PLATFORM only; not ticket URL/ID]
+│   │   ├── 日期時間 [ANNOUNCEMENT_TIMESTAMP; never event date]
+│   │   └── EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION [ALL HOLD]
+│   ├── tests/p30/test_venue01_taipei_arena_readonly.py [20/20 OFFLINE PASS]
+│   └── .github/workflows/eventradar_p30_venue01_readonly.yml [exact-head PR CI SUCCESS]
+├── VENUE-02 Taipei Music Center / National Taichung Theater [P1 OPEN; official program and native ticket links]
+├── VENUE-03 Kaohsiung Arena [P1 OPEN; official event/list/detail]
+├── VENUE-04 provenance graph [P1 OPEN; separate venue announcement ID vs ticket Event ID]
+│   └── source and session exact identity joins; ambiguous role / date / platform claims HOLD
+├── VENUE-05 controlled quality + production PWA + Android [P1 HOLD; no activity publication]
+├── P2 Taipei Performing Arts Center / National Kaohsiung Center for the Arts [DEFERRED]
+└── P3 other venues [DEFERRED]
+
+Primary P30-L9-AH ACCUPASS [NEXT; local semantic field roles, no global regex]
+Production docs/data.json / docs/platform_status.json / PWA / Pages [UNCHANGED]
+Golden / Writer / Publisher / Scheduler / Notifier [HARD_HOLD_NO_PUBLICATION]
+```
+
+- [VENUE-01 Draft PR #73](https://github.com/easonliu714/event_scraper_public/pull/73); [native exact-head CI #40846238098](https://github.com/easonliu714/event_scraper_public/actions/runs/40846238098) 20/20 PASS; [artifact #12885595556](https://github.com/easonliu714/event_scraper_public/actions/runs/40846238098/artifacts/12885595556), SHA256 0b174468bb0f40db1b879a871b910f765b588a311df3da4522675b7d4dd9ed92. CI official GET=0, live adapter not yet run; public official JSON separately observed 8 announcements, including at least one date-role inconsistency for REVIEW.
+- Venue pipeline strictly HTTP → LIST → DETAIL → IDENTITY → FIELD → GOLDEN → PUBLICATION. Ticket Plus/ibon label from venue is not ticket-system event identity. Preserve CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, ibon 39961 OPEN and PR #53 HOLD. No merge/main write or data publication.
+
 
 > **2026-10-29 P30-L9-AG — ACCUPASS 官方同 Event path 清單／詳情標題對位：限量 2/2 REVIEW exact match，正式身分與發布仍 HOLD。**
 > - FIRST fresh-read Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`；正式 `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`、`docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`；Pages 最新 dynamic build/deploy [#40683700243](https://github.com/easonliu714/event_scraper_public/actions/runs/40683700243) SUCCESS（2026-10-28 11:55 UTC）。兩份 canonical docs 僅在本 Docs Draft PR #8，main 非最新。
