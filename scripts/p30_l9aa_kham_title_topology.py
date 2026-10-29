@@ -79,7 +79,7 @@ def region_snapshot(html, expected, ready):
         counts[name] = min(len(nodes), MAX_ZONE_NODES + 1)
         if len(nodes) > MAX_ZONE_NODES:
             overflow = True
-            matches[name] = 0
+            matches[name] = None  # unassessed beyond cap; never report a false zero
             continue
         texts = [n.get(attr, "") if attr != "text" else n.get_text(" ", strip=True) for n in nodes]
         matches[name] = sum(z.normalize_title(str(v)) == expected for v in texts)
@@ -105,10 +105,10 @@ def classify(sample):
     tail = frames[-3:]
     if any(f["ready"] != "complete" for f in tail):
         return "HOLD_RENDER_NOT_COMPLETE"
-    visible = ("h3h6", "semanticName", "scopedTitle", "scopedText")
-    if all(sum(f["exactMatches"][k] for k in visible) == 1 for f in tail):
-        return "REVIEW_ONE_EXACT_VISIBLE_REGION_NO_IDENTITY_PROMOTION"
-    if any(sum(f["exactMatches"][k] for k in visible) > 1 for f in tail):
+    dom_regions = ("h3h6", "semanticName", "scopedTitle", "scopedText")
+    if all(sum(f["exactMatches"][k] for k in dom_regions) == 1 for f in tail):
+        return "REVIEW_ONE_EXACT_DOM_REGION_NO_IDENTITY_PROMOTION"
+    if any(sum(f["exactMatches"][k] for k in dom_regions) > 1 for f in tail):
         return "HOLD_MULTIPLE_EXACT_VISIBLE_REGIONS"
     if any(sum(f["exactMatches"][k] for k in ("headTitle", "openGraph", "twitter", "scopedImageAlt")) for f in tail):
         return "HOLD_METADATA_OR_IMAGE_ONLY"
@@ -128,7 +128,7 @@ def decide(probe):
         return "HOLD_LIST_IDENTITY_OR_COUNT"
     if len(probe["samples"]) != MAX_DETAILS:
         return "HOLD_DETAIL_SAMPLE_COUNT"
-    if all(s["decision"] == "REVIEW_ONE_EXACT_VISIBLE_REGION_NO_IDENTITY_PROMOTION" for s in probe["samples"]):
+    if all(s["decision"] == "REVIEW_ONE_EXACT_DOM_REGION_NO_IDENTITY_PROMOTION" for s in probe["samples"]):
         return "REVIEW_TWO_REGION_MATCHES_NO_FORMAL_PROMOTION"
     return "HOLD_TITLE_REGION_TOPOLOGY_UNRESOLVED"
 
