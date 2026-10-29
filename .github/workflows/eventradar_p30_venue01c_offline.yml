@@ -1,0 +1,68 @@
+name: EventRadar P30 VENUE-01C offline date-role CI (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue01c-date-role-20261029]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue01c-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  venue01c-date-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue01c-ci-gate-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head parent and isolated one-file change
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent=4169d37e6fe16d7ec4b03df7e9f782eb805efef9
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git rev-parse HEAD^)" = "$parent"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue01c_offline.yml')"
+          actual="$(git diff --name-status "$parent" HEAD)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Compile and 28 offline positive-negative date-role tests
+        run: |
+          python -m py_compile scripts/p30_venue01c_date_conflict.py tests/p30/test_venue01c_date_conflict.py
+          python -m unittest discover -s tests/p30 -p test_venue01c_date_conflict.py -v
+      - name: Synthetic-only evidence with independent SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p p30-venue01c-evidence
+          python - <<'PY'
+          import sys,json,hashlib,pathlib
+          sys.path.insert(0,'scripts')
+          import p30_venue01c_date_conflict as m
+          p=pathlib.Path('p30-venue01c-evidence')
+          r=m.offline_contract_report()
+          assert r['httpRequests']==0 and r['published'] is False
+          r['exactHead']='${{ github.event.pull_request.head.sha }}'
+          r['decision']='REVIEW_OFFLINE_DATE_ROLE_REFUSAL_ONLY'
+          raw=(json.dumps(r,ensure_ascii=False,sort_keys=True,indent=2)+'\n').encode()
+          (p/'date_role_contract.json').write_bytes(raw)
+          manifest={'releaseState':'HARD_HOLD_NO_PUBLICATION','filesSHA256':{'date_role_contract.json':hashlib.sha256(raw).hexdigest()}}
+          (p/'manifest.json').write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
+          assert hashlib.sha256((p/'date_role_contract.json').read_bytes()).hexdigest()==manifest['filesSHA256']['date_role_contract.json']
+          print('PASS_VENUE01C_SHA_NO_GET_NO_PUBLICATION')
+          PY
+          (cd p30-venue01c-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue01c-offline-date-role
+          path: p30-venue01c-evidence/
+          if-no-files-found: ignore
