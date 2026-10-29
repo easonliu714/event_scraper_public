@@ -1,0 +1,65 @@
+name: EventRadar P30 L9-AI bounded local sibling roles (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9ah-local-role-20261029]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9ai-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  accupass-sibling-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9ai-bounded-sibling-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head, parent and no-production scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=1a64ae6e258367c89856d5cd2b3cf558cc14ac00
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ai_accupass_siblings.yml' 'scripts/p30_l9ai_accupass_sibling_roles.py' 'tests/p30/test_l9ai_accupass_sibling_roles.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Offline parser dependency
+        run: python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2'
+      - name: Thirty-two bounded offline positive and negative tests
+        run: |
+          python -m py_compile scripts/p30_l9ai_accupass_sibling_roles.py tests/p30/test_l9ai_accupass_sibling_roles.py
+          python -m unittest discover -s tests/p30 -p test_l9ai_accupass_sibling_roles.py -v
+      - name: Create synthetic-only contract evidence, no source GET
+        run: python scripts/p30_l9ai_accupass_sibling_roles.py --offline-contract --out p30-l9ai-evidence
+      - name: Independent SHA and no-publication contract
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib,json,pathlib
+          p=pathlib.Path('p30-l9ai-evidence')
+          r=json.loads((p/'local_sibling_contract.json').read_text())
+          m=json.loads((p/'manifest.json').read_text())
+          assert hashlib.sha256((p/'local_sibling_contract.json').read_bytes()).hexdigest()==m['filesSHA256']['local_sibling_contract.json']
+          assert r['httpRequests']==0 and r['published'] is False
+          assert r['goldenAccepted']==0 and r['acceptedFields']==0
+          assert not r['rawHtmlPersisted'] and not r['rawFieldValuesPersisted']
+          print('PASS_L9AI_SHA_OFFLINE_NO_PUBLICATION')
+          PY
+          (cd p30-l9ai-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9ai-sibling-role-evidence
+          path: p30-l9ai-evidence/
+          if-no-files-found: ignore
