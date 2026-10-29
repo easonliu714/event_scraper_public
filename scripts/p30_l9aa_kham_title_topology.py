@@ -10,9 +10,9 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from scripts import p30_l9z_kham_list_detail_identity as z
-from scripts import p30_l9y_kham_event_object_boundary as y
-from scripts import p30_l9x_kham_original_parser_parity as x
+import p30_l9z_kham_list_detail_identity as z
+import p30_l9y_kham_event_object_boundary as y
+import p30_l9x_kham_original_parser_parity as x
 
 KIND = "EVENTRADAR_P30_L9AA_KHAM_TITLE_TOPOLOGY_V1"
 RELEASE = "HARD_HOLD_NO_PUBLICATION"
