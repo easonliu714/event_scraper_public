@@ -1,5 +1,40 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+## 2026-10-29 19:55 — Dual-stream A L9-AJ / B VENUE-01C native CI architecture (Draft PR only)
+
+```text
+Source main fbf4ca02... [FROZEN; formal docs/data.json and 19-platform status blobs unchanged]
+A / ACCUPASS P30-L9-AJ [Draft PR #79; exact HEAD 48b353a1467f6aaab8748de2737a1657f6265cac]
+  parent: PR #76 HEAD ed7e3d15a2fb76161ec95bad460d0003f46c8b19
+  scripts/p30_l9aj_accupass_live_siblings.py [ADD; reuses L9-AH browser+identity, L9-AI topology]
+  tests/p30/test_l9aj_accupass_live_siblings.py [ADD; 24 synthetic tests]
+  .github/workflows/eventradar_p30_l9aj_accupass_live.yml [ADD; native exact-head CI]
+  CI #40869458895 SUCCESS 56/56 tests (24 new + 32 frozen)
+  official list HTTP200; 2/2 same-path detail HTTP200/title REVIEW
+  2/2 detail local container scope >400 => HOLD_CONTAINER_CAP; field acceptance=0
+  NEXT L9-AK: heading-near bounded DOM roots; reject hidden ancestor and broad scope
+B / Taipei Arena P30-VENUE-01C-CI [Draft PR #78; exact HEAD d56bc99a7226595449f2a40fbcd67f726ad75da4]
+  parent: PR #77 HEAD 4169d37e6fe16d7ec4b03df7e9f782eb805efef9
+  scripts/p30_venue01c_date_conflict.py [inherited unchanged from PR #77]
+  tests/p30/test_venue01c_date_conflict.py [inherited unchanged; 28 synthetic tests]
+  .github/workflows/eventradar_p30_venue01c_offline.yml [ADD ONLY]
+  CI #40869303885 SUCCESS 28/28; official GET=0, no live detail parity
+  NEXT VENUE-01D: bounded DataSN/News_Content official detail identity and date role review
+B P0 geographic queue: Taipei City → New Taipei City → other North → Central → South → East
+  existing 19-source canonical dedup: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 [REUSE]
+  NTCH official venue ≠ OPENTIX ticket source #05 [cross-source evidence only]
+  new discovery: Taipei Dome / TMC / TICC / TPAC / Zepp New Taipei [DISCOVERY/UNKNOWN]
+Production Golden/Writer/Publisher/Scheduler/Notifier/Pages/PWA: UNCHANGED
+HARD_HOLD_NO_PUBLICATION
+```
+
+- A [PR #79](https://github.com/easonliu714/event_scraper_public/pull/79) [CI #40869458895](https://github.com/easonliu714/event_scraper_public/actions/runs/40869458895) [Artifact #12894199628](https://github.com/easonliu714/event_scraper_public/actions/runs/40869458895/artifacts/12894199628), independently checked ZIP SHA256 `f972fe3db0964affa1c8d6af8730dd35e5696fae094454638dd7d90f74828d90`, CRC/manifest PASS. Source topology `HOLD_CONTAINER_CAP` is an actual 2/2 finding, not zero-field proof; strict scope narrowing required.
+- B [PR #78](https://github.com/easonliu714/event_scraper_public/pull/78) [CI #40869303885](https://github.com/easonliu714/event_scraper_public/actions/runs/40869303885) [Artifact #12895276198](https://github.com/easonliu714/event_scraper_public/actions/runs/40869303885/artifacts/12895276198), independently checked ZIP SHA256 `18c36825199a2b831df62522b757e772ecf90c094ef398b83bda208fce0d14c5`, CRC/manifest PASS. Existing VENUE-01C code remains untouched, synthetic conflict refusal now runner-verified; official title/body/date field parity remains HOLD.
+- Both streams preserve field-level provenance boundary: `source`, `observed_at`, `role`, `decision` must be verified independently; DataSN ≠ ticket Event ID; platform name is a venue claim only; announcement timestamp ≠ performance time. CKSMH5/TWTC39 Android and L8 Core UI PASS retained; ibon39961 mismatch OPEN. No main/production changes or merge authorization.
+
+---
+
+
 ## 2026-10-29 18:57 — Dual-line exact-scope engineering architecture and CI boundary
 
 ```text
