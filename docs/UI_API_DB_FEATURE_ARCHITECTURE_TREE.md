@@ -2374,3 +2374,36 @@ EventRadar CI governance branch (Preview Repo, based on frozen main)
       └─ no deployment / no data write / no notifications
 ```
 **Release policy:** SRC-P22 Android Workflow SHA PASS；SRC-P23 GitHub publish and Runner **待 Android/Remote 讀回**。CI 治理分支的 GitHub Check 與 P20 PR HEAD Checks 必須分開記錄，`CI_RUNNER_PASS != PR_HEAD_CI_PASS`。
+
+## 2026-10-29 23:00 — P30-L9-AM / VENUE-01F source-first topology architecture
+
+```text
+SOURCE MAIN fbf4ca02... [FROZEN; formal data blob 7fc4fe32; status e19ca37c]
+├─ A / ACCUPASS [existing platform #02; no new platform identity]
+│  └─ PR #83 Draft HEAD 8a25ccb73d37ea2084fdc46212c49722effe8414
+│     ├─ scripts/p30_l9am_accupass_live_heading.py [ADD]
+│     │  ├─ reuses L9-AH normal Chromium list/detail identity, max two details
+│     │  ├─ reuses L9-AK heading-near 400-container/hidden-ancestor refusal
+│     │  └─ same-session source: list HTTP200, detail 2/2 HTTP200/title REVIEW
+│     ├─ tests/p30/test_l9am_accupass_live_heading.py [ADD; 8 tests]
+│     ├─ .github/workflows/eventradar_p30_l9am_live_heading.yml [ADD; read-only]
+│     ├─ exact-head CI #40896979730 SUCCESS; Artifact #12906139116 SHA/CRC PASS
+│     └─ 2/2 HOLD_MULTIPLE_HEADING_REGIONS (9 headings/9 regions each)
+├─ B / Taipei Arena [VENUE-01; announcement DataSN ≠ ticket Event ID]
+│  └─ PR #82 Draft HEAD 19fb68d293b99caf33e6db6074a51b85d40b3d50
+│     ├─ scripts/p30_venue01f_live_detail.py [ADD; one no-redirect HTTPS GET]
+│     │  ├─ official News_Content HTTP200 and exact URL
+│     │  ├─ limited HTMLParser H1/H2=0; explicit scoped labels=0
+│     │  └─ HOLD_NO_DETAIL_HEADING, no same-session title parity
+│     ├─ tests/p30/test_venue01f_live_detail.py [ADD; 8 tests]
+│     ├─ .github/workflows/eventradar_p30_venue01f_live_detail.yml [ADD; read-only]
+│     └─ exact-head CI #40896863072 SUCCESS; Artifact #12906977737 SHA/CRC PASS
+├─ Governance PR #8 [DRAFT; append-only historical preservation]
+│  ├─ docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+│  └─ docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+├─ Formal PWA: https://easonliu714.github.io/event_scraper_public/
+│  └─ no deployment or event/status data change; live HTTP UNVERIFIED
+└─ Release: HARD_HOLD_NO_PUBLICATION; accepted FIELD 0 / Golden 0
+```
+
+- **Next A:** source-bound exact *matching* heading region selection with strict ambiguity rejection, not global date regex; if blocked, advance next source Gate. **Next B:** P0 Taipei nonduplicate source discovery (Taipei Dome/TMC/TICC/TPAC), avoid redoing CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue separate from OPENTIX #05. Both have new SOURCE_QUALITY diagnostics, offline-only streak 0. Existing CKSMH 5 / TWTC 39 Android and L8 UI PASS preserved, ibon 39961 OPEN.
