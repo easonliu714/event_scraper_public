@@ -166,6 +166,20 @@ class Contracts(unittest.TestCase):
         r = report()
         r["listCounts"] = None
         self.assertEqual(m.decision(r), "HOLD_LIST_PARSE_MISSING")
+    def test_45_list_timeout_first_failure(self):
+        r = report(safe=False, http=None)
+        r.update(sourceException=True, sourceErrorKind="TIMEOUT")
+        self.assertEqual(m.decision(r), "HOLD_LIST_SOURCE_TIMEOUT")
+    def test_46_detail_network_first_failure(self):
+        d = detail(safe=False, http=None)
+        d.update(sourceException=True, sourceErrorKind="CONNECTION")
+        self.assertEqual(m.classify_detail(d), "HOLD_DETAIL_SOURCE_CONNECTION")
+    def test_47_error_dns_redacted(self):
+        self.assertEqual(m.error_kind(Exception("net::ERR_NAME_NOT_RESOLVED at https://example.invalid/private")), "DNS")
+    def test_48_error_timeout_redacted(self):
+        self.assertEqual(m.error_kind(Exception("Timeout 18000ms exceeded; url=secret")), "TIMEOUT")
+    def test_49_error_unknown_redacted(self):
+        self.assertEqual(m.error_kind(Exception("unclassified detail error at secret")), "OTHER")
 
 if __name__ == "__main__":
     unittest.main()

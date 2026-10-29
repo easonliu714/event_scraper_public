@@ -41,12 +41,12 @@ jobs:
           set -euo pipefail
           python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
           python -m playwright install chromium
-      - name: 44 offline fail-closed tests before any live request
+      - name: 49 offline fail-closed tests before any live request
         run: |
           set -euo pipefail
           python -m py_compile scripts/p30_l9z_kham_list_detail_identity.py tests/p30/test_l9z_kham_list_detail_identity.py
           python -m unittest discover -s tests/p30 -p test_l9z_kham_list_detail_identity.py -v 2>&1 | tee /tmp/l9z-tests.log
-          grep -q 'Ran 44 tests' /tmp/l9z-tests.log
+          grep -q 'Ran 49 tests' /tmp/l9z-tests.log
           grep -q '^OK$' /tmp/l9z-tests.log
       - uses: actions/download-artifact@v4
         with:

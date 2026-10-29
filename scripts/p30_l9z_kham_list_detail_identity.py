@@ -84,6 +84,21 @@ def normalize_title(text):
     """Whitespace/NFC only: never substring-match or strip event-specific text."""
     return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
 
+def error_kind(exc):
+    """Persist only a bounded error category; never persist exception text or URL."""
+    msg = str(exc).lower()
+    if "timeout" in msg or "timed out" in msg:
+        return "TIMEOUT"
+    if "err_name_not_resolved" in msg or "err_dns" in msg:
+        return "DNS"
+    if "err_cert" in msg or "ssl" in msg:
+        return "TLS"
+    if "err_connection" in msg or "err_network" in msg:
+        return "CONNECTION"
+    if "net::err" in msg:
+        return "NETWORK"
+    return "OTHER"
+
 def list_candidates(html, funcs, allowed):
     """Exact frozen production selector and object filter; all strings in memory."""
     soup = BeautifulSoup(html, "html.parser")
@@ -130,6 +145,8 @@ def heading_state(html, ready, expected):
             "exactHeadingMatches": matches}
 
 def classify_detail(detail):
+    if detail.get("sourceException"):
+        return "HOLD_DETAIL_SOURCE_" + detail.get("sourceErrorKind", "UNKNOWN")
     if not detail["finalAllowed"]:
         return "HOLD_UNSAFE_DETAIL_FINAL"
     if not detail["sameProductId"]:
@@ -149,6 +166,8 @@ def classify_detail(detail):
     return "HOLD_H1H2_NOT_STABLE"
 
 def decision(report):
+    if report.get("sourceException"):
+        return "HOLD_LIST_SOURCE_" + report.get("sourceErrorKind", "UNKNOWN")
     if not report["listFinalAllowed"]:
         return "HOLD_UNSAFE_LIST_FINAL"
     if report["listHttp"] != 200:
@@ -169,7 +188,8 @@ def one_bounded_probe(funcs, allowed, entry):
     """Normal Chromium JS, no clicks, no login, no retry, at most 3 navigations."""
     from playwright.sync_api import sync_playwright
     out = {"listHttp": None, "listFinalAllowed": False, "listCounts": None,
-           "samples": [], "navigationCount": 0, "sourceException": False}
+           "samples": [], "navigationCount": 0, "sourceException": False,
+           "sourceErrorKind": "NONE"}
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         context = browser.new_context(accept_downloads=False, service_workers="block")
@@ -190,15 +210,16 @@ def one_bounded_probe(funcs, allowed, entry):
                 raw = response.body()
                 if len(raw) <= MAX_BYTES:
                     candidates, out["listCounts"] = list_candidates(raw, funcs, allowed)
-        except Exception:
+        except Exception as exc:
             out["sourceException"] = True
+            out["sourceErrorKind"] = error_kind(exc)
         finally:
             page.close()
         if out["listCounts"] and not out["listCounts"]["unsafeSelected"] and not out["listCounts"]["nonCanonical"]:
             for i, (expected_id, expected_title, detail_url) in enumerate(candidates[:MAX_DETAILS]):
                 d = {"sampleIndex": i, "http": None, "finalAllowed": False,
                      "sameProductId": False, "frames": [], "redirects": 0,
-                     "sourceException": False}
+                     "sourceException": False, "sourceErrorKind": "NONE"}
                 detail = context.new_page()
                 detail.route("**/*", guard)
                 try:
@@ -220,8 +241,9 @@ def one_bounded_probe(funcs, allowed, entry):
                                 break
                             d["frames"].append(heading_state(
                                 rendered, detail.evaluate("document.readyState"), expected_title))
-                except Exception:
+                except Exception as exc:
                     d["sourceException"] = True
+                    d["sourceErrorKind"] = error_kind(exc)
                 finally:
                     detail.close()
                 d["decision"] = classify_detail(d)
@@ -268,6 +290,7 @@ def main():
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("L9Z_KHAM", json.dumps({
         "listHttp": result["listHttp"], "listCounts": result["listCounts"],
+        "sourceErrorKind": result["sourceErrorKind"],
         "samples": [{"http": s["http"], "decision": s["decision"],
                      "sameProductId": s["sameProductId"]} for s in result["samples"]],
         "decision": result["decision"]}, ensure_ascii=False))
