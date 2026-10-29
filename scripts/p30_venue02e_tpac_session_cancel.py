@@ -75,5 +75,24 @@ def inspect_detail(html: bytes, official_url: str, list_title: str) -> dict:
                 sessionCount=len(rows), canceledCount=canceled,
                 activeCount=len(rows) - canceled)
 
+# List-card date range and detail-page date range can have different roles.
+# Refuse conflicts instead of overwriting one with the other or calling either a show date.
+RANGE = re.compile(r"^(20\\d{2}-\\d{2}-\\d{2})\\s*[-~～]\\s*(20\\d{2}-\\d{2}-\\d{2})$")
+
+def compare_date_ranges(list_range: str, detail_range: str) -> dict:
+    result = dict(decision="HOLD_UNLABELED_DATE_RANGE", rangeRole="UNKNOWN",
+                  acceptedFields=0, goldenAccepted=0, published=False,
+                  releaseState=RELEASE)
+    if not isinstance(list_range, str) or not isinstance(detail_range, str):
+        return result
+    a, b = RANGE.fullmatch(list_range.strip()), RANGE.fullmatch(detail_range.strip())
+    if a is None or b is None:
+        return result
+    if a.group(1) > a.group(2) or b.group(1) > b.group(2):
+        return dict(result, decision="HOLD_INVALID_RANGE_ORDER")
+    if a.groups() != b.groups():
+        return dict(result, decision="HOLD_LIST_DETAIL_DATE_RANGE_CONFLICT")
+    return dict(result, decision="REVIEW_RANGE_PARITY_NOT_FIELD_ACCEPTANCE")
+
 if __name__ == "__main__":
     raise SystemExit("HOLD_NO_DIRECT_EXECUTION: import and test only; no official GET")
