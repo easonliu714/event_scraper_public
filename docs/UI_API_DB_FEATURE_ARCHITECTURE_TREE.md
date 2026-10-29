@@ -1,5 +1,43 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+## 2026-10-29 23:55 — Dual-line source topology addendum (P30-L9-AN / VENUE-02A)
+
+```text
+A / ACCUPASS P30-L9-AN [NOT COMMITTED; A branch creation safety-blocked]
+  existing PR #83 HEAD 8a25ccb73d37ea2084fdc46212c49722effe8414
+  existing CI #40896979730 SUCCESS; 2/2 official same-path/title REVIEW
+  root: p30_l9ak_accupass_heading_near.inspect_heading_regions()
+        selects all semantic H1/H2 -> 9 distinct regions per detail
+  prior p30_l9ag_accupass_detail_parity.detail_heading_evidence(html,expected_title)
+        already validates exact normalized event heading identity
+  next: select unique EXACT matched heading only; 0/multiple/hidden => HOLD
+        preserve <=400 descendants, bounded sibling roles and zero formal fields
+  this cycle SOURCE_QUALITY=0, ENGINEERING new PR/CI=0; branch write blocked
+B / Taipei Music Center P30-VENUE-02A [Draft PR #84]
+  source identity: TAIPEI_MUSIC_CENTER_OFFICIAL (not formal 19-platform duplicate)
+  scripts/p30_venue02a_tmc_source.py [ADD; no-redirect stdlib public GET]
+  tests/p30/test_venue02a_tmc_source.py [ADD; 15 offline negatives]
+  .github/workflows/eventradar_p30_venue02a_tmc_source.yml [ADD; exact-head CI]
+  HEAD 3aa3d60ae807a9555bb0e6deef5de8882cdc66ba
+  CI #40906763674 SUCCESS 15/15, artifact #12911762459
+  official list HTTP200 -> 11 titled distinct same-origin detail paths
+  one detail HTTP200 -> 37 nonempty H1/H2/H3; title parity NOT VERIFIED
+  source role=OFFICIAL_VENUE; ticket platform label != verified ticket Event ID
+  acceptedFields=0; Golden=0; published=false
+Cross-source boundaries
+  source/observed_at/role/decision required per field
+  CKSMH #17 / Songshan #14 / Huashan #13 / TWTC #16 reuse existing adapters
+  NTCH venue != OPENTIX #05 ticket source; no title-similarity auto-merge
+  P0 Taipei -> P0 New Taipei -> P1 other North -> P2 Central -> P3 South -> P4 East
+  main/data.json/platform_status.json/Pages/PWA/Writer/Publisher/Scheduler/Notifier unchanged
+  HARD_HOLD_NO_PUBLICATION
+```
+
+- CI [#40906763674](https://github.com/easonliu714/event_scraper_public/actions/runs/40906763674) Artifact [#12911762459](https://github.com/easonliu714/event_scraper_public/actions/runs/40906763674/artifacts/12911762459) independently verified ZIP CRC/manifest/SHA256 `ad8341127f3103b6ab68fd8c9cd15125c74c19dc401477ac4d6c4b58b483e660`. A source ambiguity still HOLD, B same-origin detail topology REVIEW, no title/field/Golden acceptance. Historic CKSMH5/TWTC39 Android PASS and L8 UI PASS retained; ibon39961 OPEN.
+
+---
+
+
 ## 2026-10-29 21:59 — SOURCE-FIRST A/B partial official evidence (no new engineering CI)
 
 ```text
