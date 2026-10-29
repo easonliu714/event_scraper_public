@@ -1,0 +1,97 @@
+name: EventRadar P30 L9-AE ACCUPASS same-navigation list topology (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9ae-accupass-list-topology]
+  pull_request:
+    branches: [feat/eventradar-p30-l9ad-accupass-identity]
+    paths:
+      - .github/workflows/eventradar_p30_l9ae_accupass_list_topology.yml
+      - scripts/p30_l9ae_accupass_list_topology.py
+      - tests/p30/test_l9ae_accupass_list_topology.py
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9ae-accupass
+  cancel-in-progress: false
+jobs:
+  accupass-list-topology:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact parent and production SHA gate
+        run: |
+          set -euo pipefail
+          base=7c0668443df2d540ca00e773b4028e7b93434e45
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git merge-base --is-ancestor "$base" HEAD
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ae_accupass_list_topology.yml' 'scripts/p30_l9ae_accupass_list_topology.py' 'tests/p30/test_l9ae_accupass_list_topology.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9AE_SCOPE; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/l9ae-status.json
+          echo PASS_L9AE_EXACT_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned normal Chromium and parser
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: Forty synthetic negative and positive tests
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9ae_accupass_list_topology.py tests/p30/test_l9ae_accupass_list_topology.py
+          python -m unittest discover -s tests/p30 -p test_l9ae_accupass_list_topology.py -v 2>&1 | tee /tmp/l9ae-tests.log
+          grep -q 'Ran 40 tests' /tmp/l9ae-tests.log
+          grep -q '^OK$' /tmp/l9ae-tests.log
+      - name: One normal public ACCUPASS search and four passive snapshots
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9ae_accupass_list_topology.py --status /tmp/l9ae-status.json --out p30-l9ae-evidence --live
+      - name: Independent privacy, SHA, and no-publication contract
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          root=Path("p30-l9ae-evidence")
+          raw=(root/"accupass_list_topology.json").read_bytes()
+          report=json.loads(raw)
+          manifest=json.loads((root/"manifest.json").read_bytes())
+          assert report["kind"]=="EVENTRADAR_P30_L9AE_ACCUPASS_LIST_TOPOLOGY_V1"
+          assert report["parentHead"]=="7c0668443df2d540ca00e773b4028e7b93434e45"
+          assert report["navigationCount"]==1
+          assert len(report["domObservations"])<=4
+          assert report["releaseState"]=="HARD_HOLD_NO_PUBLICATION"
+          assert report["formalVerifiedEventIdentity"]==report["acceptedFields"]==report["goldenAccepted"]==0
+          for key in ("published","productionModified","writerExecuted","schedulerExecuted","notifierExecuted","mergeExecuted","rawHtmlPersisted","rawUrlsPersisted","rawTitlesPersisted","rawEventIdsPersisted","cookiesPersisted","screenshotsPersisted"):
+              assert report[key] is False,key
+          assert b"https://" not in raw and b"<html" not in raw.lower()
+          assert manifest["filesSHA256"]["accupass_list_topology.json"]==hashlib.sha256(raw).hexdigest()
+          assert manifest["releaseState"]=="HARD_HOLD_NO_PUBLICATION" and manifest["published"] is False
+          print("PASS_L9AE_PRIVACY_SHA_HOLD",report["decision"])
+          PY
+      - name: Seal SHA256SUMS
+        if: always()
+        run: |
+          mkdir -p p30-l9ae-evidence
+          if test -f p30-l9ae-evidence/manifest.json; then
+            (cd p30-l9ae-evidence && sha256sum accupass_list_topology.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9AE_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9ae-accupass-list-topology
+          path: p30-l9ae-evidence/
+          retention-days: 14
+          if-no-files-found: warn
