@@ -28,7 +28,7 @@ def sample(frames=None, **kw):
 def report(samples=None, **kw):
     r = dict(listHttp=200, listFinalAllowed=True, listCounts={
         "unsafeSelected": 0, "nonCanonical": 0, "provisionalObjects": 10},
-        samples=samples if samples is not None else [dict(decision="REVIEW_ONE_EXACT_VISIBLE_REGION_NO_IDENTITY_PROMOTION")] * 2,
+        samples=samples if samples is not None else [dict(decision="REVIEW_ONE_EXACT_DOM_REGION_NO_IDENTITY_PROMOTION")] * 2,
         sourceException=False, sourceErrorKind="NONE")
     r.update(kw)
     return r
@@ -58,10 +58,11 @@ class Contracts(unittest.TestCase):
     def test_20_region_cap(self):
         f = snap("<main>" + "<p>noise</p>" * (m.MAX_ZONE_NODES + 1) + "</main>")
         self.assertTrue(f["zoneOverflow"])
+        self.assertIsNone(f["exactMatches"]["scopedText"])  # unassessed, never a false zero
     def test_21_no_raw_title(self):
         f = snap("<h3>測試音樂會</h3>")
         self.assertNotIn(TITLE, json.dumps(f, ensure_ascii=False))
-    def test_22_review_visible(self): self.assertEqual(m.classify(sample()), "REVIEW_ONE_EXACT_VISIBLE_REGION_NO_IDENTITY_PROMOTION")
+    def test_22_review_dom(self): self.assertEqual(m.classify(sample()), "REVIEW_ONE_EXACT_DOM_REGION_NO_IDENTITY_PROMOTION")
     def test_23_metadata_only(self): self.assertEqual(m.classify(sample(frames=[frame(visible=0, meta=1)] * 6)), "HOLD_METADATA_OR_IMAGE_ONLY")
     def test_24_not_complete(self): self.assertEqual(m.classify(sample(frames=[frame(ready="interactive")] * 6)), "HOLD_RENDER_NOT_COMPLETE")
     def test_25_no_region(self): self.assertEqual(m.classify(sample(frames=[frame(visible=0)] * 6)), "HOLD_NO_EXACT_TITLE_REGION")
