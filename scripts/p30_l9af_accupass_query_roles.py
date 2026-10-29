@@ -79,9 +79,12 @@ def inspect(html):
              malformedQueryAnchors=0, trackingOnlyAnchors=0, semanticQueryAnchors=0,
              unknownQueryAnchors=0, localTitleOnQueryAnchors=0,
              missingLocalTitleOnQueryAnchors=0, duplicateEventPaths=0,
-             uniqueEventPaths=0, nonEventAnchors=0, rejectedEventAnchors=0,
+             uniqueEventPaths=0, uniquePathsWithLocalTitle=0,
+             uniquePathsWithoutLocalTitle=0, mixedTitlePresencePaths=0,
+             conflictingTitlePaths=0, nonEventAnchors=0, rejectedEventAnchors=0,
              trackingKeyCounts={})
     seen = set()
+    title_states = {}  # in-memory path-to-local-title evidence; never persisted
     for a in anchors:
         try:
             url = urljoin(ENTRY, a.get("href") or "")
@@ -99,6 +102,7 @@ def inspect(html):
         match = ID_RE.fullmatch(p.path)
         if match:
             key = match.group(1).lower()
+            title_states.setdefault(key, {"titles": set(), "missing": False})
             if key in seen:
                 m["duplicateEventPaths"] += 1
             else:
@@ -125,9 +129,17 @@ def inspect(html):
         title = " ".join(node.get_text(" ", strip=True).split())
         if 4 <= len(title) <= MAX_TITLE:
             m["localTitleOnQueryAnchors"] += 1
+            if match:
+                title_states[key]["titles"].add(title)
         else:
             m["missingLocalTitleOnQueryAnchors"] += 1
+            if match:
+                title_states[key]["missing"] = True
     m["uniqueEventPaths"] = len(seen)
+    m["uniquePathsWithLocalTitle"] = sum(bool(s["titles"]) for s in title_states.values())
+    m["uniquePathsWithoutLocalTitle"] = sum(not s["titles"] for s in title_states.values())
+    m["mixedTitlePresencePaths"] = sum(bool(s["titles"]) and s["missing"] for s in title_states.values())
+    m["conflictingTitlePaths"] = sum(len(s["titles"]) > 1 for s in title_states.values())
     return m
 
 def classify(raw, frames, http, allowed_final, source_error):
@@ -146,10 +158,12 @@ def classify(raw, frames, http, allowed_final, source_error):
         return "HOLD_QUERY_SEMANTICS_UNKNOWN"
     if last["queryEventAnchors"] and last["strictPathWithQuery"] < last["queryEventAnchors"]:
         return "HOLD_EVENT_ID_PATH_SHAPE"
-    if last["queryEventAnchors"] and last["missingLocalTitleOnQueryAnchors"]:
-        return "HOLD_ANCHOR_LOCAL_TITLE_MISSING"
+    if last["conflictingTitlePaths"]:
+        return "HOLD_CONFLICTING_ANCHOR_LOCAL_TITLES"
+    if last["queryEventAnchors"] and last["uniquePathsWithoutLocalTitle"]:
+        return "HOLD_EVENT_PATH_WITHOUT_LOCAL_TITLE"
     if last["trackingOnlyAnchors"] and last["strictPathWithQuery"] == last["trackingOnlyAnchors"]:
-        return "REVIEW_TRACKING_NAMES_ONLY_NOT_CANONICAL_IDENTITY"
+        return "REVIEW_TRACKING_NAMES_AND_LOCAL_PATH_TITLES_NOT_DETAIL_IDENTITY"
     if last["eventPathAnchors"]:
         return "HOLD_EVENT_PATH_NOT_ACCEPTED"
     return "HOLD_NO_EVENT_PATH"
