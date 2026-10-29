@@ -5,6 +5,7 @@
 ```text
 A / ACCUPASS P30-L9-AL [SOURCE_REVIEW_PARTIAL; new PR/CI 0]
   ├─ official search → original-query same-path detail, exact title 1/1
+  ├─ listing crawled today, detail cached 2 days earlier; NOT same-session parity
   ├─ source detail: overview range and two explicitly described sessions
   ├─ web reader text-only; raw DOM/400-container algorithm UNVERIFIED
   ├─ prior L9-AJ 2/2 HOLD_CONTAINER_CAP still OPEN; formal fields 0
