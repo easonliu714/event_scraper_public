@@ -2613,3 +2613,21 @@ SOURCE MAIN fbf4ca02... [FROZEN; data 7fc4fe32; status e19ca37c; 19 platforms]
    └─ accepted fields 0 / Golden 0 / full Android E2E UNVERIFIED
 ```
 - SOURCE_QUALITY evidence was independently read from public official web pages, not from these offline-only CI jobs; no CI live GET. Taipei Dome shell DISCOVERY/HOLD, not LIST_PASS. OPENTIX #05 ticket source != TPAC venue identity. Cancellation labels do not authorize active-session promotion. New tests/CI cannot authorize merge, publisher, scheduler, notifier, Pages or Golden.
+
+
+### 2026-10-30 03:01 — final exact-head CI / artifact provenance for source-first rotation
+```text
+A / FamiTicket #07 L9-AQ PR #91 HEAD be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+  CI #40935997678 SUCCESS [frozen 12 + new 10 = 22 offline tests]
+  Artifact #12924981165 ZIP SHA256 544c49b2... CRC/manifest independently PASS
+  sourceQualityThisCI UNVERIFIED_NO_LIVE_GET; public iframe-shell detail HOLD
+B / TPAC P0 Taipei VENUE-02E PR #92 HEAD 641db6d7bde2968c05513c828789b64eac0656c8
+  CI #40936004898 SUCCESS [13 offline tests]
+  Artifact #12924443307 ZIP SHA256 bf238f64... CRC/manifest independently PASS
+  sourceQualityThisCI UNVERIFIED_NO_LIVE_GET; public list/detail title REVIEW
+  five observed session entries / two canceled; no CI live DOM acceptance
+FORMAL accepted fields 0 / Golden 0 / publication HARD_HOLD_NO_PUBLICATION
+Source main/data/status and Preview/ShowNews main UNCHANGED
+CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS PRESERVED
+```
+- Both workflows are offline-only safety Gates, not live adapter source-quality or formal PWA/Android release evidence. Next A/B require bounded official source DOM/identity and field-level provenance before promotion.
