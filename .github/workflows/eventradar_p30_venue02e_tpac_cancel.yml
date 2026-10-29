@@ -1,0 +1,65 @@
+name: EventRadar P30 VENUE-02E TPAC canceled-session refusal (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02d-field-provenance-20261030-0155]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue02e-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  tpac-session-refusal:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02e-tpac-cancel-20261030-0255'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD and three add-only paths and frozen formal data
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=1084ac72ec45143117f6f22a81ac74d3e061f5f8
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue02e_tpac_cancel.yml' 'scripts/p30_venue02e_tpac_session_cancel.py' 'tests/p30/test_venue02e_tpac_session_cancel.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Strict TPAC identity and cancellation offline tests
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2'
+          python -m py_compile scripts/p30_venue02e_tpac_session_cancel.py tests/p30/test_venue02e_tpac_session_cancel.py
+          python -m unittest discover -s tests/p30 -p test_venue02e_tpac_session_cancel.py -v
+      - name: Explicit offline-only evidence and SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p p30-venue02e-evidence
+          python - <<'PY'
+          import hashlib,json,pathlib
+          d=pathlib.Path('p30-venue02e-evidence')
+          r=dict(kind='EVENTRADAR_P30_VENUE02E_TPAC_SESSION_CANCEL_V1',
+                 sourceQualityThisCI='UNVERIFIED_NO_LIVE_GET',
+                 evidenceOrigin='OFFLINE_TESTS_ONLY',
+                 acceptedFields=0,goldenAccepted=0,published=False,
+                 releaseState='HARD_HOLD_NO_PUBLICATION')
+          raw=(json.dumps(r,sort_keys=True,indent=2)+'\n').encode()
+          (d/'audit.json').write_bytes(raw)
+          (d/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(raw).hexdigest()}},sort_keys=True)+'\n')
+          assert r['acceptedFields']==r['goldenAccepted']==0 and not r['published']
+          PY
+          (cd p30-venue02e-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue02e-tpac-cancel
+          path: p30-venue02e-evidence/
+          if-no-files-found: ignore
