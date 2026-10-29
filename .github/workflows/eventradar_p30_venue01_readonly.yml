@@ -8,7 +8,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: eventradar-p30-venue01-\${{ github.ref }}
+  group: eventradar-p30-venue01-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   venue01-offline:
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -35,7 +35,7 @@ jobs:
           actual="$(git diff --name-status "$BASE" HEAD | LC_ALL=C sort)"
           expected="$(printf 'A\t.github/workflows/eventradar_p30_venue01_readonly.yml\nA\tscripts/p30_venue01_taipei_arena_readonly.py\nA\ttests/p30/test_venue01_taipei_arena_readonly.py\n' | LC_ALL=C sort)"
           test "$actual" = "$expected"
-          test "$(git rev-parse HEAD)" = "\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
           echo PASS_VENUE01_EXACT_SCOPE
       - name: Offline syntax, 20 positive/negative tests and no-network contract
         env:
