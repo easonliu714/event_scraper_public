@@ -2,6 +2,12 @@ name: EventRadar P30 L9-AA Kham title topology (NO PUBLISH)
 on:
   push:
     branches: [feat/eventradar-p30-l9aa-kham-title-topology]
+  pull_request:
+    branches: [feat/eventradar-p30-l9z-kham-list-detail-identity]
+    paths:
+      - .github/workflows/eventradar_p30_l9aa_kham_title_topology.yml
+      - scripts/p30_l9aa_kham_title_topology.py
+      - tests/p30/test_l9aa_kham_title_topology.py
 permissions:
   contents: read
   actions: read
@@ -18,6 +24,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Frozen L9-Z parent, main blobs and exact three ADD-only paths
         run: |
           set -euo pipefail
