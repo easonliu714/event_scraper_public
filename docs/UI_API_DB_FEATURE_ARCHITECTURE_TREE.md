@@ -2584,3 +2584,32 @@ FORMAL: data/status unchanged; HARD_HOLD_NO_PUBLICATION; Android PASS retained
 
 - B Draft PR #90 final HEAD `1084ac72ec45143117f6f22a81ac74d3e061f5f8` (replaces earlier `6351af3...` within same PR), 3 ADD-only paths. `inspect`: visible H1/H2 with hidden ancestor -> HOLD; hidden role region -> HOLD; no field promotion. New regression test #10.
 - Exact-head CI #40926982220 SUCCESS (13 frozen + 10 new), artifact #12919848906 ZIP SHA256 `3981aa794a80483954c010a49ecf479ab7c89b399db419bc1e2b21a2fa62e440`, independent CRC/manifest PASS. B official title identity REVIEW; FIELD `HOLD_FIELD_NO_BOUNDED_TITLE_REGION`. A #89 exact-head CI #40926608319 SUCCESS and artifact #12920103177 CRC/manifest PASS. Formal FIELD 0/Golden 0/Publication HOLD; next B P0 Taipei new venue discovery.
+
+
+## 2026-10-30 02:55 — A FamiTicket #07 / B TPAC P0 Taipei source-first branch architecture
+```text
+SOURCE MAIN fbf4ca02... [FROZEN; data 7fc4fe32; status e19ca37c; 19 platforms]
+├─ A / FamiTicket existing platform #07 [reuse, no duplicate adapter]
+│  └─ P30-L9-AQ Draft PR #91 HEAD be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+│     ├─ base #89 4a888374a24e5515e6c1c98e33b0428b112d4fec
+│     ├─ scripts/p30_l9aq_famiticket_iframe_boundary.py [ADD]
+│     ├─ tests/p30/test_l9aq_famiticket_iframe_boundary.py [ADD]
+│     ├─ .github/workflows/eventradar_p30_l9aq_famiticket_iframe.yml [ADD]
+│     ├─ public source: official Home cards -> one iframe-shell detail
+│     └─ CI OFFLINE ONLY, exact-head/artifact FINAL PENDING; TITLE/FIELD HOLD
+├─ B / TPAC official venue (new P0 Taipei, not ticket-platform duplicate)
+│  └─ P30-VENUE-02E Draft PR #92 HEAD 641db6d7bde2968c05513c828789b64eac0656c8
+│     ├─ base #90 1084ac72ec45143117f6f22a81ac74d3e061f5f8
+│     ├─ scripts/p30_venue02e_tpac_session_cancel.py [ADD]
+│     ├─ tests/p30/test_venue02e_tpac_session_cancel.py [ADD]
+│     ├─ .github/workflows/eventradar_p30_venue02e_tpac_cancel.yml [ADD]
+│     ├─ official /program -> /program/2053 title REVIEW
+│     ├─ five session rows, two explicitly canceled [independent public source]
+│     └─ CI OFFLINE ONLY, exact-head/artifact FINAL PENDING; FIELD/GOLDEN HOLD
+├─ Governance Draft PR #8 [DOCS ONLY, sequential SHA compare, never main]
+└─ Formal PWA https://easonliu714.github.io/event_scraper_public/
+   ├─ data/status [UNCHANGED], publication HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH 5 + TWTC 39 Android USER_ATTESTED_PASS [PRESERVED]
+   └─ accepted fields 0 / Golden 0 / full Android E2E UNVERIFIED
+```
+- SOURCE_QUALITY evidence was independently read from public official web pages, not from these offline-only CI jobs; no CI live GET. Taipei Dome shell DISCOVERY/HOLD, not LIST_PASS. OPENTIX #05 ticket source != TPAC venue identity. Cancellation labels do not authorize active-session promotion. New tests/CI cannot authorize merge, publisher, scheduler, notifier, Pages or Golden.
