@@ -40,6 +40,9 @@ def inspect(html, title):
                and not prior.hidden(h, h)]
     if len(matches) != 1:
         return dict(base, decision="HOLD_FIELD_EXACT_HEADING_NOT_UNIQUE")
+    # A visible heading inside a hidden ancestor must never supply field evidence.
+    if prior.hidden(matches[0], soup):
+        return dict(base, decision="HOLD_FIELD_HIDDEN_HEADING_ANCESTOR")
     region = None
     node = matches[0]
     for _ in range(8):
@@ -48,7 +51,7 @@ def inspect(html, title):
             break
         if node.name not in ("div", "section", "article", "main"):
             continue
-        if prior.hidden(node, node):
+        if prior.hidden(node, soup):
             return dict(base, decision="HOLD_FIELD_HIDDEN_REGION")
         if len(node.select("div,section,li,p")) > MAX_CONTAINERS:
             break
