@@ -1,5 +1,29 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+> **2026-10-29 P30-L9-AA 寬宏非 H1/H2 標題區域拓樸 — iframe 與節點上限分流，正式身分仍 HOLD**
+> ```text
+> Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [NO CHANGE]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [NO CHANGE]
+> └─ Pages #40683700243 build/deploy SUCCESS [NO NEW DEPLOY]
+> L9-Z Draft PR65 @18d9a28c4b3235a5aa7b722b447f7588a707911d [UNMERGED]
+> └─ L9-AA Draft PR66 @c6efa2fb4f63ffd6be6f00e4ccd714c3ebe1c26a [UNMERGED]
+>    ├─ scripts/p30_l9aa_kham_title_topology.py [1 list + <=2 same-ID details, 6 passive frames each]
+>    │  ├─ 10 provisional list objects / 2 details HTTP200 / exact title-region matches 0
+>    │  ├─ sample0 iframe 1→4, scoped text 214, HOLD_NO_EXACT_REGION_IFRAME_PRESENT
+>    │  ├─ sample1 iframe 1→4, scoped text >250 cap, HOLD_REGION_CAP
+>    │  └─ no title/HTML/URL/ID retained; formal identity0, fields0, Golden0, publish0
+>    ├─ tests/p30/test_l9aa_kham_title_topology.py [48/48 PASS after 3 head-fixture repairs]
+>    └─ .github/workflows/eventradar_p30_l9aa_kham_title_topology.yml
+>       └─ exact-head push CI #40803769767 SUCCESS -> Artifact #12867680187
+>          └─ ZIP SHA256 bf467022f0b865ce1d047288d31d12e0e7a7749d1fe5dc5a6317054879f72e6d
+> Formal status PR53 [CI FAIL, DRAFT/UNMERGED]; ibon39961 historic mismatch OPEN
+> Next L9-AB [iframe origin/accessibility and narrowed over-cap DOM, no source bypass]
+> HARD_HOLD_NO_PUBLICATION / Source Writer Publisher Scheduler Notifier untouched
+> ```
+> - Exact full-title NFC equality is bounded to named DOM zones; metadata/image hints are non-authoritative. iframe presence alone is **not** proof of title inside frame. Original Android CKSMH5/TWTC39 PASS, L8 Core UI PASS and 11 formal PWA status screenshots retained as scoped attestations, not full-platform E2E. Only formal PWA remains front-end acceptance entry.
+
+
 
 > **2026-10-29 P30-L9-Z 寬宏同 Product ID 清單／詳情身分：HTTP 200/200，H1/H2 無候選，正式身分 HOLD**
 > ```text
