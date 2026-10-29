@@ -7,7 +7,7 @@ import p30_l9ao_accupass_role_ancestor as m
 
 TITLE = "Example event"
 WRAPPER = ('<main><section><div class="title"><h1>Example event</h1></div>'
-           '<dl><dt>活動日期</dt><dd>2026-11-07</dd></dl></section></main>')
+           '<div class="role"><span>活動日期</span><span>2026-11-07</span></div></section></main>')
 
 class AncestorTests(unittest.TestCase):
     def test_01_prior_heading_only_wrapper_holds(self):
@@ -22,13 +22,13 @@ class AncestorTests(unittest.TestCase):
         self.assertEqual(r["acceptedFields"], 0)
 
     def test_03_no_explicit_pair_holds(self):
-        r = m.inspect_role_ancestor(WRAPPER.replace("<dt>活動日期</dt><dd>2026-11-07</dd>",
+        r = m.inspect_role_ancestor(WRAPPER.replace("<span>活動日期</span><span>2026-11-07</span>",
                                                     "<p>2026-11-07</p>"), TITLE)
         self.assertTrue(r["decision"].startswith("HOLD_"))
 
     def test_04_conflicting_role_values_holds(self):
         r = m.inspect_role_ancestor(WRAPPER.replace("</dl>",
-            "<dt>活動日期</dt><dd>2026-11-08</dd></dl>"), TITLE)
+            "<div class=\"role\"><span>活動日期</span><span>2026-11-08</span></div>"), TITLE)
         self.assertEqual(r["decision"], "HOLD_ANCESTOR_ROLE_CONFLICT")
 
     def test_05_other_heading_blocks_ancestor(self):
@@ -47,7 +47,7 @@ class AncestorTests(unittest.TestCase):
         self.assertTrue(r["decision"].startswith("HOLD_"))
 
     def test_08_ambiguous_outer_role_holds(self):
-        html = WRAPPER.replace("</main>", "<dl><dt>票價</dt><dd>200</dd></dl></main>")
+        html = WRAPPER.replace("</main>", "<div class=\"role\"><span>票價</span><span>200</span></div></main>")
         r = m.inspect_role_ancestor(html, TITLE)
         self.assertEqual(r["decision"], "HOLD_ANCESTOR_SCOPE_CONFLICT")
 
@@ -61,7 +61,7 @@ class AncestorTests(unittest.TestCase):
 
     def test_11_no_global_regex(self):
         r = m.inspect_role_ancestor(WRAPPER.replace(
-            "<dl><dt>活動日期</dt><dd>2026-11-07</dd></dl>", "2026-11-07"), TITLE)
+            "<div class=\"role\"><span>活動日期</span><span>2026-11-07</span></div>", "2026-11-07"), TITLE)
         self.assertTrue(r["decision"].startswith("HOLD_"))
 
     def test_12_release_stays_locked(self):
