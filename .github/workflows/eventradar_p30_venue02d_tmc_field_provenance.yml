@@ -1,0 +1,65 @@
+name: EventRadar P30 VENUE-02D TMC field provenance review (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02c-card-heading-20261030-0112]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue02d-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  tmc-field-provenance:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02d-field-provenance-20261030-0155'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head three add-only paths and frozen formal blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=fb82a5456ab0138680fee8f0a5e818a5d035bb10
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue02d_tmc_field_provenance.yml' 'scripts/p30_venue02d_tmc_field_provenance.py' 'tests/p30/test_venue02d_tmc_field_provenance.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Bounded parser and frozen tests
+        run: |
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2'
+          python -m py_compile scripts/p30_venue02d_tmc_field_provenance.py tests/p30/test_venue02d_tmc_field_provenance.py
+          python -m unittest discover -s tests/p30 -p test_venue02c_tmc_card_heading.py -v
+          python -m unittest discover -s tests/p30 -p test_venue02d_tmc_field_provenance.py -v
+      - name: At most one official list and one same-path detail
+        run: python scripts/p30_venue02d_tmc_field_provenance.py --live --out p30-venue02d-evidence
+      - name: SHA and no-publication readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,pathlib
+          p=pathlib.Path('p30-venue02d-evidence')
+          r=json.loads((p/'field_review.json').read_text())
+          m=json.loads((p/'manifest.json').read_text())
+          assert hashlib.sha256((p/'field_review.json').read_bytes()).hexdigest()==m['filesSHA256']['field_review.json']
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION' and r['acceptedFields']==r['goldenAccepted']==0
+          assert r['published'] is False and r['ticketEventId'] is None
+          assert not r['rawHtmlPersisted'] and not r['rawUrlsPersisted'] and not r['rawTitlesPersisted']
+          print('PASS_VENUE02D_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-venue02d-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue02d-tmc-field-provenance
+          path: p30-venue02d-evidence/
+          if-no-files-found: ignore
