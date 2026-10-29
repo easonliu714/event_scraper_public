@@ -1,0 +1,123 @@
+name: EventRadar P30 L9-AA Kham title topology (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9aa-kham-title-topology]
+  pull_request:
+    branches: [feat/eventradar-p30-l9z-kham-list-detail-identity]
+    paths:
+      - .github/workflows/eventradar_p30_l9aa_kham_title_topology.yml
+      - scripts/p30_l9aa_kham_title_topology.py
+      - tests/p30/test_l9aa_kham_title_topology.py
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: eventradar-p30-l9aa-kham-title-topology
+  cancel-in-progress: false
+jobs:
+  kham-title-topology:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Frozen L9-Z parent, main blobs and exact three ADD-only paths
+        run: |
+          set -euo pipefail
+          base=18d9a28c4b3235a5aa7b722b447f7588a707911d
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git merge-base --is-ancestor "$base" HEAD
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9aa_kham_title_topology.yml' 'scripts/p30_l9aa_kham_title_topology.py' 'tests/p30/test_l9aa_kham_title_topology.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9AA_SCOPE; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/l9aa-status.json
+          echo PASS_L9AA_FROZEN_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned parsers and normal Chromium
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: 48 offline negative/positive contracts before live source
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9aa_kham_title_topology.py tests/p30/test_l9aa_kham_title_topology.py
+          python -m unittest discover -s tests/p30 -p test_l9aa_kham_title_topology.py -v 2>&1 | tee /tmp/l9aa-tests.log
+          grep -q 'Ran 48 tests' /tmp/l9aa-tests.log
+          grep -q '^OK$' /tmp/l9aa-tests.log
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-p30-l9z-kham-list-detail-identity
+          run-id: 40798083288
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-l9z
+      - name: Verify L9-Z artifact digest and SHA manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/12864821858" | python -c 'import json,sys; a=json.load(sys.stdin); assert a["digest"]=="sha256:f6508155661459bb0538fc40bf5c584eeb49bec436db4e15c130e262af1c89aa" and not a["expired"],"HOLD_L9Z_DIGEST"'
+          (cd pinned-l9z && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path("pinned-l9z")
+          raw=(root/"kham_list_detail_identity.json").read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=="d1858976888b257af0642a9832651218ca3b7d29c8099df6c753f099c28f5125"
+          manifest=json.loads((root/"manifest.json").read_bytes())
+          assert manifest["filesSHA256"]["kham_list_detail_identity.json"]==hashlib.sha256(raw).hexdigest()
+          assert manifest["releaseState"]=="HARD_HOLD_NO_PUBLICATION" and manifest["published"] is False
+          print("PASS_L9AA_PINNED_PARENT_SHA")
+          PY
+      - name: One public list and at most two same-ID detail navigations
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9aa_kham_title_topology.py --status /tmp/l9aa-status.json --parent pinned-l9z/kham_list_detail_identity.json --scraper scraper.py --out p30-l9aa-evidence --live-kham
+      - name: Independent bounded evidence, privacy and HOLD readback
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path("p30-l9aa-evidence")
+          raw=(root/"kham_title_topology.json").read_bytes()
+          r=json.loads(raw)
+          manifest=json.loads((root/"manifest.json").read_bytes())
+          assert r["kind"]=="EVENTRADAR_P30_L9AA_KHAM_TITLE_TOPOLOGY_V1"
+          assert r["parentHead"]=="18d9a28c4b3235a5aa7b722b447f7588a707911d"
+          assert r["releaseState"]=="HARD_HOLD_NO_PUBLICATION"
+          assert 1<=r["navigationCount"]<=3 and len(r["samples"])<=2
+          assert r["formalVerifiedEventIdentity"]==r["acceptedFields"]==r["goldenAccepted"]==0
+          for key in ("published","productionModified","writerExecuted","schedulerExecuted","notifierExecuted","mergeExecuted","rawHtmlPersisted","rawUrlsPersisted","rawTitlesPersisted","rawProductIdsPersisted","cookiesPersisted","screenshotsPersisted"):
+              assert r[key] is False,key
+          assert b"https://" not in raw and b"PRODUCT_ID=" not in raw and b"<html" not in raw.lower()
+          assert hashlib.sha256(raw).hexdigest()==manifest["filesSHA256"]["kham_title_topology.json"]
+          assert manifest["releaseState"]=="HARD_HOLD_NO_PUBLICATION" and manifest["published"] is False
+          print("PASS_L9AA_SHA_PRIVACY_NO_PUBLICATION",r["decision"])
+          PY
+      - name: Seal SHA256SUMS
+        if: always()
+        run: |
+          mkdir -p p30-l9aa-evidence
+          if test -f p30-l9aa-evidence/manifest.json; then
+            (cd p30-l9aa-evidence && sha256sum kham_title_topology.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9AA_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9aa-kham-title-topology
+          path: p30-l9aa-evidence/
+          retention-days: 14
+          if-no-files-found: warn
