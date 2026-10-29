@@ -27,8 +27,8 @@ class AncestorTests(unittest.TestCase):
         self.assertTrue(r["decision"].startswith("HOLD_"))
 
     def test_04_conflicting_role_values_holds(self):
-        r = m.inspect_role_ancestor(WRAPPER.replace("</dl>",
-            "<div class=\"role\"><span>活動日期</span><span>2026-11-08</span></div>"), TITLE)
+        r = m.inspect_role_ancestor(WRAPPER.replace("</section>",
+            "<div class=\"role\"><span>活動日期</span><span>2026-11-08</span></div></section>"), TITLE)
         self.assertEqual(r["decision"], "HOLD_ANCESTOR_ROLE_CONFLICT")
 
     def test_05_other_heading_blocks_ancestor(self):
