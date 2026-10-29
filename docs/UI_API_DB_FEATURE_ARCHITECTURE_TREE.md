@@ -1,5 +1,34 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+## 2026-10-29 20:55 — A/B isolated offline topology and venue identity boundary (Draft only)
+
+```text
+A / P30-L9-AK [Draft PR #81, HEAD f609d1557f39f0eb9d3d93192c07052bba935b8f]
+  ├─ scripts/p30_l9ak_accupass_heading_near.py [ADD; heading-near local root]
+  │  ├─ hidden ancestor / multiple heading / script / cap → HOLD
+  │  └─ existing 400-container bound retained; zero field acceptance
+  ├─ tests/p30/test_l9ak_accupass_heading_near.py [14 new synthetic tests]
+  ├─ .github/workflows/eventradar_p30_l9ak_heading_near.yml
+  └─ CI #40877130913 SUCCESS 46/46; Artifact #12898442400 SHA verified
+      └─ NEXT L9-AL limited live identity-bound topology; AJ 2/2 cap HOLD remains
+B / P30-VENUE-01D [Draft PR #80, HEAD 79d84788c5e63412430998470dc961c0b4251376]
+  ├─ scripts/p30_venue01d_detail_identity.py [ADD; strict DataSN/source URL/title]
+  │  ├─ exact URL, title and explicit date-label evidence only
+  │  └─ DataSN != ticket Event ID; announcement date != performance date
+  ├─ tests/p30/test_venue01d_detail_identity.py [15 new synthetic tests]
+  ├─ .github/workflows/eventradar_p30_venue01d_offline.yml
+  └─ CI #40876989597 SUCCESS 43/43; Artifact #12898406757 SHA verified
+      └─ NEXT VENUE-01E max one official detail GET; then P0 Taipei discovery
+Formal 19-platform identity dedup: CKSMH #17 / Songshan #14 / Huashan #13 / TWTC #16 REUSE
+NTCH official venue != OPENTIX #05; cross-source evidence edges only
+P0 Taipei → P0 New Taipei → P1 other North → P2 Central → P3 South → P4 East
+Source/Preview/ShowNews main, production data/status/Pages/PWA/Golden unchanged
+HARD_HOLD_NO_PUBLICATION; no merge or production write
+```
+
+---
+
+
 ## 2026-10-29 19:55 — Dual-stream A L9-AJ / B VENUE-01C native CI architecture (Draft PR only)
 
 ```text
