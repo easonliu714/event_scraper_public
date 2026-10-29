@@ -1,0 +1,68 @@
+name: EventRadar P30 VENUE-02B TMC exact title parity (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02a-tmc-discovery-20261029-2355]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue02b-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  tmc-exact-title-review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02b-tmc-title-parity-20261030-0100'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head, isolated scope and formal blob guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=3aa3d60ae807a9555bb0e6deef5de8882cdc66ba
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue02b_tmc_title_identity.yml' 'scripts/p30_venue02b_tmc_title_identity.py' 'tests/p30/test_venue02b_tmc_title_identity.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen TMC source and exact-title negative tests
+        run: |
+          python -m py_compile scripts/p30_venue02b_tmc_title_identity.py tests/p30/test_venue02b_tmc_title_identity.py
+          python -m unittest discover -s tests/p30 -p test_venue02a_tmc_source.py -v
+          python -m unittest discover -s tests/p30 -p test_venue02b_tmc_title_identity.py -v
+      - name: One official list and at most one same-path detail identity review
+        run: |
+          python scripts/p30_venue02b_tmc_title_identity.py --live --out p30-venue02b-evidence
+      - name: Independent SHA manifest and publication hold
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, pathlib
+          p = pathlib.Path('p30-venue02b-evidence')
+          r = json.loads((p/'title_review.json').read_text())
+          m = json.loads((p/'manifest.json').read_text())
+          assert hashlib.sha256((p/'title_review.json').read_bytes()).hexdigest() == m['filesSHA256']['title_review.json']
+          assert r['releaseState'] == 'HARD_HOLD_NO_PUBLICATION'
+          assert r['httpRequestsMax'] == 2
+          assert r['acceptedFields'] == r['goldenAccepted'] == 0
+          assert r['published'] is False and r['ticketEventId'] is None
+          assert not r['rawHtmlPersisted'] and not r['rawTitlesPersisted'] and not r['rawUrlsPersisted']
+          print('PASS_VENUE02B_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-venue02b-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue02b-tmc-title-review
+          path: p30-venue02b-evidence/
+          if-no-files-found: ignore
