@@ -1,0 +1,68 @@
+name: EventRadar P30 VENUE-01D offline source identity (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue01c-ci-gate-20261029]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue01d-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  venue01d-identity:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue01d-offline-identity-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head scope and frozen formal blob gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent=d56bc99a7226595449f2a40fbcd67f726ad75da4
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$parent" HEAD)" = "$parent"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue01d_offline.yml' 'scripts/p30_venue01d_detail_identity.py' 'tests/p30/test_venue01d_detail_identity.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$parent" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen date roles and new source identity negatives
+        run: |
+          python -m py_compile scripts/p30_venue01d_detail_identity.py tests/p30/test_venue01d_detail_identity.py
+          python -m unittest discover -s tests/p30 -p test_venue01c_date_conflict.py -v
+          python -m unittest discover -s tests/p30 -p test_venue01d_detail_identity.py -v
+      - name: Aggregate-only evidence SHA and release HOLD
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p p30-venue01d-evidence
+          python - <<'PY'
+          import json,hashlib,pathlib,sys
+          sys.path.insert(0,'scripts')
+          import p30_venue01d_detail_identity as m
+          p=pathlib.Path('p30-venue01d-evidence')
+          r=m.offline_contract()
+          assert r['httpRequests']==0 and r['published'] is False and r['acceptedFields']==0
+          r['exactHead']='${{ github.event.pull_request.head.sha }}'
+          raw=(json.dumps(r,sort_keys=True,indent=2)+'\n').encode()
+          (p/'contract.json').write_bytes(raw)
+          manifest={'releaseState':m.RELEASE,'filesSHA256':{'contract.json':hashlib.sha256(raw).hexdigest()}}
+          (p/'manifest.json').write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
+          assert hashlib.sha256((p/'contract.json').read_bytes()).hexdigest()==manifest['filesSHA256']['contract.json']
+          print('PASS_VENUE01D_OFFLINE_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-venue01d-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue01d-offline-identity
+          path: p30-venue01d-evidence/
+          if-no-files-found: ignore
