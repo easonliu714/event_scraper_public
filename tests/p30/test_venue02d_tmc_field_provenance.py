@@ -37,6 +37,10 @@ class Contract(unittest.TestCase):
         self.assertEqual(m.inspect(b"x"*(m.MAX_HTML+1), "Example event")["decision"], "HOLD_FIELD_INPUT")
     def test_09_no_publication(self):
         self.assertEqual(m.RELEASE, "HARD_HOLD_NO_PUBLICATION")
+    def test_10_hidden_ancestor_cannot_supply_field(self):
+        source = ('<main hidden><section><h1>Example event</h1>' + PAIR + '</section></main>').encode()
+        self.assertEqual(m.inspect(source, "Example event")["decision"],
+                         "HOLD_FIELD_HIDDEN_HEADING_ANCESTOR")
 
 if __name__ == "__main__":
     unittest.main()
