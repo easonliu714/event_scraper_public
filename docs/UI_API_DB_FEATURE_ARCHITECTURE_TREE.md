@@ -2561,3 +2561,21 @@ SOURCE MAIN fbf4ca02... [FROZEN; data blob 7fc4fe32; status blob e19ca37c]
 
 - Engineering changes are not SOURCE_QUALITY acceptance. New live CI results and artifact independent SHA/CRC readback are PENDING; no PR may be merged or promoted. A list navigation failure must be classified before retry; B role ambiguity must HOLD and move to next nonduplicate P0 Taipei venue rather than generate endless synthetic PRs.
 - Source identity dedup remains binding: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 reuse; NTCH venue != OPENTIX #05. DataSN != ticket Event ID; announcement date != performance date; claimed ticket platform != verified ticket URL/ID.
+
+### 2026-10-30 02:02 — exact-head evidence closure (no release promotion)
+
+```text
+A #89 L9-AP 4a888374... CI 40926608319 SUCCESS
+  ├─ artifact 12920103177 ZIP SHA256 91ad463a... CRC/manifest PASS
+  ├─ list HTTP200 REVIEW; detail 2/2 HTTP200 and exact title REVIEW
+  └─ 2/2 HOLD_NO_EXPLICIT_LOCAL_ROLE_PAIR; FIELD 0; Golden 0
+B #90 VENUE-02D 6351af3f... CI 40926619059 SUCCESS
+  ├─ artifact 12919199930 ZIP SHA256 d635cd68... CRC/manifest PASS
+  ├─ TMC list HTTP200/11 distinct paths; detail HTTP200/1 exact title REVIEW
+  └─ HOLD_FIELD_NO_BOUNDED_TITLE_REGION; FIELD 0; Golden 0
+NEXT A: rotate platform source/field Gate, not another empty synthetic ACCUPASS test
+NEXT B: P0 Taipei Dome/TICC/TPAC official LIST/DETAIL discovery, no duplicate platform
+FORMAL: data/status unchanged; HARD_HOLD_NO_PUBLICATION; Android PASS retained
+```
+
+- SOURCE_QUALITY live new evidence A/B both YES; offline-only streak 0/0. Artifact ZIPs independently CRC/SHA checked against runner digests and manifest. CI PASS != FIELD/GOLDEN/PWA publication PASS.
