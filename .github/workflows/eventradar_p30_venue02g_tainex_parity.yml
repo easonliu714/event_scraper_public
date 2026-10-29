@@ -1,0 +1,67 @@
+name: EventRadar P30 VENUE-02G TAINEX same-source role refusal (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02f-dome-calendar-role]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue02g-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  tainex-venue-parity:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02g-tainex-parity-20261030-0555'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD and three ADD-only files and formal blob guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=faac5d180359cb5bebcdbda6bc4c5dd52e03b440
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue02g_tainex_parity.yml' 'scripts/p30_venue02g_tainex_parity.py' 'tests/p30/test_venue02g_tainex_parity.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen Dome and new TAINEX positive-negative tests
+        run: |
+          python -m py_compile scripts/p30_venue02g_tainex_parity.py tests/p30/test_venue02g_tainex_parity.py
+          python -m unittest discover -s tests/p30 -p test_venue02f_dome_calendar_role.py -v
+          python -m unittest discover -s tests/p30 -p test_venue02g_tainex_parity.py -v
+      - name: Offline source-backed SHA evidence, zero GET
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p p30-venue02g-evidence
+          python - <<'PY'
+          import hashlib,json,pathlib
+          d=pathlib.Path('p30-venue02g-evidence')
+          obj=dict(kind='EVENTRADAR_P30_VENUE02G_TAINEX_IDENTITY_ROLE_REVIEW',
+                   evidenceOrigin='OFFLINE_FIXTURES_FROM_INDEPENDENT_PUBLIC_SOURCE_READ',
+                   sourceQualityThisCI='UNVERIFIED_NO_LIVE_GET',
+                   observedListCandidateCountIndependent=7,
+                   sampledDetailCountIndependent=1,
+                   observedSampleLocalVenueId='690',
+                   acceptedFields=0,goldenAccepted=0,published=False,
+                   releaseState='HARD_HOLD_NO_PUBLICATION')
+          raw=(json.dumps(obj,sort_keys=True,indent=2)+'\n').encode()
+          (d/'audit.json').write_bytes(raw)
+          (d/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(raw).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd p30-venue02g-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue02g-tainex-role-review
+          path: p30-venue02g-evidence/
+          if-no-files-found: ignore
