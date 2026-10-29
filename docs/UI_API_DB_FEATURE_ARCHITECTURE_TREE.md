@@ -2659,3 +2659,46 @@ Formal FIELD 0 / Golden 0 / PWA release HARD_HOLD_NO_PUBLICATION
 - A P30-L9-AR PREPARED / FamiTicket platform #07 (reuse existing source): independent public official Home list at https://www.famiticket.com.tw/Home shows `CC同人創作展` and a separate exact official detail https://www.famiticket.com.tw/Home/Activity/Info/RQA3AHUAbwBwAEgANwBzAFIAQQA1AGEAbABEADgAcABqAGMAbwBaAC8ARgBGAEcAVwBWAEUAdQBXAFEAeQBUAFcAcgAyADUARgBFADUAbgBWADQAdwA9AA2 headed `CC同人創作展`; its description explicitly distinguishes event dates `2026.11.21-22`, event hours `10:30-16:00`, venue `松山文創園區 五號倉庫`, and ticket-price text `單日票200元 / 雙日票350元`. This is an independently observed official list/detail same-title REVIEW and explicit text-role candidate, **not** adapter CI source GET, not formal FIELD, not verified ticket Event ID, and not Golden. Next Gate: one bounded same-ID/URL and title-local label topology, distinguish date/time/price and ticket voucher/reservation role; fail closed if missing/ambiguous, no iframe following or bulk requests. Prior #91 iframe-shell sample remains HOLD; a different detail shape does not resolve its identity.
 - B P30-VENUE-02F PREPARED / Taipei Dome official (new P0 Taipei venue, not in 19 platforms): independent official https://www.taipeidome.com.tw/Web/dome/ current October 2026 calendar explicitly contains both `場館已安排使用` / `場館已承租` (occupancy-only) and separate named `演唱會` / `球賽` entries. Example Oct 29/30 are occupancy-only, Oct 31 has named `《流光穿梭✦十年傳說》 GCS 2026 夏季總決賽、傳說十週年演唱會`. Distinguish venue booking/occupancy from public event; calendar day is not verified performance timestamp, and no sale/price/ticket ID. Next Gate: bounded one official calendar card + at most one genuine official detail, exact identity and event/booking role refusal; if no detail, HOLD_DETAIL_NOT_VERIFIED, do not infer LIST_PASS or publish.
 - New source-quality signals A=YES (distinct official detail role text), B=YES (official calendar occupancy-vs-event semantics), but engineering increment this cycle=0/0; offline-only consecutive SOURCE_QUALITY-less rounds A=0/B=0. New formal accepted fields=0, Golden=0, PWA event publication=HARD_HOLD_NO_PUBLICATION. No changes to docs/data.json, docs/platform_status.json, Golden, Writer/Scheduler/Notifier, main, Pages, Android CKSMH 5/TWTC 39 USER_ATTESTED_PASS, L8 UI PASS. CI and independent artifact readback are historical only, not new this cycle. Future engineering Writer must fresh-read heads and avoid overlapping writes.
+
+
+## 2026-10-30 05:00 — Dual-line role boundary architecture, A L9-AR / B VENUE-02F
+
+```text
+Source main fbf4ca02... [FROZEN, no production/Pages/JSON writes]
+├─ A / existing FamiTicket platform #07
+│  └─ L9-AR Draft PR #93 HEAD 7767c74779c6323214b12f4ffe663378428254dd
+│     ├─ base #91 be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+│     ├─ scripts/p30_l9ar_famiticket_role_text.py [ADD]
+│     │  └─ inspect_public_text(): unique 《活動資訊》 section / exact title
+│     │     event range ≠ hours ≠ two ticket variants ≠ outside refund cutoff
+│     │     malformed/duplicate/ambiguous -> HOLD, fields accepted 0
+│     ├─ tests/p30/test_l9ar_famiticket_role_text.py [ADD, 14]
+│     ├─ .github/workflows/eventradar_p30_l9ar_famiticket_role_text.yml [ADD]
+│     ├─ exact-head CI #40953953547 SUCCESS, 10 frozen + 14 = 24/24 OFFLINE
+│     └─ Artifact #12931219153 ZIP SHA256 4bad1b47... CRC/manifest PASS
+├─ B / new P0 Taipei Dome official venue [not any 19 ticket platforms]
+│  └─ VENUE-02F Draft PR #94 HEAD faac5d180359cb5bebcdbda6bc4c5dd52e03b440
+│     ├─ base #92 e5aac6b09d668de782de416e5e01b4f4f30b7ad4
+│     ├─ scripts/p30_venue02f_dome_calendar_role.py [ADD]
+│     │  └─ inspect_calendar_cell(): VENUE_OCCUPANCY_ONLY ≠ PUBLIC_EVENT
+│     │     one cell with GCS final + concert -> UNKNOWN_MULTI_EVENT
+│     │     calendar day ≠ performance timestamp; no verified detail link
+│     ├─ tests/p30/test_venue02f_dome_calendar_role.py [ADD, 15]
+│     ├─ .github/workflows/eventradar_p30_venue02f_dome_calendar_role.yml [ADD]
+│     ├─ exact-head CI #40953958782 SUCCESS, 17 frozen + 15 = 32/32 OFFLINE
+│     └─ Artifact #12930979389 ZIP SHA256 ed4e9c5b... CRC/manifest PASS
+├─ Governance Draft PR #8 [docs-only, sequential SHA compare]
+│  ├─ ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md [APPEND]
+│  └─ UI_API_DB_FEATURE_ARCHITECTURE_TREE.md [APPEND]
+└─ Formal release boundary
+   ├─ docs/data.json blob 7fc4fe32... / platform_status.json e19ca37c... [FROZEN]
+   ├─ Source 19 platform identity dedup: CKSMH #17 / Songshan #14 /
+   │  Huashan #13 / TWTC #16 REUSE; OPENTIX #05 ≠ NTCH venue
+   ├─ Source quality: role diagnostic from public/indexed text only
+   │  new raw official HTTP/DOM A=0/B=0; CI live GET A=0/B=0
+   ├─ accepted fields=0, Golden=0, published=false
+   └─ HARD_HOLD_NO_PUBLICATION; Android CKSMH 5 / TWTC 39 + L8 PASS preserved
+```
+
+- **Contract:** Both classifiers are bounded, deterministic, review-only and fail closed; CI does not fetch official websites, does not verify full DOM, and does not imply that an indexed calendar cell is a published event or one FamiTicket detail text is a verified session/price record. Official text retrieval may be cached. Preserve independent `source/observed_at/role/decision` per field before future promotion. No iframe following, login, anti-bot bypass, payment, or raw sensitive page storage.
+- **NEXT A L9-AS:** bounded one exact official FamiTicket detail HTML DOM + same-source identity/role verification, or source block HOLD and rotate. **NEXT B VENUE-02G:** one official Dome calendar card and at most one genuine same-origin detail, identity vs occupancy vs multi-event decision; if detail inaccessible, HOLD and rotate another nonduplicate P0 Taipei source. No endless synthetic Gate chain.
