@@ -2445,3 +2445,44 @@ SOURCE MAIN fbf4ca02... [FROZEN; formal data blob 7fc4fe32; status e19ca37c]
 ```
 
 - **Next A:** source-bound exact *matching* heading region selection with strict ambiguity rejection, not global date regex; if blocked, advance next source Gate. **Next B:** P0 Taipei nonduplicate source discovery (Taipei Dome/TMC/TICC/TPAC), avoid redoing CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue separate from OPENTIX #05. Both have new SOURCE_QUALITY diagnostics, offline-only streak 0. Existing CKSMH 5 / TWTC 39 Android and L8 UI PASS preserved, ibon 39961 OPEN.
+
+
+## 2026-10-30 01:12 — A/B source diagnosis architecture (PR #86 / #85)
+
+```text
+Source main fbf4ca02... [FROZEN; formal data/status blobs unchanged]
+A / ACCUPASS platform #02 P30-L9-AN
+  PR #86 Draft HEAD 23af881cbbc207e42522c460b1de0dae65a065ce
+  base #83 8a25ccb73d37ea2084fdc46212c49722effe8414
+  scripts/p30_l9an_accupass_matched_heading.py [ADD]
+    exact normalized H1/H2 expected title -> unique visible heading
+    nearest <=400-container ancestor with exactly one heading
+    local explicit label/value sibling evidence, no global regex
+    ROOT-CAUSE CANDIDATE: nearest heading-only wrapper hides later siblings
+  tests/p30/test_l9an_accupass_matched_heading.py [ADD; 14]
+  .github/workflows/eventradar_p30_l9an_matched_heading.yml [ADD]
+  CI #40918460947 SUCCESS 36/36, Artifact #12916088449
+  official 2 details -> HOLD_MATCHED_HEADING_OR_IDENTITY
+B / TAIPEI_MUSIC_CENTER_OFFICIAL P30-VENUE-02B [new P0 venue, not 19-platform duplicate]
+  PR #85 Draft HEAD 4b7792066dbec130d21e4db01d082363fc6ca031
+  base #84 3aa3d60ae807a9555bb0e6deef5de8882cdc66ba
+  scripts/p30_venue02b_tmc_title_identity.py [ADD]
+    same-path list anchor title vs visible H1/H2 exact normalized title
+    hidden/duplicate/redirect/generic/HTTP errors -> HOLD
+    ROOT-CAUSE CANDIDATES: generic anchor, heading topology, HTMLParser scope
+  tests/p30/test_venue02b_tmc_title_identity.py [ADD; 18]
+  .github/workflows/eventradar_p30_venue02b_tmc_title_identity.yml [ADD]
+  CI #40918260178 SUCCESS 33/33, Artifact #12916139029
+  live exactTitleMatches=0 -> HOLD_TITLE_IDENTITY
+Governance Draft PR #8 [DOCS ONLY; sequential update, no main write]
+  docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+  docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+Formal PWA https://easonliu714.github.io/event_scraper_public/
+  UI prior USER_ATTESTED_PASS; new Pages build UNVERIFIED
+  data.json/status.json no write; fields 0, Golden 0, no Android full E2E
+  HARD_HOLD_NO_PUBLICATION
+```
+
+- Next A: first read sanitized per-detail local HOLD subdecision; test heading-only-wrapper versus role-bearing ancestor, fail closed on multiple candidate ancestors, no field promotion; rotate platform on persistent HOLD. Next B: inspect sanitized list/detail HOLD subdecision, correct demonstrable parser defect or move to nonduplicate Taipei Dome/TICC/TPAC source discovery. No repeated empty GET or synthetic-only gate loop.
+- Dedup contract: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 reuse existing platform source IDs. NTCH venue != OPENTIX #05 ticket source. Venue DataSN != ticket Event ID; each field needs source/observed_at/role/decision. P0 Taipei -> P0 New Taipei -> P1 other North -> P2 Central -> P3 South -> P4 East.
+- CI artifact ZIP digests from runner logs, independent CRC/download readback still UNVERIFIED this cycle. Both streams new live SOURCE_QUALITY HOLD, offline-only streak 0; accepted fields/Golden/publication 0.
