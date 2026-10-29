@@ -1,0 +1,100 @@
+name: EventRadar P30 L9-AG ACCUPASS bounded detail title parity (NO PUBLISH)
+on:
+  push:
+    branches: [feat/eventradar-p30-l9ag-accupass-detail-parity]
+  pull_request:
+    branches: [feat/eventradar-p30-l9af-accupass-query-roles]
+    paths:
+      - .github/workflows/eventradar_p30_l9ag_accupass_detail_parity.yml
+      - scripts/p30_l9ag_accupass_detail_parity.py
+      - tests/p30/test_l9ag_accupass_detail_parity.py
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-l9ag-accupass
+  cancel-in-progress: false
+jobs:
+  accupass-detail-parity:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Exact parent, production blobs and three-file scope
+        run: |
+          set -euo pipefail
+          base=ae54d7687893e4f0960fc7d3926c7a376798d386
+          test "$(git rev-parse origin/main)" = fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+          git merge-base --is-ancestor "$base" HEAD
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ag_accupass_detail_parity.yml' 'scripts/p30_l9ag_accupass_detail_parity.py' 'tests/p30/test_l9ag_accupass_detail_parity.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_L9AG_SCOPE; exit 1; }
+          git show origin/main:docs/platform_status.json > /tmp/l9ag-status.json
+          echo PASS_L9AG_EXACT_SCOPE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Chromium and parser
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'playwright==1.55.0'
+          python -m playwright install chromium
+      - name: Fifty-two offline source and detail privacy tests
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/p30_l9ag_accupass_detail_parity.py tests/p30/test_l9ag_accupass_detail_parity.py
+          python -m unittest discover -s tests/p30 -p test_l9ag_accupass_detail_parity.py -v 2>&1 | tee /tmp/l9ag-tests.log
+          grep -q 'Ran 52 tests' /tmp/l9ag-tests.log
+          grep -q '^OK$' /tmp/l9ag-tests.log
+      - name: One public list and at most two same-source detail navigations
+        run: |
+          set -euo pipefail
+          python scripts/p30_l9ag_accupass_detail_parity.py --status /tmp/l9ag-status.json --out p30-l9ag-evidence --live
+      - name: Independent SHA, privacy and no-publication contract
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path("p30-l9ag-evidence")
+          raw=(root/"accupass_detail_parity.json").read_bytes()
+          report=json.loads(raw)
+          manifest=json.loads((root/"manifest.json").read_bytes())
+          assert report["kind"]=="EVENTRADAR_P30_L9AG_ACCUPASS_DETAIL_PARITY_V1"
+          assert report["parentHead"]=="ae54d7687893e4f0960fc7d3926c7a376798d386"
+          assert report["listNavigationCount"]==1
+          assert 0<=report["detailNavigationCount"]<=2
+          assert len(report["details"])==report["detailNavigationCount"]
+          assert len(report["listStates"])<=4
+          assert all(len(x["observations"])<=4 for x in report["details"])
+          assert report["releaseState"]=="HARD_HOLD_NO_PUBLICATION"
+          assert report["formalVerifiedEventIdentity"]==report["acceptedFields"]==report["goldenAccepted"]==0
+          for key in ("published","productionModified","writerExecuted","schedulerExecuted","notifierExecuted","mergeExecuted","rawHtmlPersisted","rawUrlsPersisted","rawTitlesPersisted","rawEventIdsPersisted","queryValuesPersisted","cookiesPersisted","screenshotsPersisted"):
+              assert report[key] is False,key
+          assert b"https://" not in raw and b"<html" not in raw.lower()
+          assert manifest["filesSHA256"]["accupass_detail_parity.json"]==hashlib.sha256(raw).hexdigest()
+          assert manifest["releaseState"]=="HARD_HOLD_NO_PUBLICATION" and manifest["published"] is False
+          print("PASS_L9AG_PRIVACY_SHA_HOLD",report["decision"])
+          PY
+      - name: Seal SHA256SUMS
+        if: always()
+        run: |
+          mkdir -p p30-l9ag-evidence
+          if test -f p30-l9ag-evidence/manifest.json; then
+            (cd p30-l9ag-evidence && sha256sum accupass_detail_parity.json manifest.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          else
+            echo HOLD_L9AG_REPORT_MISSING
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9ag-accupass-detail-parity
+          path: p30-l9ag-evidence/
+          retention-days: 14
+          if-no-files-found: warn
