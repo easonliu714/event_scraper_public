@@ -27,7 +27,7 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 def git_blob(raw):
-    return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\0" + raw).hexdigest()
+    return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
 
 def allowed(url):
     try:
@@ -195,12 +195,12 @@ def main():
                   rawHtmlPersisted=False, rawUrlsPersisted=False, rawTitlesPersisted=False,
                   rawEventIdsPersisted=False, cookiesPersisted=False, screenshotsPersisted=False)
     out.mkdir(exist_ok=True)
-    raw = (json.dumps(result, ensure_ascii=False, indent=2) + "\\n").encode()
+    raw = (json.dumps(result, ensure_ascii=False, indent=2) + "\n").encode()
     (out / "accupass_identity.json").write_bytes(raw)
     manifest = dict(kind="EVENTRADAR_P30_L9AD_SHA_MANIFEST_V1",
                     filesSHA256={"accupass_identity.json": digest(raw)},
                     releaseState=RELEASE, published=False)
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\\n")
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("L9AD_ACCUPASS", json.dumps(dict(http=result["listHttp"],
           listCandidates=result["listCandidates"],
           detail=(result["detail"] or {}).get("decision"), decision=result["decision"])))
