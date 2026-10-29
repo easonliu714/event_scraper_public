@@ -4,7 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-from p30_venue02e_tpac_session_cancel import inspect_detail
+from p30_venue02e_tpac_session_cancel import inspect_detail, compare_date_ranges
 
 URL = "https://tpac.org.taipei/program/2053"
 TITLE = "深夜小狗神秘習題"
@@ -57,6 +57,27 @@ class TpacCancellationTests(unittest.TestCase):
         self.check(fixture([ROWS[0]] * 31), "HOLD_SESSION_COUNT_CAP")
     def test_oversize(self):
         self.check(b"x" * 800001, "HOLD_INPUT")
+
+
+class TpacRangeConflictTests(unittest.TestCase):
+    def check(self, list_range, detail_range, expected):
+        r = compare_date_ranges(list_range, detail_range)
+        self.assertEqual(r["decision"], expected)
+        self.assertEqual(r["rangeRole"], "UNKNOWN")
+        self.assertEqual(r["acceptedFields"], 0)
+        self.assertEqual(r["goldenAccepted"], 0)
+        self.assertFalse(r["published"])
+    def test_official_list_detail_date_conflict(self):
+        self.check("2026-10-28 - 2026-10-31", "2026-10-29 - 2026-11-01",
+                   "HOLD_LIST_DETAIL_DATE_RANGE_CONFLICT")
+    def test_same_range_review_only(self):
+        self.check("2026-10-29 - 2026-11-01", "2026-10-29 - 2026-11-01",
+                   "REVIEW_RANGE_PARITY_NOT_FIELD_ACCEPTANCE")
+    def test_missing_label_or_range_hold(self):
+        self.check("", "2026-10-29 - 2026-11-01", "HOLD_UNLABELED_DATE_RANGE")
+    def test_reverse_date_order_hold(self):
+        self.check("2026-11-01 - 2026-10-29", "2026-10-29 - 2026-11-01",
+                   "HOLD_INVALID_RANGE_ORDER")
 
 if __name__ == "__main__":
     unittest.main()
