@@ -77,7 +77,7 @@ def inspect_detail(html: bytes, official_url: str, list_title: str) -> dict:
 
 # List-card date range and detail-page date range can have different roles.
 # Refuse conflicts instead of overwriting one with the other or calling either a show date.
-RANGE = re.compile(r"^(20\\d{2}-\\d{2}-\\d{2})\\s*[-~～]\\s*(20\\d{2}-\\d{2}-\\d{2})$")
+RANGE = re.compile(r"^(20\d{2}-\d{2}-\d{2})\s*[-~～]\s*(20\d{2}-\d{2}-\d{2})$")
 
 def compare_date_ranges(list_range: str, detail_range: str) -> dict:
     result = dict(decision="HOLD_UNLABELED_DATE_RANGE", rangeRole="UNKNOWN",
