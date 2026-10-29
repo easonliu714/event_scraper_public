@@ -2745,3 +2745,38 @@ Source main fbf4ca02... [FROZEN]
 - **Next A L9-AT:** unique source-local DOM role association only after exact visible title and marker; avoid global dates and role conflation, no promotion.
 - **Next B VENUE-02H:** one bounded official TAINEX list/detail adapter observation, venue identity + per-field evidence; HOLD on ambiguity and rotate P0 Taipei/New Taipei.
 - **No production change:** Source/Preview/ShowNews main and formal JSON untouched, Pages live deploy UNVERIFIED. Exact-head CI and independent ZIP SHA/CRC/manifest readback are engineering evidence, not official publication or Android E2E.
+
+### 2026-10-30 06:55 Asia/Taipei — L9-AT / VENUE-02H identity and locality architecture
+
+```text
+Source main fbf4ca02... / formal JSON unchanged [HARD_HOLD_NO_PUBLICATION]
+├─ A / FamiTicket #07 [REUSE existing ticket platform]
+│  └─ L9-AT Draft #97 HEAD fc08271acbe309ccb0f55180356738b7ffac5128
+│     ├─ scripts/p30_l9at_famiticket_local_dom.py [ADD]
+│     │  ├─ frozen L9-AS exact heading+marker -> local semantic-section gate
+│     │  ├─ official GET=1 HTTP200, 128352B, heading parent div, marker parent p
+│     │  ├─ no shared section/article -> HOLD_NO_SHARED_SEMANTIC_EVENT_SECTION
+│     │  └─ no event/price/session/ticket ID accepted, no raw HTML
+│     ├─ tests/p30/test_l9at_famiticket_local_dom.py [ADD, 10]
+│     ├─ exact-head CI #40969667118 SUCCESS 23/23
+│     └─ Artifact #12940115947 SHA256 906faf93... CRC/manifest PASS
+├─ B / P0 Taipei TAINEX [new venue source, not one of 19 ticket platforms]
+│  └─ VENUE-02H Draft #98 HEAD b1f4ea1b0ada362aa0db1772434212c9b69ecca9
+│     ├─ scripts/p30_venue02h_tainex_live_identity.py [ADD]
+│     │  ├─ official LIST /event + DETAIL /event/689 HTTP200/200
+│     │  ├─ exact anchor=1, heading=1, venue role labels present
+│     │  ├─ /event/689 coffee != /event/690 tea even with same period/hall/organizer
+│     │  └─ venueLocalId != ticketEventId, accepted FIELD=0
+│     ├─ tests/p30/test_venue02h_tainex_live_identity.py [ADD, 14]
+│     ├─ exact-head CI #40969673735 SUCCESS 28/28
+│     └─ Artifact #12939228326 SHA256 7de0da81... CRC/manifest PASS
+├─ Governance Draft #8 [docs-only, sequential append; not merged to main]
+└─ Release lock [CKSMH 5 / TWTC 39 Android PASS + L8 UI PASS preserved]
+   ├─ SourceQuality A structural HOLD / B list-detail REVIEW
+   ├─ accepted FIELD=0 / Golden=0 / publication HARD_HOLD_NO_PUBLICATION
+   └─ Pages runtime/Android new E2E UNVERIFIED
+```
+
+- **First true issue identified:** the predecessor A count-only heading+marker contract permitted an unrelated DOM section to satisfy both global counts. The new locality guard correctly rejects that actual live DOM shape; do not weaken it to make a green field Gate. Next A must inspect source-local common-`div` ancestry with bounded distance/label ownership, not global regex.
+- **B anti-collapse evidence:** TAINEX /event/689 coffee and /event/690 tea are distinct source-local records despite identical exhibition period, hall and organizer. Use independent `source/observed_at/role/decision` per field; exhibition period != session start; organizer link != ticket sale link; same date/location/organizer != identity.
+- **NEXT:** A L9-AU bounded source-local ancestry proof or HOLD/rotate; B VENUE-02I provenance and cross-record distinctness. CI SUCCESS != source-field acceptance, Golden, PWA publish or Android PASS.
