@@ -1,0 +1,62 @@
+name: EventRadar P30 VENUE-01B one bounded official source GET (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue01-readonly-20261029]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue01b-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  venue01b-live:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue01-live-shape-20261029'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head, source parent and three-file isolated scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=52655204dd3ac6fddd12347411fad849eb77a288
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue01b_live.yml' 'scripts/p30_venue01_live_shape.py' 'tests/p30/test_venue01b_live_shape.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Offline positive and negative source-shape contracts
+        run: |
+          python -m py_compile scripts/p30_venue01_live_shape.py tests/p30/test_venue01b_live_shape.py
+          python -m unittest discover -s tests/p30 -p test_venue01b_live_shape.py -v
+      - name: One normal official GET through existing frozen adapter
+        run: |
+          python scripts/p30_venue01_live_shape.py --live
+      - name: Evidence integrity and no-publication contract
+        run: |
+          python - <<'PY'
+          import json,hashlib,pathlib
+          p=pathlib.Path('p30-venue01b-evidence')
+          r=json.loads((p/'venue01b.json').read_text())
+          m=json.loads((p/'manifest.json').read_text())
+          assert m['filesSHA256']['venue01b.json']==hashlib.sha256((p/'venue01b.json').read_bytes()).hexdigest()
+          assert r['published'] is False and r['acceptedFields']==0 and r['goldenAccepted']==0
+          assert r['rawHtmlPersisted'] is False and r['rawUrlsPersisted'] is False
+          print('PASS_VENUE01B_EVIDENCE_SHA_NO_PUBLICATION')
+          PY
+          (cd p30-venue01b-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue01b-live-source-shape
+          path: p30-venue01b-evidence/
+          if-no-files-found: ignore
