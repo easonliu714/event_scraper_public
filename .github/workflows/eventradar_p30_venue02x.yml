@@ -1,12 +1,12 @@
 name: EventRadar P30-VENUE-02X exact-head source-quality (NO PUBLISH)
 on:
   pull_request:
-    branches: [feat/eventradar-p30-venue02x-fuzhong15-allshow]
+    branches: [feat/eventradar-p30-venue02w-fuzhong15-multishow]
     types: [opened, synchronize, reopened]
 permissions:
   contents: read
 concurrency:
-  group: eventradar-p30-venue-02w-${{ github.event.pull_request.number }}
+  group: eventradar-p30-venue-02x-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 jobs:
   source-quality:
@@ -29,7 +29,7 @@ jobs:
           base=f5c5af8442ad294c61bb137bd911b3a36abe46b3
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
-          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02x_fuzhong15_multishow.py' 'tests/p30/test_venue02x_fuzhong15_multishow.py' '.github/workflows/eventradar_p30_venue02x.yml' | LC_ALL=C sort)"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02x_fuzhong15_allshow.py' 'tests/p30/test_venue02x_fuzhong15_allshow.py' '.github/workflows/eventradar_p30_venue02x.yml' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
           test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
@@ -38,15 +38,15 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
-          python -m py_compile scripts/p30_venue02x_fuzhong15_multishow.py tests/p30/test_venue02x_fuzhong15_multishow.py
+          python -m py_compile scripts/p30_venue02x_fuzhong15_allshow.py tests/p30/test_venue02x_fuzhong15_allshow.py
           python -m unittest discover -s tests/p30 -p 'test_venue02w_fuzhong15_multishow.py' -v
-          python -m unittest discover -s tests/p30 -p 'test_venue02x_fuzhong15_multishow.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02x_fuzhong15_allshow.py' -v
       - name: Bounded official source-quality read and immutable receipt
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p eventradar_p30_venue02x-evidence
-          python scripts/p30_venue02x_fuzhong15_multishow.py --live-one --out eventradar_p30_venue02x-evidence/audit.json
+          python scripts/p30_venue02x_fuzhong15_allshow.py --live-one --out eventradar_p30_venue02x-evidence/audit.json
           python - <<'PY'
           import hashlib,json,pathlib
           root=pathlib.Path('eventradar_p30_venue02x-evidence')
