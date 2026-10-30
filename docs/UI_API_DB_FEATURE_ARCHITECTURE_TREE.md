@@ -3311,3 +3311,45 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
 - **A SOURCE_QUALITY (independent official public reader, not CI GET):** [Huashan /exhibition](https://www.huashan1914.com/exhibition) links to a percent-encoded Chinese detail slug [official example](https://www.huashan1914.com/exhibition/%E9%A2%A8%E5%9C%9F%E9%9B%BB%E5%BD%B1%E9%99%A2). Frozen L9-BL `safe_detail` ASCII-only slug `[A-Za-z0-9_-]` excludes this real route; this is a concrete root-cause explanation for strict LIST zero, **not** proof of full index coverage, list-title parity or event identity. Official detail H1 contains activity title and separate activity time/venue, but the index anchor includes date and venue; do not equate whole-card text with H1. [Draft PR #135](https://github.com/easonliu714/event_scraper_public/pull/135) L9-BM HEAD `6e59197a9e199ece48fda523efb152f24ece5612`, base #133 exact `c8ff4835083d794562272a144d428af1e2a3c4d6`; add-only route diagnostic, 11 fail-closed tests and offline exact-head workflow. [CI #41102494088](https://github.com/easonliu714/event_scraper_public/actions/runs/41102494088) **QUEUED / NOT YET PASS** at this append; official GET in CI **0 by design**, artifact independent verification PENDING. NEXT L9-BN: source card-local title vs H1 identity and role boundaries, bounded new detail only if justified; retain Songshan #14 title mismatch and ibon 39961 OPEN.
 - **B SOURCE_QUALITY (independent official public reader, not CI GET):** [Ceramics index](https://www.ceramics.ntpc.gov.tw/xmdoc?XsmSId=0J148497613881029302) and [selected official detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302) show exact title and explicit `展覽日期:2026年10月16日至2026年11月15日/展覽地點:b1陶藝長廊` after long narrative. Frozen VENUE-02Z skips parent nodes >260 chars and reported two venue candidates; text-node locality is a plausible date-missing cause, but **venue conflict remains HOLD**, no formal field accepted. [Draft PR #136](https://github.com/easonliu714/event_scraper_public/pull/136) VENUE-02AA HEAD `1d4349bf5b80c8de2cf32343d8276cc8925ea48e`, base #134 exact `126d797bf999d640c8250be92c888c54b6ed6b1f`; add-only bounded leaf role diagnostic, 10 negative tests and offline exact-head workflow. [CI #41102498719](https://github.com/easonliu714/event_scraper_public/actions/runs/41102498719) **QUEUED / NOT YET PASS** at this append; official GET in CI **0 by design**, artifact independent verification PENDING. NEXT VENUE-02AB: diagnose two venue DOM candidates/section ownership from source evidence, then rotate P0 New Taipei if ambiguity persists.
 - **Safety/metrics:** A/B engineering commits and Draft PRs created; exact-head CI **PENDING/PENDING**, not claimed PASS. Both lines independent new SOURCE_QUALITY topology evidence **YES/YES**; CI itself offline-only, no repeated official GET; consecutive cycles without any source evidence A/B **0/0**. Accepted FIELD A/B **0/0**, Golden **0**, published **0**, `HARD_HOLD_NO_PUBLICATION` unchanged. No main/merge/force push/production Scraper/Writer/Publisher/Scheduler/Notifier/Golden/formal JSON/Pages/Android writes. Preserve CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 UI PASS; Songshan #14/Huashan #13 reused, NTCH venue != OPENTIX #05.
+
+### 2026-10-31 — A L9-BN / B VENUE-02AB source-bound architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ 19 canonical ticket sources: platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124 [FROZEN]
+│  └─ A Huashan platform #13 [REUSE, NOT NEW VENUE PLATFORM]
+│     ├─ Prior L9-BM Draft #135 HEAD 6e59197a9e199ece48fda523efb152f24ece5612
+│     │  ├─ CI #41102494088 SUCCESS 22/22, artifact #12998208865 independent CRC/SHA/manifest PASS
+│     │  └─ route topology REVIEW; accepted FIELD 0
+│     └─ L9-BN Draft #137 HEAD 1c8c2426f3310921dfff273daa4cd5f6daac6156
+│        ├─ scripts/p30_l9bn_huashan_card_identity.py [ADD]
+│        │  ├─ source-observed encoded Unicode slug including fullwidth ！
+│        │  ├─ require unique same-route card-local heading + exact detail H1
+│        │  └─ reject unsafe URL, duplicate cards/headings, whole-card text identity
+│        ├─ tests/p30/test_l9bn_huashan_card_identity.py [ADD, 11 source-derived/negative]
+│        ├─ .github/workflows/eventradar_p30_l9bn.yml [ADD, exact-head, read-only]
+│        ├─ CI #41111749743 QUEUED at append; official GET=0; artifact pending
+│        └─ NEXT L9-BO real DOM card-heading binding or rotate; FIELD=0
+├─ B P0 New Taipei Ceramics venue [DISTINCT FROM 19 TICKET PLATFORMS]
+│  ├─ Prior VENUE-02AA Draft #136 HEAD 1d4349bf5b80c8de2cf32343d8276cc8925ea48e
+│  │  ├─ CI #41102498719 SUCCESS 20/20, artifact #12999791771 independent CRC/SHA/manifest PASS
+│  │  └─ date/venue leaf role REVIEW; previous 2 venue candidates unresolved
+│  └─ VENUE-02AB Draft #138 HEAD c6e27a4ba16c2cbc72abee20cab79d4bb62caf8e
+│     ├─ scripts/p30_venue02ab_ceramics_role_ownership.py [ADD]
+│     │  ├─ distinguish separate date/venue labels vs inline slash-separated
+│     │  ├─ duplicate same-value role => HOLD, conflicting role => HOLD
+│     │  └─ unique source-local label => REVIEW only, never accepted FIELD
+│     ├─ tests/p30/test_venue02ab_ceramics_role_ownership.py [ADD, 12]
+│     ├─ .github/workflows/eventradar_p30_venue02ab.yml [ADD, exact-head, read-only]
+│     ├─ CI #41111758065 QUEUED at append; official GET=0; artifact pending
+│     └─ NEXT VENUE-02AC selected detail DOM ownership or rotate P0 New Taipei
+├─ Governance Draft PR #8 [TWO CANONICAL DOCS ONLY, SHA-GUARDED, NOT main]
+└─ Production docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [FROZEN]
+   ├─ independent official source topology signal YES/YES; CI GET 0/0
+   ├─ accepted FIELD 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+   ├─ Android CKSMH #17 5 / TWTC #16 39 USER_ATTESTED_PASS; L8 UI PASS
+   └─ Songshan #14 and ibon 39961 mismatch OPEN; Pages/Toolkit UNVERIFIED
+```
+
+- **Source-bound observation:** [Huashan index](https://www.huashan1914.com/exhibition) card includes date/title/venue, while [same-link detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8) has title H1, activity time/location and outbound ACCUPASS link. This is a source-observed single page, not accepted event/session/ticket identity. Ceramics [second detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302) uses separate date and location lines; prior [selected detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302) uses inline slash labels. Different exhibit IDs must not be merged or cross-corroborated; previous duplicate venue candidates remain HOLD.
+- **Safety and exact-head:** A/B PRs each 3 ADD-only files on isolated branches based on exact previous Gate HEAD. Prior A/B artifacts independently checked CRC, SHA256SUMS and audit manifest, including headSHA; new CI pending at append, not claimed PASS. No main/merge/production/Golden/formal data/Pages/Android mutation. Canonical-source dedup maintained (CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue != OPENTIX #05). No Owner action required.
