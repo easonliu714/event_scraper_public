@@ -2855,3 +2855,38 @@ Source main fbf4ca02... [FROZEN; 19 canonical ticket source IDs]
 ```
 
 - **Root cause / next:** A has no bounded immediate sibling table despite exact list/detail headings; next inspect real source-local DOM topology or rotate existing source, never global-date promotion. B START text cannot uniquely bind a time and OPEN is absent at selected local-tag level; rotate P0 New Taipei rather than repeatedly GET same rid. Independent artifact ZIP CRC, SHA256SUMS and manifest validated. A initial CI failures were fixed on final exact HEAD without skipping regressions. Next A L9-AX; B VENUE-02L. All new role candidates remain REVIEW/HOLD, not formal FIELD/GOLDEN/PWA/Android PASS.
+
+### 2026-10-30 10:58 Asia/Taipei — A L9-AX / B VENUE-02L source topology and announcement identity architecture
+
+```text
+Source main fbf4ca02... [FROZEN] / formal 19 ticket platforms
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ P30-L9-AX Draft #106 exact HEAD fa91b729683813f8988273b56ce82237d4b70057
+│     ├─ base #103 HEAD 25e14e60708677e40fd25b701ac211bfc0ffed50
+│     ├─ 3 ADD-only: bounded DOM topology script / negative tests / exact-head workflow
+│     ├─ official DETAIL GET=1 HTTP200, 85144B; exact H1 and one session heading
+│     ├─ depth 0 heading-parent div: 0 table; depth 1 parent div: 1 following div -> 1 table
+│     ├─ one date-token hint is diagnostic only; no row/date/price/event ID promoted
+│     ├─ CI #40994721273 SUCCESS 19/19; artifact #12950643340 CRC/SHA PASS
+│     └─ NEXT L9-AY bounded table row label/role ownership, refund isolation
+├─ B New Taipei Arts Center [P0 New Taipei, separate VENUE source, NOT ticket platform]
+│  └─ P30-VENUE-02L Draft #105 exact HEAD 252e7c6b200da89634f0cee28a1602520e27877a
+│     ├─ base #104 HEAD 66abfb279e597fde03d3a8c737ceb04013c76342
+│     ├─ 3 ADD-only: same-SID monthly bulletin guard / 10 negatives / exact-head workflow
+│     ├─ official index/detail GET=2 HTTP200/200; 60789B/61111B
+│     ├─ exact index sid+title anchor=0 -> HOLD_LIST_SID_TITLE_NOT_UNIQUE
+│     ├─ monthly bulletin SID != individual performance Event ID; same title != same SID
+│     ├─ venue claims ERA/OPENTIX are not verified ticket Event IDs or sale times
+│     ├─ CI #40994655518 SUCCESS 20/20; artifact #12950313009 CRC/SHA PASS
+│     └─ NEXT VENUE-02M bounded index-link root cause or P0 New Taipei rotation
+├─ Governance Draft #8 [two canonical docs serial SHA-guarded append, NOT main]
+└─ Formal release lock [accepted FIELD A/B=0/0; Golden=0; published=0]
+   ├─ ENGINEERING CI A/B PASS/PASS; new SOURCE_QUALITY A/B YES/YES; offline-only 0/0
+   ├─ formal data.json 7fc4fe... / platform_status.json e19ca37c... unchanged
+   ├─ HARD_HOLD_NO_PUBLICATION, no main/production/Pages/Android write
+   ├─ CKSMH #17 5 and TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS preserved
+   └─ Pages live runtime UNVERIFIED; ibon 39961 mismatch OPEN
+```
+
+- **Evidence separation:** A's ancestor table is a source-derived structural candidate only, not a session field. B's HTTP200/200 is source access only; zero exact index anchors means source-local identity HOLD. No publication, Golden or Android promotion from engineering CI. Official detail and index evidence may be individually valid without a confirmed link edge.
+- **Dedup:** Songshan #14, Huashan #13, TWTC #16 and CKSMH #17 are existing ticket/source identities; NTCH venue and OPENTIX #05 are distinct sources. ERA #08 is reused, NTPC Arts Center is a new venue identity. Toolkit path/permission remains UNKNOWN from current accessible repository records; no local Toolkit invocation.
