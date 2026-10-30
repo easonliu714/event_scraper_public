@@ -29,7 +29,7 @@ jobs:
           base=7d9a260624b900cf26208cf65a90fa82ff21c072
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
-          expected="$(printf 'A\\t%s\\n' 'scripts/p30_l9bk_songshan_identity.py' 'tests/p30/test_l9bk_songshan_identity.py' '.github/workflows/eventradar_p30_l9bk.yml' | LC_ALL=C sort)"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9bk_songshan_identity.py' 'tests/p30/test_l9bk_songshan_identity.py' '.github/workflows/eventradar_p30_l9bk.yml' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
           test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
@@ -58,7 +58,7 @@ jobs:
           print('SOURCE_QUALITY_DECISION='+str(a.get('decision')))
           print('SOURCE_QUALITY_COUNTS='+json.dumps({k:v for k,v in a.items() if isinstance(v,(int,bool)) and k!='published'},sort_keys=True))
           print('SOURCE_RECEIPTS='+json.dumps({k:v for k,v in a.items() if k.endswith('Receipt')},sort_keys=True))
-          (root/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(p.read_bytes()).hexdigest()}},sort_keys=True)+'\\n')
+          (root/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(p.read_bytes()).hexdigest()}},sort_keys=True)+'\n')
           PY
           (cd eventradar_l9bk-evidence && sha256sum *.json > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4

@@ -13,7 +13,7 @@ HOME = "https://www.songshanculturalpark.org/exhibition"
 HOST = "www.songshanculturalpark.org"
 HOLD = "HARD_HOLD_NO_PUBLICATION"
 PATH = re.compile(r"^/exhibition/activity/[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$")
-RANGE = re.compile(r"\\s+20\\d{2}-\\d{2}-\\d{2}\\s*-\\s*20\\d{2}-\\d{2}-\\d{2}\\s*$")
+RANGE = re.compile(r"\s+20\d{2}-\d{2}-\d{2}\s*-\s*20\d{2}-\d{2}-\d{2}\s*$")
 AGGREGATES = ("展演攻略", "活動攻略", "活動總覽")
 
 def norm(value):
@@ -55,7 +55,7 @@ def inspect(index_html, detail_html):
     heads = [norm(h.get_text(" ", strip=True)) for h in soup.find_all(["h1","h2","h3"], limit=80)]
     result["exactTitleMatches"] = heads.count(title)
     text = norm(soup.get_text(" ", strip=True))
-    result["detailDateRoleCount"] = len(re.findall(r"活動日期\\s*[：:]", text))
+    result["detailDateRoleCount"] = len(re.findall(r"活動日期\s*[：:]", text))
     if result["exactTitleMatches"] != 1:
         return dict(result, decision="HOLD_DETAIL_TITLE_MISMATCH_OR_AMBIGUITY")
     if result["detailDateRoleCount"] > 1:
