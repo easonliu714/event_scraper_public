@@ -2919,3 +2919,34 @@ Source main fbf4ca02... [FROZEN; 19 canonical ticket-platform IDs]
 ~~~
 
 - **NEXT:** A L9-AZ only bounded same-source row/cell semantic ownership or rotate another existing platform if no unique session identity; B VENUE-02N only bounded two-candidate Xinzhuang index-link disambiguation or rotate next P0 New Taipei source. Neither source evidence nor CI alone authorizes formal FIELD, Golden, publication, Pages or Android PASS.
+
+
+### 2026-10-30 12:53 Asia/Taipei — A/B isolated source-evidence architecture, no release
+
+```text
+Source main fbf4ca02... [FROZEN, 19 canonical source identities]
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ L9-AZ Draft #109 HEAD d95788c3550c9ec80f64afceab89d74ec6bfff57
+│     ├─ base #107 HEAD 177ec796...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official same PRODUCT_ID detail GET=1 HTTP200 / 85144B
+│     ├─ exact heading-owned table=1, header row=3 th, data row=3 td
+│     ├─ data row: date token=1, time token=1, anchor=1; session attr=0
+│     ├─ strict date/time header role=0/0; no session identity/field promotion
+│     └─ CI #41005326759 SUCCESS; artifact #12955665120 CRC/SHA PASS
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not a ticket platform]
+│  └─ VENUE-02N Draft #110 HEAD b2320eaacbaead8424170549ffe1dc055fe52ba5
+│     ├─ base #108 HEAD c65efb5f...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official homepage GET=1 HTTP200 / 57492B, same-origin links=59
+│     ├─ candidate /submenu usein=2 psid=0G286667437547603307
+│     ├─ candidate /submenu usein=5 psid=0G313393761267791561
+│     ├─ both labels 展演活動; distinct index roles, no LIST_PASS/DETAIL/ID
+│     └─ CI #41005330183 SUCCESS; artifact #12954923603 CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs serial SHA-guarded, NOT main]
+└─ Release boundary FIELD A/B=0/0, Golden=0, published=0
+   ├─ new SOURCE_QUALITY A/B YES/YES, offline-only streak 0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; no main/formal JSON/production/Pages/Android write
+   ├─ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS preserved
+   └─ Pages live runtime UNVERIFIED; ibon 39961 mismatch OPEN
+```
+
+- **NEXT:** A inspect row-local anchor same-product/session identity (one bounded source edge only) or rotate existing ticket platform if identity absent; B one controlled candidate `/submenu` GET to distinguish `usein` roles, otherwise rotate next P0 New Taipei venue. Do not infer ticket ID from venue, session time from announcement, or formal FIELD from CI.
