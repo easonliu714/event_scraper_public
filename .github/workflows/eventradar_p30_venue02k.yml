@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: eventradar-venue02j-${{ github.event.pull_request.number }}
+  group: eventradar-venue02k-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 jobs:
   source-quality:
@@ -37,7 +37,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
           python -m py_compile scripts/p30_venue02k_zepp_role.py tests/p30/test_venue02k_zepp_role.py
-          python -m unittest discover -s tests/p30 -p test_venue02k_zepp_role.py -v
+          python -m unittest discover -s tests/p30 -p test_venue02j_zepp_newtaipei.py -v
           python -m unittest discover -s tests/p30 -p test_venue02k_zepp_role.py -v
       - name: At most two normal public GETs and sanitized evidence
         shell: bash
