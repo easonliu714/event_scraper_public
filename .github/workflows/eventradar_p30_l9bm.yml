@@ -1,0 +1,66 @@
+name: EventRadar P30-L9BM exact-head offline root-cause (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9bl-huashan-source]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-l9bm-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  offline-root-cause:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9bm-huashan-encoded-path'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head and immutable production guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=c8ff4835083d794562272a144d428af1e2a3c4d6
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9bm_huashan_route_diagnostic.py' 'tests/p30/test_l9bm_huashan_route_diagnostic.py' '.github/workflows/eventradar_p30_l9bm.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen predecessor and root-cause regressions (zero official GET)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
+          python -m py_compile 'scripts/p30_l9bm_huashan_route_diagnostic.py' 'tests/p30/test_l9bm_huashan_route_diagnostic.py'
+          python -m unittest discover -s tests/p30 -p 'test_l9bl_huashan_source.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_l9bm_huashan_route_diagnostic.py' -v
+      - name: Offline evidence and immutable manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_l9bm-evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          root=pathlib.Path('eventradar_l9bm-evidence')
+          audit={'gate':'P30-L9BM','mode':'OFFLINE_ROOT_CAUSE_ONLY',
+                 'sourceQualityNewFromCI':False,'officialGET':0,'acceptedFields':0,
+                 'goldenAccepted':0,'published':False,
+                 'releaseState':'HARD_HOLD_NO_PUBLICATION',
+                 'headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()}
+          p=root/'audit.json';p.write_text(json.dumps(audit,sort_keys=True)+'\n')
+          (root/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(p.read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd eventradar_l9bm-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_l9bm-evidence
+          path: eventradar_l9bm-evidence/
+          if-no-files-found: ignore
