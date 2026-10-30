@@ -1,0 +1,63 @@
+name: EventRadar P30 VENUE-02L NTPC Arts Center identity review (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02k-zepp-role]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-venue02l-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  source-quality:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02l-ntpc-artcenter-identity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head and immutable formal data guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=66abfb279e597fde03d3a8c737ceb04013c76342
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue02l.yml' 'scripts/p30_venue02l_ntpc_artcenter.py' 'tests/p30/test_venue02l_ntpc_artcenter.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen predecessor and negative regressions
+        run: |
+          python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
+          python -m py_compile scripts/p30_venue02l_ntpc_artcenter.py tests/p30/test_venue02l_ntpc_artcenter.py
+          python -m unittest discover -s tests/p30 -p test_venue02k_zepp_role.py -v
+          python -m unittest discover -s tests/p30 -p test_venue02l_ntpc_artcenter.py -v
+      - name: At most two normal public GETs and sanitized evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p p30-venue02l-evidence
+          python scripts/p30_venue02l_ntpc_artcenter.py --live-one --out p30-venue02l-evidence/audit.json
+          python - <<'PY'
+          import hashlib,json,pathlib
+          root=pathlib.Path('p30-venue02l-evidence');p=root/'audit.json';a=json.loads(p.read_text())
+          assert 1<=a['requestCount']<=2 and a['requestBudget']==2
+          assert a['acceptedFields']==a['goldenAccepted']==0 and a['published'] is False
+          assert a['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert 'rawHtml' not in a and 'cookies' not in a
+          (root/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(p.read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd p30-venue02l-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-venue-02l-source-review
+          path: p30-venue02l-evidence/
+          if-no-files-found: ignore
