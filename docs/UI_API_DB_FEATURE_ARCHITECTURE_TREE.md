@@ -3110,3 +3110,39 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical ticke
 
 - **Source identity and provenance:** CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 remain existing sources; OPENTIX #05 is distinct from NTCH venue. 府中15 is a New Taipei venue discovery identity only; `sid` and `xsmsid` are venue URL parameters, not a verified ticket Event ID. Exact heading/date-role REVIEW cannot promote event datetime, ticket sale status or Golden. Every future accepted field requires source/observed_at/role/decision and conflict rejection.
 - **Safety:** Two isolated Draft PRs, exact-head immutable-data guards, independent artifact SHA256SUMS/manifest/CRC; no merge, main write, production writer/publisher/scheduler/notifier, formal JSON, Pages or Android changes. A next L9-BH and B next VENUE-02V remain parallel.
+
+### 2026-10-30 21:02 Asia/Taipei — A L9-BH / B VENUE-02V exact-head source-quality architecture
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical platform IDs]
+├─ A existing OPENTIX ticket platform #05 [REUSE; distinct from NTCH venue]
+│  └─ L9-BH Draft #125 exact HEAD 027876e9f27444456f3822917ccc3f185ee63258
+│     ├─ frozen parent #123 3885b2b1ce299cc795bd2ac8b3b6a47d83809cc1
+│     ├─ 3 ADD-only: source-derived /event/<digits> title, 17 tests, exact-head CI
+│     ├─ CI #41059836503 SUCCESS 31/31; artifact #12978741251 CRC/SHA PASS
+│     ├─ 2 official GET HTTP200/200; 64 index edges; 1 exact detail H1
+│     ├─ 1 ticket section, 1 venue chooser, 1 session chooser, 1 refund label
+│     ├─ REVIEW only; labels do not prove session datetime, price, sale or refund value
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT L9-BI source-local value roles
+├─ B 府中15 P0 New Taipei venue [nonduplicate; NOT ticket platform]
+│  └─ VENUE-02V Draft #126 exact HEAD d023f55434a17a84630e97a7aba14c694b9c5a0b
+│     ├─ frozen parent #124 272b0909caaba3849769fa1f21144520f0b036bb
+│     ├─ 3 ADD-only: five-cell row-local date/time, 16 negatives, exact-head CI
+│     ├─ CI #41059843014 SUCCESS 32/32; artifact #12977774158 CRC/SHA PASS
+│     ├─ 2 official GET HTTP200/200; 47 index row candidates
+│     ├─ exact film heading=1; local 放映日期 label=1; row↔detail datetime parity=1
+│     ├─ sid is film/detail ID not verified unique screening or ticket Event ID
+│     ├─ 售/報/索 are admission markers, not sale proof; REVIEW only
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT VENUE-02W multi-showing conflicts
+├─ Governance Draft PR #8 [two canonical docs sequential SHA-guarded; NOT main]
+└─ Release boundary HARD_HOLD_NO_PUBLICATION
+   ├─ docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [FROZEN]
+   ├─ platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124 [FROZEN]
+   ├─ SOURCE_QUALITY A/B YES/YES; offline-only streak A/B 0/0
+   ├─ accepted FIELD A/B 0/0; Golden 0; published 0
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages runtime and Toolkit UNKNOWN/UNVERIFIED
+~~~
+
+- **Per-field provenance contract:** Preserve source / observed_at / role / decision per independent field; never equate OPENTIX ticket sections with verified session values, venue film `sid` with ticket Event ID, or date-label text with a published timestamp. Multi-date film details require row-specific venue screening identity and conflict rejection before any acceptance. New A/B evidence is SOURCE_QUALITY REVIEW, not Golden/PWA publication or Android verification.
+- **Safety and dedup:** No main, merge, production scraper/writer/publisher/scheduler/notifier, Golden, formal JSON, Pages or Android write. CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 remain canonical reused sources; NTCH venue and OPENTIX #05 remain distinct. Both artifact ZIPs independently verified against CRC, SHA256SUMS and manifest. Next A L9-BI and B VENUE-02W proceed independently; no Owner action required.
