@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   source-quality:
-    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9bg-eventgo-identity'
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9bg-udn-source-identity'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
