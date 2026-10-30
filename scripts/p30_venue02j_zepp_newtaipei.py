@@ -10,7 +10,7 @@ LIST="https://www.zepp.co.jp/hall/newtaipei/schedule/"
 DETAIL="https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=162473"
 RID="162473"
 HOLD="HARD_HOLD_NO_PUBLICATION"
-CAP=220000
+CAP=512000  # source observed 237434B before cap; bounded 500KB diagnostic, never unlimited
 
 def norm(s):
     return " ".join(unicodedata.normalize("NFKC",str(s)).split())
