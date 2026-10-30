@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   source-quality:
-    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02u-cloudgate-discovery'
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02u-fuzhong15-sessions'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
