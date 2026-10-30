@@ -15,6 +15,10 @@ class Cases(unittest.TestCase):
         self.assertEqual(x["decision"],"REVIEW_ALL_SHOWINGS_EXACT_PARITY_NO_SESSION_ID")
         self.assertEqual((x["matchedShowingCount"],x["missingShowingCount"],x["extraDetailDateCount"]),(2,0,0))
         self.assertIsNone(x["venueScreeningId"])
+        self.assertEqual(x["invalidWeekdayCount"],0)
+    def test_source_weekday_mismatch(self):
+        wrong=idx([("10/14(四)","18:40",TITLE,URL),S])
+        self.assertEqual(inspect(wrong,detail(BOTH))["decision"],"HOLD_WEEKDAY_DATE_MISMATCH")
     def test_missing_second_detail(self):
         x=inspect(INDEX,detail("2026/10/14 18:40"))
         self.assertEqual(x["decision"],"HOLD_INCOMPLETE_ALL_SHOWING_PARITY")
