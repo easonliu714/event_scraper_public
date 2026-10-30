@@ -3373,3 +3373,40 @@ Safety: HARD_HOLD_NO_PUBLICATION; no main, formal data, production or Android wr
 ```
 
 - Earlier same-round `QUEUED` status is historical and superseded by the above exact-head SUCCESS readback. Source-observed sample regressions are not live adapter identity/field acceptance. Independent official-source topology evidence is separate from CI; do not interpret two different Ceramics exhibit IDs as corroboration or the Huashan outbound ACCUPASS link as verified ticket ID. CKSMH #17 Android 5 / TWTC #16 Android 39 USER_ATTESTED_PASS and L8 UI PASS retained; source dedup and `HARD_HOLD_NO_PUBLICATION` unchanged.
+
+
+### 2026-10-31 03:55 Asia/Taipei — Dual-line source-bound identity architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ A canonical Huashan platform #13 [REUSE]
+│  └─ L9-BO Draft PR #139 HEAD 9c719011f09e4b48cec89f00ecca6864d0359740
+│     ├─ base #137 exact 1c8c2426f3310921dfff273daa4cd5f6daac6156
+│     ├─ 3 ADD-only script/test/read-only exact-head workflow
+│     ├─ two official 2026-10-31 cards share date+venue but differ in route/H1
+│     ├─ 這樣啊！ 16:00–17:30; 台灣滋味 10:30–12:00
+│     ├─ source URL/H1 distinct; no venue/date identity collapse; ticket IDs UNKNOWN
+│     ├─ CI #41119325923 SUCCESS predecessor 11 + new 10 = 21/21; GET=0
+│     └─ Artifact #13006973703 ZIP SHA256 34301eda1b613daab6d4d472ed88490c5423dac58a00600719c19583ec65df78
+├─ B Ceramics P0 New Taipei [OFFICIAL VENUE, NOT NEW 19-PLATFORM SOURCE]
+│  └─ VENUE-02AC Draft PR #140 HEAD 454dc37c2b0555b202c2eb13bd76ed5a6f01730d
+│     ├─ base #138 exact c6e27a4ba16c2cbc72abee20cab79d4bb62caf8e
+│     ├─ 3 ADD-only script/test/read-only exact-head workflow
+│     ├─ SID 0Q218338899799849722 = 山彩疊疊-唐榕個展, 10/16–11/15
+│     ├─ SID 0Q238554544743104681 = 殼之巢 — 情景之階, 10/13–11/10
+│     ├─ prior AB TITLE=殼之巢 paired with selected SID=0Q218... = WRONG ID
+│     ├─ strict SID/title/query anti-cross-record refusal; FIELD still HOLD
+│     ├─ CI #41119333456 SUCCESS predecessor 12 + new 12 = 24/24; GET=0
+│     └─ Artifact #13007042752 ZIP SHA256 fab2cf4dc250aa637e884edd8320a0eabb9c8bf6bce32ab0a9f4e12e7e23dadf
+├─ Governance Draft PR #8 [two canonical docs SHA-guarded, NOT main]
+└─ Formal docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+   / docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124
+   ├─ independent ZIP CRC/SHA256SUMS/manifest/headSHA PASS both
+   ├─ SOURCE_QUALITY YES/YES, offline-only consecutive 0/0; CI GET=0/0
+   ├─ accepted FIELD 0/0, Golden 0, published 0, HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH #17 5, TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Toolkit and Pages live runtime UNVERIFIED
+```
+
+- **Official readback:** [Huashan index](https://www.huashan1914.com/exhibition), [first detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8), [second detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E5%8F%B0%E7%81%A3%E6%BB%8B%E5%91%B3); [Ceramics first SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302), [second SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302). These are bounded public observations, not CI official GET, live Adapter PASS or accepted FIELD.
+- **NEXT:** A L9-BP real Huashan card title/date/time role ownership or rotate existing canonical platform. B VENUE-02AD correct prior selected SID/title fixture and field-node ownership, or rotate another P0 New Taipei venue after HOLD. No main/production/Golden/Pages/Android writes.
