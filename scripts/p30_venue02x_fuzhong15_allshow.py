@@ -3,10 +3,11 @@
 import argparse
 import hashlib
 import json
+import re
 from collections import Counter
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
-from p30_venue02u_fuzhong15_sessions import HOME, HOLD, get_one, norm
+from p30_venue02u_fuzhong15_sessions import HOME, HOLD, get_one, norm, safe_detail
 from p30_venue02v_fuzhong15_row_parity import index_rows, year_hint, detail_screening_dates
 from p30_venue02w_fuzhong15_multishow import showing_groups
 
@@ -40,6 +41,33 @@ def inspect_all_showings(index_html, detail_html):
             expected.append(stamp.strftime("%Y/%m/%d %H:%M"))
         except ValueError:
             return dict(result, decision="HOLD_INVALID_INDEX_CALENDAR_DATE")
+    # The displayed weekday is a source-local claim, not an inferred session ID.
+    raw_weekdays = []
+    for tr in BeautifulSoup(index_html, "html.parser").find_all("tr", limit=800):
+        cells = tr.find_all("td", recursive=False)
+        if len(cells) != 5:
+            continue
+        anchors = cells[2].find_all("a", href=True)
+        if len(anchors) != 1 or safe_detail(anchors[0]["href"]) != selected["url"]:
+            continue
+        match = re.fullmatch(r"(\d{1,2})/(\d{1,2})\(([一二三四五六日天])\)",
+                             norm(cells[0].get_text(" ", strip=True)))
+        if match and int(match.group(1)) == month:
+            raw_weekdays.append((int(match.group(1)), int(match.group(2)),
+                                 norm(cells[1].get_text(" ", strip=True)), match.group(3)))
+    if len(raw_weekdays) != len(group):
+        return dict(result, decision="HOLD_WEEKDAY_SCOPE_AMBIGUOUS")
+    invalid = 0
+    for m, day, clock, weekday in raw_weekdays:
+        try:
+            actual = WEEKDAYS[datetime.strptime(
+                f"{year}/{m:02d}/{day:02d} {clock}", "%Y/%m/%d %H:%M").weekday()]
+            invalid += (actual != ("日" if weekday == "天" else weekday))
+        except ValueError:
+            return dict(result, decision="HOLD_INVALID_INDEX_CALENDAR_DATE")
+    result["invalidWeekdayCount"] = invalid
+    if invalid:
+        return dict(result, decision="HOLD_WEEKDAY_DATE_MISMATCH")
     titles = {row["title"] for row in group}
     if len(titles) != 1:
         return dict(result, decision="HOLD_SAME_FILM_TITLE_CONFLICT")
