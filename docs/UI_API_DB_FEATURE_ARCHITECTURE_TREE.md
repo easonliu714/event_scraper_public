@@ -2982,3 +2982,34 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN, 19 canonical sourc
 ~~~
 
 - **NEXT A L9-BB:** classify unsafe row anchor component without repeat GET if possible; otherwise rotate existing ticket platform, do not relax URL validation. **NEXT B VENUE-02P:** one bounded official same-origin detail URL derived from one of six candidate index links and verify index-to-detail identity; no LIST_PASS from link hints alone. P0 New Taipei venue priority continues; existing CKSMH/Songshan/Huashan/TWTC sources must not be duplicated, and NTCH venue != OPENTIX #05.
+
+
+### 2026-10-30 14:53 Asia/Taipei — A/B official source failure taxonomy and venue detail edge
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 ticket-platform IDs]
+├─ A ERA #08 existing ticket source [REUSE, no duplicate platform]
+│  └─ L9-BB Draft #113 exact HEAD 256b51777b60e00729552fa931dcf9ec9fb6c27b
+│     ├─ base #111 HEAD 39c47e1c0b80be366cbeee18d08aa4751494b5d5
+│     ├─ 3 ADD-only script/tests/exact-head workflow; CI #41016639794 48/48 PASS
+│     ├─ one official detail GET HTTP200 / 85144B, SHA 744f98a5e2b5...
+│     ├─ row-local anchor failure root classification NON_HTTPS_SCHEME
+│     ├─ no unsafe navigation, session ID, accepted FIELD or Golden
+│     └─ artifact #12959707275 independent CRC/SHA/manifest PASS; NEXT L9-BC rotate existing source
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not one of 19 ticket sources]
+│  └─ VENUE-02P Draft #114 exact HEAD 6fc5e2701467e859d9d51ac7d08ba5c36cf2309a
+│     ├─ base #112 HEAD 9ff0438d8606a7bdee355ea3566e7f6f723f1fac
+│     ├─ 3 ADD-only script/tests/exact-head workflow; CI #41016643327 50/50 PASS
+│     ├─ official submenu GET HTTP200 / 34926B, 6 detail link hints
+│     ├─ one source-derived /xmdoc/cont?xsmsid=[sanitized] GET HTTP302
+│     ├─ no redirect followed, no exact title or venue event ID accepted
+│     └─ artifact #12958979022 independent CRC/SHA/manifest PASS; NEXT VENUE-02Q redirect taxonomy or P0 rotation
+├─ Governance Draft PR #8 [two canonical docs, serial SHA-guarded append, NOT main]
+└─ HARD_HOLD_NO_PUBLICATION [FIELD A/B=0/0, Golden=0, published=0]
+   ├─ new official SOURCE_QUALITY A/B YES/YES; offline-only streak 0/0
+   ├─ formal data/status blobs unchanged; no main/production/Pages/Android write
+   ├─ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS + L8 UI PASS preserved
+   └─ ibon 39961 title mismatch OPEN; Pages live runtime UNVERIFIED; Toolkit UNKNOWN
+~~~
+
+- **Source identity dedup:** Existing CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 must not be duplicated. NTCH venue remains distinct from OPENTIX #05. Redirect status and non-HTTPS anchor are source-derived negative-quality evidence, not publication permission.
