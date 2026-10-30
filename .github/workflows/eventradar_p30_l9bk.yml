@@ -1,0 +1,69 @@
+name: EventRadar P30-L9-BK exact-head source-quality (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9bj-opentix-value-topology]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-l9bk-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  source-quality:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9bk-songshan-source'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head and immutable production data guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=7d9a260624b900cf26208cf65a90fa82ff21c072
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\\t%s\\n' 'scripts/p30_l9bk_songshan_identity.py' 'tests/p30/test_l9bk_songshan_identity.py' '.github/workflows/eventradar_p30_l9bk.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen predecessor and new fail-closed tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
+          python -m py_compile scripts/p30_l9bk_songshan_identity.py tests/p30/test_l9bk_songshan_identity.py
+          python -m unittest discover -s tests/p30 -p 'test_l9bj_opentix_value_topology.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_l9bk_songshan_identity.py' -v
+      - name: One bounded official index and detail read
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_l9bk-evidence
+          python scripts/p30_l9bk_songshan_identity.py --live-one --out eventradar_l9bk-evidence/audit.json
+          python - <<'PY'
+          import hashlib,json,pathlib
+          root=pathlib.Path('eventradar_l9bk-evidence')
+          p=root/'audit.json'; a=json.loads(p.read_text())
+          assert 1<=a['requestCount']<=a['requestBudget']==2
+          assert a['acceptedFields']==a['goldenAccepted']==0 and a['published'] is False
+          assert a['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert 'rawHtml' not in a and 'cookies' not in a
+          print('SOURCE_QUALITY_DECISION='+str(a.get('decision')))
+          print('SOURCE_QUALITY_COUNTS='+json.dumps({k:v for k,v in a.items() if isinstance(v,(int,bool)) and k!='published'},sort_keys=True))
+          print('SOURCE_RECEIPTS='+json.dumps({k:v for k,v in a.items() if k.endswith('Receipt')},sort_keys=True))
+          (root/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(p.read_bytes()).hexdigest()}},sort_keys=True)+'\\n')
+          PY
+          (cd eventradar_l9bk-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_l9bk-evidence
+          path: eventradar_l9bk-evidence/
+          if-no-files-found: ignore
