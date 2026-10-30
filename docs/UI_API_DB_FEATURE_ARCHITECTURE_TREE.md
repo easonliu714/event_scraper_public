@@ -2890,3 +2890,32 @@ Source main fbf4ca02... [FROZEN] / formal 19 ticket platforms
 
 - **Evidence separation:** A's ancestor table is a source-derived structural candidate only, not a session field. B's HTTP200/200 is source access only; zero exact index anchors means source-local identity HOLD. No publication, Golden or Android promotion from engineering CI. Official detail and index evidence may be individually valid without a confirmed link edge.
 - **Dedup:** Songshan #14, Huashan #13, TWTC #16 and CKSMH #17 are existing ticket/source identities; NTCH venue and OPENTIX #05 are distinct sources. ERA #08 is reused, NTPC Arts Center is a new venue identity. Toolkit path/permission remains UNKNOWN from current accessible repository records; no local Toolkit invocation.
+
+
+### 2026-10-30 12:01 Asia/Taipei — A L9-AY / B VENUE-02M source-bound architecture (NO PUBLISH)
+
+~~~text
+Source main fbf4ca02... [FROZEN; 19 canonical ticket-platform IDs]
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ L9-AY Draft #107 HEAD 177ec7960c37cefc69fd04719591120a43559130
+│     ├─ base #106 fa91b729...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official detail GET=1 HTTP200, 85144B; PRODUCT_ID P1GFK34F exact H1
+│     ├─ bounded session-heading-owned table=1, rows=2, row-local date hints=1
+│     ├─ refund/ambiguous row isolation; REVIEW hint only, no SESSION ID/field
+│     └─ CI #41000485930 30/30 SUCCESS; Artifact #12952943416 CRC/SHA PASS
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not one of 19 ticket platforms]
+│  └─ VENUE-02M Draft #108 HEAD c65efb5f6b977e9ae24ae0572a1f316b73824fe7
+│     ├─ base #105 252e7c6b...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official homepage GET=1 HTTP200, 57492B; same-origin links=59
+│     ├─ two event-index candidates -> HOLD_INDEX_DISCOVERY_ZERO_OR_AMBIGUOUS
+│     ├─ no second GET, no LIST/DETAIL/IDENTITY/field/ticket ID acceptance
+│     └─ CI #41000492179 31/31 SUCCESS; Artifact #12952788796 CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs serial SHA-guarded append, NOT main]
+└─ Release boundary [FIELD A/B=0/0, Golden=0, published=0]
+   ├─ NEW SOURCE_QUALITY A/B=YES/YES; offline-only streak=0/0
+   ├─ HARD_HOLD_NO_PUBLICATION, formal data/status blobs unchanged
+   ├─ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS, L8 UI PASS retained
+   └─ Pages live runtime UNVERIFIED; ibon 39961 mismatch OPEN
+~~~
+
+- **NEXT:** A L9-AZ only bounded same-source row/cell semantic ownership or rotate another existing platform if no unique session identity; B VENUE-02N only bounded two-candidate Xinzhuang index-link disambiguation or rotate next P0 New Taipei source. Neither source evidence nor CI alone authorizes formal FIELD, Golden, publication, Pages or Android PASS.
