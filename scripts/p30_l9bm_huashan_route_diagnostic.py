@@ -16,8 +16,8 @@ def classify_href(raw):
             url.password or url.port or url.query or url.fragment):
         return "UNSAFE", None
     path = unquote(url.path)
-    if "%" in path or any(ord(c) < 32 for c in path) or
-            not re.fullmatch(r"/exhibition/[^/]{1,100}/?", path):
+    if ("%" in path or any(ord(c) < 32 for c in path) or
+            not re.fullmatch(r"/exhibition/[^/]{1,100}/?", path)):
         return "NON_DETAIL_ROUTE", None
     slug = path.split("/")[2]
     if not re.fullmatch(r"[\w\-]+", slug, flags=re.UNICODE):
