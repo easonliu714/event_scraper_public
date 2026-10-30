@@ -3077,3 +3077,36 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical platf
 - **B ENGINEERING VENUE-02T:** [Draft PR #122](https://github.com/easonliu714/event_scraper_public/pull/122), base frozen #120 HEAD `d83e7a8b6da4e11e7df213f04a71d422ba7d4215`, exact HEAD `1dfe24da6282dfc85e52cfb804e1f432c0517c01`; 3 ADD-only script/test/workflow files, immutable data guard. [Exact-head CI #41044773243](https://github.com/easonliu714/event_scraper_public/actions/runs/41044773243) SUCCESS, predecessor 8/8 + new 12/12 tests. [Artifact #12972181139](https://github.com/easonliu714/event_scraper_public/actions/runs/41044773243/artifacts/12972181139) ZIP SHA256 `2f67b35a273128920932a6bf1e376e2e879185f12ab6f369e69334a2f3e4dcc2`; independent ZIP CRC, audit manifest SHA256 and SHA256SUMS readback PASS.
 - **B NEW SOURCE_QUALITY:** after Shulin #120 identity mismatch, rotate to nonduplicate **Cloud Gate Theater P0 New Taipei**. One official `https://www.cloudgate.org.tw/cgt` GET HTTP200/123426 bytes; strict HTTPS same-origin performance/event/program/show path candidates **0**. No second GET; decision **`HOLD_NO_SOURCE_DERIVED_DETAIL_EDGE`**, no LIST_PASS, venue Event ID, ticket ID or FIELD. **NEXT B VENUE-02U:** do not repeat Cloud Gate synthetic path checks; prioritize another nonduplicate P0 New Taipei official source (Fuzhong15 or Ceramics) for a bounded real index/detail edge, or diagnose route structure only from permitted new source evidence.
 - **Engineering/source/release separation:** A/B new official SOURCE_QUALITY diagnostic YES/YES (negative identity/path evidence, not formal acceptance); offline-only consecutive **0/0**. Accepted formal FIELD A/B **0/0**, Golden **0**, published **0**, `HARD_HOLD_NO_PUBLICATION` persists. No merge/main/production Scraper/Writer/Publisher/Scheduler/Notifier/formal JSON/Pages/Android write. Preserve CKSMH #17 5, TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS; ibon 39961 mismatch OPEN. Songshan #14/Huashan #13/TWTC #16/CKSMH #17 dedup; NTCH venue source distinct from OPENTIX #05. No Owner action required.
+
+### 2026-10-30 20:02 Asia/Taipei — A L9-BG / B VENUE-02U exact-head architecture and source-role evidence
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical ticket platform IDs]
+├─ A existing UDN ticket platform #06 [REUSE, no duplicate]
+│  └─ L9-BG Draft #123 exact HEAD 3885b2b1ce299cc795bd2ac8b3b6a47d83809cc1
+│     ├─ predecessor #121 HEAD 0e06522defba61f642c4085d58641db491efb43d
+│     ├─ 3 ADD-only: bounded same-origin UDN source script, 14 negative tests, exact-head CI
+│     ├─ official index/detail HTTP200/200; 89964B/153256B; 6 strict source-derived edges
+│     ├─ 3 detail H1/H2/H3; exact index-title matches=0 → HOLD_TITLE_MISMATCH_OR_AMBIGUITY
+│     ├─ CI #41052180894 SUCCESS 25/25; Artifact #12974827452 ZIP CRC/SHA PASS
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT L9-BH OPENTIX #05 identity role
+├─ B 府中15 P0 New Taipei official screening venue [NOT in 19 ticket platforms]
+│  └─ VENUE-02U Draft #124 exact HEAD 272b0909caaba3849769fa1f21144520f0b036bb
+│     ├─ predecessor #122 HEAD 1dfe24da6282dfc85e52cfb804e1f432c0517c01
+│     ├─ 3 ADD-only: strict same-sid screening script, 16 negatives, exact-head CI
+│     ├─ official index/detail HTTP200/200; 94372B/54926B; 45 source-derived screening edges
+│     ├─ one exact index/detail heading + one 放映日期 label → REVIEW only
+│     ├─ screening sid ≠ ticket Event ID; label ≠ accepted date value; no sale/admission inference
+│     ├─ CI #41052188097 SUCCESS 28/28; Artifact #12974424424 ZIP CRC/SHA PASS
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT VENUE-02V row/date/session provenance
+├─ Governance Draft PR #8 [serial SHA-guarded two-doc append; NOT main]
+└─ Formal release boundary
+   ├─ docs/data.json 7fc4fe... / platform_status.json e19ca37c... [FROZEN]
+   ├─ NEW SOURCE_QUALITY A/B=YES/YES; offline-only consecutive A/B=0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; accepted FIELD A/B=0/0, Golden=0, published=0
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 Core UI PASS
+   └─ ibon 39961 mismatch OPEN; official Pages runtime UNVERIFIED; Toolkit UNKNOWN
+~~~
+
+- **Source identity and provenance:** CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 remain existing sources; OPENTIX #05 is distinct from NTCH venue. 府中15 is a New Taipei venue discovery identity only; `sid` and `xsmsid` are venue URL parameters, not a verified ticket Event ID. Exact heading/date-role REVIEW cannot promote event datetime, ticket sale status or Golden. Every future accepted field requires source/observed_at/role/decision and conflict rejection.
+- **Safety:** Two isolated Draft PRs, exact-head immutable-data guards, independent artifact SHA256SUMS/manifest/CRC; no merge, main write, production writer/publisher/scheduler/notifier, formal JSON, Pages or Android changes. A next L9-BH and B next VENUE-02V remain parallel.
