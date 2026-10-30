@@ -1,0 +1,71 @@
+name: EventRadar P30-VENUE02AD one bounded Ceramics detail (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02ac-ceramics-sid-title]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-venue02ad-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  exact-sid-live-detail:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02ad-ceramics-live-sid-fixture'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head and frozen production guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=454dc37c2b0555b202c2eb13bd76ed5a6f01730d
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$( { printf 'A\t%s\n' 'scripts/p30_venue02ad_ceramics_live_sid_probe.py' 'tests/p30/test_venue02ad_ceramics_live_sid_probe.py' '.github/workflows/eventradar_p30_venue02ad.yml'; printf 'M\t%s\n' 'tests/p30/test_venue02ab_ceramics_role_ownership.py'; } | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Corrected AB fixture, AC identity and AD regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'requests==2.32.5'
+          python -m py_compile scripts/p30_venue02ad_ceramics_live_sid_probe.py tests/p30/test_venue02ad_ceramics_live_sid_probe.py
+          python -m unittest discover -s tests/p30 -p 'test_venue02ab_ceramics_role_ownership.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02ac_ceramics_sid_title.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02ad_ceramics_live_sid_probe.py' -v
+      - name: ONE bounded first-party selected SID GET, HOLD is not source PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_venue02ad-evidence
+          python scripts/p30_venue02ad_ceramics_live_sid_probe.py --live-one --out eventradar_venue02ad-evidence/source_audit.json
+      - name: SHA256 evidence manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('eventradar_venue02ad-evidence')
+          d={'gate':'P30-VENUE-02AD','mode':'CORRECTED_FIXTURE_PLUS_ONE_BOUNDED_LIVE_GET',
+             'acceptedFields':0,'goldenAccepted':0,'published':False,
+             'releaseState':'HARD_HOLD_NO_PUBLICATION',
+             'headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()}
+          a=p/'audit.json';a.write_text(json.dumps(d,sort_keys=True)+'\n')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{x.name:hashlib.sha256(x.read_bytes()).hexdigest() for x in p.glob('*.json') if x.name!='manifest.json'}},sort_keys=True)+'\n')
+          PY
+          (cd eventradar_venue02ad-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_venue02ad-evidence
+          path: eventradar_venue02ad-evidence/
+          if-no-files-found: ignore
