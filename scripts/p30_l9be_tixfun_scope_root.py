@@ -15,7 +15,7 @@ def inspect_scopes(html):
     scopes=[]
     for depth in range(1,6):
         parent=parent.parent
-        if parent is None or parent.name in ("body","html"): break
+        if parent is None or parent.name in ("body","html","[document]"): break
         nodes=parent.find_all(["th","dt","strong","b","label","span","div","p","li"],limit=350)
         exact={k:0 for k in ROLE_PATTERNS}; hints=0
         for node in nodes:
@@ -26,6 +26,7 @@ def inspect_scopes(html):
             if role: exact[role]+=1
             elif any(t in s for t in TOKENS): hints+=1
         scopes.append(dict(depth=depth,scannedNodes=len(nodes),exactLabelCounts=exact,nonExactRoleHints=hints))
+        if parent.name=="main": break
     if not scopes:
         return dict(decision="HOLD_NO_BOUNDED_HEADING_SCOPE",acceptedFields=0)
     found=sum(sum(s["exactLabelCounts"].values()) for s in scopes)
