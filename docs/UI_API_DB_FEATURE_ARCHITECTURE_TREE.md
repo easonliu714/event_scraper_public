@@ -3353,3 +3353,23 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
 
 - **Source-bound observation:** [Huashan index](https://www.huashan1914.com/exhibition) card includes date/title/venue, while [same-link detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8) has title H1, activity time/location and outbound ACCUPASS link. This is a source-observed single page, not accepted event/session/ticket identity. Ceramics [second detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302) uses separate date and location lines; prior [selected detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302) uses inline slash labels. Different exhibit IDs must not be merged or cross-corroborated; previous duplicate venue candidates remain HOLD.
 - **Safety and exact-head:** A/B PRs each 3 ADD-only files on isolated branches based on exact previous Gate HEAD. Prior A/B artifacts independently checked CRC, SHA256SUMS and audit manifest, including headSHA; new CI pending at append, not claimed PASS. No main/merge/production/Golden/formal data/Pages/Android mutation. Canonical-source dedup maintained (CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue != OPENTIX #05). No Owner action required.
+
+### 2026-10-31 — L9-BN / VENUE-02AB final exact-head artifact integrity (supersedes pending)
+
+```text
+A canonical Huashan #13 L9-BN Draft #137
+  HEAD 1c8c2426f3310921dfff273daa4cd5f6daac6156
+  CI #41111749743 SUCCESS: predecessor 11 + new 11 = 22/22
+  Artifact #13002939397 SHA256 5a53b376d704f7b40cced9a323761e4e375bfe2538727586caca8bb2ff3c83f4
+  independent ZIP CRC / SHA256SUMS / manifest / exact headSHA PASS
+B P0 New Taipei Ceramics VENUE-02AB Draft #138
+  HEAD c6e27a4ba16c2cbc72abee20cab79d4bb62caf8e
+  CI #41111758065 SUCCESS: predecessor 10 + new 12 = 22/22
+  Artifact #13002998660 SHA256 243106f1798d70800804c3ce579cd670b59a7d04e6fc18f2943f3017f54fb0f8
+  independent ZIP CRC / SHA256SUMS / manifest / exact headSHA PASS
+Both: first true CI failure NONE; official CI GET 0; no accepted FIELD/Golden/publish
+Next: A L9-BO source-card DOM binding; B VENUE-02AC selected-detail DOM owner
+Safety: HARD_HOLD_NO_PUBLICATION; no main, formal data, production or Android writes
+```
+
+- Earlier same-round `QUEUED` status is historical and superseded by the above exact-head SUCCESS readback. Source-observed sample regressions are not live adapter identity/field acceptance. Independent official-source topology evidence is separate from CI; do not interpret two different Ceramics exhibit IDs as corroboration or the Huashan outbound ACCUPASS link as verified ticket ID. CKSMH #17 Android 5 / TWTC #16 Android 39 USER_ATTESTED_PASS and L8 UI PASS retained; source dedup and `HARD_HOLD_NO_PUBLICATION` unchanged.
