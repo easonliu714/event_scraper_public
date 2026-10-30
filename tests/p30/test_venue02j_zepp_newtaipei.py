@@ -23,5 +23,5 @@ class Cases(unittest.TestCase):
     def test_other_domain(self):self.check(L.replace("www.zepp.co.jp","evil.example"),D,"HOLD_LIST_RID_OR_TITLE")
     def test_missing_detail_title(self):self.check(L,D.replace("<h3>40 Fingers</h3>",""),"HOLD_DETAIL_ARTIST_NOT_UNIQUE")
     def test_duplicate_detail_title(self):self.check(L,D+"<h3>40 Fingers</h3>","HOLD_DETAIL_ARTIST_NOT_UNIQUE")
-    def test_missing_start(self):self.check(L,D.replace("19:30",""),"HOLD_START_ROLE_UNVERIFIED")
+    def test_realistic_300kb_body(self):self.check(L+" "*300000,D,"REVIEW_ZEPP_SAME_RID_LIST_DETAIL_NO_FIELDS")\n    def test_oversize_513kb(self):self.check(L+" "*513000,D,"HOLD_INPUT")\n    def test_missing_start(self):self.check(L,D.replace("19:30",""),"HOLD_START_ROLE_UNVERIFIED")
 if __name__=="__main__":unittest.main()
