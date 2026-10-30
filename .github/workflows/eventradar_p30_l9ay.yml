@@ -1,0 +1,66 @@
+name: EventRadar P30 l9ay source-quality exact-head (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9ax-era-topology]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-l9ay-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  source-quality:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9ay-era-row-role'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head and immutable formal data guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=fa91b729683813f8988273b56ce82237d4b70057
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ay.yml' 'scripts/p30_l9ay_era_row_role.py' 'tests/p30/test_l9ay_era_row_role.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen predecessor and fail-closed regressions
+        run: |
+          python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
+          python -m py_compile scripts/p30_l9ay_era_row_role.py tests/p30/test_l9ay_era_row_role.py
+          python -m unittest discover -s tests/p30 -p test_l9aw_era_session_role.py -v
+          python -m unittest discover -s tests/p30 -p test_l9ax_era_topology.py -v
+          python -m unittest discover -s tests/p30 -p test_l9ay_era_row_role.py -v
+      - name: Bounded official GET and sanitized SHA evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p p30-l9ay-evidence
+          python scripts/p30_l9ay_era_row_role.py --live-one --out p30-l9ay-evidence/audit.json
+          python - <<'PY'
+          import hashlib,json,pathlib
+          root=pathlib.Path('p30-l9ay-evidence')
+          p=root/'audit.json'
+          a=json.loads(p.read_text())
+          assert 1<=a['requestCount']<=a['requestBudget']<=2
+          assert a['acceptedFields']==a['goldenAccepted']==0 and a['published'] is False
+          assert a['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert 'rawHtml' not in a and 'cookies' not in a
+          (root/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256(p.read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd p30-l9ay-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-l9-ay-source-review
+          path: p30-l9ay-evidence/
+          if-no-files-found: ignore
