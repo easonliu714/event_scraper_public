@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from p30_l9av_era_source_role import HOME, DETAIL, HOLD, CAP, norm, get_one, inspect as prior_inspect
 
-DATE = re.compile(r"\b20\d{2}[/.-]\d{1,2}[/.-]\d{1,2}\b")
+# Unicode Chinese label immediately before a digit is a word character; use digit guards, not \b.\nDATE = re.compile(r"(?<!\d)20\d{2}[/.-]\d{1,2}[/.-]\d{1,2}(?!\d)")
 HEADINGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
 
 def after_heading(heading, target, max_siblings=4):
