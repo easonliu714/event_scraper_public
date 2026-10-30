@@ -38,8 +38,10 @@ class Cases(unittest.TestCase):
     def test_duplicate_label(self):
         self.assertEqual(inspect(INDEX,detail(BOTH)+"<p>放映日期：</p>")["decision"],"HOLD_DETAIL_TITLE_LABEL_OR_CAP")
     def test_invalid_calendar_date(self):
-        bad=("10/32(五)","20:00",TITLE,URL)
-        self.assertEqual(inspect(idx([R,bad]),detail(BOTH))["decision"],"HOLD_INVALID_INDEX_CALENDAR_DATE")
+        feb1=("02/14(六)","18:40",TITLE,URL)
+        feb2=("02/30(一)","20:00",TITLE,URL)
+        febindex=idx([feb1,feb2]).replace("2026年10月放映場次表","2026年02月放映場次表")
+        self.assertEqual(inspect(febindex,detail(BOTH))["decision"],"HOLD_INVALID_INDEX_CALENDAR_DATE")
     def test_no_index_year(self):
         self.assertEqual(inspect(INDEX.replace("2026年10月放映場次表","放映場次表"),detail(BOTH))["decision"],"HOLD_INDEX_YEAR_MONTH_AMBIGUOUS")
     def test_unrelated_film_not_same_session(self):
