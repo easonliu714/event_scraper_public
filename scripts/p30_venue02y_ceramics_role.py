@@ -40,7 +40,7 @@ def index_edges(html):
         if not title:
             imgs=a.find_all("img",alt=True,limit=3)
             title=norm(imgs[0]["alt"]) if len(imgs)==1 else ""
-        title=re.sub(r"^標題[：:]\\s*","",title)
+        title=re.sub(r"^標題[：:]\s*","",title)
         if not 3<=len(title)<=160:
             continue
         role="REGISTRATION" if any(w in title for w in ("申請","徵件簡章","報名")) else "EXHIBITION_CANDIDATE"
@@ -62,8 +62,8 @@ def inspect(index_html,detail_html):
     headings=[norm(h.get_text(" ",strip=True)) for h in soup.find_all(["h1","h2","h3","h4"],limit=100)]
     result["exactTitleMatches"]=headings.count(title)
     txt=norm(soup.get_text(" ",strip=True))
-    result["detailExhibitionDateRoleCount"]=len(re.findall(r"展覽日期\\s*[：:]",txt))
-    result["detailRegistrationRoleCount"]=len(re.findall(r"報名期間\\s*[：:]",txt))
+    result["detailExhibitionDateRoleCount"]=len(re.findall(r"展覽日期\s*[：:]",txt))
+    result["detailRegistrationRoleCount"]=len(re.findall(r"報名期間\s*[：:]",txt))
     if result["exactTitleMatches"]!=1:
         return dict(result,decision="HOLD_DETAIL_TITLE_MISMATCH_OR_AMBIGUITY")
     if result["detailRegistrationRoleCount"] or result["detailExhibitionDateRoleCount"]>1:
