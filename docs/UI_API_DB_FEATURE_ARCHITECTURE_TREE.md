@@ -3031,3 +3031,40 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 ticket-platform
 - **A ENGINEERING:** [Draft PR #117](https://github.com/easonliu714/event_scraper_public/pull/117) `P30-L9-BD` exact HEAD `e13e6988ab85a929b248c919eef1043e180c86bd`, base #115 HEAD `675678e68b4448e23df608878671b59499f0f8a9`. Three ADD-only script/test/exact-head read-only CI files. One allowlisted official TixFun #09 same-PRODUCT_ID detail GET, local heading-owned exact label classification for PERFORMANCE_DATE / PRICE / SALE_TIME / REFUND; never accept field values. [CI #41029345199](https://github.com/easonliu714/event_scraper_public/actions/runs/41029345199) **QUEUED/PENDING** at governance append; SOURCE_QUALITY outcome **PENDING** (do not claim official GET succeeded before artifact readback).
 - **B ENGINEERING:** [Draft PR #118](https://github.com/easonliu714/event_scraper_public/pull/118) `P30-VENUE-02R` exact HEAD `e55c8f22ca287c2e38da749697359691f8a29a8d`, base #116 HEAD `60fb431f3d63646e717362722c23a45cf2cd5bf4`. Three ADD-only script/test/exact-head read-only CI files. Rotate from Xinzhuang NON_DETAIL_TARGET redirect HOLD to nonduplicate P0 New Taipei Shulin Arts Center official index, exactly one normal GET and HTTPS same-origin link-role diagnostics; no detail navigation. [CI #41029352597](https://github.com/easonliu714/event_scraper_public/actions/runs/41029352597) **QUEUED/PENDING** at governance append; SOURCE_QUALITY outcome **PENDING**.
 - **Release and next:** A/B accepted FIELD 0/0, Golden 0, published 0, `HARD_HOLD_NO_PUBLICATION`. CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS retained; ibon 39961 mismatch OPEN. No main/production/Pages/Android/formal JSON write, no merge. NEXT independently read exact-head CI job steps and artifacts; if failure fix first true root cause on isolated PR branches; then A evaluate local label ownership vs sales/refund ambiguity and B advance only if Shulin LIST/DETAIL evidence genuinely supports it. Offline-only streak pending CI/source receipts, not invented.
+
+
+### 2026-10-30 17:55 Asia/Taipei — A/B source-first diagnostic architecture (Draft-only)
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical platform IDs]
+├─ A TixFun #09 existing ticket source [REUSE, not new platform]
+│  ├─ L9-BD #117 exact HEAD e13e6988ab85a929b248c919eef1043e180c86bd
+│  │  └─ CI #41029345199 SUCCESS 21/21; artifact #12965570890 CRC/SHA PASS
+│  │     1 official detail HTTP200, heading=1, 0 local exact labels
+│  └─ L9-BE #119 exact HEAD f9061f2d1e4c9a2ef991ea07ce593a29f359d43e
+│     ├─ initial CI #41037244174 FAIL (scope crossed main/footer)
+│     ├─ root fix: stop at main/document; no weakened test
+│     ├─ corrected CI #41037311140 SUCCESS 15/15
+│     ├─ artifact #12968761706 independent ZIP CRC/SHA256SUMS/manifest PASS
+│     ├─ 1 official detail GET HTTP200/43984B, heading=1
+│     ├─ 5 bounded ancestor scopes, exact performance/price/sale/refund labels 0
+│     └─ HOLD_NO_EXACT_SCOPE_LABELS_ROTATE_SOURCE; NEXT L9-BF other existing source
+├─ B Shulin Arts Center P0 New Taipei [nonduplicate venue source]
+│  ├─ VENUE-02R #118 HEAD e55c8f22ca287c2e38da749697359691f8a29a8d
+│  │  └─ CI #41029352597 SUCCESS 18/18; artifact #12965142009 CRC/SHA PASS
+│  │     1 official index GET HTTP200, 6 xmdoc link-role groups, no LIST_PASS
+│  └─ VENUE-02S #120 exact HEAD d83e7a8b6da4e11e7df213f04a71d422ba7d4215
+│     ├─ CI #41037248016 SUCCESS 16/16; artifact #12968796405 CRC/SHA PASS
+│     ├─ index GET HTTP200/49836B, 9 strict same-origin detail candidates
+│     ├─ 1 selected source-derived detail GET HTTP200/41047B
+│     ├─ index label vs detail heading exact matches=0
+│     └─ HOLD_DETAIL_TITLE_MISMATCH_OR_AMBIGUITY; NEXT VENUE-02T P0 NTPC rotation
+├─ Governance Draft PR #8 [two canonical docs serialized SHA-guarded, NOT main]
+└─ Release boundary FIELD A/B=0/0, Golden=0, published=0
+   ├─ NEW SOURCE_QUALITY A/B YES/YES; offline-only consecutive 0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; no production/main/formal JSON/Pages/Android write
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages runtime UNVERIFIED; Toolkit UNKNOWN
+~~~
+
+- **Source dedup:** Reuse CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue source distinct from OPENTIX #05. No venue DataSN as ticket ID, no announcement date as performance time. **NEXT:** A rotate away from TixFun zero labels; B rotate away from Shulin title mismatch, prioritize other nonduplicate P0 New Taipei official source; no synthetic-only repeat loops.
