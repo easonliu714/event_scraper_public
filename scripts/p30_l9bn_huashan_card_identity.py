@@ -5,9 +5,24 @@ Observed public index card contains date/title/venue while its linked detail H1
 contains title alone. Never infer identity from whole-card text or URL alone.
 """
 import hashlib
+import re
+from urllib.parse import unquote, urljoin, urlsplit
 from bs4 import BeautifulSoup
-from p30_l9bm_huashan_route_diagnostic import classify_href
-from p30_l9bl_huashan_source import norm
+from p30_l9bl_huashan_source import norm, HOME, HOST
+
+def classify_href(raw):
+    """Strict source-observed Unicode path: only fullwidth ！ punctuation added."""
+    if not raw or raw.startswith("//") or any(c in raw for c in ("\\", "\n", "\r", "\t")):
+        return "UNSAFE", None
+    u=urlsplit(urljoin(HOME,raw))
+    if (u.scheme!="https" or u.hostname!=HOST or u.username or u.password
+            or u.port or u.query or u.fragment):
+        return "UNSAFE", None
+    decoded=unquote(u.path)
+    if ("%" in decoded or any(ord(c)<32 for c in decoded)
+            or not re.fullmatch(r"/exhibition/[\w！-]{1,150}/?",decoded,flags=re.UNICODE)):
+        return "UNSAFE", None
+    return ("ENCODED_UNICODE_DETAIL" if "%" in u.path else "PLAIN_DETAIL"),u.geturl()
 
 HOLD = "HARD_HOLD_NO_PUBLICATION"
 
