@@ -3272,3 +3272,34 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
 - **Independent evidence:** Both artifact ZIPs downloaded and independently checked: CRC clean, manifest SHA256 and SHA256SUMS match. A [PR #131](https://github.com/easonliu714/event_scraper_public/pull/131) / [CI #41085556226](https://github.com/easonliu714/event_scraper_public/actions/runs/41085556226); B [PR #132](https://github.com/easonliu714/event_scraper_public/pull/132) / [CI #41085604504](https://github.com/easonliu714/event_scraper_public/actions/runs/41085604504).
 - **CI root cause / remediation:** Both first-run exact-head checks failed before official GET because workflow `printf` was double-escaped. One atomic multi-file correction commit per branch fixed workflow escaping and Python regex; final exact-head CI passed without weakening guard. Do not equate Songshan list HTTP200 with identity PASS or Ceramics exhibit date label with accepted date/time, sale, admission, ticket Event ID or Golden. Per-field `source/observed_at/role/decision` and conflict refusal remain mandatory.
 - **Safety/dedup:** No main, merge, production Scraper/Writer/Publisher/Scheduler/Notifier, formal JSON, Pages or Android writes. Reuse Songshan #14, Huashan #13, TWTC #16, CKSMH #17; NTCH venue != OPENTIX #05. Local Toolkit path/permissions UNKNOWN, not invoked; formal Pages live UI UNVERIFIED. No Owner action required.
+
+
+### 2026-10-31 00:59 Asia/Taipei — A P30-L9-BL / B P30-VENUE-02Z — dual workstream architecture/evidence boundary (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ A canonical platform #13 Huashan (reuse ID; no duplicate adapter)
+│  └─ L9-BL Draft #133 HEAD c8ff4835083d794562272a144d428af1e2a3c4d6
+│     ├─ base #131 abcd61bff97a08ace5f9c221a39f256115f2055c
+│     ├─ 3 ADD-only files; exact-head CI #41094843830 SUCCESS (12+11=23)
+│     ├─ artifact #12996041125 SHA256 966a558048fae55791c02ff6922cc78c2ac9d4e0b4a27c2039dce410ca202579
+│     ├─ index HTTP200 318407B, strict detail edges 0; detail GET 0
+│     └─ HOLD_LIST_ZERO_OR_TITLE_CONFLICT; Songshan #14 mismatch remains OPEN
+├─ B P0 New Taipei Ceramics venue (not canonical 19 ticket platforms)
+│  └─ VENUE-02Z Draft #134 HEAD 126d797bf999d640c8250be92c888c54b6ed6b1f
+│     ├─ base #132 4276d0f3ddc95997ca52b527a511a8da426daacf
+│     ├─ 3 ADD-only files; exact-head CI #41094853593 SUCCESS (13+10=23)
+│     ├─ artifact #12995626775 SHA256 7d6df24f11421d5d1c2725d09cbc50d06be8030a108f51959a9680f1fc08b71d
+│     ├─ index/detail HTTP200/200; edges 6, registration excluded 1, exact title 1
+│     ├─ bounded exhibition date ranges 0, venue candidates 2
+│     └─ HOLD_DATE_RANGE_MISSING_INVALID_OR_AMBIGUOUS; no accepted fields
+├─ Docs Draft #8 canonical docs [sequential SHA-guarded append; NOT main]
+└─ Formal data/status blobs 7fc4fe... / e19ca37c... [FROZEN]
+   ├─ SOURCE_QUALITY new negative evidence YES/YES; offline-only 0/0
+   ├─ FIELD A/B 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages/Toolkit UNVERIFIED
+```
+
+- **NEXT:** A L9-BM classify Huashan list path/title mismatch without repeating unchanged GET; rotate another canonical source if blocked. B VENUE-02AA diagnose date/venue DOM role scope from existing evidence or rotate within P0 New Taipei. Do not promote field values from unbound labels or duplicate venue candidates.
+- **Independent evidence:** [A CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41094843830) / [A Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41094843830/artifacts/12996041125); [B CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41094853593) / [B Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41094853593/artifacts/12995626775). Both ZIP CRC, SHA256SUMS and manifest independently verified. Main, formal data/status, Pages, Android and production writer untouched; `HARD_HOLD_NO_PUBLICATION` persists.
