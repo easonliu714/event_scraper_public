@@ -29,7 +29,7 @@ jobs:
           base=454dc37c2b0555b202c2eb13bd76ed5a6f01730d
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
-          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02ad_ceramics_live_sid_probe.py' 'tests/p30/test_venue02ad_ceramics_live_sid_probe.py' '.github/workflows/eventradar_p30_venue02ad.yml'; printf 'M\t%s\n' 'tests/p30/test_venue02ab_ceramics_role_ownership.py' | LC_ALL=C sort)"
+          expected="$( { printf 'A\t%s\n' 'scripts/p30_venue02ad_ceramics_live_sid_probe.py' 'tests/p30/test_venue02ad_ceramics_live_sid_probe.py' '.github/workflows/eventradar_p30_venue02ad.yml'; printf 'M\t%s\n' 'tests/p30/test_venue02ab_ceramics_role_ownership.py'; } | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
           test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
