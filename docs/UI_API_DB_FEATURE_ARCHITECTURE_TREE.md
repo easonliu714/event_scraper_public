@@ -3172,3 +3172,47 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN, 19 canonical platf
 
 - **Per-field provenance:** A local session chooser label is not a verified session value; multiple screenings sharing one venue film/detail URL require distinct row date/time identity with independent `source/observed_at/role/decision`. Refund, sale, admission, screening and performance dates remain separate roles; ambiguity stays HOLD.
 - **Safety/dedup:** No main, merge, production scraper/writer/publisher/scheduler/notifier, Golden, formal JSON, Pages or Android write. P0 Taipei/New Taipei dedup enforced; CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 reused; NTCH venue distinct from OPENTIX #05. Both lines new source-quality evidence; offline-only 0/0.
+
+### 2026-10-30 22:57 Asia/Taipei — A L9-BJ / B VENUE-02X read-only source-quality architecture
+
+```text
+EventRadar Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+  production docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [NO WRITE]
+  production docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124 [19 IDs; NO WRITE]
+  Docs Draft PR #8 [SEQUENTIAL UPDATE; never main]
+  A / OPENTIX canonical platform #05
+    P30-L9-BJ Draft PR #129 HEAD 7d9a260624b900cf26208cf65a90fa82ff21c072
+    scripts/p30_l9bj_opentix_value_topology.py [ADD]
+      section_roles -> unique title/H2/<=24 sibling/<=2400 bytes
+      exact local 選擇場次 -> immediate sibling only
+      reject interactive/JS-only, sale/refund mixed role, invalid/multiple datetime
+      timezone, actual session ID, price, sale and ticket Event ID remain UNKNOWN
+    tests/p30/test_l9bj_opentix_value_topology.py [ADD, 14/14]
+    .github/workflows/eventradar_p30_l9bj.yml [ADD; exact HEAD, read-only]
+    CI #41076150901 SUCCESS (13 predecessor + 14 new)
+    artifact #12987525681 ZIP CRC/SHA/manifest independently PASS
+    official GET 2/2 HTTP200; 64 event edges; 4 local nodes/166 bytes
+    decision HOLD_JS_OR_UNBOUND_SESSION_VALUE; accepted FIELD 0
+    NEXT L9-BK rotate source, no repeated OPENTIX synthetic-only loop
+  B / FUZHONG15_P0_NEW_TAIPEI [distinct from canonical 19 ticket sources]
+    P30-VENUE-02X Draft PR #130 HEAD 0af602111623772e8ec65c15c5dfac7b18da3ffb
+    scripts/p30_venue02x_fuzhong15_allshow.py [ADD]
+      index_rows + year_hint + showing_groups -> one same-film group
+      detail_screening_dates -> exact full set/multiset equality
+      missing/extra/duplicate/invalid calendar/title ambiguity => HOLD
+      film sid != unique venue screening ID != ticket Event ID
+    tests/p30/test_venue02x_fuzhong15_allshow.py [ADD, 13/13]
+    .github/workflows/eventradar_p30_venue02x.yml [ADD; exact HEAD, read-only]
+    CI #41076158652 SUCCESS (12 predecessor + 13 new)
+    artifact #12988230108 ZIP CRC/SHA/manifest independently PASS
+    official GET 2/2 HTTP200; 47 rows; 2/2 all-showing exact date/time parity
+    decision REVIEW_ALL_SHOWINGS_EXACT_PARITY_NO_SESSION_ID; accepted FIELD 0
+    NEXT VENUE-02Y rotate to P0 New Taipei Ceramics official source discovery
+  release gates: Golden 0 / publish 0 / HARD_HOLD_NO_PUBLICATION
+  unchanged: CKSMH #17 Android 5, TWTC #16 Android 39, L8 Core UI PASS
+  dedup: Songshan #14, Huashan #13, TWTC #16, CKSMH #17
+  NTCH venue source != OPENTIX #05; ibon 39961 title mismatch OPEN
+  official Pages runtime UNVERIFIED; Toolkit local path/permission UNKNOWN
+```
+
+- **Independent evidence:** A [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41076150901) / [artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41076150901/artifacts/12987525681) ZIP SHA256 `30041a754eb4822b4a2ecaa93582312b6b9291bbce2eca0bc9c980fc393881f1`; B [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41076158652) / [artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41076158652/artifacts/12988230108) ZIP SHA256 `692243eaf8f8ad63a1e1f94912378cc9ee8be12e7e59d609f8c5bae26d3026e5`. Both artifacts independently passed ZIP CRC, SHA256SUMS and audit manifest. SOURCE_QUALITY YES/YES, offline-only consecutive 0/0, zero formal fields/Golden/publish; no main, Pages, Android or production writer mutations.
