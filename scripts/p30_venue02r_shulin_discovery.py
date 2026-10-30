@@ -5,7 +5,7 @@ import argparse,hashlib,json
 from datetime import datetime,timezone
 from urllib.parse import urlsplit,urljoin,parse_qsl
 from bs4 import BeautifulSoup
-from p30_l9bc_tixfun_identity import get_one,HOLD
+from p30_venue02m_xinzhuang_discovery import get_one,HOLD
 URL="https://www.culture.ntpc.gov.tw/shulin_artcenter_chi/xmdoc?XsmSId=0J080506169482009359"
 HOST="www.culture.ntpc.gov.tw"
 def safe_link(href):
