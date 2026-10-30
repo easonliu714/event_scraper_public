@@ -3239,3 +3239,36 @@ A L9-BJ #129 exact HEAD 7d9a260624b900cf26208cf65a90fa82ff21c072
   CI #41076150901 SUCCESS; HOLD_JS_OR_UNBOUND_SESSION_VALUE unchanged
   NEXT A L9-BK rotate existing platform; NEXT B VENUE-02Y rotate P0 New Taipei Ceramics
 ```
+
+### 2026-10-30 23:59 Asia/Taipei — A L9-BK / B VENUE-02Y source-first exact-head evidence (NO PUBLISH)
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ A existing Songshan platform #14 [REUSE, not duplicate venue source]
+│  └─ L9-BK Draft #131 HEAD abcd61bff97a08ace5f9c221a39f256115f2055c
+│     ├─ base #129 HEAD 7d9a260624b900cf26208cf65a90fa82ff21c072
+│     ├─ 3 ADD-only script/test/workflow; exact-head CI #41085556226 SUCCESS (14+12=26)
+│     ├─ Artifact #12991147600 ZIP SHA256 55fa52b09724994645dd4b93eff3efa868495d2eeefe7ae97a3d2072fbbc92a5
+│     ├─ 2 official GET HTTP200/HTTP200; 25 source-derived UUID detail edges
+│     ├─ selected detail exact heading 0 → HOLD_DETAIL_TITLE_MISMATCH_OR_AMBIGUITY
+│     └─ FIELD 0; NEXT L9-BL bounded identity root cause / rotate
+├─ B P0 新北市鶯歌陶瓷博物館 [NEW venue identity, not ticket platform]
+│  └─ VENUE-02Y Draft #132 HEAD 4276d0f3ddc95997ca52b527a511a8da426daacf
+│     ├─ base #130 HEAD 6f37c6181fcf1f848cdfe9739bee852cf6b2a99d
+│     ├─ 3 ADD-only script/test/workflow; exact-head CI #41085604504 SUCCESS (14+13=27)
+│     ├─ Artifact #12992240410 ZIP SHA256 40928d531e491be6f1e10d2674cfc09e82ffb754284570a11173a22089ea794a
+│     ├─ 2 official GET HTTP200/HTTP200; 6 source-derived edges, 1 registration excluded
+│     ├─ exact exhibition title 1; date-role label 1; registration role 0
+│     ├─ REVIEW_EXHIBITION_IDENTITY_ROLE_NO_FIELDS; ticket Event ID UNKNOWN
+│     └─ FIELD 0; NEXT VENUE-02Z date-range/location provenance fail-closed
+├─ Governance Draft PR #8 [sequential SHA-guarded append to BOTH canonical docs; NOT main]
+└─ Formal docs/data.json 7fc4fe... / platform_status.json e19ca37c... [FROZEN]
+   ├─ SOURCE_QUALITY new YES/YES; offline-only consecutive 0/0
+   ├─ FIELD A/B 0/0, Golden 0, published 0, HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages runtime/Toolkit UNKNOWN
+~~~
+
+- **Independent evidence:** Both artifact ZIPs downloaded and independently checked: CRC clean, manifest SHA256 and SHA256SUMS match. A [PR #131](https://github.com/easonliu714/event_scraper_public/pull/131) / [CI #41085556226](https://github.com/easonliu714/event_scraper_public/actions/runs/41085556226); B [PR #132](https://github.com/easonliu714/event_scraper_public/pull/132) / [CI #41085604504](https://github.com/easonliu714/event_scraper_public/actions/runs/41085604504).
+- **CI root cause / remediation:** Both first-run exact-head checks failed before official GET because workflow `printf` was double-escaped. One atomic multi-file correction commit per branch fixed workflow escaping and Python regex; final exact-head CI passed without weakening guard. Do not equate Songshan list HTTP200 with identity PASS or Ceramics exhibit date label with accepted date/time, sale, admission, ticket Event ID or Golden. Per-field `source/observed_at/role/decision` and conflict refusal remain mandatory.
+- **Safety/dedup:** No main, merge, production Scraper/Writer/Publisher/Scheduler/Notifier, formal JSON, Pages or Android writes. Reuse Songshan #14, Huashan #13, TWTC #16, CKSMH #17; NTCH venue != OPENTIX #05. Local Toolkit path/permissions UNKNOWN, not invoked; formal Pages live UI UNVERIFIED. No Owner action required.
