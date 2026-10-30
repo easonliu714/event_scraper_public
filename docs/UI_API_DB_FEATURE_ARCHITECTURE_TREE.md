@@ -2950,3 +2950,35 @@ Source main fbf4ca02... [FROZEN, 19 canonical source identities]
 ```
 
 - **NEXT:** A inspect row-local anchor same-product/session identity (one bounded source edge only) or rotate existing ticket platform if identity absent; B one controlled candidate `/submenu` GET to distinguish `usein` roles, otherwise rotate next P0 New Taipei venue. Do not infer ticket ID from venue, session time from announcement, or formal FIELD from CI.
+
+
+### 2026-10-30 13:54 Asia/Taipei — A/B isolated source-evidence architecture, no release
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN, 19 canonical source IDs]
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ L9-BA Draft #111 HEAD 39c47e1c0b80be366cbeee18d08aa4751494b5d5
+│     ├─ base Draft #109 HEAD d95788c3...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official same PRODUCT_ID P1GFK34F detail GET=1 HTTP200 / 85143B
+│     ├─ heading-owned table 1 candidate date+time row, 1 row-local anchor
+│     ├─ anchor URL strict scheme/credential/port guard: HOLD_UNSAFE_ANCHOR_URL
+│     ├─ no row-anchor navigation, session ID, accepted date/time/field
+│     └─ CI #41010935815 SUCCESS 40/40; artifact #12957074291 ZIP CRC/SHA PASS
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not an existing ticket platform]
+│  └─ VENUE-02O Draft #112 HEAD 9ff0438d8606a7bdee355ea3566e7f6f723f1fac
+│     ├─ base Draft #110 HEAD b2320eaa...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ one official /submenu?usein=2&psid=0G286667437547603307 GET HTTP200 / 34926B
+│     ├─ 1 event-bearing heading, 46 same-origin links, 6 detail-link hints
+│     ├─ example path /xmdoc/cont?xsmsid=... [key only; ID not verified]
+│     ├─ REVIEW_SUBMENU_DETAIL_LINK_HINTS_NO_LIST_PASS, no title/ID/date accepted
+│     └─ CI #41010940348 SUCCESS 41/41; artifact #12957701480 ZIP CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs serial SHA-guarded append, NOT main]
+└─ Release boundary FIELD A/B=0/0, Golden=0, published=0
+   ├─ NEW SOURCE_QUALITY A/B=YES/YES; offline-only consecutive 0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; no main/formal JSON/production/Pages/Android write
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS preserved
+   ├─ ibon 39961 title mismatch OPEN; Pages live runtime UNVERIFIED
+   └─ Toolkit local path/permission UNKNOWN, not invoked
+~~~
+
+- **NEXT A L9-BB:** classify unsafe row anchor component without repeat GET if possible; otherwise rotate existing ticket platform, do not relax URL validation. **NEXT B VENUE-02P:** one bounded official same-origin detail URL derived from one of six candidate index links and verify index-to-detail identity; no LIST_PASS from link hints alone. P0 New Taipei venue priority continues; existing CKSMH/Songshan/Huashan/TWTC sources must not be duplicated, and NTCH venue != OPENTIX #05.
