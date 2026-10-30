@@ -2791,3 +2791,39 @@ Source main fbf4ca02... / formal JSON unchanged [HARD_HOLD_NO_PUBLICATION]
 - **B / NEW SOURCE_QUALITY:** TAINEX P0 Taipei official `https://www.tainex.com.tw/event/690` HTTP **200**, 25598 bytes, body SHA256 `67b1584bd00fed3eff13df8ef0fb4a7ac43886609e649e1606d8fd317ce49fa0`, observed `2026-10-29T23:55:51Z`. Unique exact title and each of three role labels (exhibition period, venue, organizer) observed once; separate `source/observed_at/role/decision` provenance REVIEW, no values formally accepted. Venue-local ID 690 != earlier official 689; no merge by same date/hall/organizer, no ticket ID inference. B direct-source-zero streak=0, accepted fields=0, Golden=0.
 - **Formal release:** A/B Engineering CI PASS; A SOURCE_QUALITY structural drift HOLD, B SOURCE_QUALITY official detail REVIEW; neither equals Golden. `HARD_HOLD_NO_PUBLICATION`, formal accepted fields 0, Golden 0, published 0. Existing CKSMH #17 five and TWTC #16 thirty-nine Android USER_ATTESTED_PASS, L8 Core UI PASS preserved; ibon 39961 mismatch OPEN. Source dedup: Songshan #14/Huashan #13/TWTC #16/CKSMH #17 reuse; OPENTIX #05 distinct from NTCH venue.
 - **NEXT:** A P30-L9-AV rotate to next existing ticket-platform blocker with one bounded lawful same-source identity/field-role probe (FamiTicket current iframe-only sample remains HOLD; no unbounded retries). B P30-VENUE-02J prioritize P0 Taipei/new Taipei venue-source live LIST/DETAIL with explicit venue-local field provenance and conflict checks; TAINEX 689/690 identity REVIEW does not establish ticket/session time. No release or merge without authorization.
+
+
+### 2026-10-30 08:54 Asia/Taipei — L9-AV / VENUE-02J dual-source architecture and release isolation
+
+```text
+Source main fbf4ca02... [FROZEN] / formal 19 ticket-platform identities
+├─ A: ERA #08 existing ticket platform [REUSE, no duplicate]
+│  └─ L9-AV Draft PR #101 HEAD 48044fdbaccb69c75dce14d072386e2200ecfcc3
+│     ├─ base #99 255d7fccd3941c7d6067df5cfdfac772e0543d03
+│     ├─ scripts/p30_l9av_era_source_role.py + tests + exact-head workflow [3 ADD]
+│     ├─ official HOME/DETAIL HTTP200/200; 88868B/85144B; PRODUCT_ID=P1GFK34F
+│     ├─ unique list anchor/detail H1; session vs refund headings separated
+│     ├─ source identity REVIEW, PRODUCT_ID not accepted global Event ID
+│     ├─ CI #40982374572 SUCCESS 19/19; Artifact #12945392225 ZIP SHA256 0604336a...
+│     └─ accepted FIELD=0 / Golden=0 / published=false
+├─ B: Zepp New Taipei P0 New Taipei official venue [NOT in 19 ticket platforms]
+│  └─ VENUE-02J Draft PR #102 HEAD 4babae6f5528fdc65cddad6f26b9b4c5f3b576f8
+│     ├─ base #100 2c3dc12640b3049aac972b39c29e71d2fca069ee
+│     ├─ scripts/p30_venue02j_zepp_newtaipei.py + tests + exact-head workflow [3 ADD]
+│     ├─ official LIST/DETAIL HTTP200/200; 339236B/310465B
+│     ├─ unique venue-local rid=162473, artist 40 Fingers, START 19:30
+│     ├─ KKTIX = VENUE_CLAIMED_PLATFORM_ONLY; not verified ticket Event ID
+│     ├─ source body-cap HOLD 220KB fixed to bounded 512000B, 513KB negative
+│     ├─ intermediate test-source newline syntax CI FAIL repaired without skip
+│     ├─ final CI #40982473329 SUCCESS 20/20; Artifact #12945915452 SHA256 dc32cf15...
+│     └─ PRICE unscoped; accepted FIELD=0 / Golden=0 / published=false
+├─ Governance Draft PR #8 [two canonical docs, SHA-checked serial append; not main]
+└─ Formal release boundary
+   ├─ docs/data.json blob 7fc4fe... / platform_status.json e19ca37c... [FROZEN]
+   ├─ SOURCE_QUALITY A/B=YES, offline-only consecutive A/B=0
+   ├─ HARD_HOLD_NO_PUBLICATION; accepted FIELD=0 / Golden=0 / published=false
+   ├─ Android CKSMH 5/TWTC 39 USER_ATTESTED_PASS + L8 Core UI PASS preserved
+   └─ Pages live runtime and new Android E2E UNVERIFIED
+```
+
+- **NEXT A L9-AW:** ERA same-PRODUCT_ID detail session table vs refund deadline exact section-local label/value provenance; refuse ambiguous/global dates, no formal FIELD promotion. **NEXT B VENUE-02K:** Zepp same-rid START/OPEN vs external ticket URL role and source-bound identity; venue claim alone cannot establish ticket Event ID. Rotate within P0 New Taipei if blocked. Existing CKSMH #17/Songshan #14/Huashan #13/TWTC #16 reused; NTCH venue != OPENTIX #05; ibon39961 mismatch OPEN. No main/Golden/production/Pages writes.
