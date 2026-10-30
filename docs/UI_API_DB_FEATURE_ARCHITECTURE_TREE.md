@@ -3427,3 +3427,34 @@ Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
 - **B ENGINEERING:** [Draft PR #144](https://github.com/easonliu714/event_scraper_public/pull/144) **VENUE-02AE**, base exact #142 `b99e5fee03191ddc8a82bf448cf533693d154455`, HEAD `2584b1c13c9343be6d636331935ad347dbe359a4`, three ADD-only script/test/workflow files. [Exact-head CI #41135143244](https://github.com/easonliu714/event_scraper_public/actions/runs/41135143244) **SUCCESS**, predecessor AD **6/6** plus new AE **8/8 = 14/14**, all steps including frozen production guard PASS, first true failure NONE. [Artifact #13016630426](https://github.com/easonliu714/event_scraper_public/actions/runs/41135143244/artifacts/13016630426) ZIP SHA256 `2f28cf52c90c042108473a902f9fca8d80b20d67df2db6b2ea4015a4de8f3e1a`; independent ZIP CRC, SHA256SUMS, manifest and headSHA **PASS**.
 - **B NEW SOURCE_QUALITY (official CI GET=1):** One bounded normal [Ceramics selected official SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302) HTTP200, 43071 bytes, source SHA256 `225ad43708eea9da047e4aa4bd42fbbdb4552d5198828268394dedd7d80c65aa`, observed `2026-10-30T22:00:51Z`. Exact SID/H3 title matched **1**. One date-role and one venue-role **separate span text nodes**, each with regex miss **1**, no inline both-role node, no sale/registration mixed node. Decision `HOLD_REGEX_OR_INLINE_NODE_OWNERSHIP`: leaf label/value may be separated; **do not infer value from sibling/parent without structural proof**. NEXT **VENUE-02AF**: offline source-derived adjacent label/value DOM topology with strict section/SID ownership, or rotate next P0 New Taipei venue on continued ambiguity; no repeated unchanged GET. Accepted FIELD 0.
 - **Two-line metrics and safety:** ENGINEERING CI PASS/PASS; SOURCE_QUALITY new root-cause evidence YES/YES; official GET 1/1; independent source-signal-free consecutive rounds **A=0/B=0**. Live FIELD decisions HOLD/HOLD; formally accepted FIELD A/B **0/0**, Golden **0**, published **0**, `HARD_HOLD_NO_PUBLICATION` remains. Preserve CKSMH #17 Android 5 and TWTC #16 Android 39 USER_ATTESTED_PASS, L8 Core UI PASS; ibon 39961 mismatch OPEN; Huashan #13 is existing canonical platform, Ceramics separate New Taipei venue. No main/merge/force push, Production Scraper/Writer/Publisher/Scheduler/Notifier, formal data/status, Pages or Android changes. No Owner operation required.
+
+
+### 2026-10-31 06:50 Asia/Taipei — L9-BR / VENUE-02AF source-derived identity architecture
+
+```text
+Source main (read-only): fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Preview main: 03e515d65e827d5ed67fe341d079907a96bf784a
+ShowNews main: 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad
+Governance: Draft PR #8 only, NOT main
+A platform #13 Huashan REUSE:
+  L9-BQ #143 7b25df824a012e0acc97dc26b7c7c4b2cfaad868
+  -> L9-BR Draft #145 54518a63466872b4893ed453ab1746f389e565a0
+  -> decoded path != canonical URL; query/fragment, percent-encoding,
+     foreign origin, duplicates separately classified; no route promotion
+  -> source-derived offline diagnostic + 8 tests, CI #41140927342 initially running
+  -> NEXT L9-BS bounded new evidence or rotate existing source; FIELD=0
+B P0 New Taipei Ceramics (distinct venue, no duplicate 19-platform ID):
+  VENUE-02AE #144 2584b1c13c9343be6d636331935ad347dbe359a4
+  -> VENUE-02AF Draft #146 bb327cd2710db8d053b025c3b15af68023e1ab0d
+  -> same SID + unique H3 prerequisite; direct adjacent span label/value
+     only within one p/li; cross-section, invalid chronology, duplicates HOLD
+  -> source-derived offline diagnostic + 9 tests, CI #41140933850 initially running
+  -> NEXT VENUE-02AG source section ownership or rotate P0 New Taipei; FIELD=0
+A/B this round official GET=0/0, new independent SOURCE_QUALITY=NO/NO,
+offline-only consecutive rounds=1/1 (previous round official GET=1/1).
+Accepted FIELD=0/0; Golden=0; published=0; HARD_HOLD_NO_PUBLICATION.
+Formal docs/data.json and docs/platform_status.json blobs frozen.
+No merge/main/production scraper/writer/publisher/scheduler/notifier/Pages/Android writes.
+CKSMH #17 Android 5 + TWTC #16 Android 39 USER_ATTESTED_PASS and L8 UI PASS retained.
+Toolkit local path/permissions UNKNOWN; Pages runtime UNVERIFIED.
+```
