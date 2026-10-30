@@ -3216,3 +3216,26 @@ EventRadar Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
 ```
 
 - **Independent evidence:** A [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41076150901) / [artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41076150901/artifacts/12987525681) ZIP SHA256 `30041a754eb4822b4a2ecaa93582312b6b9291bbce2eca0bc9c980fc393881f1`; B [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41076158652) / [artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41076158652/artifacts/12988230108) ZIP SHA256 `692243eaf8f8ad63a1e1f94912378cc9ee8be12e7e59d609f8c5bae26d3026e5`. Both artifacts independently passed ZIP CRC, SHA256SUMS and audit manifest. SOURCE_QUALITY YES/YES, offline-only consecutive 0/0, zero formal fields/Golden/publish; no main, Pages, Android or production writer mutations.
+
+### 2026-10-30 23:00 Asia/Taipei — VENUE-02X final exact-head correction / source GET discipline
+
+```text
+B VENUE-02X Draft PR #130 FINAL HEAD 6f37c6181fcf1f848cdfe9739bee852cf6b2a99d
+  supersedes interim 0af602111623772e8ec65c15c5dfac7b18da3ffb
+  scripts/p30_venue02x_fuzhong15_allshow.py
+    new source row weekday-vs-calendar verification [fail closed]
+    invalidWeekdayCount now measured, not constant-zero
+  tests/p30/test_venue02x_fuzhong15_allshow.py [14/14; adds mismatch refusal]
+  CI #41076522426 SUCCESS (12/12 predecessor + 14/14 new)
+  artifact #12988290506 CRC / SHA256SUMS / manifest independent PASS
+  ZIP SHA256 1897badff2ff3e73ae96d081ba714d0ad56433d87fbf940ef5e7f7203af3a44b
+  official HTTP200/HTTP200, 47 row-local screenings, all-showing 2/2 exact
+  invalid weekday 0; missing 0; extra 0; duplicate 0
+  REVIEW_ALL_SHOWINGS_EXACT_PARITY_NO_SESSION_ID
+  accepted FIELD 0, Golden 0, published 0; HARD_HOLD_NO_PUBLICATION
+  caveat: intermediate synchronize CI #41076507788 caused repeated GET
+  next Writer must atomically commit corrections / avoid intermediate live CI
+A L9-BJ #129 exact HEAD 7d9a260624b900cf26208cf65a90fa82ff21c072
+  CI #41076150901 SUCCESS; HOLD_JS_OR_UNBOUND_SESSION_VALUE unchanged
+  NEXT A L9-BK rotate existing platform; NEXT B VENUE-02Y rotate P0 New Taipei Ceramics
+```
