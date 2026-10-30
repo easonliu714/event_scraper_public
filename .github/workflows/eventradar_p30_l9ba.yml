@@ -29,23 +29,24 @@ jobs:
           base=d95788c3550c9ec80f64afceab89d74ec6bfff57
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
-          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ba.yml' 'scripts/p30_l9ba_era_cell_ownership.py' 'tests/p30/test_l9ba_era_cell_ownership.py' | LC_ALL=C sort)"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_l9ba.yml' 'scripts/p30_l9ba_era_row_anchor.py' 'tests/p30/test_l9ba_era_row_anchor.py' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
           test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
       - name: Frozen predecessors and fail-closed regression tests
         run: |
           python -m pip install --disable-pip-version-check 'requests==2.32.5' 'beautifulsoup4==4.14.2'
-          python -m py_compile scripts/p30_l9ba_era_cell_ownership.py tests/p30/test_l9ba_era_cell_ownership.py
+          python -m py_compile scripts/p30_l9ba_era_row_anchor.py tests/p30/test_l9ba_era_row_anchor.py
           python -m unittest discover -s tests/p30 -p test_l9ax_era_topology.py -v
           python -m unittest discover -s tests/p30 -p test_l9ay_era_row_role.py -v
-          python -m unittest discover -s tests/p30 -p test_l9ba_era_cell_ownership.py -v
+          python -m unittest discover -s tests/p30 -p test_l9az_era_cell_ownership.py -v
+          python -m unittest discover -s tests/p30 -p test_l9ba_era_row_anchor.py -v
       - name: Bounded official source GET with sanitized SHA receipt
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p p30-l9ba-evidence
-          python scripts/p30_l9ba_era_cell_ownership.py --live-one --out p30-l9ba-evidence/audit.json
+          python scripts/p30_l9ba_era_row_anchor.py --live-one --out p30-l9ba-evidence/audit.json
           python - <<'PY'
           import hashlib,json,pathlib
           root=pathlib.Path('p30-l9ba-evidence')
