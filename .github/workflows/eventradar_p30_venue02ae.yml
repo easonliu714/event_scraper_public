@@ -1,0 +1,67 @@
+name: EventRadar P30-VENUE02AE bounded Ceramics role-node cause (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02ad-ceramics-live-sid-fixture]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-venue02ae-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  role-node-cause:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02ae-ceramics-role-node-cause'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head and frozen production guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=b99e5fee03191ddc8a82bf448cf533693d154455
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02ae_ceramics_role_node_cause.py' 'tests/p30/test_venue02ae_ceramics_role_node_cause.py' '.github/workflows/eventradar_p30_venue02ae.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: AD predecessor and AE strict regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'requests==2.32.5'
+          python -m py_compile scripts/p30_venue02ae_ceramics_role_node_cause.py tests/p30/test_venue02ae_ceramics_role_node_cause.py
+          python -m unittest discover -s tests/p30 -p 'test_venue02ad_ceramics_live_sid_probe.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02ae_ceramics_role_node_cause.py' -v
+      - name: ONE official selected SID GET for new role-node cause
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_venue02ae-evidence
+          python scripts/p30_venue02ae_ceramics_role_node_cause.py --live-one --out eventradar_venue02ae-evidence/source_audit.json
+      - name: SHA256 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('eventradar_venue02ae-evidence')
+          a={'gate':'P30-VENUE-02AE','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'acceptedFields':0,'goldenAccepted':0,'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True)+'\n')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{x.name:hashlib.sha256(x.read_bytes()).hexdigest() for x in p.glob('*.json') if x.name!='manifest.json'}},sort_keys=True)+'\n')
+          PY
+          (cd eventradar_venue02ae-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_venue02ae-evidence
+          path: eventradar_venue02ae-evidence/
+          if-no-files-found: ignore
