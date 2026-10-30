@@ -2827,3 +2827,31 @@ Source main fbf4ca02... [FROZEN] / formal 19 ticket-platform identities
 ```
 
 - **NEXT A L9-AW:** ERA same-PRODUCT_ID detail session table vs refund deadline exact section-local label/value provenance; refuse ambiguous/global dates, no formal FIELD promotion. **NEXT B VENUE-02K:** Zepp same-rid START/OPEN vs external ticket URL role and source-bound identity; venue claim alone cannot establish ticket Event ID. Rotate within P0 New Taipei if blocked. Existing CKSMH #17/Songshan #14/Huashan #13/TWTC #16 reused; NTCH venue != OPENTIX #05; ibon39961 mismatch OPEN. No main/Golden/production/Pages writes.
+
+### 2026-10-30 10:04 Asia/Taipei — A L9-AW / B VENUE-02K source-bound architecture addendum
+
+```text
+Source main fbf4ca02... [FROZEN; 19 canonical ticket source IDs]
+├─ A existing ERA #08 [reuse] → Draft #103 HEAD 25e14e60708677e40fd25b701ac211bfc0ffed50
+│  ├─ predecessor #101 HEAD 48044fdb... → 3 ADD-only script/test/workflow
+│  ├─ exact PRODUCT_ID P1GFK34F HOME/DETAIL HTTP200/200, one list link + H1
+│  ├─ section-local <=4 sibling scan: HOLD_NO_SESSION_LOCAL_TABLE
+│  ├─ refund cutoff must not become EVENT/SALE/SESSION date; no accepted fields
+│  └─ exact-head CI #40989430932 SUCCESS 19/19; Artifact #12948636061 CRC/SHA PASS
+├─ B Zepp New Taipei official venue [not one of 19 ticket sources]
+│  └─ Draft #104 HEAD 66abfb279e597fde03d3a8c737ceb04013c76342
+│     ├─ predecessor #102 HEAD 4babae6f... → 3 ADD-only script/test/workflow
+│     ├─ official same-rid 162473 LIST/DETAIL HTTP200/200
+│     ├─ START local marker 1 / OPEN local marker 0, time association ambiguous
+│     ├─ KKTIX = venue-claimed platform, not verified ticket Event ID/URL
+│     └─ exact-head CI #40989270451 SUCCESS 20/20; Artifact #12948706138 CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs, serial SHA-guarded append, NOT main]
+└─ Release lock [accepted FIELD A/B=0/0; Golden=0; published=0]
+   ├─ source-quality new diagnostic evidence A/B=YES/YES, offline-only streak 0/0
+   ├─ docs/data.json 7fc4fe... / platform_status.json e19ca37c... [unchanged]
+   ├─ HARD_HOLD_NO_PUBLICATION, no writer/publisher/scheduler/notifier or Pages write
+   ├─ Android CKSMH 5 / TWTC 39 USER_ATTESTED_PASS + L8 UI PASS preserved
+   └─ Pages live runtime and new Android E2E UNVERIFIED; ibon 39961 OPEN
+```
+
+- **Root cause / next:** A has no bounded immediate sibling table despite exact list/detail headings; next inspect real source-local DOM topology or rotate existing source, never global-date promotion. B START text cannot uniquely bind a time and OPEN is absent at selected local-tag level; rotate P0 New Taipei rather than repeatedly GET same rid. Independent artifact ZIP CRC, SHA256SUMS and manifest validated. A initial CI failures were fixed on final exact HEAD without skipping regressions. Next A L9-AX; B VENUE-02L. All new role candidates remain REVIEW/HOLD, not formal FIELD/GOLDEN/PWA/Android PASS.
