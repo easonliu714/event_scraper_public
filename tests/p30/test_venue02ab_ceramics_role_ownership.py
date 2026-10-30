@@ -6,6 +6,8 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/"scripts"))
 from p30_venue02ab_ceramics_role_ownership import classify_field_ownership as audit
 TITLE="殼之巢 — 情景之階：佐藤雅之個展"
+# Source correction: inline role text belongs to the OTHER official SID.
+TITLE_INLINE="山彩疊疊-唐榕個展"
 def detail(body,heading=TITLE):
     return f"<main><h3>{heading}</h3><article>{body}</article></main>"
 SEPARATE="<p>展覽日期：2026年10月13日至2026年11月10日</p><p>展覽地點：1樓陽光特展室</p>"
@@ -17,7 +19,7 @@ class Cases(unittest.TestCase):
         self.assertEqual((r["dateRoleNodes"],r["venueRoleNodes"]),(1,1))
         self.assertEqual(r["acceptedFields"],0)
     def test_official_inline_slash_labels(self):
-        r=audit(detail(INLINE),TITLE)
+        r=audit(detail(INLINE,heading=TITLE_INLINE),TITLE_INLINE)
         self.assertEqual(r["decision"],"REVIEW_SINGLE_LEAF_ROLE_NOT_ACCEPTED")
         self.assertEqual(r["distinctDateValues"],1)
     def test_same_venue_repeated_holds(self):
