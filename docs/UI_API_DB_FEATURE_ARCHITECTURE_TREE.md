@@ -3538,3 +3538,21 @@ CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS; L8 UI PASS
 ```
 
 **Source evidence:** [Huashan official detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8), [Ceramics first SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302), [Ceramics second SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302). Current ACCUPASS fresh read UNVERIFIED. New source-role text is independent public reader evidence, not official GET in CI or live adapter acceptance. Read-only exact-head jobs passed all steps; ZIP CRC/SHA manifest independently **not verified** in this cycle. Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
+
+### 2026-10-31 10:02 — dual-line immutable artifact verification readback
+
+```text
+A L9-BT #149 HEAD ac4d174865c9ae16d874f8bca94aabb5d2be49b8
+  CI 41158031995 SUCCESS 21/21; Artifact 13026056618
+  ZIP SHA256 3ac061f1acfd755baea79805f4b7a83abc176577a3d3d4155af98e9606e521e9
+  ZIP CRC + SHA256SUMS + manifest file hashes + audit headSHA PASS
+B VENUE-02AH #150 HEAD 5283df1033a6fbceadb702492b7a159c3f534962
+  CI 41158093785 SUCCESS 22/22; Artifact 13025658512
+  ZIP SHA256 e130e56212c3c96e11b1f77e578e5f6e76b38ead5962c9d114e061679f216e78
+  ZIP CRC + SHA256SUMS + manifest file hashes + audit headSHA PASS
+Source quality: independent official page roles YES/YES; CI GET=0/0
+Accepted fields=0/0; Golden=0; published=0; HARD_HOLD_NO_PUBLICATION
+Pages live fetch unavailable, Android PASS retained; no formal data/status change
+```
+
+This supersedes earlier Artifact-independent-verification UNVERIFIED statements for these two exact artifacts only; source HTML DOM leaf and independent FORMAL FIELD acceptance remain HOLD. Next A rotate canonical platform, B rotate nonduplicate P0 New Taipei venue.
