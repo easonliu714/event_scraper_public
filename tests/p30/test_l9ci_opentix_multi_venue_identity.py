@@ -11,9 +11,9 @@ spec.loader.exec_module(m)
 def fixture():
     return {"venue_url": m.VENUE_URL, "opentix_url": m.OPENTIX_URL,
             "event_id": m.EVENT_ID, "linked_event_canonical_url": m.OPENTIX_URL,
-            "venue_title": m.TITLE, "opentix_title": m.TITLE,
+            "venue_title": m.VENUE_TITLE, "opentix_title": m.TITLE,
             "venue": m.VENUE, "opentix_venue": m.VENUE,
-            "opentix_venues": [m.VENUE] + ["different venue " + str(i) for i in range(8)],
+            "opentix_venues": list(m.VENUES),
             "shows": [{"date": d, "time": t, "weekday": w,
                        "role": "VENUE_DESCRIPTIVE_PERFORMANCE", "ticket_session_id": None}
                       for d, t, w in m.SHOWS],
@@ -52,6 +52,8 @@ class Gate(unittest.TestCase):
         self.reject("HOLD_CROSS_SOURCE_TITLE", lambda x: x.update(opentix_title="other"))
     def test_venue(self):
         self.reject("HOLD_CROSS_SOURCE_VENUE", lambda x: x.update(opentix_venue="other"))
+    def test_unverified_venue_label(self):
+        self.reject("HOLD_NINE_DISTINCT_VENUES", lambda x: x["opentix_venues"].__setitem__(1, "invented venue"))
     def test_venue_count(self):
         self.reject("HOLD_NINE_DISTINCT_VENUES", lambda x: x["opentix_venues"].pop())
     def test_duplicate_venue(self):
