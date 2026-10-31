@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 SOURCE = "iNDIEVOX#18"
 EVENT_ID = "26_iv04280c7"
 HOME = "https://www.indievox.com/"
-TITLE = "【美秀集團《等無》巡迴 2026】"
+TITLE = "〖美秀集團《等無》巡迴 2026〗"
 HOLD = "HARD_HOLD_NO_PUBLICATION"
 SESSIONS = (
     ("2026-12-05", "20:00", "LIVE WAREHOUSE", "高雄一"),
