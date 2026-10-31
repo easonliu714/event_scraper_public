@@ -22,6 +22,8 @@ class TestGate(unittest.TestCase):
  def test_event_host(self):self.reject("HOLD_OPENTIX_CANONICAL_ID",lambda v,o,p:o["BEL"].update(url="https://evil.test/event/2099700588990402561"))
  def test_swapped_id(self):self.reject("HOLD_OPENTIX_CANONICAL_ID",lambda v,o,p:o["BODY"].update(event_id="2099700588990402561"))
  def test_title(self):self.reject("HOLD_INDEPENDENT_TITLE_PARITY",lambda v,o,p:o["BODY"].update(title="another"))
+ def test_venue_middle_dot_variant(self):
+  x=self.check(lambda v,o,p:v["shows"]["BEL"].update(title="傑宏．貝爾"));self.assertEqual(x["decision"],"HOLD_SHORTLINK_MAPPING_AND_TICKET_SESSION_IDS")
  def test_venue(self):self.reject("HOLD_VENUE_PARITY",lambda v,o,p:o["BEL"].update(venue="other"))
  def test_showtime(self):self.reject("HOLD_DESCRIPTIVE_TIME_PARITY",lambda v,o,p:o["BODY"]["description_shows"][0].__setitem__(1,"14:00"))
  def test_price_role(self):self.reject("HOLD_PRICE_ROLE",lambda v,o,p:o["BEL"].update(price_role="PER_SESSION_TICKET_PRICE"))
