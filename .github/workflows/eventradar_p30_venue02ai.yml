@@ -1,0 +1,59 @@
+name: EventRadar P30-VENUE02AI Zepp two sessions and ticket link (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02ah-ceramics-date-role-boundary]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  zepp-session:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02ai-zepp-session-ticket-role'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head and three ADD-only paths; formal data/status frozen
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=5283df1033a6fbceadb702492b7a159c3f534962
+          test "$(git rev-parse HEAD)" = "\${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02ai_zepp_session_ticket_role.py' 'tests/p30/test_venue02ai_zepp_session_ticket_role.py' '.github/workflows/eventradar_p30_venue02ai.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: AH predecessor and AI two-session ticket-boundary tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check 'beautifulsoup4==4.14.2' 'requests==2.32.5'
+          python -m py_compile scripts/p30_venue02ai_zepp_session_ticket_role.py tests/p30/test_venue02ai_zepp_session_ticket_role.py
+          python -m unittest discover -s tests/p30 -p 'test_venue02ah_ceramics_date_role_boundary.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02ai_zepp_session_ticket_role.py' -v
+      - name: Sanitized source-bound audit and SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_venue02ai-evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('eventradar_venue02ai-evidence')
+          a={'gate':'P30-VENUE-02AI','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'source':'Zepp New Taipei','officialGETinCI':0,'independentSourceEvidence':'SAME_RID_TITLE_TWO_EXPLICIT_SESSIONS_TICKET_LINK_UNVERIFIED','candidateSessionCount':2,'ticketIdentityVerified':False,'acceptedFields':0,'goldenAccepted':0,'published':False,'decision':'HOLD_TWO_SESSIONS_TICKET_DETAIL_AND_BODY_STATUS_UNVERIFIED','releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True)+'\n')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd eventradar_venue02ai-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_venue02ai-evidence
+          path: eventradar_venue02ai-evidence/
+          if-no-files-found: ignore
