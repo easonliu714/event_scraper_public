@@ -1,0 +1,56 @@
+name: EventRadar P30-L9-BY source parity (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9bx-eventgo-status-roles]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  source-parity:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9by-opentix-xinzhuang-parity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head, ADD-only, production freeze
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=56275e2693d82f3f2bd1bf4843c496bff215fa13
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9by_opentix_xinzhuang_parity.py' 'tests/p30/test_l9by_opentix_xinzhuang_parity.py' '.github/workflows/eventradar_p30_l9by.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Predecessor and new strict tests
+        run: |
+          python -m py_compile scripts/p30_l9by_opentix_xinzhuang_parity.py tests/p30/test_l9by_opentix_xinzhuang_parity.py
+          python -m unittest discover -s tests/p30 -p test_l9bx_eventgo_status_roles.py -v
+          python -m unittest discover -s tests/p30 -p test_l9by_opentix_xinzhuang_parity.py -v
+      - name: Sanitized exact-head audit manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_l9by-evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('eventradar_l9by-evidence')
+          a={'gate':'P30-L9-BY','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'source':'OPENTIX#05','officialGETinCI':0,'sourceObservationDate':'2026-10-31','independentOfficialReader':True,'acceptedFields':0,'goldenAccepted':0,'published':False,'decision':'HOLD_TICKET_SESSION_DATE_NOT_INDEPENDENTLY_VERIFIED','releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True)+'\n')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd eventradar_l9by-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_l9by-evidence
+          path: eventradar_l9by-evidence/
+          if-no-files-found: ignore
