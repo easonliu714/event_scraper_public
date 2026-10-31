@@ -59,7 +59,7 @@ class Cases(unittest.TestCase):
         self.assertEqual(inspect_one(**a)["decision"],"HOLD_DUPLICATE_OR_MISSING_ROLE")
     def test_registration_not_venue(self):
         a,_=samples(); a["html"]=a["html"].replace("b1陶藝長廊","報名日期2026年10月16日")
-        self.assertEqual(inspect_one(**a)["decision"],"HOLD_VENUE_MIXED_ROLE")
+        self.assertEqual(inspect_one(**a)["decision"],"HOLD_MIXED_OR_UNLABELED_ROLE_TEXT")
     def test_no_implicit_publication(self):
         a,b=samples(); x=inspect_two([a,b])
         self.assertFalse(x["published"])
