@@ -1,5 +1,1354 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+## 2026-10-29 23:55 — Dual-line source topology addendum (P30-L9-AN / VENUE-02A)
+
+```text
+A / ACCUPASS P30-L9-AN [NOT COMMITTED; A branch creation safety-blocked]
+  existing PR #83 HEAD 8a25ccb73d37ea2084fdc46212c49722effe8414
+  existing CI #40896979730 SUCCESS; 2/2 official same-path/title REVIEW
+  root: p30_l9ak_accupass_heading_near.inspect_heading_regions()
+        selects all semantic H1/H2 -> 9 distinct regions per detail
+  prior p30_l9ag_accupass_detail_parity.detail_heading_evidence(html,expected_title)
+        already validates exact normalized event heading identity
+  next: select unique EXACT matched heading only; 0/multiple/hidden => HOLD
+        preserve <=400 descendants, bounded sibling roles and zero formal fields
+  this cycle SOURCE_QUALITY=0, ENGINEERING new PR/CI=0; branch write blocked
+B / Taipei Music Center P30-VENUE-02A [Draft PR #84]
+  source identity: TAIPEI_MUSIC_CENTER_OFFICIAL (not formal 19-platform duplicate)
+  scripts/p30_venue02a_tmc_source.py [ADD; no-redirect stdlib public GET]
+  tests/p30/test_venue02a_tmc_source.py [ADD; 15 offline negatives]
+  .github/workflows/eventradar_p30_venue02a_tmc_source.yml [ADD; exact-head CI]
+  HEAD 3aa3d60ae807a9555bb0e6deef5de8882cdc66ba
+  CI #40906763674 SUCCESS 15/15, artifact #12911762459
+  official list HTTP200 -> 11 titled distinct same-origin detail paths
+  one detail HTTP200 -> 37 nonempty H1/H2/H3; title parity NOT VERIFIED
+  source role=OFFICIAL_VENUE; ticket platform label != verified ticket Event ID
+  acceptedFields=0; Golden=0; published=false
+Cross-source boundaries
+  source/observed_at/role/decision required per field
+  CKSMH #17 / Songshan #14 / Huashan #13 / TWTC #16 reuse existing adapters
+  NTCH venue != OPENTIX #05 ticket source; no title-similarity auto-merge
+  P0 Taipei -> P0 New Taipei -> P1 other North -> P2 Central -> P3 South -> P4 East
+  main/data.json/platform_status.json/Pages/PWA/Writer/Publisher/Scheduler/Notifier unchanged
+  HARD_HOLD_NO_PUBLICATION
+```
+
+- CI [#40906763674](https://github.com/easonliu714/event_scraper_public/actions/runs/40906763674) Artifact [#12911762459](https://github.com/easonliu714/event_scraper_public/actions/runs/40906763674/artifacts/12911762459) independently verified ZIP CRC/manifest/SHA256 `ad8341127f3103b6ab68fd8c9cd15125c74c19dc401477ac4d6c4b58b483e660`. A source ambiguity still HOLD, B same-origin detail topology REVIEW, no title/field/Golden acceptance. Historic CKSMH5/TWTC39 Android PASS and L8 UI PASS retained; ibon39961 OPEN.
+
+---
+
+
+## 2026-10-29 21:59 — SOURCE-FIRST A/B partial official evidence (no new engineering CI)
+
+```text
+A / ACCUPASS P30-L9-AL [SOURCE_REVIEW_PARTIAL; new PR/CI 0]
+  ├─ official search → original-query same-path detail, exact title 1/1
+  ├─ listing crawled today, detail cached 2 days earlier; NOT same-session parity
+  ├─ source detail: overview range and two explicitly described sessions
+  ├─ web reader text-only; raw DOM/400-container algorithm UNVERIFIED
+  ├─ prior L9-AJ 2/2 HOLD_CONTAINER_CAP still OPEN; formal fields 0
+  └─ NEXT bounded live L9-AK DOM check max one identity-bound detail
+B / Taipei Arena VENUE-01E [SOURCE_REVIEW_PARTIAL; new PR/CI 0]
+  ├─ official OpenData DataSN 9576400 → News_Content official detail
+  ├─ title exact 1/1, two explicit performance dates with separate admission
+  ├─ OpenData 日期時間 is publication metadata, not performance time
+  ├─ Ticket Plus label/link is venue claim, NOT ticket Event ID identity
+  ├─ web reader text-only; adapter execution/HTTP code UNVERIFIED
+  └─ NEXT one controlled adapter detail parity or next P0 Taipei discovery
+Both lines: source-quality +1 bounded observation each; engineering PR/CI +0
+Prior #81/#80 exact-head CI SUCCESS; no new Artifact; no formal FIELD/Golden
+19-platform dedup #17/#14/#13/#16 REUSE; NTCH venue ≠ OPENTIX #05
+P0 Taipei → P0 New Taipei → P1 North → P2 Central → P3 South → P4 East
+Formal data/status/Pages/PWA/Writer/Publisher/Scheduler/Notifier unchanged
+HARD_HOLD_NO_PUBLICATION; no merge or main write
+```
+
+- Official observations: [ACCUPASS list](https://www.accupass.com/search), [ACCUPASS detail](https://www.accupass.com/event/2610130920421573278644?utm_campaign=accu_e_&utm_medium=search_result_&utm_source=web), [Taipei Arena OpenData](https://www.arena.taipei/OpenData.aspx?SN=DDA0CF2A5B65EBFE), [Taipei Arena detail](https://www.arena.taipei/News_Content.aspx?n=2E1489AFE4B1BEA1&s=44EFCD82A9D43986). No raw page or private values stored. Observed source role relationships are REVIEW only, not CI-run adapter evidence. Source/Preview/ShowNews main and formal data/status blobs remain frozen.
+
+---
+
+
+## 2026-10-29 20:55 — A/B isolated offline topology and venue identity boundary (Draft only)
+
+```text
+A / P30-L9-AK [Draft PR #81, HEAD f609d1557f39f0eb9d3d93192c07052bba935b8f]
+  ├─ scripts/p30_l9ak_accupass_heading_near.py [ADD; heading-near local root]
+  │  ├─ hidden ancestor / multiple heading / script / cap → HOLD
+  │  └─ existing 400-container bound retained; zero field acceptance
+  ├─ tests/p30/test_l9ak_accupass_heading_near.py [14 new synthetic tests]
+  ├─ .github/workflows/eventradar_p30_l9ak_heading_near.yml
+  └─ CI #40877130913 SUCCESS 46/46; Artifact #12898442400 SHA verified
+      └─ NEXT L9-AL limited live identity-bound topology; AJ 2/2 cap HOLD remains
+B / P30-VENUE-01D [Draft PR #80, HEAD 79d84788c5e63412430998470dc961c0b4251376]
+  ├─ scripts/p30_venue01d_detail_identity.py [ADD; strict DataSN/source URL/title]
+  │  ├─ exact URL, title and explicit date-label evidence only
+  │  └─ DataSN != ticket Event ID; announcement date != performance date
+  ├─ tests/p30/test_venue01d_detail_identity.py [15 new synthetic tests]
+  ├─ .github/workflows/eventradar_p30_venue01d_offline.yml
+  └─ CI #40876989597 SUCCESS 43/43; Artifact #12898406757 SHA verified
+      └─ NEXT VENUE-01E max one official detail GET; then P0 Taipei discovery
+Formal 19-platform identity dedup: CKSMH #17 / Songshan #14 / Huashan #13 / TWTC #16 REUSE
+NTCH official venue != OPENTIX #05; cross-source evidence edges only
+P0 Taipei → P0 New Taipei → P1 other North → P2 Central → P3 South → P4 East
+Source/Preview/ShowNews main, production data/status/Pages/PWA/Golden unchanged
+HARD_HOLD_NO_PUBLICATION; no merge or production write
+```
+
+---
+
+
+## 2026-10-29 19:55 — Dual-stream A L9-AJ / B VENUE-01C native CI architecture (Draft PR only)
+
+```text
+Source main fbf4ca02... [FROZEN; formal docs/data.json and 19-platform status blobs unchanged]
+A / ACCUPASS P30-L9-AJ [Draft PR #79; exact HEAD 48b353a1467f6aaab8748de2737a1657f6265cac]
+  parent: PR #76 HEAD ed7e3d15a2fb76161ec95bad460d0003f46c8b19
+  scripts/p30_l9aj_accupass_live_siblings.py [ADD; reuses L9-AH browser+identity, L9-AI topology]
+  tests/p30/test_l9aj_accupass_live_siblings.py [ADD; 24 synthetic tests]
+  .github/workflows/eventradar_p30_l9aj_accupass_live.yml [ADD; native exact-head CI]
+  CI #40869458895 SUCCESS 56/56 tests (24 new + 32 frozen)
+  official list HTTP200; 2/2 same-path detail HTTP200/title REVIEW
+  2/2 detail local container scope >400 => HOLD_CONTAINER_CAP; field acceptance=0
+  NEXT L9-AK: heading-near bounded DOM roots; reject hidden ancestor and broad scope
+B / Taipei Arena P30-VENUE-01C-CI [Draft PR #78; exact HEAD d56bc99a7226595449f2a40fbcd67f726ad75da4]
+  parent: PR #77 HEAD 4169d37e6fe16d7ec4b03df7e9f782eb805efef9
+  scripts/p30_venue01c_date_conflict.py [inherited unchanged from PR #77]
+  tests/p30/test_venue01c_date_conflict.py [inherited unchanged; 28 synthetic tests]
+  .github/workflows/eventradar_p30_venue01c_offline.yml [ADD ONLY]
+  CI #40869303885 SUCCESS 28/28; official GET=0, no live detail parity
+  NEXT VENUE-01D: bounded DataSN/News_Content official detail identity and date role review
+B P0 geographic queue: Taipei City → New Taipei City → other North → Central → South → East
+  existing 19-source canonical dedup: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 [REUSE]
+  NTCH official venue ≠ OPENTIX ticket source #05 [cross-source evidence only]
+  new discovery: Taipei Dome / TMC / TICC / TPAC / Zepp New Taipei [DISCOVERY/UNKNOWN]
+Production Golden/Writer/Publisher/Scheduler/Notifier/Pages/PWA: UNCHANGED
+HARD_HOLD_NO_PUBLICATION
+```
+
+- A [PR #79](https://github.com/easonliu714/event_scraper_public/pull/79) [CI #40869458895](https://github.com/easonliu714/event_scraper_public/actions/runs/40869458895) [Artifact #12894199628](https://github.com/easonliu714/event_scraper_public/actions/runs/40869458895/artifacts/12894199628), independently checked ZIP SHA256 `f972fe3db0964affa1c8d6af8730dd35e5696fae094454638dd7d90f74828d90`, CRC/manifest PASS. Source topology `HOLD_CONTAINER_CAP` is an actual 2/2 finding, not zero-field proof; strict scope narrowing required.
+- B [PR #78](https://github.com/easonliu714/event_scraper_public/pull/78) [CI #40869303885](https://github.com/easonliu714/event_scraper_public/actions/runs/40869303885) [Artifact #12895276198](https://github.com/easonliu714/event_scraper_public/actions/runs/40869303885/artifacts/12895276198), independently checked ZIP SHA256 `18c36825199a2b831df62522b757e772ecf90c094ef398b83bda208fce0d14c5`, CRC/manifest PASS. Existing VENUE-01C code remains untouched, synthetic conflict refusal now runner-verified; official title/body/date field parity remains HOLD.
+- Both streams preserve field-level provenance boundary: `source`, `observed_at`, `role`, `decision` must be verified independently; DataSN ≠ ticket Event ID; platform name is a venue claim only; announcement timestamp ≠ performance time. CKSMH5/TWTC39 Android and L8 Core UI PASS retained; ibon39961 mismatch OPEN. No main/production changes or merge authorization.
+
+---
+
+
+## 2026-10-29 18:57 — Dual-line exact-scope engineering architecture and CI boundary
+
+```text
+A / P30-L9-AI [Draft PR #76; HEAD ed7e3d15a2fb76161ec95bad460d0003f46c8b19]
+  ├─ scripts/p30_l9ai_accupass_sibling_roles.py [ADD-only, OFFLINE]
+  │   ├─ max semantic roots=8 / local containers=400 / direct sibling pairs=80
+  │   ├─ exact label whitelist EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION
+  │   └─ conflict/hidden/interactive/oversize reject; no raw value persistence
+  ├─ tests/p30/test_l9ai_accupass_sibling_roles.py [32/32 offline PASS]
+  ├─ .github/workflows/eventradar_p30_l9ai_accupass_siblings.yml [exact-head CI PASS]
+  └─ official GET=0, source field acceptance=0, Golden=0 [NEXT L9-AJ live bounded topology]
+B / P30-VENUE-01C [Draft PR #77; HEAD 4169d37e6fe16d7ec4b03df7e9f782eb805efef9]
+  ├─ scripts/p30_venue01c_date_conflict.py [ADD-only, OFFLINE]
+  │   ├─ title date vs explicit 活動日期/時間, 活動日期, 演出日期 label
+  │   └─ conflict/ambiguity/announcement timestamp reject; event date never accepted
+  ├─ tests/p30/test_venue01c_date_conflict.py [28 synthetic cases proposed, NOT CI verified]
+  └─ .github/workflows/eventradar_p30_venue01c_date_conflict.yml [NOT COMMITTED]
+      └─ connector write safety block → CI HOLD; controlled review/write needed
+P0 geography & source dedup: see preceding section; 19 platform IDs unchanged
+Production main/data/status/Pages/PWA/Golden/Writer/Publisher/Scheduler/Notifier UNCHANGED
+HARD_HOLD_NO_PUBLICATION
+```
+
+- A [PR #76](https://github.com/easonliu714/event_scraper_public/pull/76), base #75 exact HEAD `1a64ae6e258367c89856d5cd2b3cf558cc14ac00`, native [CI #40861443416](https://github.com/easonliu714/event_scraper_public/actions/runs/40861443416) SUCCESS 32/32 with all job steps success. [Artifact #12892060990](https://github.com/easonliu714/event_scraper_public/actions/runs/40861443416/artifacts/12892060990) ZIP SHA256 `b3c7c0a01641aa7266fdd6248138b79ca52557198abf7a3aca11b31af8e7a7d0`, independently checked CRC/manifest SHA. This is offline parser quality only, not official detail FIELD PASS.
+- B [PR #77](https://github.com/easonliu714/event_scraper_public/pull/77), base #74 exact HEAD `f2654b0ed7284eb67403bd969ba84dd68c751d2a`, two ADD-only files, CI HOLD because the proposed isolated workflow was blocked by write safety checks; 28 tests are **not yet verified**, and official GET=0 this Gate. Do not bypass the block or claim an exact-head CI.
+- Both canonical docs updated sequentially on Draft PR #8; P0 Taipei → New Taipei and canonical source identity dedup remain in effect. Venue-01 previous one-GET eight-announcement REVIEW remains valid, not repeated. CKSMH5/TWTC39 Android USER_ATTESTED_PASS, L8 Core UI, formal PWA visual PASS preserved; ibon39961 OPEN, Golden=0, no publication.
+
+---
+
+## 2026-10-29 18:53 — Owner-approved P0 Taipei/New Taipei venue queue and source identity graph (Draft PR #8 only)
+
+```text
+A / P30-L9-AH [#75 CI PASS 30/30] → L9-AI bounded local sibling labels [NEXT]
+  official list 25 distinct paths; 2/2 same-path detail title REVIEW
+  dt/dd + th/td bounded topology 0/2; eight role fields HOLD; Golden=0
+B / P30-VENUE-01B [#74 CI PASS 20/20 + exactly one official GET]
+  Taipei Arena DataSN announcements 8 [venue IDs only, ticket Event IDs 0]
+  VENUE-01C title/body date conflict + source detail parity [NEXT]
+  P0 Taipei City [highest priority]
+    Existing 19-platform sources [REUSE, NO DUPLICATE ADAPTER]
+      #17 CKSMH / P0-06 [5/5 Android PASS; add session/venue provenance only]
+      #14 Songshan / P0-09 [LIST=1 historical; DETAIL HOLD]
+      #13 Huashan / P0-10 [LIST=7 historical; 1 detail REVIEW; FIELD HOLD]
+      #16 TWTC / P0-11 [39 detail Android PASS; one postponed date HOLD]
+    Distinct venue discovery [DISCOVERY/UNKNOWN, not LIST_PASS]
+      Taipei Arena official news + OpenData [VENUE-01]
+      Taipei Dome, Taipei Music Center, NTCH (separate from OPENTIX #05)
+      TICC, TPAC, Nangang Exhibition Center
+      Taipei mass-event permit review [review is NOT approval/event sale]
+  P0 New Taipei City [next priority; all DISCOVERY/UNKNOWN]
+    Zepp New Taipei, New Taipei Arts Center, Xinzhuang Arts Center
+    Shulin Arts Center, Cloud Gate Theater, Fuzhong 15, Yingge Museum
+  P1 Other North [Keelung, Taoyuan, Hsinchu, Miaoli]
+  P2 Central [Taichung National Theater retained, not Taipei; then others]
+  P3 South [Kaohsiung Arena retained, not P0; then others]
+  P4 East [Yilan, Hualien, Taitung]; islands deferred
+  VENUE-04 [venue DataSN != ticket Event ID; exact session evidence edges]
+  VENUE-05 [PWA/Android Golden and publication HOLD]
+Formal 19-platform registry: docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124
+Production data/status/Pages/Golden/Writer/Publisher/Scheduler/Notifier UNCHANGED
+HARD_HOLD_NO_PUBLICATION
+```
+
+**Candidate URL discovery manifest (not verified LIST/DETAIL):** Taipei Arena `https://www.arena.taipei/News.aspx?n=2E1489AFE4B1BEA1&sms=F9A95D3F5A5C2C68`; Taipei Dome `https://www.taipeidome.com.tw/Web/dome/`; Taipei Music Center `https://www.tmc.taipei/tw/blog/show`; NTCH `https://npac-ntch.org/programs`; TPAC `https://tpac.org.taipei/program`; TICC `https://ticc.com.tw/wSite/sp?bId=6853&ctNode=385&mp=2&xdUrl=%2FwSite%2Fap%2Fcp_Activity.jsp`; CKSMH `https://event.culture.tw/CKSMH` [#17]; Songshan `https://www.songshanculturalpark.org/exhibition` [#14]; Huashan `https://www.huashan1914.com/exhibition` [#13]; TWTC `https://twtc.com.tw/exhibition?p=home` [#16]; Nangang `https://www.tainex.com.tw/event`; permit review `https://majorevent.gov.taipei/News.aspx?_CSN=DC8B1134D3826039&n=3D3E2948CDA72DD8&sms=E2A80B3BD6378AB0` [application not approval]. New Taipei: Zepp `https://www.zepp.co.jp/hall/newtaipei/schedule/`; NTPC Arts `https://www.culture.ntpc.gov.tw/artcenter_chi/sitesearch`; Xinzhuang `https://www.xzcac.ntpc.gov.tw/`; Shulin `https://www.culture.ntpc.gov.tw/shulin_artcenter_chi/xmdoc?XsmSId=0J080506169482009359`; Cloud Gate `https://www.cloudgate.org.tw/cgt`; Fuzhong15 `https://www.fuzhong15.ntpc.gov.tw/xcmovie?XsmSId=0M361641875264878260`; Yingge `https://www.ceramics.ntpc.gov.tw/xmdoc?XsmSId=0J148497613881029302`. Every untested URL is `DISCOVERY/UNKNOWN`.
+
+**Source identity contract:** Canonical platform ID is authoritative for existing #13/#14/#16/#17; venue aliases are subordinate identities, not new platform records. NTCH venue source is distinct from OPENTIX #05; similar titles cannot create an automatic identity merge. Every venue/ticket field must have independent `source`, `observed_at`, `role`, `decision`; conflicting dates stay UNKNOWN/HOLD. Owner geographical priority supersedes older Taichung/Kaohsiung order without deleting history. A line proceeds concurrently; neither CI success nor venue HTTP200 equals Golden or production publication.
+
+---
+
+## 2026-10-29 17:56 — P30 dual-workstream architecture update (Draft only)
+
+```text
+A / ACCUPASS P30-L9-AH [PR #75 exact-head CI PASS, 30/30]
+  ├─ scripts/p30_l9ah_accupass_field_roles.py [new, one list + max 2 details, scoped dt/dd and th/td]
+  ├─ tests/p30/test_l9ah_accupass_field_roles.py [new, 30 positive/negative offline]
+  ├─ .github/workflows/eventradar_p30_l9ah_accupass_roles.yml [new, exact-head SHA]
+  └─ official details 2/2 title REVIEW; 2 scoped roots each, 0 local pairs [NEXT L9-AI]
+B / Taipei Arena VENUE-01B [PR #74 exact-head CI PASS, 20/20]
+  ├─ scripts/p30_venue01_live_shape.py [new, one real GET via frozen adapter]
+  ├─ tests/p30/test_venue01b_live_shape.py [new, 20 offline negative tests]
+  ├─ .github/workflows/eventradar_p30_venue01b_live.yml [new, PR-only GET]
+  ├─ 8 venue announcements; claimed ticket platforms 4+2+1+1; ticket IDs=0
+  └─ date title/body mismatch [NEXT VENUE-01C, HOLD]
+VENUE-02/03 official program/detail [OPEN]; VENUE-04 provenance [OPEN]; VENUE-05 Golden/PWA/Android [HOLD]
+Production data/status/Pages/PWA/Golden/Writer/Publisher/Scheduler/Notifier [UNCHANGED; HARD_HOLD_NO_PUBLICATION]
+```
+
+- **A P30-L9-AH** [Draft PR #75](https://github.com/easonliu714/event_scraper_public/pull/75), base #72 HEAD `adbbe114c27259b80f5db80dcfee94204da09979`, exact HEAD `1a64ae6e258367c89856d5cd2b3cf558cc14ac00`, 3 ADD-only engineering files; [native PR CI #40853357012](https://github.com/easonliu714/event_scraper_public/actions/runs/40853357012) SUCCESS 30/30 offline tests; [artifact #12888381080](https://github.com/easonliu714/event_scraper_public/actions/runs/40853357012/artifacts/12888381080) ZIP SHA256 `b0986523c46d7f874b73c7bc73d16398b14b9a57f92dffcd5cb5d0c9bf7b2044`, independent ZIP CRC/manifest PASS. One ACCUPASS official list HTTP200 and 2/2 same-path details HTTP200/H1-H2 title REVIEW; scoped main/article/[role=main]/#event-detail 2 roots per detail, **0 explicit dt/dd or th/td label/value pairs**. Eight semantic field roles all HOLD; accepted fields=0. NEXT A: L9-AI investigate alternative bounded local DOM label topology, no global regex.
+- **B P30-VENUE-01B** [Draft PR #74](https://github.com/easonliu714/event_scraper_public/pull/74), base #73 HEAD `52655204dd3ac6fddd12347411fad849eb77a288`, exact HEAD `f2654b0ed7284eb67403bd969ba84dd68c751d2a`, 3 ADD-only engineering files; [native PR CI #40853246928](https://github.com/easonliu714/event_scraper_public/actions/runs/40853246928) SUCCESS 20/20 offline tests and **one actual HTTPS GET through existing VENUE-01 Adapter**, no redirects/retries. Eight official announcements, eight unique venue source hashes, explicit venue-claimed platform counts Ticket Plus/遠大=4, 拓元=2, ibon=1, KKTIX=1; [artifact #12887408810](https://github.com/easonliu714/event_scraper_public/actions/runs/40853246928/artifacts/12887408810) ZIP SHA256 `a7c811a4c5991f1eace8307140638462039e1322bd2e6e464c7890da2e733c11`, independent ZIP CRC/manifest PASS. `REVIEW_LIVE_OFFICIAL_SOURCE_SHAPE_ONLY`: DataSN is venue announcement identity, platform name is a claim not ticket Event ID. Official title 2027/1/16–17 vs labeled body 2027/1/26–27 date discrepancy remains HOLD. NEXT B: VENUE-01C bounded date-role conflict refusal and official detail parity.
+- No Source/Preview/ShowNews main writes, no formal data/status/Pages/PWA/Golden/Publisher/Writer/Scheduler/Notifier changes, no merge. `HARD_HOLD_NO_PUBLICATION` stays. Preserve CKSMH 5, TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, formal status UI 11 screenshot PASS, ibon 39961 mismatch OPEN, PR #53 HOLD. CI success ≠ Golden/Android E2E/production publication.
+
+---
+
+> **2026-10-29 P30-VENUE architecture addendum — Owner approved, VENUE-01 offline CI PASS / live source REVIEW.** Existing primary P30-L9-AH remains OPEN/NEXT. This parallel tree is source-only, not PWA publication.
+
+```text
+P30 venue source (isolated Draft PR #73, exact HEAD 52655204dd3ac6fddd12347411fad849eb77a288)
+├── VENUE-01 Taipei Arena official OpenData [ADAPTER + OFFLINE CI PASS; LIVE ADAPTER PENDING]
+│   ├── scripts/p30_venue01_taipei_arena_readonly.py [NEW; Python stdlib; --live explicit]
+│   │   ├── one HTTPS GET; no redirect/retry/login/bypass; max 2 MB / 40 items
+│   │   ├── official JSON DataSN + Source URL + title shape [REVIEW SOURCE ANNOUNCEMENT]
+│   │   ├── venue_source_key_hash [VENUE namespace; ticket_event_id = null]
+│   │   ├── explicit 售票系統： label [CLAIMED_PLATFORM only; not ticket URL/ID]
+│   │   ├── 日期時間 [ANNOUNCEMENT_TIMESTAMP; never event date]
+│   │   └── EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION [ALL HOLD]
+│   ├── tests/p30/test_venue01_taipei_arena_readonly.py [20/20 OFFLINE PASS]
+│   └── .github/workflows/eventradar_p30_venue01_readonly.yml [exact-head PR CI SUCCESS]
+├── VENUE-02 Taipei Music Center / National Taichung Theater [P1 OPEN; official program and native ticket links]
+├── VENUE-03 Kaohsiung Arena [P1 OPEN; official event/list/detail]
+├── VENUE-04 provenance graph [P1 OPEN; separate venue announcement ID vs ticket Event ID]
+│   └── source and session exact identity joins; ambiguous role / date / platform claims HOLD
+├── VENUE-05 controlled quality + production PWA + Android [P1 HOLD; no activity publication]
+├── P2 Taipei Performing Arts Center / National Kaohsiung Center for the Arts [DEFERRED]
+└── P3 other venues [DEFERRED]
+
+Primary P30-L9-AH ACCUPASS [NEXT; local semantic field roles, no global regex]
+Production docs/data.json / docs/platform_status.json / PWA / Pages [UNCHANGED]
+Golden / Writer / Publisher / Scheduler / Notifier [HARD_HOLD_NO_PUBLICATION]
+```
+
+- [VENUE-01 Draft PR #73](https://github.com/easonliu714/event_scraper_public/pull/73); [native exact-head CI #40846238098](https://github.com/easonliu714/event_scraper_public/actions/runs/40846238098) 20/20 PASS; [artifact #12885595556](https://github.com/easonliu714/event_scraper_public/actions/runs/40846238098/artifacts/12885595556), SHA256 0b174468bb0f40db1b879a871b910f765b588a311df3da4522675b7d4dd9ed92. CI official GET=0, live adapter not yet run; public official JSON separately observed 8 announcements, including at least one date-role inconsistency for REVIEW.
+- Venue pipeline strictly HTTP → LIST → DETAIL → IDENTITY → FIELD → GOLDEN → PUBLICATION. Ticket Plus/ibon label from venue is not ticket-system event identity. Preserve CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, ibon 39961 OPEN and PR #53 HOLD. No merge/main write or data publication.
+
+
+> **2026-10-29 P30-L9-AG — ACCUPASS 官方同 Event path 清單／詳情標題對位：限量 2/2 REVIEW exact match，正式身分與發布仍 HOLD。**
+> - FIRST fresh-read Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`；正式 `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`、`docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`；Pages 最新 dynamic build/deploy [#40683700243](https://github.com/easonliu714/event_scraper_public/actions/runs/40683700243) SUCCESS（2026-10-28 11:55 UTC）。兩份 canonical docs 僅在本 Docs Draft PR #8，main 非最新。
+> - [P30-L9-AG 隔離 Draft PR #72](https://github.com/easonliu714/event_scraper_public/pull/72) Open/Draft/Unmerged；base 為 L9-AF #71 exact HEAD `ae54d7687893e4f0960fc7d3926c7a376798d386`，本 Gate exact HEAD `adbbe114c27259b80f5db80dcfee94204da09979`；相對 parent 僅 ADD `scripts/p30_l9ag_accupass_detail_parity.py`、`tests/p30/test_l9ag_accupass_detail_parity.py`、`.github/workflows/eventradar_p30_l9ag_accupass_detail_parity.yml`，未修改正式 scraper/data/status、Publisher/Writer/Scheduler/Notifier。
+> - 原生 [push CI #40838501892](https://github.com/easonliu714/event_scraper_public/actions/runs/40838501892) 與 [exact-head PR CI #40838523869](https://github.com/easonliu714/event_scraper_public/actions/runs/40838523869) 均 SUCCESS，**52/52 離線契約測試、所有 job steps PASS，無第一個真失敗**；PR [Artifact #12881702325](https://github.com/easonliu714/event_scraper_public/actions/runs/40838523869/artifacts/12881702325) ZIP SHA256 `cf11c7ad89e6c7fa8ac2c83ade4b17533717552a2af1ef86acaccea31c7517aa`，已獨立下載核對 ZIP CRC、SHA256SUMS、Manifest、隱私及 No Publication contract。
+> - 一次正常公開 ACCUPASS 清單 HTTP200，原始 HTML 與最終 DOM 均 **103 anchors／50 合法同源 event-path query anchors／25 相異 Event paths／25 有唯一局部標題／0 局部標題衝突**。選取至多兩個相異 path 的 anchor-local title，使用**原始完整 query URL**（不刪／不改 query）各導覽一次官方詳情，HTTP **200/200**、無異站／ID／query redirect；四次被動 DOM 觀察，兩筆最後均 `complete`，各 9 個 H1/H2、各 **1 個完整 NFC/空白正規化標題吻合**，結果兩筆 `REVIEW_EXACT_SAME_PATH_H1_H2_TITLE_NOT_FORMAL_IDENTITY`。本輪不持久化 URL、標題、Event ID、Query 值、原始 HTML、Cookie、截圖。
+> - 整體決策 `REVIEW_TWO_SOURCE_BOUND_TITLE_MATCHES_NOT_FORMAL_IDENTITY`：**2/2 只代表限量同次官方來源標題對位成功，不代表 25/25 全站、正式 identity、活動欄位或 Golden 已驗收**。正式身分 0、EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION 接受欄位 0、Golden 0、發布 0；`HARD_HOLD_NO_PUBLICATION` 持續。保留 ibon 39961 歷史 mismatch OPEN、CKSMH 5／TWTC 39 Android USER_ATTESTED_PASS、L8 Core UI PASS、正式 PWA status 11 張 Android 截圖視覺 PASS。
+> - **下一 Gate P30-L9-AH**：只針對本次已能對位的同 Event ID 官方詳情，檢查 EVENT／SALE／ADMISSION／REGISTRATION／VOUCHER／VENUE／PRICE／SESSION **局部語意 DOM／標籤值關係**及歧義拒絕規則；採小樣本、嚴格來源對位、日期語意區隔、缺值 HOLD，不用全頁 regex 拼接。仍不得接受正式欄位、改 Golden、發佈、合併或啟用 Writer/Publisher/Scheduler/Notifier；任何風險開關需 Owner 精確授權。
+
+
+> **2026-10-29 P30-L9-AF — ACCUPASS 同次公開來源 query 名稱與重複連結／局部標題關係 Gate：25 個相異 Event path 各有 anchor-local 標題，仍僅 REVIEW，禁止正式發布。**
+> - FIRST fresh-read：Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`；正式 status blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`、data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`；正式 Pages build/deploy #40683700243 SUCCESS。兩份 canonical docs 僅在 Docs Draft PR #8，main 非最新。
+> - [P30-L9-AF Draft PR #71](https://github.com/easonliu714/event_scraper_public/pull/71) Open/Draft/Unmerged；base L9-AE PR #70 HEAD `36dce126cb0e17be3a2bbb4fe385d89ce9f4f338`，exact HEAD `ae54d7687893e4f0960fc7d3926c7a376798d386`；相對 base 僅 ADD 三檔 `scripts/p30_l9af_accupass_query_roles.py`、`tests/p30/test_l9af_accupass_query_roles.py`、`.github/workflows/eventradar_p30_l9af_accupass_query_roles.yml`，沒有正式資料與 Publisher/Writer/Scheduler/Notifier 修改。
+> - [最終 exact-head PR CI #40831993939](https://github.com/easonliu714/event_scraper_public/actions/runs/40831993939) SUCCESS，52/52 synthetic tests、原生 Chromium 官方來源、隱私／SHA／No Publication contract PASS；[Artifact #12879261534](https://github.com/easonliu714/event_scraper_public/actions/runs/40831993939/artifacts/12879261534) GitHub digest SHA256 `2456761dd4399cedb35d559738db05203d9747c379d879ca90bda4d8c0883322`，runner SHA256SUMS 與 Manifest PASS。中間非最新 HEAD 的 push CI #40831969597 兩項舊斷言 FAIL（改為逐 path 標題判定後未同步測試），已修補並由最終 exact-head 52/52 PASS；中間被取消的過時 run 不作正式 Gate 結論。
+> - 一次正常公開 ACCUPASS 搜尋 HTTP200、原始 HTML／四次被動 DOM 觀察一致：全部 103 個連結、50 個同源 event-path query 連結，均為符合 8–64 字元 ID path 的 URL；**25 個相異 path、25 個重複 anchor**。50 個 query 的安全名稱僅 `utm_source`、`utm_medium`、`utm_campaign`（各 50 次），semantic/unknown/malformed=0；**沒有封存任何參數值或未知名稱**。25 個 anchor 含局部標題、25 個重複 anchor 缺局部標題；按同 path 聚合後 **25/25 相異 path 各至少有一個局部標題、0 個 path 缺標題、0 個 path 有衝突的局部標題**。此為清單層 REVIEW，不代表官方詳情對位或可移除 query。
+> - Decision `REVIEW_TRACKING_NAMES_AND_LOCAL_PATH_TITLES_NOT_DETAIL_IDENTITY`；正式同 Event ID 詳情 title match、EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION、Golden 均仍 0；`HARD_HOLD_NO_PUBLICATION`、ibon 39961 OPEN、CKSMH 5／TWTC 39 Android USER_ATTESTED_PASS、L8 Core UI PASS 均保留。正式 PWA/status/data/Pages 不變。
+> - **下一 Gate P30-L9-AG**：至多兩筆合法官方 ACCUPASS 詳情，同一次清單中選取相異 path 且 anchor-local title 有唯一來源的候選，**沿用完整原始官方 query URL、不刪 query、不重組全頁 regex**，確認最終同源 HTTPS／Event ID path／來源標題對位；若跳轉或無 H1/H2/可驗證標題則 HOLD。禁止登入、驗證繞過、購票、發布及未授權 merge。
+
+
+> **2026-10-29 P30-L9-AE — ACCUPASS 同一次 HTTP200 來源 HTML／正常 Chromium DOM 清單結構 Gate，發現 50 個帶 query 的 event-path 連結；正式活動身分仍 HOLD。**
+> - FIRST fresh-read：Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`；正式 `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`、`docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`，Pages build/deploy #40683700243 SUCCESS；兩份唯一 canonical docs 仍只在本 Docs Draft PR #8，不把 main 當最新。
+> - [P30-L9-AE Draft PR #70](https://github.com/easonliu714/event_scraper_public/pull/70) Open/Draft/Unmerged，base L9-AD #69 HEAD `7c0668443df2d540ca00e773b4028e7b93434e45`，exact HEAD `36dce126cb0e17be3a2bbb4fe385d89ce9f4f338`；精確三個 ADD-only：`scripts/p30_l9ae_accupass_list_topology.py`、`tests/p30/test_l9ae_accupass_list_topology.py`、`.github/workflows/eventradar_p30_l9ae_accupass_list_topology.yml`。沒有變更正式資料或主分支。
+> - [push CI #40825868164](https://github.com/easonliu714/event_scraper_public/actions/runs/40825868164) SUCCESS，40/40 tests；[exact-head PR CI #40825879825](https://github.com/easonliu714/event_scraper_public/actions/runs/40825879825) SUCCESS，40/40 tests，所有 job steps PASS，沒有第一個真失敗；[PR Artifact #12876303392](https://github.com/easonliu714/event_scraper_public/actions/runs/40825879825/artifacts/12876303392) GitHub digest SHA256 `4a35a9efb10756bb7111616dfe0ac6d0d978962ea4f34558048f4bef886705b3`；runner SHA256SUMS、Manifest、隱私／禁止發布契約 PASS。
+> - 本輪**一個合法公開 ACCUPASS 搜尋導覽**：HTTP200；原始 response HTML 和最後 Chromium DOM 各有 103 個 `a[href]`，其中 50 個同源 `/event/` path 連結、**50 個均帶 query**，因此嚴格無 query Event ID 規則命中 0；53 個非 event-path；沒有外站 event link，card-title hints 0。四次被動 DOM 觀察、無詳情 GET。相同次數不能推論這 50 個是唯一活動或可接受的 ID；歷史 L7-B 25 候選不與本次相加。
+> - 根因分流從「HTTP200 清單 0」縮小為 **HOLD_EVENT_PATH_FORMAT_OR_QUERY**；**不是**來源無活動的證明，亦非直接解除網址 query 安全規則的授權。正式 identity/fields/Golden=0，`HARD_HOLD_NO_PUBLICATION`、ibon 39961 OPEN、CKSMH 5／TWTC 39 Android USER_ATTESTED_PASS、L8 Core UI PASS 均保留。
+> - **下一 Gate P30-L9-AF**：僅在一個合法公開來源內，分析 event-path query **參數名稱分類（不封存值）**、是否有來源明確定義的 canonical event ID 與 anchor-local title，對追蹤／語意／身分參數採 fail-closed；仍不進行詳情或活動發布，除非來源身分合約明確成立。禁止全球 regex 拼接日期／標題、禁止繞過驗證、禁止未授權 merge。
+
+> **2026-10-29 P30-L9-AD — ACCUPASS 公開來源清單／詳情身分 Gate：HTTP200，但本次來源局部候選 0，維持 HOLD**
+> - FIRST fresh-read Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`；正式 status blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`、data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`，Pages #40683700243 SUCCESS。唯一 canonical docs 在 Draft PR #8，main 非最新。
+> - 新增 [隔離 Draft PR #69](https://github.com/easonliu714/event_scraper_public/pull/69)，base L9-AC PR #68 HEAD `3b6b64ff4803a1a156e5774a23850f756d31e799`，HEAD `7c0668443df2d540ca00e773b4028e7b93434e45`，精確三個 ADD-only：`scripts/p30_l9ad_accupass_identity.py`、`tests/p30/test_l9ad_accupass_identity.py`、`.github/workflows/eventradar_p30_l9ad_accupass_identity.yml`。原生 [push CI #40820240208](https://github.com/easonliu714/event_scraper_public/actions/runs/40820240208) SUCCESS，36/36 tests PASS，所有 job steps PASS；[Artifact #12874351285](https://github.com/easonliu714/event_scraper_public/actions/runs/40820240208/artifacts/12874351285) GitHub digest SHA256 `dbd4c2ab8c70b8990e93189ce3ee24186efb027dd5f73e37cdd8306e9781b8c5`，SHA256SUMS/manifest runner readback PASS。PR-triggered exact-head [CI #40820252117](https://github.com/easonliu714/event_scraper_public/actions/runs/40820252117) 亦 SUCCESS 36/36、所有 job steps PASS；[PR Artifact #12874551505](https://github.com/easonliu714/event_scraper_public/actions/runs/40820252117/artifacts/12874551505) GitHub digest SHA256 `48a1d86666b09c91d8f65eec4808e6264447d07c421b78bdd2a343f2f28b2f6d`，runner SHA256SUMS/manifest PASS。
+> - ACCUPASS 本次一次正常公開 Chromium search HTTP200，來源限定 anchor-local Event ID／標題解析**0 筆候選**，因此**未發出詳情 GET**；歷史 L7-B 25 候選／詳情 0 匹配僅歷史資料，不得當本次數量或推斷來源消失。下一 Gate 應區分原始 HTML anchor、正常 JS hydration 後 DOM、官方卡片結構／Event ID URL 格式（有限量、無繞過），優先定位清單 0 原因，非盲目重複詳情。
+> - 正式身分 0、EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION 接受欄位 0、Golden 0、發布 0；`HARD_HOLD_NO_PUBLICATION`。Source main、正式 data/status、Pages、Writer/Publisher/Scheduler/Notifier 未修改；CKSMH5／TWTC39 Android PASS、L8 Core UI PASS、11 張正式 PWA status 視覺 PASS 保留；ibon39961 歷史 mismatch OPEN，PR #53 CI HOLD 未解除。無 merge 授權。
+
+
+> **2026-10-29 P30-L9-AC — 寬宏頂層表格／具名標題元件的嚴格界定診斷；36/36 CI PASS，兩筆身分仍 HOLD**
+> - FIRST fresh-read Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`; 正式 `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`, `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, Pages build/deploy #40683700243 SUCCESS，未發布新活動。唯一兩份 canonical docs 仍在 Draft PR #8，不假設 main 已有最新內容。
+> - [隔離 Draft PR #68](https://github.com/easonliu714/event_scraper_public/pull/68) HEAD `3b6b64ff4803a1a156e5774a23850f756d31e799`，base 為 L9-AB PR #67 HEAD `f657555b16f41d4d24e4b67205c0c0019d0b12fe`，精確 3 個 ADD-only 路徑：`scripts/p30_l9ac_kham_toplevel_title.py`、`tests/p30/test_l9ac_kham_toplevel_title.py`、`.github/workflows/eventradar_p30_l9ac_kham_toplevel_title.yml`。原生 exact-head [PR CI #40814681972](https://github.com/easonliu714/event_scraper_public/actions/runs/40814681972) **SUCCESS 36/36**，所有 job steps 成功；[Artifact #12872031546](https://github.com/easonliu714/event_scraper_public/actions/runs/40814681972/artifacts/12872031546) ZIP SHA256 `9fe03516d36997d12486dbb2e0743b001e6dd519f575800eaf6dc4339443a7f5`，已獨立下載、驗證 ZIP CRC、SHA256SUMS 與 Manifest。Parent L9-AB Artifact #12869148942 SHA256 `18da27a1ceec328af40ae5f2ca3eb59665bbd82e6d4258355de71cfb39458b21` 驗證 PASS。
+> - 正常公開 Chromium：官方清單 HTTP200，44 anchors → 10 暫存候選；最多兩筆同 Product ID 詳情 HTTP200/200，四次被動 DOM 觀察。兩筆最後觀察的**限定頂層表格列 0、具名活動標題元件 0、完整標題吻合 0**，無上限溢出；均 `HOLD_NO_BOUND_TOPLEVEL_TITLE`。此僅表示所檢查的 table/semantic component 選取區域無候選，**不證明全站沒有活動標題**，亦不證明原始 L7-B 0 筆原因；不採用全頁 regex、不存原始 HTML／標題／URL／ID、不讀跨來源 iframe。
+> - **決策：寬宏暫停重複短時定位，下一 Gate P30-L9-AD 轉向另一平台的清單／詳情身分阻塞（優先 ACCUPASS 25 候選／歷史詳情 0 匹配），以最新來源重新限定檢查，不複製歷史數據當現況。** 正式驗證活動身分 0、EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION 可接受欄位 0、Golden 0、發布 0；`HARD_HOLD_NO_PUBLICATION`。保留 CKSMH5／TWTC39 Android USER_ATTESTED_PASS、L8 Core UI PASS、正式 PWA 11 張 Android 狀態頁視覺 PASS、ibon39961 歷史 title mismatch OPEN；Source main/Pages/data/status/Writer/Publisher/Scheduler/Notifier 均未改動。PR #53 原生 CI 仍 FAIL/HOLD，不能藉本 Gate 解除。
+
+
+> **2026-10-29 P30-L9-AB — 寬宏 iframe 同源判定與窄範圍 DOM：30/30 CI PASS，正式身分仍 HOLD**
+> - FIRST fresh-read Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`; formal status blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`, data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, last Pages build/deploy #40683700243 SUCCESS. Canonical docs only in Docs Draft PR #8, never assumed main.
+> - [Isolated Draft PR #67](https://github.com/easonliu714/event_scraper_public/pull/67) HEAD `f657555b16f41d4d24e4b67205c0c0019d0b12fe`, base frozen L9-AA PR #66 HEAD `86ef4fffb67824f9981bba984ecadb62eca93631`; exactly 3 ADD-only paths: `scripts/p30_l9ab_kham_iframe_narrow.py`, `tests/p30/test_l9ab_kham_iframe_narrow.py`, `.github/workflows/eventradar_p30_l9ab_kham_iframe_narrow.yml`. Native exact-head [Actions #40809856495](https://github.com/easonliu714/event_scraper_public/actions/runs/40809856495) SUCCESS **30/30**, all job steps success, source/parent/manifest/privacy/HOLD checks pass. [Artifact #12869148942](https://github.com/easonliu714/event_scraper_public/actions/runs/40809856495/artifacts/12869148942) ZIP SHA256 `18da27a1ceec328af40ae5f2ca3eb59665bbd82e6d4258355de71cfb39458b21` (GitHub artifact digest and job SHA256SUMS checked).
+> - One normal public list HTTP200, 10 provisional candidates; two same-Product-ID detail HTTP200/200. Each sampled detail observed 4 passive snapshots; final iframe topology for both: **3 child frames = 1 opaque/about:blank + 2 unrelated-origin, 0 allowed same-origin, 0 readable same-origin, 0 iframe exact title**. No cross-origin iframe content inspected. First detail `HOLD_NO_SOURCE_BOUND_IFRAME_TITLE`; second broad DOM >250 cap but narrowed semantic zone bounded and exact title=0: `HOLD_BROAD_OVERFLOW_NARROW_ZERO_NOT_IDENTITY`. This does NOT prove title absence from all official DOM, nor prove third-party iframe ownership; no broad cap increase or global regex.
+> - Formal verified identity 0, accepted EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION 0, Golden 0, published 0; **HARD_HOLD_NO_PUBLICATION**. Source main/Pages/data/status/Writer/Publisher/Scheduler/Notifier untouched. Preserve CKSMH5/TWTC39 Android USER_ATTESTED_PASS, L8 Core UI PASS, formal PWA 11-screen visual PASS, ibon39961 historical title mismatch OPEN. **Next P30-L9-AC**: source-bound non-iframe top-level title component/table region discovery under strict caps and same Product ID; otherwise pivot to another platform's unresolved list/detail Gate. No merge authorization.
+
+
+> **2026-10-29 P30-L9-AA 寬宏非 H1/H2 標題區域拓樸 — iframe 與節點上限分流，正式身分仍 HOLD**
+> ```text
+> Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [NO CHANGE]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [NO CHANGE]
+> └─ Pages #40683700243 build/deploy SUCCESS [NO NEW DEPLOY]
+> L9-Z Draft PR65 @18d9a28c4b3235a5aa7b722b447f7588a707911d [UNMERGED]
+> └─ L9-AA Draft PR66 @86ef4fffb67824f9981bba984ecadb62eca93631 [UNMERGED]
+>    ├─ scripts/p30_l9aa_kham_title_topology.py [1 list + <=2 same-ID details, 6 passive frames each]
+>    │  ├─ 10 provisional list objects / 2 details HTTP200 / evaluated exact title-region matches 0 (over-cap zone unassessed)
+>    │  ├─ sample0 iframe 1→4, scoped text 214, HOLD_NO_EXACT_REGION_IFRAME_PRESENT
+>    │  ├─ sample1 iframe 1→4, scoped text >250 cap / match null (unassessed), HOLD_REGION_CAP
+>    │  └─ no title/HTML/URL/ID retained; formal identity0, fields0, Golden0, publish0
+>    ├─ tests/p30/test_l9aa_kham_title_topology.py [48/48 PASS after 3 head-fixture repairs]
+>    └─ .github/workflows/eventradar_p30_l9aa_kham_title_topology.yml
+>       └─ exact-PR-head CI #40803982844 SUCCESS -> Artifact #12866284781
+>          └─ ZIP SHA256 4b1b9d830cf947202798f9c601d9c69c194af35c4b64c3320dbe5fd04d4a9075
+> Formal status PR53 [CI FAIL, DRAFT/UNMERGED]; ibon39961 historic mismatch OPEN
+> Next L9-AB [iframe origin/accessibility and narrowed over-cap DOM, no source bypass]
+> HARD_HOLD_NO_PUBLICATION / Source Writer Publisher Scheduler Notifier untouched
+> ```
+> - Exact full-title NFC equality is bounded to named DOM zones; metadata/image hints are non-authoritative; over-cap regions are null/unassessed rather than false zero. iframe presence alone is **not** proof of title inside frame. Original Android CKSMH5/TWTC39 PASS, L8 Core UI PASS and 11 formal PWA status screenshots retained as scoped attestations, not full-platform E2E. Only formal PWA remains front-end acceptance entry.
+
+
+
+> **2026-10-29 P30-L9-Z 寬宏同 Product ID 清單／詳情身分：HTTP 200/200，H1/H2 無候選，正式身分 HOLD**
+> ```text
+> Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [STATUS ONLY]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages #40683700243 build/deploy SUCCESS [NO NEW DEPLOY]
+> L9-Y Draft PR64 @b8bd1905a875d62d131cd8db1fec814437b2fcb5
+> └─ L9-Z Draft PR65 @18d9a28c4b3235a5aa7b722b447f7588a707911d [UNMERGED]
+>    ├─ scripts/p30_l9z_kham_list_detail_identity.py [bounded 1 list + 2 details]
+>    │  ├─ frozen original scraper.py blob 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+>    │  ├─ list HTTP200 / 44 anchors / 10 provisional objects
+>    │  ├─ two canonical same-Product-ID detail HTTP200/200, redirects0/0
+>    │  ├─ 4 passive H1/H2 snapshots each: heading candidates 0/8; title parity 0/2
+>    │  ├─ detail1 final complete; detail2 final interactive -> HOLD (not wrong-title proof)
+>    │  └─ no raw source persisted; verified identity0 / accepted fields0 / Golden0 / publish0
+>    ├─ tests/p30/test_l9z_kham_list_detail_identity.py [49/49 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9z_kham_list_detail_identity.yml
+>       └─ exact-head CI #40798083288 SUCCESS -> Artifact #12864821858
+>          └─ ZIP SHA256 f6508155661459bb0538fc40bf5c584eeb49bec436db4e15c130e262af1c89aa
+> Formal PR53 [CI FAIL/security blocked, DRAFT/UNMERGED]
+> Formal fields UNKNOWN / Golden0 / Publish0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - First L9-Z CI #40797873931 passed 44 offline tests but misclassified a live navigation exception as unsafe-final; atomic error-category fix and five new tests produced 49/49 final CI PASS. The second capture obtained HTTP200 and exact same-ID detail routing but found no H1/H2 title candidates; this is a structural gap, not an activity identity pass. Next L9-AA: source-bound title region topology with fail-closed exact matching, no raw retention or publication. CKSMH5/TWTC39 Android PASS and L8 Core UI PASS preserved.
+
+
+> **2026-10-29 P30-L9-Y 寬宏 original create_event_obj 邊界 — 10 provisional objects, identity 0, NO PUBLISH**
+> ```text
+> Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED ENGINEERING STATUS ONLY]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages #40683700243 build/deploy SUCCESS [NO NEW DEPLOY]
+> L9-X Draft PR63 @b90a6af4f6bb2bab4a6570a025e7068cd1c69093
+> └─ L9-Y Draft PR64 @b8bd1905a875d62d131cd8db1fec814437b2fcb5 [UNMERGED]
+>    ├─ scripts/p30_l9y_kham_event_object_boundary.py [AST-isolated frozen scraper functions]
+>    │  ├─ one normal public Chromium category205 navigation; HTTP200
+>    │  ├─ static/rendered each 44 anchors → 10 selector → 10 PRODUCT_ID → 10 pre-object
+>    │  ├─ exact create_event_obj accepted provisional 10 / rejected 0 / normalized 0
+>    │  ├─ duplicate-after-acceptance 0 / unsafe link 0; no raw source persisted
+>    │  └─ verified identity 0 / accepted fields 0 / Golden 0 / published 0
+>    ├─ tests/p30/test_l9y_kham_event_object_boundary.py [38/38 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9y_kham_event_object_boundary.yml
+>       └─ final exact-head CI #40790894717 SUCCESS → Artifact #12860709898
+>          └─ ZIP SHA256 436199dd5cf7b8f18c552f6fd128b4a5654b8fd421042de2adcc798e22186568
+> Formal PR53 [CI FAIL/security blocked, DRAFT/UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - **Interpretation:** the original `create_event_obj` title/noise/normalization stage did not remove any of ten current category205 URL-pattern links in this capture. This does **not** explain historical L7-B generic zero (different source time), nor verify activity identity/detail, dates, price, venue, sessions or publication. First CI failed wrong branch status lookup, second failed malformed-parent KeyError; both corrected on isolated branch before final PASS. Next L9-Z: limited same-Event-ID official list/detail identity validation, retain source lineage and HOLD.
+
+
+> **2026-10-29 P30-L9-X 寬宏原始 parser 同次來源階段對照 — 10 URL-pattern → 10 selector → 10 PRODUCT_ID → 10 anchor text，尚非活動驗證**
+> ```text
+> Formal Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 published snapshot]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-W Draft PR62 @9bc37d326ee6e1b698e36061f8323e0894c98ad6
+> └─ L9-X Draft PR63 @b90a6af4f6bb2bab4a6570a025e7068cd1c69093 [UNMERGED]
+>    ├─ scripts/p30_l9x_kham_original_parser_parity.py [one Chromium navigation; BeautifulSoup static/rendered]
+>    │  ├─ exact frozen scraper.py blob 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+>    │  ├─ static 44 anchors / broad UTK0201 10 / original selector 10
+>    │  ├─ original PRODUCT_ID gate PASS 10 / unique 10 / anchor text nonempty 10
+>    │  ├─ rendered three passive snapshots each 10/10/10 pre-event stages
+>    │  └─ create_event_obj NOT EXECUTED; identity/fields/Golden/publish all 0
+>    ├─ tests/p30/test_l9x_kham_original_parser_parity.py [36/36 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9x_kham_original_parser_parity.yml
+>       └─ native CI #40784134457 SUCCESS -> Artifact #12858063173
+>          └─ ZIP SHA256 c259d931c6c8b9c3b2bb8f5e398e6675231202fd718e136cf9c185d9bd6a4c5f
+> Formal status Draft PR53 [CI FAIL/security-blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - **Interpretation:** 2026-10-29 07:00 Taiwan current Kham original selector and PRODUCT_ID gate do not explain the earlier L7-B 2026-10-26 generic zero. Cross-time page drift, the remaining `create_event_obj` title/noise stage, and other category behavior remain unresolved. Do not equate 10 links with 10 verified events. Next P30-L9-Y targets exact post-selector title/noise filter and event-object boundary under bounded source evidence; no main/Pages/production mutation.
+>
+
+> **2026-10-29 P30-L9-W 寬宏清單邊界：當前 static/rendered URL-pattern 10；歷史 generic list=0，尚非 parser 根因證明**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 snapshot]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages run 40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-V Draft PR61 @46dd6ddade398603cca4fc6f8dbb8f644ce64d3c
+> └─ L9-W Draft PR62 @9bc37d326ee6e1b698e36061f8323e0894c98ad6 [UNMERGED]
+>    ├─ scripts/p30_l9w_kham_list_boundary.mjs
+>    │  ├─ SHA-pinned L7-B + formal status, one normal Chromium official category navigation
+>    │  ├─ HTTP200, redirects0, static 44 anchors / 10 unique same-host UTK0201-pattern
+>    │  ├─ rendered four snapshots 10/10/10/10; ready interactive→interactive→complete→complete
+>    │  ├─ review CURRENT link presence vs HISTORIC 0; no parser root-cause assertion
+>    │  └─ no raw source persistence, detail identity 0, fields 0, Golden 0, publish 0
+>    ├─ tests/p30/test_l9w_kham_list_boundary.mjs [39/39 offline PASS]
+>    └─ .github/workflows/eventradar_p30_l9w_kham_list_boundary.yml
+>       └─ exact-head CI #40775864493 SUCCESS -> Artifact #12854207689
+>          └─ ZIP SHA256 2ba90bf6d5e080443b5e01309ae877f3057f9915082b9c3b303c130f0051fa61
+> Formal status Draft PR53 [CI FAIL/security-blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - **Interpretation:** Current 10 URL-pattern matches are not 10 confirmed events. The L7-B 2026-10-26 generic zero and 2026-10-29 current 10 were observed at different times; neither a static-parser bug nor JS-only source is proven. Next L9-X: bounded same-session original generic parser vs structural anchor/card/title association, then exact ID/detail parity if justified. Preserve ibon 39961 historic mismatch OPEN and CKSMH 5/TWTC 39 Android USER_ATTESTED_PASS + L8 UI PASS.
+>
+
+
+> **2026-10-29 P30-L9-V — 19-platform SHA-pinned HTTP/list blocker classification, one safe BeClass probe**
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 published]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> └─ Pages Run 40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-U Draft PR60 @2b26e27bee40f3bff7dc08b1a3fec1c1a9f5d96d
+> └─ L9-V Draft PR61 @46dd6ddade398603cca4fc6f8dbb8f644ce64d3c [UNMERGED]
+>    ├─ scripts/p30_l9v_19source_blocker_triage.py [SHA-pinned original L7B report + published status]
+>    │  ├─ 3 HTTP403 (KKTIX/拓元/BeClass); 1 HTTP200 zero generic (寬宏)
+>    │  ├─ 3 HTTP200 zero but separate source adapters (ibon/TWTC/CKSMH)
+>    │  ├─ 7 list-positive detail identity HOLD; 5 list-positive field role HOLD
+>    │  ├─ BeClass one bounded public GET => HTTP403, 0 redirect follows, 0 retries
+>    │  └─ no raw URLs/HTML/cookies; no current root-cause claim for other 18 sources
+>    ├─ tests/p30/test_l9v_19source_blocker_triage.py [34/34 offline]
+>    └─ .github/workflows/eventradar_p30_l9v_19source_blocker_triage.yml
+>       └─ CI Run 40768439655 SUCCESS -> Artifact 12852485007
+>          └─ ZIP SHA256 4bf89a060381e1fd1093bc4a24c3878d7ee41a4c99fa01bfdec23f7035d07a06
+> Formal status Draft PR53 [CI FAIL/security blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - Historical 19-platform evidence is not a live 19-platform E2E assertion. L7-B Artifact 12665097220 digest `8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6` and report SHA `e07c01a5d36ab0c950c45fb26e5fdd270103b4013bbf62a00c48291fee5f595a` verified. One new BeClass 403 observation does not resolve earlier 302. Next L9-W: focus 寬宏 public list=0 parser boundary, or BeClass normal public redirect discrepancy. Keep ibon 39961 historic mismatch OPEN, original Android 44 USER_ATTESTED_PASS and L8 UI PASS, Docs Draft PR8 sole canonical authority; no publication.
+
+
+
+> **2026-10-29 P30-L9-U ibon 39961 exact list/detail heading identity — native CI 46/46 PASS, historical mismatch OPEN**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> └─ Pages #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-T Draft PR59 @7923ede339b219a2264127f4163eb6d75e31a66b
+> └─ L9-U Draft PR60 @2b26e27bee40f3bff7dc08b1a3fec1c1a9f5d96d [UNMERGED]
+>    ├─ scripts/p30_l9u_ibon_39961_heading_identity.mjs
+>    │  ├─ pinned L9-K cross-window report + L9-H historic mismatch, both SHA checked
+>    │  ├─ one normal public list + one exact detail navigation, HTTP200/200
+>    │  ├─ exact 39961 same-card list title 1; no ambiguous same-ID candidate
+>    │  ├─ twelve passive H1/H2 observations / 500ms; first complete/match index1
+>    │  ├─ stable current H1/H2 match tail; historic L9-H mismatch remains OPEN
+>    │  └─ no raw title/HTML/links/cookies/screenshots persisted; fields 0
+>    ├─ tests/p30/test_l9u_ibon_39961_heading_identity.mjs [46/46 PASS]
+>    └─ .github/workflows/eventradar_p30_l9u_ibon_39961_heading_identity.yml
+>       └─ native CI #40759836065 SUCCESS, Artifact 12846208917
+>          └─ ZIP SHA256 2144b4f1b8d2837a626690e914a28c65d4c4864aa25a18b7cf86506ae07fcfd2
+> Formal PWA status Draft PR53 [CI FAIL/security-blocked, UNMERGED]
+> Formal fields UNKNOWN / Golden 0 / Publish 0 / HARD_HOLD_NO_PUBLICATION
+> ```
+> - Current 39961 source title alignment is **REVIEW ONLY** and does not explain the prior L9-H `HOLD_TITLE_MISMATCH`; formal identity is not certified. K report SHA `87eef831253a7dea00f53100ea7f0b5c914d6b9cfa62b63906d8d1a846af50a9`, H report SHA `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` verified. Next L9-V prioritizes 19-platform 403/302/0 HTTP/list blocker matrix, no redundant short-window 39961 retry. Docs canonical only on Draft PR8. Existing CKSMH 5/TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, and formal status visual screenshots retained; no 19-source E2E claim.
+>
+
+> **2026-10-29 P30-L9-T ibon 39907 exact heading readiness — native CI 32/32 PASS, field HOLD**
+>
+> Formal PWA Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 UNCHANGED; docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 IMMUTABLE; docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 PUBLISHED PR51; Pages #40683700243 SUCCESS, NO NEW DEPLOY.
+>
+> - L9-S Draft PR58 HEAD cf8250a16d9e59df8957e82000fa8ef5e02ae230 -> **L9-T Draft PR59 HEAD 7923ede339b219a2264127f4163eb6d75e31a66b**, unmerged.
+> - scripts/p30_l9t_ibon_39907_heading_states.mjs: one normal public Chromium navigation to ibon 39907; twelve passive 500ms snapshots. Distinguishes complete + no headings, complete + H3/H4-only, complete + H1/H2 nonmatch candidate. Actual HTTP200, document complete index1, exact title index3, two pre-match complete H3/H4-only states, zero nonmatching H1/H2 candidates, stable matched final three. Decision HOLD_TRANSIENT_HEADING_ABSENCE.
+> - tests/p30/test_l9t_ibon_39907_heading_states.mjs: 32/32 deterministic fail-closed tests PASS.
+> - .github/workflows/eventradar_p30_l9t_ibon_39907_heading_states.yml: first CI #40749594278 FAIL due to token env typo, corrected in isolated branch; final exact-head CI #40749692079 SUCCESS, Artifact 12842508760 ZIP SHA256 f1f99035f316b61adc2d208a844e349ae5312ddc173d0b1cdc14b29abd324fcd; parent L9-S report SHA 337668d7b805e4102f69cf9faa6da73cdf34e4ac54f4add8a45c66b39083e0a2 and original L9-F report SHA 81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4 independently checked.
+> - No raw source text/HTML/links/cookies/screenshots persisted. Fields 0 / Golden 0 / publication 0 / HARD_HOLD_NO_PUBLICATION. Docs canonical only on Draft PR8, NOT main; formal status Draft PR53 remains CI FAIL/security-blocked and unmerged. Existing CKSMH 5/TWTC 39 Android PASS, L8 Core UI PASS and 11 formal PWA screenshots retained without full 19-source E2E claims. Next L9-U: bounded exact ID/title H1/H2 evidence for historical ibon 39961 or first unresolved source identity.
+
+
+> **2026-10-29 P30-L9-S three-source title readiness — native CI 30/30 PASS; 39907 complete-state nonmatch HOLD**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> └─ Pages deploy #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-R Draft PR57 @3f473d6b377650cf15b84e83d2481f8790347cac
+> └─ L9-S Draft PR58 @cf8250a16d9e59df8957e82000fa8ef5e02ae230 [UNMERGED]
+>    ├─ scripts/p30_l9s_ibon_three_title_readiness.mjs
+>    │  ├─ 3 SHA-pinned ibon IDs 39575/39907/39978, one normal navigation each
+>    │  ├─ 8 passive title/readyState snapshots at 600ms per ID
+>    │  ├─ complete-state unmatched candidate vs stable matched tail
+>    │  └─ no click, title/date text, HTML, links, screenshots or cookies persisted
+>    ├─ tests/p30/test_l9s_ibon_three_title_readiness.mjs [30/30 PASS]
+>    └─ .github/workflows/eventradar_p30_l9s_ibon_three_title_readiness.yml
+>       └─ Native CI #40740745592 SUCCESS, Artifact 12838189367
+>          ├─ 39575: HTTP200, title first index2, complete first index3, REVIEW only
+>          ├─ 39907: HTTP200, complete first index1, title first index2,
+>          │         one complete-state nonmatch, HOLD_COMPLETE_NONMATCH_BEFORE_STABLE_TAIL
+>          ├─ 39978: HTTP200, complete/title first index1, REVIEW only
+>          └─ formal fields 0, Golden 0, Publish 0, HARD_HOLD_NO_PUBLICATION
+> Docs Draft PR8 only [NOT MAIN]
+> Formal PWA status Draft PR53 [CI FAIL / security-blocked / UNMERGED]
+> ```
+> - L9-S native job `123001351188` passed exact three ADD-only path gate, 30 deterministic tests, parent R/F exact-head artifact SHA, and independent report SHA readback. Artifact ZIP SHA256 `3b53e69770add8a1c30324e7276ee7d931caf158b53b5c354213c5c074a0c169`, R report SHA `ef8a897497a789061141d1fd44116b4b268f38107e087b84085ecadbe287b838`, original F report SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`. `document.readyState=complete` is not sufficient for correct source title identity (39907). Stable title tail is REVIEW, not Golden. Next L9-T: independently disambiguate 39907 completed-document no-exact-title state (heading absent vs nonmatching candidate unresolved) vs delayed SPA hydration; no proof of wrong-event title. Existing CKSMH 5/TWTC 39/L8 Core Android PASS and 11 formal PWA screenshots retained without full E2E claims.
+>
+
+> **2026-10-29 P30-L9-R exact-head title readiness — ibon 39878 delayed heading proven, no field promotion**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> └─ Pages deploy #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-Q Draft PR56 @59152fb83cb396924a6935f36681fac7fb0079f9
+> └─ L9-R Draft PR57 @3f473d6b377650cf15b84e83d2481f8790347cac [UNMERGED]
+>    ├─ scripts/p30_l9r_ibon_title_state.mjs [39878, 8 passive snapshots, 650ms]
+>    │  ├─ no raw title text, HTML, links, dates, screenshots or click persistence
+>    │  ├─ absent/not-ready vs exact heading match vs stable unmatched H1/H2 candidate
+>    │  └─ snapshot 2 first complete and exact match, tail 3 stable exact matches
+>    ├─ tests/p30/test_l9r_ibon_title_state.mjs [36/36 fail-closed]
+>    └─ .github/workflows/eventradar_p30_l9r_ibon_title_state.yml
+>       └─ CI #40731815454 SUCCESS, artifact 12835237400
+>          ├─ first two CI runs FAILED missing test exports; corrected in Draft branch
+>          ├─ source HTTP200, nonmatch after complete 0, no stable wrong-title proof
+>          └─ formal fields 0, Golden 0, Writer 0, Publish 0, HARD HOLD
+> Governance Docs Draft PR #8 only [NOT MAIN]
+> Formal PWA status Draft PR #53 [CI FAIL/security-blocked; UNMERGED]
+> ```
+> - Parent Q report SHA `235d7bc2ef20d6550da12da7bc6aee4d212fa0dcf6821936d7446df802108c1d`; original F report SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`; new artifact ZIP `sha256:cce75aa2bd82d4a695b58019db8e6c0cee5e703052039f3cb80210dfa70df96a`. L9-R proves transient title hydration in the latest bounded capture, **not** that all prior mismatches were timing-related. No date/price/session/SALE field Golden; no source production modification or new PWA deploy. Next L9-S: apply strict title readiness to bounded source samples while preserving fail-closed publication boundary.
+>
+
+
+> **2026-10-28 P30-L9-Q ibon 39878 passive hydration/identity Gate — native 36/36 PASS; fields HOLD**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PR51 PUBLISHED]
+> └─ Pages build/deploy #40683700243 SUCCESS [NO NEW DEPLOY]
+> L9-P Draft PR55 @158b13cf3d45b9e1fe377bda4182a4da5e5864c8
+> └─ L9-Q Draft PR56 @59152fb83cb396924a6935f36681fac7fb0079f9 [UNMERGED]
+>    ├─ scripts/p30_l9q_ibon_hydration.mjs [one official 39878 page, six passive snapshots at 700ms]
+>    │  ├─ per-snapshot exact source title parity boolean + DOM readyState
+>    │  ├─ direct H3 活動日期 count, immediate sibling control counts, direct text presence boolean
+>    │  └─ first-label index, hydration transition, last-three topology stability
+>    ├─ tests/p30/test_l9q_ibon_hydration.mjs [36/36 fail-closed contracts]
+>    └─ .github/workflows/eventradar_p30_l9q_ibon_hydration.yml
+>       └─ CI #40721117824 SUCCESS, artifact 12829898767
+>          ├─ HTTP200; H3 absent snapshot 0 -> first present snapshot 1
+>          ├─ last-three local topology stable; widget controls remain untyped
+>          ├─ titleAll=false and allReadyComplete=false -> identity/timing HOLD
+>          └─ accepted fields 0, Golden 0, Publisher/Writer 0, HARD_HOLD
+> Governance Docs Draft PR #8 only [NOT MAIN]
+> Formal PWA status Draft PR53 [CI FAIL, security-blocked, UNMERGED]
+> ```
+> - Exact-head CI #40721117824 job 122931962543 SUCCESS, parent L9-P ZIP digest `24fbff9dc7d6a2723731a7968e4e13a8740dc1d1cb766ed86f089ddba4cb3f03`, parent report SHA `4c6a920d23c3f47bbee07fc102513d002fda62eeed69715beb4d63aae40188c3`, L9-F source SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`, new Artifact ZIP SHA `0e07aec0a6c8a0524457c58e782906d799e3a7f773d084e876bcf1aaddd3ab48`. `titleAll=false` alone does not prove wrong event; missing/not-ready heading is possible. Next L9-R isolates title hydration versus mismatch with no raw text persistence. No date/price/field promotions, Golden, event publication, new PWA deployment or release from HOLD.
+>
+
+
+> **2026-10-28 P30-L9-P ibon interactive widget topology — native 36/36 PASS, formal source-field extraction still HOLD**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [PUBLISHED PR51]
+> ├─ docs/platform-status.html [Owner Android visual PASS; no new deployment]
+> └─ GitHub Pages native deployment 40683700243 SUCCESS
+> L9-O Source Draft PR54 @96748095bbe8084d302bf74b3a7c0aa119039ca2
+> └─ L9-P Source Draft PR55 @158b13cf3d45b9e1fe377bda4182a4da5e5864c8 [UNMERGED]
+>    ├─ scripts/p30_l9p_ibon_control_types.mjs [four exact official details, 2 passive DOM snapshots]
+>    │  ├─ label: direct H3 活動日期 only; nextElementSibling controls only
+>    │  ├─ anchor/button/form/input/select/role-button counts, no URL/text/date extraction
+>    │  └─ compare source-title identity + control type/count drift across snapshots
+>    ├─ tests/p30/test_l9p_ibon_control_types.mjs [36/36 fail-closed]
+>    └─ .github/workflows/eventradar_p30_l9p_ibon_control_types.yml
+>       └─ Run 40711541169 SUCCESS, artifact 12826851317
+>          ├─ all four HTTP200, 4/4 title both snapshots
+>          ├─ 39575/39907/39978: stable 2 button + 2 input controls
+>          ├─ 39878: first H3 label missing -> second H3 with 2 button + 2 input
+>          ├─ 3/4 control topology stable; 1/4 same-page hydration drift
+>          └─ 0 accepted dates/prices/fields, 0 Golden, 0 publishing, HARD HOLD
+> Formal PWA status Draft PR53 [UNMERGED; old test CI FAIL and safety write blocker]
+> ```
+> - Source L9-O report SHA256 `767900155ebf408886db68d8c89d4fd9a1e2044994bbf7c560ac7e7d91e14d32` and original L9-F SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4` verified from exact pinned GitHub artifacts; L9-P artifact ZIP digest `24fbff9dc7d6a2723731a7968e4e13a8740dc1d1cb766ed86f089ddba4cb3f03`. Source P30-L9-P Run `40711541169` completed SUCCESS; CI 36/36. The two-button/two-input widget is **not** typed date evidence. No click, no purchase, no screenshot, no raw HTML, no link URL, no source text persisted.
+> - Next P30-L9-Q: passive hydration-ready stabilization and exact source-bound label/value role diagnostics; do not infer date from interactive widget or force fields Golden. Historic 44 Android user PASS, L8 Core UI PASS retained. Governance docs only on Draft PR #8; main has unchanged official status page. No new main merge or Event Writer/Scheduler/Notifier/Golden activation.
+>
+
+> **2026-10-28 P30-L9-O source UI topology — four current interactive label HOLD, native CI PASS**
+>
+> ```text
+> Formal PWA main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE]
+> ├─ docs/platform_status.json [published PR51 snapshot; 19 platforms; Owner Android visual PASS]
+> └─ docs/platform-status.html [published PR51, not PR53 draft]
+> L9-N Draft PR52 @768e2ee1d6982b3e690c48d98d0be0f4e16a6944
+> └─ L9-O Draft PR54 @96748095bbe8084d302bf74b3a7c0aa119039ca2
+>    ├─ scripts/p30_l9o_ibon_label_topology.mjs [normal Chromium, 4 exact detail IDs, H3 vs L9-M selector]
+>    ├─ tests/p30/test_l9o_ibon_label_topology.mjs [29/29 negative contracts]
+>    └─ .github/workflows/eventradar_p30_l9o_ibon_label_topology.yml
+>       └─ CI Run 40702378377 SUCCESS -> Artifact 12820574944
+>          ├─ 4/4 HTTP200 + exact title heading parity (including ID 39575)
+>          ├─ 4/4 H3 活動日期 local labels; L9-M selector also 4/4
+>          ├─ 4/4 adjacent region HOLD_INTERACTIVE_LOCAL
+>          └─ 0 formal fields / Golden / Writer / Publish; release HARD_HOLD
+> Formal PWA status Draft PR53 @4381c01d3132634a8ec6535abddedcfeaaffcb40
+> └─ CI 40686748311 FAILURE: ibon field status vs existing exact-contract assertion
+>    └─ required test extension write blocked by platform safety; NO BYPASS, NO MERGE
+> ```
+> - L9-O native Run `40702378377` exact-head SHA, 29/29 offline tests, four live details and independent SHA readback PASS. Evidence ZIP SHA256 `c0f03e2448ae90388f113164388a254808656d5f274a75e2eaad66c2a530b8d3`. L9-N parent report SHA `2033f232423a212698d94e023042656407e93e8d16bfe62f42252613a2071024`, parent ZIP metadata SHA verified. Earlier L9-N 3/4 titles + zero labels remains historical; later L9-O 4/4 titles + four H3 labels shows time-varying observations, not a proven selector bug or formal fix. All four adjacent label regions contain interactive controls and remain unbound, not dates. The next L9-P should inspect control type and local source role without activation, with deterministic negative tests; no source field promotion.
+>
+
+> **2026-10-28 P30-L9-N and formal Android status-page visual confirmation — new source diagnostics CI PASS, public status update DRAFT HOLD**
+>
+> ```text
+> Formal PWA Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [UNCHANGED]
+> ├─ docs/platform_status.json [current published PR #51 snapshot; 19 platform cards / 264 list candidates]
+> ├─ docs/platform-status.html [current published PR #51; Android 11 screenshot VISUAL USER_PASS]
+> └─ docs/data.json [unchanged blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+> Source L9-M Draft PR #50 @4597385dbf216dc358c3e432e6ccc560caf9f1f2
+> └─ L9-N Draft PR #52 @768e2ee1d6982b3e690c48d98d0be0f4e16a6944 [UNMERGED]
+>    ├─ scripts/p30_l9n_ibon_local_root_cause.mjs [4 official details / direct h3 local]
+>    ├─ tests/p30/test_l9n_ibon_local_root_cause.mjs [22/22 offline]
+>    └─ .github/workflows/eventradar_p30_l9n_ibon_root_causes.yml
+>       └─ Native Run 40686039228 SUCCESS -> Artifact 12814702732
+> Formal PWA Refresh Draft PR #53 @4381c01d3132634a8ec6535abddedcfeaaffcb40 [HOLD]
+> ├─ docs/platform_status.json [records L9-M 4/4 historical, L9-N current 3/4 and zero accepted fields]
+> └─ docs/platform-status.html [human Chinese stage labels, raw codes expandable]
+> ```
+> - The latest L9-N actual HTTP200 title matches **3 of 4**; ID `39575` source title mismatch, other 3 current matches but zero recognized local date labels. No `EVENT_PERIOD` value read from the source; all formal price/date/session/ticket status unknown, Golden 0. Earlier L9-M 4 of 4 title matches and four AMBIGUOUS_OR_INTERACTIVE remain valid as historical observations only, not continuous proof. Artifact ZIP SHA256 `a049545092f6a508791f3a12b5c05395de7b4eb975efbb3d9b8813319ec1a5c9`, native CI Run `40686039228` completed SUCCESS, 22/22 offline negatives.
+> - Formal status PWA owner Android visual 11 screenshots PASS as user attestation only. Draft #53 must remain unmerged because required test extension linking status JSON to new L9-N SHA was blocked by platform security; do not bypass the block. The deployed PR #51 Source main formal PWA status still valid as its dated snapshot. EventRadar hourly sole scheduled Writer enabled for safe future Gate work, Pokémon Sleep tasks not touched, no release from HOLD without Owner and evidence.
+>
+
+> **2026-10-28 P30-STATUS official PWA status-only public diagnostics architecture — Pages deployment SUCCESS, event-feed immutable**
+>
+> ```text
+> Source main@fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [NEW after USER-authorized status-only PR #51]
+> ├─ docs/data.json [UNMODIFIED Git Blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+> ├─ docs/index.html [single new header anchor → platform-status.html; prior fetch(data.json) unchanged]
+> ├─ docs/platform_status.json [19 individual platform status rows; L7B SHA provenance + overlays]
+> │  ├─ baseline: 2026-10-26 15:53:41 UTC, 19 attempts, 16 HTTP200 / 3 403, 264 list candidates
+> │  ├─ per-source: HTTP → LIST → DETAIL → FIELD ROLES → Android → EVENT PUBLISH
+> │  ├─ CKSMH: 5 independent activity/Android PASS; TWTC: 39 Android PASS / 38 date candidates / 1 postponed conflict
+> │  ├─ ibon: normal Chromium 22 distinct list candidates; 39961 drift review; L9-M 4 titles parity and 0 field promotions
+> │  └─ all status fields evidence-only; counts from different Gates NOT summed; event publication HARD_HOLD
+> ├─ docs/platform-status.html [mobile responsive; loads ./platform_status.json with no-store]
+> │  ├─ per-platform card, search and stage filters, GitHub evidence links, explicit timestamps
+> │  ├─ safe DOM textContent / no HTML injection, site links only to github.com
+> │  └─ read-only, no notifications, background scheduler, login, checkout or event feed rewrites
+> ├─ tests/p30/test_public_platform_status_readonly.py [19/19 count/identity checks against 3 real artifacts]
+> └─ .github/workflows/eventradar_public_platform_status.yml [source-only read permissions]
+>    └─ CI 40683470517 SUCCESS + PR CI 40683520120 SUCCESS
+>       └─ GitHub Pages Build/Deploy Run 40683700243 SUCCESS
+> ```
+> - PR #51 status-only merged as requested; independent readback Source main new HEAD `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, `docs/platform_status.json` Git blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`, `docs/platform-status.html` Git blob `63264fb19991123aceb929a17427e7ef10313a12`, index Git blob `d752332f4d4e8074fef9ceb56d12560caf25b8df`, `docs/data.json` unchanged. Actual external GitHub Pages HTTP and mobile screenshot verification not available to assistant at this checkpoint; user front-end inspection remains PENDING, but Pages native deploy SUCCESS.
+> - P30-L9-M source-specific detail diagnostic remains separate Draft PR #50, no main merge; four ibon HTTP200/title 4/4, local pair reason `AMBIGUOUS_OR_INTERACTIVE` 4/4, accepted role value 0. Status publication must NEVER be conflated with event Golden/PWA candidate publication. Only previously attested Android 44 (CKSMH 5/TWTC 39) plus L8 core-preview UAT are PASS; site-specific Android for remaining 17 platforms NOT tested/attested.
+> - Two canonical governance files continue exclusively on Docs Draft PR #8. Source main now has read-only progress page, not governance doc updates. Do not change Writer/Notifier/Scheduler, do not merge stalled source PRs, do not retire Preview/ShowNews; event feed release remains `HARD_HOLD_NO_PUBLICATION`.
+>
+
+> **2026-10-28 P30-L9-L source-only four official ibon details semantic review architecture — CI PASS / field evidence 0**
+>
+> ```text
+> Source main@fc4f963247d [unchanged]
+> └─ L9-K Draft PR #48 @ 30aa18a9fbe4dc7b46f9b4b2cf41a51b70f0b11a [already PASS, no rework]
+>    └─ L9-L Draft PR #49 @ 627a8175b1095c42d878219d95935357457d35e5
+>       ├─ scripts/p30_l9l_ibon_four_field_semantics.mjs [normal public Chromium, 4 IDs]
+>       │  ├─ L9-F Run 40494326021 Artifact 12729277485 pinned SHA
+>       │  ├─ ids 39575/39878/39907/39978, strict official URL/source title parity
+>       │  ├─ typed EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION
+>       │  ├─ only DIRECT_SIBLING / LOCAL_PARENT / SAME_NODE source-binding
+>       │  └─ ibon_four_field_semantics.json + manifest.json + SHA256SUMS.txt
+>       ├─ tests/p30/test_l9l_ibon_four_field_semantics.mjs [30/30 negatives]
+>       └─ .github/workflows/eventradar_p30_l9l_ibon_four_fields.yml [readonly push]
+>          └─ GitHub Actions Run 40681114004 → Artifact 12812317856
+> ```
+> - Native [Run 40681114004](https://github.com/easonliu714/event_scraper_public/actions/runs/40681114004) Job `122791739707` success, exact 3 add-only paths and formal Pages/runtime Git blob SHA PASS, 30/30 offline tests, actual pinned source L9-F JSON SHA256 `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`. Four new ibon public detail HTTP200/title parity PASS, one recognized label and one rejected role per page, **0 accepted field pairs**. Formal date/price/ticket/venue/event session remain NULL/UNKNOWN and no role or session promotion.
+> - [SHA Artifact 12812317856](https://github.com/easonliu714/event_scraper_public/actions/runs/40681114004/artifacts/12812317856) ZIP `a4b2716566504c0f0c8fbffc364b632e10483b2a47d3d44055f2d7326cdc74de` (1654 B), read-only semantic report + SHA. `HARD_HOLD_NO_PUBLICATION`, Writer/Publisher/Scheduler/Notifier/merges/retirement prohibited, Android 44 original PASS, L8 core UI PASS and L9-K 39961 historic mismatch HOLD preserved. Next L9-M should diagnose *why* local sibling is rejected without promoting unbound global body dates; update only these two governance docs in Docs Draft PR #8.
+>
+
+> **2026-10-28 P30-L9-K official ibon 39961 cross-window source identity assurance architecture — native PASS 3/3 across 2 time windows, RELEASE HARD HOLD**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [immutable Pages/data/runtime]
+> └─ L9-J Source Draft PR #47 @ 727aea8aa673b29cd4a589c0a9ca68836fac4b92
+>    └─ L9-K Source Draft PR #48 @ 30aa18a9fbe4dc7b46f9b4b2cf41a51b70f0b11a
+>       ├─ scripts/p30_l9k_ibon_39961_cross_window.mjs [readonly]
+>       │  ├─ pinned L9-J Run 40619619643 Artifact 12786507149 [2/2 current short-window PASS]
+>       │  ├─ pinned L9-H Run 40516301527 Artifact 12740505389 [prior 39961 mismatch]
+>       │  ├─ provenance(): double SHA and historical mismatch mandatory
+>       │  ├─ minimumWindow(): >=4 hours after latest upstream sample before ANY public fetch
+>       │  ├─ capture(): one NEW ephemeral standard Chromium official list + exact 39961 detail
+>       │  ├─ crossWindowDecision(): compare 3 captures over 2 time windows
+>       │  └─ ibon_39961_cross_window.json + SHA manifest (no production writes)
+>       ├─ tests/p30/test_l9k_ibon_39961_cross_window.mjs [30/30 fail-closed]
+>       └─ .github/workflows/eventradar_p30_l9k_ibon_cross_window.yml [read-only push]
+>          └─ Actions Run 40673236521 -> Artifact 12809656497
+> ```
+> - **GitHub native source evidence:** [Run 40673236521](https://github.com/easonliu714/event_scraper_public/actions/runs/40673236521) job `122765043788` completed SUCCESS at `30aa18a9fbe4dc7b46f9b4b2cf41a51b70f0b11a`; exact 3 source ADD-only files and official Pages/`docs/data.json`/`scraper.py` SHA gates PASS, 30/30 offline tests PASS; upstream SHA-pinned report `27bb5cf2450d1aed03e51c0954a3b785acc88d94518787ff3f12861fa1f88159` (L9-J) and `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` (L9-H) independently validated with GitHub Artifacts + SHA256SUMS + manifests. Initial [Run 40673115086](https://github.com/easonliu714/event_scraper_public/actions/runs/40673115086) failed before any new website request due missing test helper `sha` export; only L9-K script repaired, final native CI PASS.
+> - **Current first-party UI fact:** Last L9-J sampled `2026-10-28T02:13:51.393Z`; new L9-K `2026-10-28T10:35:05.675Z` (**8.354h gap**). One new normal browser process and 2 public top-level navigations: ibon `Index/entertainment` HTTP200 with one directly bound canonical numeric `39961` list card, ibon `ActivityInfo/Details/39961` HTTP200 with 3 detail headings and exact source/list-title agreement. Cumulative **3 of 3 source title matches across 2 observation windows** yields `CROSS_WINDOW_THREE_MATCHES_REVIEW_ONLY`. Historical L9-H `HOLD_TITLE_MISMATCH` must remain `OPEN_UNEXPLAINED`, `formalIdentityCertified=false` and `formalReleaseEligible=false`; do not treat finite-time reproducibility as permanent official activity identity validity.
+> - **Sealed [Artifact 12809656497](https://github.com/easonliu714/event_scraper_public/actions/runs/40673236521/artifacts/12809656497)** name `eventradar-p30-l9k-ibon-39961-cross-window-readonly`, ZIP `sha256:c20ac82e7bd0c5a8e87530bbe126a81741fae2776058dd9394a8291c737118de`, 2416 bytes. `ibon_39961_cross_window.json` + `manifest.json` + `SHA256SUMS.txt` verified by native CI; no full HTML/screenshots/cookies/network bodies, no custom anti-bot behaviors, no credential use beyond GitHub artifact readonly token.
+> - **UI/API/DB boundary — releaseState=HARD_HOLD_NO_PUBLICATION:** `formalEventDate=null`, `formalPrice=null`, `ticketStatus=UNKNOWN`, `formalFieldPromotions=0`, `goldenAccepted=0`, `published=false`; `Writer/Scheduler/Notifier/Publisher/mergeExecuted=false`, no change to Source main, Preview main, ShowNews main, data.json, App, API, DB, Android. Original 44 Android USER_ATTESTED_PASS and L8 new core UI USER_ATTESTED_PASS preserved. P30-L9-A ten mandatory release blockers still active, 19-source completeness not established.
+> - **Next P30-L9-L:** isolate the four previously matched ibon detail IDs `39575,39878,39907,39978` for **official label-to-date/venue/price/SESSION semantic binding evidence**. Use bounded visual/text DOM structures with correct EVENT vs SALE vs ADMISSION vs REGISTRATION vs VOUCHER period roles, no undocumented API guessing, no whole-page date regex, no automatic Golden/Writer promotion. Keep 39961 intermittent mismatch under review instead of scheduling unapproved automated monitoring; two authoritative governance docs continue on Docs Draft PR #8 only.
+>
+
+> **2026-10-28 SRC-P30-L9-J ibon 39961 independent source repeatability architecture — CI PASS 2/2 SAME RUN, past mismatch held**
+>
+> ```text
+> Source main@fc4f963247d [unchanged / Pages/runtime/data protected]
+> └─ L9-I Source Draft PR #46 @ ca60d3182172ad7f824fbcb5a2a6c9189fecc74b
+>    └─ L9-J Source Draft PR #47 @ 727aea8aa673b29cd4a589c0a9ca68836fac4b92
+>       ├─ scripts/p30_l9j_ibon_39961_repeatability.mjs
+>       │  ├─ L9-I Run 40524765567 Artifact 12744025880 [last point-in-time 39961 title parity]
+>       │  ├─ L9-H Run 40516301527 Artifact 12740505389 [prior 39961 TITLE_MISMATCH]
+>       │  ├─ validateParents() exact original title/event ID/source report SHA
+>       │  ├─ capture() two ephemeral normal browser instances (not one shared context)
+>       │  │  ├─ 1 official ibon Index/entertainment per round, numeric same-card ID 39961
+>       │  │  └─ 1 exact ibon ActivityInfo/Details/39961 per round, bounded headings
+>       │  ├─ 8-second minimum gap; individual UTC timestamps, HTTP and HOLD reasons
+>       │  ├─ grade() 2/2 match still REVIEW_ONLY; historical mismatch mandatory
+>       │  └─ ibon_39961_repeatability.json + manifest.json + SHA256SUMS.txt
+>       ├─ tests/p30/test_l9j_ibon_39961_repeatability.mjs [30/30 offline negatives]
+>       └─ .github/workflows/eventradar_p30_l9j_ibon_39961_repeat.yml
+>          └─ native Run 40619619643 -> Artifact 12786507149 [SHA PASS]
+> ```
+> - **Actual native source Gate:** [Run 40619619643](https://github.com/easonliu714/event_scraper_public/actions/runs/40619619643) Job `122590202592` completed SUCCESS at Source Draft PR #47 head `727aea8aa673b29cd4a589c0a9ca68836fac4b92`, exact 3 additive paths / Git blob freeze / 30 offline tests PASS, source reports SHA `73eaec24fbe591d5bd39e2ba4704f5d0693e45f802d57fd4b9ecf013d6cd44fb` (L9-I) and `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` (L9-H) independently SHA-verified with manifests. Run #1 initial `40619506719` FAILED on missing exported source constants before browser access; repaired through new script only and successful second run, no change to prior Gates.
+> - **Observed first-party public DOM:** Round 1 `2026-10-28T02:13:33.400Z` to `02:13:38.431Z`; Round 2 `02:13:46.435Z` to `02:13:51.393Z`, **two separate Chromium processes, four top-level list/detail navigations**. Each round list HTTP200/exactly one official numeric source ID title, detail HTTP200/three headings, source same-card title equals official detail heading and original title. Thus `sameRunTitleMatches=2/2`, `currentTwoRoundObservation=TWO_SEPARATE_BROWSER_MATCHES_REVIEW_ONLY`. This is short-window reproducibility, not evidence that L9-H mismatch was false or cause fixed. Explicit `historicalMismatchRetained=true`, `unexplainedPriorMismatch=true`, `formalIdentityReleaseEligible=false` and overall `HARD_HOLD_NO_PUBLICATION`.
+> - **[Artifact 12786507149](https://github.com/easonliu714/event_scraper_public/actions/runs/40619619643/artifacts/12786507149)** ZIP SHA256 `20a8e664f3431cf6f6a90267577cdc455915350ba6784d02a4694a01a9d25348`, 2218 bytes, source report + Manifest + SHA256SUMS native sealed. Stores bounded official URLs, titles, per-round times, HTTP and quality only; no full HTML, images, cookies, network bodies, JS bundles, private tokens, no independent verified formal event date, price, ticket status or multi-session split. `formalFieldPromotions=0`, `goldenAccepted=0`, Writer/Scheduler/Notifier/Publisher/merge 0, protected Pages/API/DB/preview untouched.
+> - **Next L9-K data assurance:** use a distinct later time-window source-only Gate to compare 39961 with these pinned rounds, enforce regression/mismatch HOLD and no automatic schedule. Separately work on clearly source-bound event period parsing for the four unaffected official IDs. Historical Android 44 USER_ATTESTED_PASS, L8 new core Android PASS and L9-A ten release blockers unchanged. Both canonical governance docs remain Docs Draft PR #8, not merged to Source main.
+>
+
+> **2026-10-27 SRC-P30-L9-I ibon 39961 official source/title drift comparison architecture — native CI PASS, historical instability OPEN**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [frozen, formal app/Pages data immutable]
+> └─ L9-H Draft PR #45 @ 56d309a9d4d895c7adfb525723c6e2a9c4abd2cb
+>    └─ L9-I Draft PR #46 @ ca60d3182172ad7f824fbcb5a2a6c9189fecc74b
+>       ├─ scripts/p30_l9i_ibon_39961_identity.mjs
+>       │  ├─ sha-pin L9-H Run 40516301527 Artifact 12740505389 [prior 39961 mismatch]
+>       │  ├─ sha-pin L9-F Run 40494326021 Artifact 12729277485 [historical source title]
+>       │  ├─ exact numeric event ID + official canonical URL / single ID uniqueness
+>       │  ├─ normal Chromium current Index/entertainment same-card list title
+>       │  ├─ normal Chromium current ActivityInfo/Details/39961 bounded headings
+>       │  ├─ adjudicate(): MISSING/FOREIGN/403/WAF/AMBIGUOUS/MISMATCH→HOLD
+>       │  ├─ matched current list+detail titles => REVIEW_ONLY_NO_RELEASE
+>       │  └─ ibon_39961_identity_adjudication.json + SHA manifest
+>       ├─ tests/p30/test_l9i_ibon_39961_identity.mjs [30/30 offline]
+>       └─ .github/workflows/eventradar_p30_l9i_ibon_39961_identity.yml [read-only push]
+>          └─ Native GitHub Actions Run 40524765567 → Artifact 12744025880
+> ```
+> - **Native verification** [Run 40524765567](https://github.com/easonliu714/event_scraper_public/actions/runs/40524765567) completed/success (Job `122261189909`) at exact L9-I head, exact 3-file additive scope, protected Source Pages/runtime SHA, 30/30 positive-negative contracts, dual upstream source digest `e8a5e392e3f80ce6504df88c2564506b32d476204c01c5de139869dfd5b7965b` (L9-H) and `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4` (L9-F) both validated with SHA256SUMS + manifest.
+> - **Actual 39961 current UI evidence:** official Index/entertainment list HTTP200, exactly one canonical ID `39961` same-card event title candidate; official /ActivityInfo/Details/39961 HTTP200, 3 bounded detail headings, current-source same-ID list/detail title parity `true`. Original title also observed `true`, `driftObserved=false`. Decision `REVIEW_ONLY_NO_RELEASE / CURRENT_LIST_DETAIL_PARITY_REVIEW_ONLY`. This does **not erase** L9-H prior point-in-time `HOLD_TITLE_MISMATCH`; intermittent source/rendering/root cause is still unproven and formal identity reliability remains held. Count each source capture separately, not an eternal 39961 PASS.
+> - **[Artifact 12744025880](https://github.com/easonliu714/event_scraper_public/actions/runs/40524765567/artifacts/12744025880)** ZIP `sha256:19a6d802733d36bedaf164db8cdcbd0cdca25422eff7f01841f44af3ad696243` (1,889 B), contains isolated identity adjudication JSON, manifest, SHA256SUMS; GitHub runner verifies SHA. No raw HTML/screenshots, login/cookies, private source or network bodies stored.
+> - **API / DB / formal UI boundary:** L9-I only fetches public list + exact detail, does not write to `docs/data.json`, DB, API, PWA, Scheduler, Writer, notifier or Golden; `formalFieldPromotions=0`, `ticketStatus=UNKNOWN`, `goldenAccepted=0`, `releaseState=HARD_HOLD_NO_PUBLICATION`; preserve historical Android 44 PASS, L8 core UI PASS and P30-L9-A ten release blockers. Next L9-J should test *repeatability* of exact same-ID list/detail matching under separate bounded current renders and retain disagreements as HOLD, not assume an improved DOM selector fixes a transient identity problem. Both formal governance files remain exclusively on Draft PR #8.
+>
+
+> **2026-10-27 SRC-P30-L9-H dual-source official ibon local DOM hierarchical-binding architecture — native CI PASS, one current ID mismatch**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [unchanged]
+> └─ L9-G Source Draft PR #44 @ 07cc3ce1743a56d2bc60213d345f27672cef97d5
+>    └─ L9-H Source Draft PR #45 @ 56d309a9d4d895c7adfb525723c6e2a9c4abd2cb
+>       ├─ scripts/p30_l9h_ibon_local_dom_hierarchy.mjs [NO WRITE / NO GLOBAL DATE SEARCH]
+>       │  ├─ L9-G Run 40511115223 Artifact 12738140163 [structure + verified ID]
+>       │  ├─ L9-F Run 40494326021 Artifact 12729277485 [original title + ID]
+>       │  ├─ parentProof(): SHA+manifest+five official URL/ID/title cross-contract
+>       │  ├─ inspectLocalDom(): bounded only local label next-element/parent next-element/direct text
+>       │  ├─ reviewNeighbor(): DATE vs SALE vs ADMISSION vs REGISTRATION vs VOUCHER vs PRICE
+>       │  ├─ assessStructure(): role conflict, generic PRICE/資訊, image counts, no global dates
+>       │  └─ ibon_local_dom_hierarchy.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9h_ibon_local_dom_hierarchy.mjs [36/36 positive-negative]
+>       └─ .github/workflows/eventradar_p30_l9h_ibon_local_dom.yml [push-only READ]
+>          └─ final native Run 40516301527 -> Artifact 12740505389
+> ```
+> - **Actual CI:** [Run 40516301527](https://github.com/easonliu714/event_scraper_public/actions/runs/40516301527) completed/success, Job `122230984614`, exact three-add-only SHA boundary and **36/36** mocked negative/positive contracts, two independently SHA-sealed upstream artifact source reports verified. L9-G source report SHA `a1736d4b4c0148c9e74eccbe9b4c1f3ab05b6ee3f94c306bac210df1e08b7a42`, L9-F title report SHA `81780c6cf5d7fa09239f9d90c5a889b53016c81693d47dc20e8f73a9dc77ffe4`. Source-only `main` production runtime/Pages blob fingerprints unchanged.
+> - **Five live ibon detail pages:** IDs `39575,39878,39907,39961,39978` HTTP200. **Current title parity 4/5**; `39961` is **CURRENT_TITLE_MISMATCH_HOLD** despite prior historical detail match, so current labels/field values from that record cannot be trusted. Each page has `EVENT_PERIOD` `h3` label parent `div`, but **zero** safe immediate local-value relationships, `locallyBoundReviewPairs=0`, `rejectedOrHoldPairs=0`; DOM label presence does not prove readable or valid activity dates. All formal `dateStart/dateEnd/venue/price/saleWindow/registrationPeriod/voucherValidity=null/UNKNOWN`, ticket status UNKNOWN, session splitting 0, Golden 0, writer/publisher/scheduler/notifier/merge disabled, full platform coverage/production rollback still HOLD.
+> - **Artifact** [12740505389](https://github.com/easonliu714/event_scraper_public/actions/runs/40516301527/artifacts/12740505389), ZIP SHA256 `2c4672a2b0be4f323d638455865bdf19becaed3615babdf7b6526f9b6da3c048`, 2137 bytes, SHA checked by native CI, no raw HTML/screenshots/cookies/network-body archive. Failures retained: prior Run `40514885666` cancelled at OS deps; `40515905716` failed on token placeholder after offline PASS; final `40516301527` succeeded after workflow-only fixes. Earlier 44 Android user PASS and new L8 core UI PASS unchanged.
+> - **Next P30-L9-I:** isolate single `39961` current source-list/detail title-drift adjudication before any further field semantic promotions or Android preview refresh. Review other four source-bound dates only with explicit local DOM association, not global page regex. Formal release remains `HARD_HOLD_NO_PUBLICATION`; governance is in Docs Draft PR #8, not Source main.
+>
+
+> **2026-10-27 L9-H CI dependency correction and pending native rerun**
+>
+> - The L9-H dual-source identity architecture requires both L9-G structural Artifact `12738140163` and L9-F original title Artifact `12729277485`; original L9-G typed JSON does not include source titles, so IDs alone cannot establish current title parity. Source Draft PR #45 head `56d309a9d4d895c7adfb525723c6e2a9c4abd2cb`. Native Run `40514885666` CANCELLED at Chromium OS dependencies, Run `40515905716` failed on a literal authentication placeholder in second artifact download **after 36/36 tests PASS**; repaired workflow `github.token` and Run `40516301527` queued. No field evidence yet from this Gate. All source and Pages main fingerprints remain unchanged and formal release `HARD_HOLD_NO_PUBLICATION`.
+>
+
+> **2026-10-27 P30-L9-H source cross-binding + local DOM probe architecture checkpoint — CI RUNNING**
+>
+> ```text
+> Source main@fc4f963247d [FROZEN]
+> └─ L9-G Draft PR #44 @ 07cc3ce1743a56d2bc60213d345f27672cef97d5
+>    └─ L9-H Draft PR #45 @ 21d935e94236ef5a0becd13a0e7fd2496d5f3362
+>       ├─ scripts/p30_l9h_ibon_local_dom_hierarchy.mjs [dual SHA source: L9G structure + L9F original titles]
+>       ├─ tests/p30/test_l9h_ibon_local_dom_hierarchy.mjs [36 offline tests, pending native CI]
+>       └─ .github/workflows/eventradar_p30_l9h_ibon_local_dom.yml
+>          └─ Run 40514885666 in progress at this checkpoint
+> ```
+> - Does NOT use L9-G ID-only report to recreate event titles: read both exact upstream GitHub Artifacts and cross-check SHA manifest / five source IDs / L9-F title / L9-G prior detail parity, then new normal Chromium public detail DOM neighbors. Persist limited label-bound snippets, relation type and image counts, not raw HTML/cookies/network bodies, no unbound whole-body dates. All accepted candidates are `REVIEW_ONLY` and `formalFieldPromoted=false`; `HARD_HOLD_NO_PUBLICATION`. No formal Pages/DB/API/Writer/Scheduler/Android changes. This WIP is not a CI result; supersede only after fresh native CI completion.
+>
+
+> **2026-10-27 P30-L9-G ibon detail DOM hierarchy evidence — native CI PASS, no verified role values**
+>
+> ```text
+> event_scraper_public Source main@fc4f963247d [frozen, production blobs immutable]
+> └─ Source Draft PR #43 L9-F @ d85504773108281099ec0654c5c772de243f910c
+>    └─ Source Draft PR #44 L9-G @ 07cc3ce1743a56d2bc60213d345f27672cef97d5
+>       ├─ scripts/p30_l9g_ibon_rendered_field_structure.mjs
+>       │  ├─ exact L9F Artifact 12729277485 source SHA and five title-parity IDs
+>       │  ├─ normal ephemeral Playwright Chromium five public details
+>       │  ├─ bounded DOM probes th/td, dt/dd, same-parent sibling, leaf label: value
+>       │  ├─ typed roles EVENT/ADMISSION/SALE/REGISTRATION/VOUCHER/PRICE/VENUE/SESSION
+>       │  ├─ reject EVENT_PERIOD neighbor without time token; reject generic PRICE/資訊
+>       │  └─ rendered_field_structure.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9g_ibon_rendered_field_structure.mjs [32/32 offline]
+>       └─ .github/workflows/eventradar_p30_l9g_rendered_structure.yml
+>          └─ GitHub Run 40511115223 → Artifact 12738140163
+> ```
+> - **Source evidence and architecture effect:** [Run 40511115223](https://github.com/easonliu714/event_scraper_public/actions/runs/40511115223) completed/success, Job `122212973983`, actual normal Chromium each of five ibon Event IDs `39575/39878/39907/39961/39978`: HTTP200, strict official title parity PASS. DOM structures: no `table/tr/th/td` and no `dl/dt/dd`, extensive `strong`/`b` elements; each page yielded exactly 1 recognized `EVENT_PERIOD` label and same-parent sibling probe with `REJECT_MISSING_DATE_TIME`. Total 5 source title parity, 5 rejected label/value associations, **zero accepted review pairs and zero formal promotions**. Do not assert activities lack true show dates or that another section is safe to parse. Original 6/22 ibon cumulative sampled title-parity figure remains unchanged because these are the *same previously verified five*, not five additional distinct activities.
+> - **Artifact** [12738140163](https://github.com/easonliu714/event_scraper_public/actions/runs/40511115223/artifacts/12738140163), ZIP SHA256 `769a138757c35711c9b55332e169966fdc0c4a4bd2ffb70166a304610fb3ba42` (2054 bytes), JSON+SHA manifest, verified and unexpired. No raw page HTML, screenshots, cookies, request bodies or private browser state stored. Both source input SHA and output SHA verified by native Actions.
+> - **Data gate:** all official `dateStart/dateEnd/price/registrationPeriod/saleWindow/voucherValidity/venue` remain NULL/UNKNOWN, `ticketStatus=UNKNOWN`, `goldenAccepted=0`, `published=false`, Writer/Scheduler/Notifier/merge disabled, `releaseState=HARD_HOLD_NO_PUBLICATION`; no official Pages/data.json/API/DB writes. Prior Android original 44 user attestations and L8 new core UI PASS remain intact. Next **P30-L9-H** bounded DOM section-neighbor/child structure discovery of existing five titles before writing any role parser; avoids global text dates, cross-role promotion and false "price" parsing.
+> - Governance remains in two canonical documents on Docs Draft PR #8 only; no production main merge/Preview/ShowNews retirement.
+>
+
+> **2026-10-27 SRC-P30-L9-F SHA-pinned ibon real detail/role review architecture — five matches, zero eligible field pairs**
+>
+> ```text
+> Source main@fc4f963247d [unchanged]
+> └─ L9-E Draft PR #42 @ 63a079c1bee7111b1ef7b04431607d9845fe3b9f [22 new rendered ibon candidate IDs]
+>    └─ L9-F Draft PR #43 @ d85504773108281099ec0654c5c772de243f910c
+>       ├─ scripts/p30_l9f_ibon_detail_role_review.mjs
+>       │  ├─ validateSource(): SHA-pinned exact 22 candidate IDs + 1 prior parity
+>       │  ├─ chooseAdditional(): deterministic 5 distinct untested numeric ibon IDs
+>       │  ├─ Chromium normal public detail: exact source URL/ID/title parity, no login/checkout
+>       │  ├─ DOM: same-row th/td, adjacent dt/dd, direct label: value only
+>       │  ├─ classifyField(): EVENT vs ENTRY vs SALE vs REGISTRATION vs VOUCHER
+>       │  ├─ PRICE/資訊 reject, SESSION review-only/no extra records
+>       │  └─ detail_role_review.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9f_ibon_detail_role_review.mjs [30/30 negative-positive]
+>       └─ .github/workflows/eventradar_p30_l9f_ibon_detail.yml [readonly push CI]
+>          └─ Actions Run 40494326021 -> Artifact 12729277485
+> ```
+> - **Native source proof:** [Run 40494326021](https://github.com/easonliu714/event_scraper_public/actions/runs/40494326021), job `122155815270`, 30/30 offline tests PASS; pinned [L9-E Artifact 12709568132](https://github.com/easonliu714/event_scraper_public/actions/runs/40449476633/artifacts/12709568132) source JSON SHA256 `d24a41262f362fc749c14c48a74dd5e85d27007d634309be6c72f30a8f1fc9ee`. New official ibon detail ID `39575,39878,39907,39961,39978` all HTTP200 and exact title parity. Total tested `6/22`, `16/22` remain without sampled detail. [Artifact 12729277485](https://github.com/easonliu714/event_scraper_public/actions/runs/40494326021/artifacts/12729277485) ZIP SHA256 `811e1b133c253f3cde33c31a203a9ed4bfbfab7418822a9b3a59c00fdd9cf884`, 1842 B; internal JSON/Manifest/SHA256SUMS sealed.
+> - **Crucial UI/semantics observation:** current strictly typed label/value DOM extractor yielded **0 eligible adjacent role evidence pairs**, **0 rejected pairs** across five matched rendered pages. This is a **source parser structure limitation**, NOT evidence that ibon events have no dates/tickets/venues. Do not infer the global body date as EVENT_PERIOD, do not promote sale/registration/admission to event-show dates, do not confuse multi-session times with new event IDs. Formal `dateStart/price/salePeriod/registrationPeriod/voucherValidity=null`, `ticketStatus=UNKNOWN`, field promotion 0, Golden 0, Writer/Scheduler/Notifier/Publisher and merge 0.
+> - **Next P30-L9-G:** bounded noninteractive normal public-browser DOM layout diagnostic for those five known IDs; identify source-labeled date/price/venue roles or clear HOLD when no bound pairs, add negative fixtures and independent SHA. Avoid raw HTML, personal tokens, arbitrary endpoint guessing, WAF bypass. Main Pages/runtime and original 44 Android PASS plus L8 new core UI PASS remain unchanged; L9-A ten release blockers still mandatory. Two formal governance documents only under Draft PR #8, unmerged.
+>
+
+> **2026-10-27 P30-L9-E ibon live browser rendering architecture — 22 REVIEW candidates, native CI PASS**
+>
+> ```text
+> Source main@fc4f963247d [FROZEN, no formal Pages/data/runtime mutation]
+> └─ L9-D Source Draft PR #41 @ 8836dc29a6dcf4baaabed08102ffb1b7fbed6bc3 [HTTP-only ibon HTML 200/list0 verified]
+>    └─ L9-E Source Draft PR #42 @ 63a079c1bee7111b1ef7b04431607d9845fe3b9f
+>       ├─ scripts/p30_l9e_ibon_browser_render.mjs
+>       │  ├─ Chromium Playwright 1.55.0: normal, nonstealth public browser, ephemeral context
+>       │  ├─ exactly 2 official ibon list navigations, normal first/third-party page resources
+>       │  ├─ rendered DOM anchors + same-card heading to canonical numeric activity ID
+>       │  ├─ 22 list candidate IDs, sample 1 exact official detail title-parity
+>       │  └─ no raw HTML, cookies, request bodies, headless stealth, WAF bypass or publisher
+>       ├─ tests/p30/test_l9e_ibon_browser_render.mjs [30/30 mocked positive-negatives]
+>       └─ .github/workflows/eventradar_p30_l9e_ibon_browser.yml [push-only contents:read]
+>          └─ Actions Run 40449476633 -> Artifact 12709568132 [SHA-sealed]
+> ```
+> - **Verified run** [40449476633](https://github.com/easonliu714/event_scraper_public/actions/runs/40449476633) completed/success, Job `122008564226` completed/success, immutable L9-D parent and exact three new files source guard, Playwright normal Chromium installed, 30/30 tests PASS. First public `/Index/entertainment` rendered HTTP200 with 67 anchors, 16 script elements, body text 1690 chars and **22** same-card/numeric ibon official detail URL candidates. 64 page resource requests observed, 54 first-party; these are browser resources, **not 64 sampled details**. Second official `/Home/MoreResult?inATAPID=105&inATAPWebType=entertainment` rendered HTTP200 with 34 anchors, 16 scripts, body text 509 chars, **0** bounded event candidates, remains HOLD. 38 page resource requests, 30 first-party. One bounded detail sample `DETAIL_TITLE_PARITY_PASS`, other 21 untested. Artifact [12709568132](https://github.com/easonliu714/event_scraper_public/actions/runs/40449476633/artifacts/12709568132) ZIP SHA256 `866c8b935d47fe391a4fdf8f69eae2a33664d67b6ef0650707a594993a2ccfef` (3020 bytes), contains report JSON, Manifest and SHA256SUMS; independent GitHub readback.
+> - **Semantics:** `RENDERED_SOURCE_CANDIDATES_REVIEW_ONLY` is SOURCE/URL/TITLE candidate not guaranteed active event, published schedule, exact multi-session identity or real-time stock. `DETAIL_TITLE_PARITY_PASS` for only one means title agreement not Golden. All candidates have `formalDate=null`, `formalPrice=null`, `ticketStatus=UNKNOWN`, `goldenVerified=false`, `published=false`. No field roles promoted. Original L9-D 0 candidate is for **unrendered raw HTML** and is retained as historically accurate; no prior Gate reimplementation.
+> - **Isolation boundary:** L9-E normal browser may request official and standard third-party page scripts as part of rendering, but deliberately records only aggregate source/network data, canonical public event URLs/titles, no arbitrary API endpoint guesses or activity transactions, no cookies, full DOM, logged-in session or private tokens; never changes `docs/data.json`, published PWA, API, DB, scheduler, notifier, Writer, source main or historic Android 44 user PASS. Release remains `HARD_HOLD_NO_PUBLICATION`, L8 core Android PASS with full E2E pending, L9-A ten blockers still active.
+> - **Next isolated P30-L9-F:** SHA-pin L9E fresh report and sample **3–5** further official detail pages via approved normal browser, strict identity parity, date-role and PRICE meaningful-token review-only evidence, fail closed on 403/WAF/mismatch, output evidence-only JSON. Do not grant Golden/Publisher/Cloud Scheduler PR #1 or retire repositories; two governance docs live solely on Draft PR #8, not main.
+>
+
+> **2026-10-27 SRC-P30-L9-D ibon public fresh DOM diagnostic architecture — CI PASS / zero list**
+>
+> ```text
+> Source main@fc4f963247d (unchanged, protected formal Pages/source blobs)
+> └─ L9-C Source Draft PR #40 @ ae469b52e7b7b7f16dda1eeab584be8e16d63f50 [native PASS]
+>    └─ L9-D Source Draft PR #41 @ 8836dc29a6dcf4baaabed08102ffb1b7fbed6bc3
+>       ├─ scripts/p30_l9d_ibon_public_dom.py [NEW public HTTP only]
+>       │  ├─ audited ibon.LISTS: Index/entertainment and Home/MoreResult
+>       │  ├─ GET: same-host redirects/HTTPS, <=2 list + 1 strict detail if ID candidate
+>       │  ├─ analyze(): direct anchor, JSON-LD Event, same-object public JSON hydration
+>       │  ├─ DOM script counts/malformed JSON/body text/render hints, no JS execution
+>       │  └─ fresh_ibon_dom_diagnostics.json + manifest.json [SHA sealed]
+>       ├─ tests/p30/test_l9d_ibon_dom.py [28/28 mock negatives]
+>       └─ .github/workflows/eventradar_p30_l9d_ibon_dom.yml [push only/read only]
+>          └─ Run 40447833667 → Artifact 12708438784 [SHA sealed]
+> ```
+> - **Native result:** [Actions Run 40447833667](https://github.com/easonliu714/event_scraper_public/actions/runs/40447833667) completed/success, Job `122003220447` complete success, exact 3 new paths and source/Pages integrity gate, 28/28 offline tests and **2 new actual HTTPS GETs**. [Artifact 12708438784](https://github.com/easonliu714/event_scraper_public/actions/runs/40447833667/artifacts/12708438784) ZIP SHA256 `e4ec2a8a849abbfaabd76aea7b5117cbed0bd8f04d5f86ae1f47083241c5fb9a`, 1852 B, unexpired/read back; internal manifest and SHA checks PASS.
+> - **Actual ibon response architecture:** both official list URLs returned `HTTP_OK/200`, **0 anchors, 0 direct activity IDs, 0 JSON-LD / hydration candidates, visible text length=8, scripts=11** (5 official script source tags, 2 other-host scripts, 4 non-JSON inline scripts). No first-party JS bundle content fetched, no JS runtime executed, so **DO NOT CLAIM hidden API identified or ibon no activities**. L9-C `ibon=HTTP200/list0` remains valid and more precisely diagnosed as `HOLD_PUBLIC_HTML_NO_BOUND_EVENT_ID`. This makes full browser-rendered DOM evidence the next falsifiable dependency, not speculation about cancellation.
+> - **Boundaries:** `candidateOrigin=L9D_NEW_PUBLIC_HTTP`, `actualFreshHTTPRequests=2`, `formalFieldPromotions=goldenAccepted=0`, `published=false`, `releaseState=HARD_HOLD_NO_PUBLICATION`; no auto merge/hide/delete, source runtime/Writer/Scheduler/Notifier untouched. Report stores safe HTTP/page SHA and DOM counts only, no raw HTML or downloaded remote third-party scripts, no credentials, no browser automation, no WAF evasion. Any future candidate needs official same-card/same-object identity and detail verification before even REVIEW ONLY field evidence; formal dates/ticket status/price remain NULL/UNKNOWN.
+> - **Next P30-L9-E:** regular public-browser rendering in strict read-only isolated CI without anti-bot/login/stealth, capture only DOM safe evidence and bounded link/title roles; if site blocks/returns empty, HOLD. History: 44 Android USER_ATTESTED_PASS, L8 new Android CORE_UI_USER_ATTESTED_PASS unchanged; L9A ten release blockers retained. Formal two governance documents remain exclusively Docs Draft PR #8, not main.
+>
+
+> **2026-10-27 SRC-P30-L9-C fresh four-official-adapter architecture — read-only live HTTP/list/detail native CI PASS**
+>
+> ```text
+> event_scraper_public main@fc4f963247d [unchanged; formal docs/data.json/Pages/runtime frozen]
+> └─ Source PR #39 L9-B @ b1f831f985074e5011950403823bb1b4c41d16b4 [PASS/HARD_HOLD]
+>    └─ Source Draft PR #40 L9-C @ ae469b52e7b7b7f16dda1eeab584be8e16d63f50
+>       ├─ scripts/p30_l9c_four_source_fresh.py [new public HTTPS; NO writer]
+>       │  ├─ CKSMH Query.list.ctr -> official actId-bound anchors -> 1 detail.sample
+>       │  ├─ TWTC exhibition?p=home -> official table rows -> exhibition_more.aspx?id
+>       │  ├─ ibon Index/entertainment + Home/MoreResult -> numeric activity ID links (0 currently)
+>       │  └─ FamiTicket Home -> official card /Home/Activity/Info IDs -> detail.sample
+>       ├─ tests/p30/test_l9c_four_source_fresh.py [25/25 mocked URL/ID/semantic negatives]
+>       └─ .github/workflows/eventradar_p30_l9c_four_fresh.yml
+>          └─ read-only native CI 40443838700 -> artifact 12707735836 [sha256 sealed]
+> ```
+> - **Actual native evidence** [Run 40443838700](https://github.com/easonliu714/event_scraper_public/actions/runs/40443838700) completed/success; per-source fresh GET **8 total**; CKSMH 5 current actId candidates/detail title 1/1 match, TWTC 40 capped current exhibition table/detail title 1/1 match, FamiTicket 40 capped card candidates/detail title 1/1 match, ibon two official HTTP200 list GET/0 candidates/detail NOT_ATTEMPTED `HOLD_LIST_ZERO_OR_HTTP`. Source list-positive 3/4, new candidate count 85; these 85 are NOT verified events nor formal field records; 3 title matches prove only sampled source/detail title parity. Internal per-platform HTTP source URLs, source role, current list/detail quality and SHA are in [Artifact 12707735836](https://github.com/easonliu714/event_scraper_public/actions/runs/40443838700/artifacts/12707735836), ZIP digest `74940280bf4df32821b39557b1b52a959ef1c2735709964efc673c889c4399da` (10,272 B).
+> - **Identity and field gates:** cksmh_list enforces `actId` official host/path, TWTC table requires recognized bounded exhibition period and canonical `exhibition_more.aspx?id`; ibon canonicalizes official ActivityInfo/Details numeric IDs and rejects outbound domain, FamiTicket admits official query-free opaque detail IDs. No title similarity auto-merge. Raw exhibition periods/venues are `REVIEW_ONLY`; event date/show time/entry/registration/sale/voucher validity/price/ticket status remain unavailable for promotion. No formal date/price/ticket promotions, Golden/Writer/Publisher/Scheduler/Notifier or current Android/data.json changes.
+> - **Roadmap and HOLD:** ibon HTTP200/list0 current (JS-specific extraction needed), CKSMH/TWTC/Fami limited detail sampling and capped lists, full 19 platform freshness/accuracy not proven, full L8 Android E2E and production rollback pending; `releaseState=HARD_HOLD_NO_PUBLICATION`. Previous 44 Android user-accepted events and new L8 core UI PASS preserved. Next L9-D is no-bypass official ibon response/DOM diagnostic and source-tier fidelity; not production schedule/writer activation. Both governance documents remain in Draft PR #8 (not main).
+>
+
+> **2026-10-27 P30-L9-B source-quality / synthetic rollback architecture — native CI PASS / publication DENIED**
+>
+> ```text
+> Source main@fc4f963247d [FROZEN]
+> └─ L9-A Source Draft PR #38 @ d35c3b78f09bcbeeb4da79ea3b6014330798ebfa [release HARD HOLD, CI PASS]
+>    └─ L9-B Source Draft PR #39 @ b1f831f985074e5011950403823bb1b4c41d16b4
+>       ├─ scripts/p30_l9b_field_quality_rollback.mjs [NO HTTP, immutable artifacts only]
+>       │  ├─ L7-B fresh_candidate.json + platform_diagnostics.json [34 upstream HTTP, NOT NEW]
+>       │  ├─ L7-C preview-data.json [264/5/259, prior Android core UAT]
+>       │  ├─ L9-A release_blocker_matrix.json [10 mandatory HOLD]
+>       │  ├─ labelQuality(e) → PRICE/資訊 REJECT; currency/venue/date REVIEW_ONLY
+>       │  ├─ review(inputs) → 12 source evidence labels + 19 platform adapter HOLD rows
+>       │  ├─ syntheticRollback(isolatedCopy) → tamper then restore SHA parity
+>       │  └─ build(inputs, isolatedOutput) → quality/gap/rollback JSON + SHA manifest
+>       ├─ tests/p30/test_l9b_field_quality_rollback.mjs [30/30 negative-positive]
+>       └─ .github/workflows/eventradar_p30_l9b_field_quality_rollback.yml
+>          ├─ Exact L9-A parent, no formal source/Pages/blob changes; three-file add-only
+>          ├─ SHA256SUMS and JSON Schema 2020-12 for L7-B/C/L9-A pinned source artifacts
+>          └─ Run 40442853866 -> Artifact 12707416716 [HARD HOLD]
+> ```
+> - **Independent native GitHub result** [Run 40442853866](https://github.com/easonliu714/event_scraper_public/actions/runs/40442853866) completed/success with all 30 positive-negative tests, SHA/Schema parent lineage, 12 actual field labels, report hash, synthetic restore. [Artifact 12707416716](https://github.com/easonliu714/event_scraper_public/actions/runs/40442853866/artifacts/12707416716) ZIP SHA256 `3906b4e9689987429040ce9508fc88e4dbb0491199fd5984e55fb469065114d0`, 6,070 bytes.
+> - **Actual quality states:** `VENUE_TEXT_REVIEW_ONLY=6`, `PRICE_TOKEN_REVIEW_ONLY=2`, `REJECT_GENERIC_NON_PRICE=2`, `TIME_ROLE_TOKEN_REVIEW_ONLY=2`. All `formalFieldPromoted=false`. Valid-looking evidence is still not source-level Golden; raw authoritative dates, identity, current ticket availability and classification remain HOLD/UNKNOWN. No newly issued public HTTP requests or platform-specific actual fresh extraction in L9-B. Adapter focus: CKSMH actId + TWTC table + ibon JS + FamiTicket detail title.
+> - **Rollback definition boundary:** malicious *synthetic* temporary file changes then copied-baseline exact byte restore, restored SHA `070a4a6eb3c0fc8a0ebccee44ed8f0016c9a31d9aa3872a2801a8497a58bf59e`; copies removed. `productionRollbackVerified=false`. Real writer, recovery rehearsal of deployed Pages and three-repository migration/retirement are not implemented. `releaseState=HARD_HOLD_NO_PUBLICATION`, Cloud Scheduler PR #1 HIGH_RISK_HOLD, Source PRs unmerged. User's original 44 Android UAT PASS and L8 preview CORE_UI_PASS are preserved.
+> - **Next P30-L9-C** bounded *new* source-specific HTTPS acquisition and parser effectiveness under exact SHA-sealed output, no bypass, no formal DATA.JSON / PWA / API / DB update until separate quality/release gates; all platform zero-lists remain HOLD absent explicit verified evidence. Governance two documents only in [Docs Draft PR #8](https://github.com/easonliu714/event_scraper_public/pull/8), not source main.
+>
+
+> **2026-10-27 SRC-P30-L9-A immutable evidence-to-release-blocker architecture — 26/26 native CI PASS, RELEASE HARD_HOLD**
+>
+> ```text
+> event_scraper_public: production main fc4f963247d (FROZEN)
+> └─ L7-C Source Draft PR #37 @ 4668dab1c7061e9d752da0cdfcd58a004e1459f1 (CI & Android CORE UI PASS)
+>    └─ L9-A Source Draft PR #38 @ d35c3b78f09bcbeeb4da79ea3b6014330798ebfa
+>       ├─ scripts/p30_l9a_release_blockers.mjs [NO NETWORK / NO APP WRITES]
+>       │  ├─ exact L7-B fresh_candidate.json + platform_diagnostics.json
+>       │  ├─ exact L7-C preview-data.json
+>       │  ├─ SHA/identity/type/role/candidate/date/ticket/full-coverage validation
+>       │  └─ release_blocker_matrix.json + manifest.json (HARD_HOLD_NO_PUBLICATION)
+>       ├─ tests/p30/test_l9a_release_blockers.mjs [26/26 positive/negative]
+>       └─ .github/workflows/eventradar_p30_l9a_release_blockers.yml [push-only read permissions]
+>          ├─ download exact L7-B fresh Artifact Run 40353636708 [SHA/Schema]
+>          ├─ download exact L7-C Android Artifact Run 40436642012 [SHA]
+>          └─ Native CI 40439742917 -> Artifact 12705887127 [SHA sealed]
+> ```
+> - CI <https://github.com/easonliu714/event_scraper_public/actions/runs/40439742917> completed/success and Job `121976963857` all steps PASS. Artifact <https://github.com/easonliu714/event_scraper_public/actions/runs/40439742917/artifacts/12705887127> ZIP SHA256 `a576ddb077342920659288392cbaf66cfcb4e24665cf5eb0a6b4e6f123c54aa3`, 2766 bytes. Exact three added files vs L7C parent; frozen runtime/Pages blobs; READONLY.
+> - `evaluate(fresh,diag,preview,raw)`: strong source SHA, run ID, typed source and 264↔5↔259 identities; reject any formal date/price/ticket promotion or cross-source title/URL drift; 10 mandatory blockers. `build(paths,out)`: destination confined to isolated workspace, output blocker JSON + SHA manifest; `releaseState=HARD_HOLD_NO_PUBLICATION`, `readyToMerge=false`, `readyToDeploy=false`, `readyToEnableWriter=false`, `readyToStartScheduler=false`, `readyToRetireRepos=false`, `approvedActions=[]`. **This is a proven deny Gate, not formal release readiness.**
+> - Android L8 user evidence remains `CORE_UI_PASS`/full E2E incomplete; original 44 user-attested PASS preserved. `PRICE/資訊` candidate snippets flagged invalid for numeric price promotion; source official date/price/venue/sale/registration/ticket data still UNVERIFIED/UNKNOWN. No production Publisher, Golden, database migration, Scheduler PR #1, notifications, repository closure or merges. Next L9-B may run isolated field quality negatives/rollback rehearsal planning, never auto-publish. Governance lives in Draft PR #8, not main.
+>
+
+> **2026-10-27 P30-L8/G5K Android loopback UAT core PASS with bounded real-device evidence**
+>
+> - Termux SHA256 verified `eventradar-p30-l7c-isolated-android-preview.zip` equals official sealed Artifact ZIP `a524f40fd46cff6ad60046c314e70eaa44499fcddab035956ae16d25cadde3b6`; inner `index.html`, `preview-data.json`, `README.txt` all passed `sha256sum -c SHA256SUMS.txt`. Original official Source `main@fc4f963247d68eed29425808cc14e7250f312d05`, Docs-only Draft PR #8, source Draft PR #37 unchanged at start.
+> - Observed via provided Android screenshots: same-phone Chrome on `http://127.0.0.1:8766/index.html`, 264 total/5 detail title parity/259 review-only summary, default five cards, Event Go platform filter exactly one card, modal content and controls for four sampled cards (Event Go, UDN, iNDIEVOX, 華山1914), event/venue/price/ticket/date roles kept as labeled source evidence only; responsive screen no obvious overprint. Mark `ANDROID_L8_CORE_UI_USER_ATTESTED_PASS`. Do not claim keyword typing, five individual modal interactions, actual source HTTP navigation or all 259 rows user-verified; `ANDROID_L8_FULL_E2E_HOLD_PARTIAL_EVIDENCE`.
+> - Formal field promotion prohibited: review snippet `PRICE/資訊` on Event Go/UDN is ambiguous, not a numeric price; UI labels `UNKNOWN`, `未核實`, `非 Golden` correctly disclose uncertainty. User-authorized next isolated Gate is **P30-L9-A read-only Release Blocker Matrix**, with explicit blocker statuses and SHA-sealed diagnostics, no Writer, Publisher, PR merge, repo retirement or Cloud Scheduler. Historical Android original 44 remain USER_ATTESTED_PASS.
+>
+
+> **2026-10-27 SRC-P30-L7-C isolated Android review UI CI PASS — architecture authority update**
+>
+> ```text
+> event_scraper_public (main fc4f963247d; UNCHANGED)
+> └─ L7-B Source PR #36 @ e680456f0033e528fb25da61a4b3b6e35aa22447 [native CI PASS]
+>    └─ L7-C Source Draft PR #37 @ 4668dab1c7061e9d752da0cdfcd58a004e1459f1
+>       ├─ scripts/p30_l7c_isolated_preview.mjs   [source SHA typed parent -> pure data converter]
+>       ├─ scripts/p30_l7c_isolated_index.html    [mobile safe DOM UI/search/platform/quality/modal/official URL]
+>       ├─ tests/p30/test_l7c_isolated_preview.mjs [18/18 CI positive-negative]
+>       └─ .github/workflows/eventradar_p30_l7c_preview.yml [user-uploaded, native push CI PASS]
+>          └─ pinned L7-B Run 40353636708 fresh evidence + SHA/2020-12 schema
+>             -> L7-C isolated index.html + preview-data.json + README.txt + SHA256SUMS.txt
+>                artifact 12704885384 SHA256 a524f40fd46cff6ad60046c314e70eaa44499fcddab035956ae16d25cadde3b6
+> ```
+> - **Gate provenance:** dedicated [GitHub Actions Run 40436642012](https://github.com/easonliu714/event_scraper_public/actions/runs/40436642012), completed/success, Job `121966765821` all steps success, exact frozen parent and four-add-only diff, 18 offline negatives PASS, HTML inline JavaScript syntax PASS, inherited source Artifacts sealed/read-back. The formerly blocked workflow publication is now resolved through user web upload; retain prior WIP/HOLD snapshot as historical evidence but mark it superseded. Docs governance still only [Draft PR #8](https://github.com/easonliu714/event_scraper_public/pull/8), no main merge.
+> - **UI and DATA:** upstream collection used **34 real GETs** over 19 public platforms: 16 HTTP OK, 12 list-positive, 264 **candidate** source IDs; only 5 of 12 sampled details pass title parity. L7-C performs **zero additional fresh site HTTP** and uses only L7-B immutable inputs, `candidateOrigin=L7C_PINNED_NEW_HTTP_ARTIFACT_PREVIEW_NOT_A_NEW_CRAWL`. Preview data counts: total 264, detail-title-parity tier 5, list-only/title-identity-HOLD 259. Search/platform/quality filter and modal original official/third-party link; external source from allowlisted HTTPS, no Javascript HTML injection or production fetch. `dateStart/dateEnd/venue/price/registrationPeriod/saleWindow/voucherValidity=null`, `ticketStatus=UNKNOWN`, no automatic merges, field Golden promotion, data writer, notifier or cloud scheduler.
+> - **Next P30-L8 G5K:** isolated same-phone Android loopback UAT **not yet performed**, requiring final Artifact SHA and internal SHA256SUMS before testing, verify category/tier behavior, five trusted detail-title-parity only (not fully official event/price verification), 259 explicitly pending, relative link/UNKNOWN text, no text overlap and normal modal close/HTTPS source navigation. Historic 44 Android records remain USER_ATTESTED_PASS without re-test. L9 controlled Writer/Publisher and L10 repository retirement remain LOCKED.
+>
+
+> **2026-10-26 L7-C new candidate mobile preview source tree: WIP / CI HOLD**
+>
+> ```text
+> Source [Draft PR #37, head 1f76f00173d3ec96d88f9b11f65bd995e020bd45]
+> ├─ scripts/p30_l7c_isolated_preview.mjs     [candidate; immutable L7B evidence input, no HTTP]
+> ├─ scripts/p30_l7c_isolated_index.html      [candidate; responsive review-tier UI; safe DOM]
+> └─ tests/p30/test_l7c_isolated_preview.mjs  [candidate; 18 unexecuted in native CI]
+> Native L7-C GitHub Actions workflow: NOT PUBLISHED / platform safety write BLOCKED
+> Artifact: NONE; SHA read-back: NONE; Android UAT: NOT STARTED
+> ```
+> - Exact L7B parent Draft PR #36 `e680456f0033e528fb25da61a4b3b6e35aa22447` remains **PASS** under [Run 40353636708](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708) (19-source actual GET, 16 HTTP OK, 12 list-positive, 264 candidates, 12 detail GET, five title-parity, 12 labeled review snippets). Intended L7-C source is only the SHA-sealed [Artifact 12665097220](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708/artifacts/12665097220), never L7-A historical JSON or production docs/data.json.
+> - Proposed UI defaults to 5 detail-title parity candidates and marks 259 others list-only/title-HOLD, official links only, formal event dates/sale/registration/voucher/price/ticketStatus UNKNOWN, third-party StrollTimes never first-party. This is **source design only, not live E2E proof**. Workflow publication requires a permitted authorized route; do not circumvent security blockers, merge PR or request new Android UAT until actual CI, artifact SHA and independent read-back PASS. Prior Android accepted 44 preserved.
+>
+
+> **2026-10-26 P30-L7-B final live-source topology and quality tier summary (supersedes pending entry below)**
+>
+> - Source [PR #36](https://github.com/easonliu714/event_scraper_public/pull/36) Draft HEAD `e680456f0033e528fb25da61a4b3b6e35aa22447`, base PR #35 `17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8`; Native [Run 40353636708](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708) completed/success, 34/34 offline, exact four added paths, SHA and JSON Schema PASS; [Artifact 12665097220](https://github.com/easonliu714/event_scraper_public/actions/runs/40353636708/artifacts/12665097220) ZIP `sha256:8ad3a6c8d0b3259ef9187830a33455365a8ff4c7bc30061653345d74cef758c6`.
+> - **Real source stage counts:** fresh HTTP requests=34; 19 platform entries; HTTP_OK=16 (3 HTTP_403), LIST_POSITIVE=12, LIST_CANDIDATES=264 (unreviewed), DETAIL_HTTP_OK=12/12, DETAIL_TITLE_PARITY=5/12, FIELDS_LABELED_REVIEW_ONLY=12 snippets. Only five detail-source title parity matches; all 264 are not automatically verified events. None of the five are promoted to Golden; `fullPlatformCoverageVerified=false`.
+> - **Stage-level source holds:** ACCUPASS 25 list-only, OPENTIX 40 list/1 parity, UDN 6 list/1 parity, FamiTicket 40 list-only, 年代 28 list-only, TixFun 24 list-only, Event Go 38 list/1 parity, 華山 7 list/1 parity, 松山 1 list-only, KidsClub 33 list-only, iNDIEVOX 19 list/1 parity, StrollTimes 3 aggregator-only/list; CKSMH/TWTC/ibon HTTP200 but generic LIST0, 寬宏 HTTP200/list0, KKTIX/拓元/BeClass HTTP403. Every stage failure remains a specific HOLD, never silently interpreted as expired/removed events.
+> - **Data-to-UI contract for next L7-C:** default detail-confirmed tier [5 current candidates] vs list-only/mismatch [259 candidates] clearly separated; third-party StrollTimes cannot be rebranded as official organiser; no date/price/ticket-status inference; official platform link only if URL provenance checked. A new isolated file-based preview must not replace `docs/index.html`, `docs/data.json` or P20 preview; user-attested Android 44 unchanged. L8 Android test is only of **new** isolated candidate UI.
+>
+
+> **2026-10-26 SRC-P30-L7-B fresh acquisition architecture — isolated Source Draft PR #36**
+>
+> ```text
+> event_scraper_public [source only; main unchanged]
+> └─ feat/eventradar-p30-l7b-fresh-acquisition [PR #36 Draft on PR #35]
+>    ├─ scripts/p30_l7b_fresh_acquisition.py
+>    │  ├─ nineteen named public HTTPS list-entry configurations [no old JSON input]
+>    │  ├─ get_page -> 403/404/429/redirect/timeout/oversize/content-SHA evidence
+>    │  ├─ parse_list -> conservative canonical host + event URL + title + stable ID
+>    │  ├─ detail sample <=1/platform -> HTTP + exact source URL + title parity
+>    │  ├─ labeled EVENT_PERIOD / ADMISSION_TIME / REGISTRATION_PERIOD /
+>    │  │  SALE_PERIOD / VOUCHER_VALIDITY / VENUE / PRICE only as REVIEW_REQUIRED
+>    │  └─ emit isolated fresh_candidate.json + platform_diagnostics.json + manifest.json
+>    ├─ tests/p30/test_l7b_fresh_acquisition.py [34 mocked positive/negative cases]
+>    ├─ schemas/p30_l7b_fresh_candidates.schema.json [Draft 2020-12, freshness guard]
+>    └─ .github/workflows/eventradar_p30_l7b_fresh.yml [push-only, read-only, SHA seal]
+> ```
+> - **Immutable boundaries:** PR #36 base PR #35 at `17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8`, main `fc4f963247d68eed29425808cc14e7250f312d05`, exact four additions verified by native CI; no replacement of historical offline L7A 12-node + 66-edge snapshot, no use of `docs/data.json` or old L1 response for new data. All three existing Repo main/Android original 44 preserved.
+> - **LIVE run 40353068648 completed/success** at first HEAD `5e132dbc881b75aae124833110969084940c2b6d`: actual fresh HTTP 33, 19 configured sources, 15 HTTP 200, 11 nonempty parsed list groups, 223 list-identity *candidates*, 11 HTTP 200 sampled details, only 5 conservative title parity passes and 12 extracted role-labeled review-only snippets. Artifact 12665121626 SHA256 `280ecd745e87919e6f711bbe4251d185c63c46021b1557d93f2ae4a4ac36de6c`. Success is only **minimum actual HTTP → LIST → identity-matched DETAIL chain**; full 19-platform coverage is false and no event metadata Golden promoted.
+> - **Four known source-entry corrections now on same PR #36** HEAD `e680456f0033e528fb25da61a4b3b6e35aa22447` pending subsequent CI: FamiTicket `/Home` official portal, ibon `/Index/entertainment` official JS shell, TWTC `/exhibition?p=home` official exhibition listing, CKSMH `/Query.list.ctr` official cultural activity list. These routes came from prior source parser Gated code, but **each must still make a new GET**; live CI pending, no false claim of success. Other platforms remain per-source HOLD when 403, no list or detail title mismatch; no bypass.
+> - **Source JSON:** `candidateOrigin=L7B_ACTUAL_NEW_PUBLIC_HTTP`, `collectedAtUTC`, `actualFreshHTTPRequests`, `sourcePlatform`, `sourceRole`, `sourceUrl`, `listEvidence`, `detailHttp`, `detailTitle`, `detailIdentityVerified`, `fieldEvidence[{role,label,observedValue,sourceUrl,verification:REVIEW_REQUIRED}]`. Formal `dateStart/dateEnd/eventTimeZone/venue/price/registrationPeriod/saleWindow/voucherValidity=null`, `ticketStatus=UNKNOWN`, `category=待分類`, `mergeAllowed=goldenVerified=published=false`. Unit mock explicitly `candidateOrigin=L7B_SYNTHETIC_TEST_INJECTION_NOT_FRESH`, fresh count zero, must fail LIVE schema acceptance. Label observations must not conflate registration/sale/admission/show periods.
+> - **Next layer:** P30-L7-C current-source isolated JSON quality review + separated preview UI → L8 G5K new-source Android E2E. L9 Writer/Publisher/rollback and L10 consolidation remain HOLD until explicit approval; Cloud Scheduler PR #1 remains HIGH_RISK_HOLD. Two governance files only on docs Draft PR #8, never silently promoted to main.
+>
+
+
+> **2026-10-26 SRC-P30-L7-A source pinned sample to schema 2020-12 candidate JSON architecture**
+>
+> - **功能隔離**：[Source Draft PR #35](https://github.com/easonliu714/event_scraper_public/pull/35) `feat/eventradar-p30-l7a-isolated-snapshot@17d189c5615cdd58db3ea0e7e1ea9472a5ab1cc8`，base L6B PR #34 `c42ee0f4125bf94c0c948a08e60cce677887e324`，四新檔：`scripts/p30_l7a_isolated_candidate_json.mjs`、`schemas/p30_l7a_isolated_candidates.schema.json`、`tests/p30/test_l7a_isolated_candidate_json.mjs`、`.github/workflows/eventradar_p30_l7a_snapshot.yml`。**No network**：原生 Github Actions 下載 L6B Run `40331119770` exact SHA-sealed archive → `cross_platform_review.json` → `checkParent()` source URL / identity / 12 records / 66 pair / 2 reference / 3 ibon show roles → `transform()` → isolated `candidate_sample.json` + `relationships_review.json` + `manifest.json` → schema Draft 2020-12 validation＋SHA manifest＋ZIP artifact；任何 `docs/` production data path 目的地 fail-closed。
+> - `candidate_sample.json` **root schema**：`{kind:"EVENTRADAR_P30_L7A_ISOLATED_SAMPLE_CANDIDATES_V1",schemaVersion:"1.0.0",runId:"P30-L7A-SNAPSHOT-<inputSha16>",candidateOrigin:"L7A_PINNED_HISTORICAL_EVIDENCE_NOT_FRESH",actualFreshHTTPRequests:0,evidenceAsOfUTC:null,fullPlatformCoverageVerified:false,sampledSourceOnly:true,sourceParentKind,sourceParentRunId:40331119770,sourceParentSHA256,candidateCount:12,platformBreakdown:{StrollTimes:6,FamiTicket:4,ibon:2},candidateEventRecords[12],...GOLDEN/WRITER/PUBLISHED:false}`。每筆 `candidateEventRecords[]` 具有 `candidateId=er7a_<sha256(platform+\n+url).slice(0,24)>`、`runId`、`sourcePlatform`、`sourceRole`、`sourceUrl`、`officialLinkUrl`、`firstPartyReferenceUrl`、`qualityState`、`qualityFlags`、`sourceDateEvidence[]`、`showSessionEvidence[]`、`candidateSessionCount`、`sourceLineage[]`、`categoryHint`、正式 `category:"待分類"`／`dateStart/dateEnd/eventTimeZone/venue/price/registrationPeriod/saleWindow/voucherValidity:null`、`ticketStatus:"UNKNOWN"`、`goldenVerified:false`／`published:false`／`mergeAllowed:false`。
+> - **欄位角色邊界**：Bitan `GOV_OFFICIAL_CALENDAR` `sourceDateEvidence[{dateRole:"OFFICIAL_EVENT_PERIOD_REVIEW_ONLY",value:["2026-10-17","2026-12-13"]}]` **不提升正式 dateStart/dateEnd**；NieR 官方製作方 2/20 18:00、2/21 14:00 `showSessionEvidence[2]`（`isEventRecord:false`、原加場公告發佈時間仍 HOLD），`candidateSessionCount=2` **仍只有一筆 ibon source event**；RUNIDRE 的第三場只有未核實的 count，不偽造原製作方 show evidence。其餘 10 筆沒有可核定日期維持 NULL。StrollTimes article 官方身分只確立碧潭一條 government reference，其餘仍保留原 `sourceUrl` 和 `qualityState=AGGREGATOR_ARTICLE_OFFICIALITY_HOLD`。
+> - `relationships_review.json` 是**獨立** 66 個兩兩身分審核（其中跨平台 44），每組 `{a:candidateId,b:candidateId,relationship:"UNPROVEN_DO_NOT_MERGE",reviewStatus:"REQUIRES_INDEPENDENT_FIRST_PARTY_SAME_EVENT_PROOF",mergeAllowed:false,deleteAllowed:false,hideAllowed:false}`，不與公開活動清單混在一起。 `manifest.json` 將 upstream source SHA、產物檔 SHA 和 deterministic runId 做 parity；不同執行時間的同一來源得到相同 runId/源 ID，避免假裝即時新 crawl。
+> - [GitHub Run 40333136396](https://github.com/easonliu714/event_scraper_public/actions/runs/40333136396) completed/success，30/30 Node negative tests、SHA pinned exact input、正式 main blob scope、2020-12 JSON schema `jsonschema.FormatChecker`、12/66 及角色區隔語義 Gate、輸出 SHA 全 PASS。實際 `runId=P30-L7A-SNAPSHOT-e1e8b58812dc5b6d`，input SHA `e1e8b58812dc5b6ddee5ae9630bd6929f96bf470bcfd04637a0a2463aba687e4`；封存 [Artifact 12655660899](https://github.com/easonliu714/event_scraper_public/actions/runs/40333136396/artifacts/12655660899) ZIP digest `sha256:35eb9d9f604b24ce639ef7693c8aaf60758dc4b252487f0f6138bc846100c1e4`。Source main `fc4f963247d68eed29425808cc14e7250f312d05`、Android 原 44 USER_ATTESTED_PASS、正式 PWA/JSON/通知/排程完全不動，PR #35／治理 [PR #8](https://github.com/easonliu714/event_scraper_public/pull/8) 仍 Draft。
+> - **下階段層級**：`P30-L7-B bounded FRESH actual HTTP/list/detail source evidence` → `P30-L7-C isolated current candidate JSON + independent preview (explicit origin/freshness status)` → `P30-L8 G5K Android/PWA new-source real-device UAT`。新 HTTP 之前絕不稱 12 個 historical sample 為 19 平台全量 fresh data，無法查證日期／票況時保留 UNKNOWN 與官方連結；未授權不得 merge、publish、開 notifier/cron 或 retire other repos。
+>
+
+
+> **2026-10-26 P30-L6-B cross-platform source event, show/session and two origin references architecture**
+>
+> - Source Draft [PR #34](https://github.com/easonliu714/event_scraper_public/pull/34) 在上階段 L6A [PR #33](https://github.com/easonliu714/event_scraper_public/pull/33) frozen HEAD `774e2de11580ed961658d6a6254b34ae4ded57c7` 新增 `scripts/p30_l6b_g5j_cross_platform_identity.mjs`、`tests/p30/test_l6b_g5j_cross_platform_identity.mjs`、`.github/workflows/eventradar_p30_l6b_g5j.yml`。唯一資料輸入為 4 組 sealed GitHub Actions Artifacts (L6A Run `40324420431`、FamiTicket L5D Run `40312137162`、ibon L5A Run `40301911354`、NieR original producer L5C Run `40305582187`)：`SHA256SUMS.txt` 驗證 → `verifyInputs({g5j,fami,ibon,nier})` Source URL/role/eventID/HTTP/title/date/officiality → `reconcile()` 12 source-event records＋66 pairs＋2 first-party provenance edges → isolated `cross_platform_review.json`。**本 Gate 不接網路、不讀正式 DB、無 web/publish API 操作**。
+> - `candidateRecords[12]`: `6 THIRD_PARTY_AGGREGATOR_ONLY`＋`4 FamiTicket OFFICIAL_TICKET_DETAIL_EXACT_TITLE`＋`2 ibon OFFICIAL_TICKET_DETAIL_EXACT_TITLE`，每個有 `{platform,eventUrl,title,provenance,referenceFirstPartyUrl,referenceTimeRange,verifiedSourceEventId,sessionCount,unverifiedSessionCount,categoryHint,categoryVerified:false,eventDateStart:null,eventDateEnd:null,ticketStatus:"UNKNOWN",price:null,mergeAllowed:false,published:false}`。NieR ibon **2 show sessions ≠ 2 independent event IDs**；原 ibon 2 events／3 raw show candidates 納入來源身分，不把「開放入場」「售票日期」「場次追加公告」當作獨立活動或 Golden。FamiTicket 4/4 來源標題與 URL 經比對，但三筆展覽實際展期不足維持 UNKNOWN。
+> - `examinedPairs[66]`: 44 跨平台＋22 同平台，每條記錄 `{a,b,platforms,crossPlatform,titleEqualityObservation,organiserIdentityParity:"NOT_PROVEN_BOTH_SIDES",primarySourceEventIdParity:"NOT_PROVEN_BOTH_SIDES",activityEditionParity:"NOT_PROVEN",venueIdentityParity:"NOT_PROVEN_BOTH_SIDES",eventDateRoleParity:"NOT_PROVEN_BOTH_SIDES",showSessionIdentityParity:"NOT_PROVEN",action:"RETAIN_SEPARATELY_REVIEW_ONLY",automaticMergeAllowed:false,automaticHideAllowed:false,deleteAllowed:false,duplicateAccepted:false}`。 `firstPartyReferenceEdges[2]` 僅 Bitan governor calendar 與 NieR original producer tour；其存在**不代表任何兩個跨平台來源活動已證實重複**。明確限制欄位未確認時不能判定同一活動、主辦、版次、場館或 session。
+> - Final [GitHub Actions 40331119770](https://github.com/easonliu714/event_scraper_public/actions/runs/40331119770) completed/success，34/34 negative tests、四份 upstream SHA manifest、formal runtime Source Blob/PR parent identity、12/66/44/22/2 schema、零 publication/merge/hide/delete/fieldDate/category upgrade、output SHA sealed [Artifact 12654907565](https://github.com/easonliu714/event_scraper_public/actions/runs/40331119770/artifacts/12654907565) ZIP digest `sha256:2dd2e49145c6e250a36efc3ba6371892c611436eaf15d3061ed7d999a1eec506` PASS。最終 Source PR #34 HEAD `c42ee0f4125bf94c0c948a08e60cce677887e324`，Source main `fc4f963247d68eed29425808cc14e7250f312d05`、Android 44 user-attested PASS 完全未改；首輪 CI `40330918202` fixture 漏 Bitan official period 而 FAIL，已修正，不能回報最初 FAIL 為 PASS。
+> - **下一階段 P30-L7-A** 建立可驗證的新隔離 JSON candidate schema：來源鍵 `platform+officialSourceUrl`、`run_id`、`sourceRole`、`fieldEvidence`、`eventDateRole`、`sourceQuality`；把 `same-event match`、`same-article`、`parent-child`、`show-session` 四種不同邊標籤保持分開。先只對已核實的受限樣本做 smoke，L7-B 才逐步擴展全新 19 平台 current HTTP/list/details 的新數據集；沒有新的 HTTP 讀回不能假稱全新資料。最後 P30-L8 提供真正可實機 Android/PWA 預覽包，在此之前保持正式 Writer、Golden、通知與 Repo 退役 LOCKED。
+>
+
+
+> **2026-10-26 P30-L6-A G5J reversible six-node fifteen-pair classification architecture**
+>
+> - Source [Draft PR #33](https://github.com/easonliu714/event_scraper_public/pull/33)（base L5-E3 PR #32 frozen HEAD `7057990d9e698302fa60e933b7579492b8969620`），新三檔 `scripts/p30_l6a_g5j_reversible_dedup.mjs`、`tests/p30/test_l6a_g5j_reversible_dedup.mjs`、`.github/workflows/eventradar_p30_l6a_g5j.yml`。單向資料流 `L5E3 sealed identity_graph_review.json`（含 E1/E2 父來源 artifact SHA）→ `verifyGraph()`（schema、六 canonical article URLs、7 exact typed edges、Bitan first-party proof 僅 1 個、4 H1 drift review notes、零正式升級）→ `classificationHint()` 與 `pairEvidence()` → `buildReview()` → isolated `dedup_classification_review.json`；**Node pure offline, zero network/site fetch and zero formal DB/PWA writes**。
+> - `reviewedCandidates[6]` 含 `{id,homepageCardTitle,observedArticleH1,sourceRole:"THIRD_PARTY_EVENT_AGGREGATOR",provenance,provenanceRank,identityReview,relationshipRisk,categoryHint,categoryEvidence,classificationReason,officialCategoryVerified:false,referenceOfficialUrl,referenceOfficialPeriod,dateStart:null,dateEnd:null,venue:null,ticketStatus:"UNKNOWN",price:null,mergedWith:[],autoMergeAllowed:false,autoHideAllowed:false,deleteAllowed:false,goldenVerified:false,published:false}`。分類來源只有標題 keyword，5 `文化節慶`、1 `藝文展覽` **PROVISIONAL**，不是官方驗證；Bitan 的政府原始活動期間只存在 `referenceOfficialPeriod`，不自動升級 `dateStart/dateEnd`。
+> - `reviewPairs[15]` 含兩個不同 article URL、`titleRelationship`、`sharedTitleEvidence`、`primarySourceCrossIdentity/organiserSame/venueSame/dateOrSessionSame/editionSame:"NOT_PROVEN"`、`relationship:"UNKNOWN_NOT_MERGED"`、`proposedAction:"KEEP_SEPARATE_PENDING_EVIDENCE"`、`mergeAllowed:false`、`autoHideAllowed:false`、`deleteAllowed:false`。`sourceEvidenceEdges[7]` 只保留 E3 6 個 `AGGREGATOR_LIST_CARD_POINTS_TO_SAME_ARTICLE` 和 1 個 `ONE_EVENT_OFFICIAL_GOV_CALENDAR_CORROBORATED`（Bitan），不得轉換成正式事件合併。來源證據 `provenanceRank` 是「來源成熟度」而非重複概率。
+> - 原生 [Run 40324420431](https://github.com/easonliu714/event_scraper_public/actions/runs/40324420431) **30/30 test + input SHA + Source production Blob + 6/15/7 schema + sealed artifact PASS**，[Artifact 12651050317](https://github.com/easonliu714/event_scraper_public/actions/runs/40324420431/artifacts/12651050317) digest `sha256:8ad284d56998949a4cff44f094c3dcbace17e1c96cba257824c77abc3850f06d`。PR #33 HEAD `774e2de11580ed961658d6a6254b34ae4ded57c7`；Source `main@fc4f963247d68eed29425808cc14e7250f312d05`、Android 44 original PASS、formal `docs/data.json`/PWA remains untouched。下階段 L6-B first-party cross-platform EventID／edition／time／session 類型區隔＋negatives，再進 L7 isolated fresh JSON → L8 Android E2E，禁止自動合併、下架、發布。
+>
+
+
+> **2026-10-26 P30-L5-E3 title relationship graph and no automatic parent/subevent merge**
+>
+> - Source [Draft PR #32](https://github.com/easonliu714/event_scraper_public/pull/32) `feat/eventradar-p30-l5e3-article-identity-graph@7057990d9e698302fa60e933b7579492b8969620`（stack E2 PR #31 HEAD `f0b07bf4ad45ed9e833d6825c4c119097c698694`）三新增檔 `scripts/p30_l5e3_strolltimes_identity_graph.mjs`、`tests/p30/test_l5e3_strolltimes_identity_graph.mjs`、`.github/workflows/eventradar_p30_l5e3_title_graph.yml`。E1 [Run 40314650154](https://github.com/easonliu714/event_scraper_public/actions/runs/40314650154) `lineage_evidence.json`＋E2 [Run 40315847664](https://github.com/easonliu714/event_scraper_public/actions/runs/40315847664) `independent_gov_event_review.json` 兩個 parent schema/資料版次 SHA Gate→6 個 exact StrollTimes article URLs stock Chromium re-observe H1→`lexicalIdentity()`→`graphFromEvidence()`→隔離 `identity_graph_review.json`，沒有外站爬取、服務啟用、官方寫入或通知。
+> - 重要 schema：`nodes[]:{id:<canonicalAggregatorArticleUrl>,homepageCardTitle,articleH1,priorE1TitleStatus,currentTitleState,titleOverlapEvidence,officialGovernmentProof,mergeAllowed:false,sourceEventDateStart:null,sourceEventDateEnd:null,ticketStatus:"UNKNOWN",price:null,goldenVerified:false,published:false}`；`edges[0..5]:{kind:"AGGREGATOR_LIST_CARD_POINTS_TO_SAME_ARTICLE",from:"strolltimes-home-card:<url>",to:<url>,mergeAllowed:false,originalOrganiserProven:false}`＋第七條僅碧潭 `ONE_EVENT_OFFICIAL_GOV_CALENDAR_CORROBORATED`（`reviewOnlyOfficialEventPeriod=["2026-10-17","2026-12-13"]`，E2 first party calendar URL），絕不將卡片相同 article URL 作跨活動 `DELETE/MERGE`。
+> - 標題分類：`AGGREGATOR_TITLE_IDENTITY_MATCH`（只允許原標題完全一致或合法結尾括號 MM/DD 展示時間後綴）；`EDITORIAL_HEADLINE_EXTENSION_REVIEW`（原標題加冒號／副標，例如香山濕地藝術季、新北濕地藝術季、**2026晴空季**，且 `parentChildRelationship="EDITORIAL_SUBTITLE_RELATIONSHIP_NOT_PROVEN"`）；`TITLE_OVERLAP_RELATIONSHIP_REVIEW`（共有至少 5 個實質中文字、可能同系列但不同子活動，例如「桃園眷村文化節」vs「龜山眷村故事館場次」）；`DISJOINT_TITLE_IDENTITY_HOLD`／`HTTP_OR_REDIRECT_HOLD`。這些都僅形成 **review notes**，`mergeAllowed=false`，任何年份或短城市字串都不足以確認同一場活動。
+> - Gate 真實 GitHub [Run 40318751941](https://github.com/easonliu714/event_scraper_public/actions/runs/40318751941) completed/success，27/27 test、6 個公開文章 200、2 H1 original matched、3 editorial/1 series-overlap review、0 confirmed parent/subevent、0 auto merge、1 government event reference、2 parent SHA、正式 `docs/data.json`／`docs/index.html`／`scraper.py` identity Gate、isolated SHA manifest 皆 PASS；Artifact [12647638215](https://github.com/easonliu714/event_scraper_public/actions/runs/40318751941/artifacts/12647638215) digest `sha256:a412483fe6e8ecc53e088baadec21020464ee9ab82b545c424a6d93c35df9596`。E3 的 6 個重新讀回頁面不等於 StrollTimes 24 篇皆有原始官方來源；僅碧潭 1 個 FIRST-PARTY REVIEW evidence，`originalOfficialEventUrl`、正式日期／票況維持未升級。
+> - **下一系統演進 P30-L6-A → L6-B G5J**：使用 graph data 執行純離線、可逆、人工可審計的「活動同一性」與「多場次／多場域／同年份不同屆」分類，將 same-aggregator-article-URL 與 independent FIRST PARTY edge 及 potential parent/subevent 依證據強度分開；未證明的活動關係 **一定 0 auto merge / 0 auto hide / 0 delete**。後續 P30-L7 隔離 fresh JSON / P30-L8 新資料 Android UAT，正式 Source `main@fc4f963247d68eed29425808cc14e7250f312d05`、Android 44 UAT、正式 PWA、服務與 Writer 全程維持原狀，PR #32 和治理 PR #8 Draft 未合併。
+>
+
+
+> **2026-10-26 P30-L5-E StrollTimes source section graph and BItan organiser government first-party evidence**
+>
+> - Source Draft [PR #30](https://github.com/easonliu714/event_scraper_public/pull/30) from PR #29 `f960d0bd91d4ca38df17f0ecb2c053fd7a0299f6`: 3 new files `scripts/p30_l5e_strolltimes_source_lineage.mjs`, `tests/p30/test_l5e_strolltimes_source_lineage.mjs`, `.github/workflows/eventradar_p30_l5e_strolltimes_lineage.yml`. Stage DIL/source schema `StrollTimes homepage candidate {title,aggregatorUrl,originalOfficialUrl:null}` → (bound detail `H1`) → explicit `資料來源` H2/H3 header-to-next-header hyperlink region → `credits[]:{url,anchorLabel,sourceSection:"資料來源",role,linkedEventTitleIndependentlyMatched:false,organiserAccountAuthenticityVerified:false,originalOfficialEventDetailVerified:false}`; Google map `VENUE_MAP_NOT_EVENT_SOURCE`, Facebook `ATTRIBUTED_SOCIAL_POST_ACCOUNT_NOT_VERIFIED`, official ticket site `TICKET_SITE_EVENT_IDENTITY_NOT_VERIFIED`, .gov.tw `GOV_INSTITUTION_WEBSITE_EVENT_IDENTITY_NOT_VERIFIED`, unknown exterior `OTHER_REFERENCED_WEBSITE_IDENTITY_NOT_VERIFIED`. Only credits section, never arbitrary navigation/social/maps links. Browser only visits StrollTimes pages (1 homepage + six article), no external source follows; false article H1 matches do not collect sources. CI [40314650154](https://github.com/easonliu714/event_scraper_public/actions/runs/40314650154) PASS 23/23 tests, 24 list, 6 HTTP200 details, 2 exact H1, 3 attributable Facebook URLs; four parent-/child-article H1 identity HOLD; Artifact 12645714192 digest `sha256:aeb7d368f20924e9025e49e0bed631c570410b8228e2e83ede047c1ebf02c65e`. PR #30 HEAD `ae2c2bdd014fdb9df2cb7d05781d6347d92848b5`; previous first run CI FAIL due strict 6/6 H1 and earlier budget, preserving historical failures.
+> - Source Draft [PR #31](https://github.com/easonliu714/event_scraper_public/pull/31) from PR #30: 3 new files `scripts/p30_l5e2_bitan_government.py`, `tests/p30/test_l5e2_bitan_government.py`, `.github/workflows/eventradar_p30_l5e2_bitan_gov.yml`. Isolated `E1 lineage_evidence.json` (pinned SHA via GitHub Actions Run 40314650154) → exact StrollTimes BItan aggregator article `/events/new-taipei/261016084730/` H1 identity → government first-party [calendar](https://newtaipei.travel/zh-tw/calendar/detail/4058) + official [municipal newsroom](https://www.ntpc.gov.tw/ch/home.jsp?dataserno=66daa0e44fad9dd95b5b7e5ece1bf28d&id=e8ca970cde5c00e1), each limited one HTML HTTP request, same official event date/location/organizer. `independent_gov_event_review.json` stores `{reviewOnlyOfficialEventUrl, reviewOnlyOfficialEventPeriod:["2026-10-17","2026-12-13"], primaryOfficialCalendar:{identity:"OFFICIAL_EVENT_TITLE_BOUND",dateRole:"OFFICIAL_ORGANISER_EVENT_PERIOD",organiser:"新北市政府觀光旅遊局",venueEvidence:"新北市新店區碧潭風景區",completeIdentity:true},secondaryGovernmentNews:{publishedAtDate:"2026-10-14",dateRole:"NEWS_PUBLICATION_DATE_NOT_EVENT_START"},officialFirstPartyIndependentEventIdentityCount:1,strolltimesOriginalFacebookCreditsUnverified:true,allOtherAggregatorArticlesVerified:false,finalDatePromotionCount:0,dateStart:null,dateEnd:null,ticketStatus:"UNKNOWN",price:null,goldenAccepted:false,published:false,writerExecuted:false}`. Government news publication is NOT an event date.
+> - Final native [CI 40315847664](https://github.com/easonliu714/event_scraper_public/actions/runs/40315847664) completed/success, 20/20 offline, E1 Artifact manifest, GET 200/200 original govt source, exact city venue and organiser, bounded multi-source calendar date, all original Pages runtime blob identities, SHA [Artifact 12646961925](https://github.com/easonliu714/event_scraper_public/actions/runs/40315847664/artifacts/12646961925) digest `sha256:a5c34c0fefce372cede0ac2c0e5e9d3b3b107d5073f9b880c86de9d57ff3aad6` PASS. Source PR #31 HEAD `f0b07bf4ad45ed9e833d6825c4c119097c698694`; Source main `fc4f963247d68eed29425808cc14e7250f312d05` and 44 accepted Android records remain unchanged. First-party identity success is only **one specific BItan article**; remaining 23 source identities and 4 sampled H1 nonexact are HOLD; no official JSON writer, notifications, scheduler, repo retirement, automatic consolidation.
+> - Next architecture implementation: `P30-L5-E3` source-link to official detail same-event proof with identity/dateRole/organiser role and explicit `parent_event` vs `subevent` edges for aggregator title variants; `P30-L6 G5J` reversible dedup/classification, `P30-L7` isolated new JSON, `P30-L8 G5K` Android PWA real-candidate smoke. Do not turn a source-credited Facebook post into verified organiser account, or a calendar post date into official activity period.
+>
+
+
+> **2026-10-26 P30-L5-D1 FamiTicket four public detail samples and emoji-labelled TPBL roles architecture**
+>
+> - Source [Draft PR #29](https://github.com/easonliu714/event_scraper_public/pull/29)：`scripts/p30_l5d_famiticket_field_roles.mjs`（獨立公開 Chromium readonly）、`tests/p30/test_l5d_famiticket_field_roles.mjs`（27 positive-negative fixtures）、`.github/workflows/eventradar_p30_l5d_famiticket_fields.yml`（native scoped CI，精確三新檔、Parent PR #28 frozen SHA、正式 Blob Guard）。`findDetailCards()` 比較首頁 heading/alt/title/anchor-text 對官方 `/Home/Activity/Info/<opaque-id>` 一對一 URL，最先必須找到唯一精確的 2026 ITF，再取最多 3 個其他不同活動。首頁 + 4 詳情共至多 5 次導覽／160 ibon 以外的 FamiTicket/CDN 核准請求上限，禁止其他 Host、登入、購票、非公開 API、CAPTCHA 繞過、PWA 或 Data Writer。
+> - `roleFields()` 只採用官方詳情 DOM 上明確 `label：value` 或 **下一行**的白名單角色，emoji `🔱`／`🌊` 項目要保留 label role；四位數西元年合法日期 token、有完整日數邊界（19 不能截成 1；20 不能截成 02），禁止由 title 年份、系列「26-27」與「10/8」月日片段猜測活動日期。新 taxonomy：`EVENT_TIME_LABEL_ONLY`、`VENUE_LABEL_ONLY`、`SERIES_DESCRIPTOR_NOT_EVENT_TIME`、`ADMISSION_NOT_EVENT_START`、`SALE_WINDOW_NOT_EVENT`、`REGISTRATION_WINDOW_NOT_EVENT`、`VOUCHER_VALIDITY_NOT_EVENT`、`VOUCHER_REDEMPTION_LOCATION_NOT_EVENT_VENUE`。僅輸出 `LABELED_RAW_EVIDENCE_UNPROMOTED` 和 bounded excerpt，部分欄位未出現保持 UNKNOWN/HOLD。
+> - `role_evidence.json.detailSamples[]` 為 `{listTitle,officialUrl,detailHttp,observedUrl,identity,fields[],fieldHintLines[],structuredFieldPairs[],dateStart:null,dateEnd:null,venue:null,ticketStatus:"UNKNOWN",price:null,category:"待分類",fieldPromotionCount:0,goldenVerified:false,published:false}`。必須清單/detail exact title 才允許擷取欄位 raw evidence，所有 field `officialEventDateAccepted=false`；頁面購票鈕、票券有效/兌換、銷售期間不是實時售票狀態或展覽/比賽日。
+> - 實測 [GitHub Actions Run 40312137162](https://github.com/easonliu714/event_scraper_public/actions/runs/40312137162) completed/success：FamiTicket 官網首頁 HTTPS200、**4/4 different actual detail HTTP200、4/4 exact title**（ITF、臺中市美術館典藏展、駁二動漫祭、高雄全家海神主場）。TPBL 官方「🔱比賽地點／🔱開放場次／🔱預售票全面販售時間」得到三種分離 role，另三筆展覽/動漫詳情此抽樣未取得安全可解析的真正展期，不能硬補。27/27 tests/官方 production SHA/manifest PASS，Artifact [12643879532](https://github.com/easonliu714/event_scraper_public/actions/runs/40312137162/artifacts/12643879532) digest `sha256:3489998d4869e979f9e7496f3abfa2ada17b4dc8369437b813950993b3635563`。PR #29 HEAD `f960d0bd91d4ca38df17f0ecb2c053fd7a0299f6`；Source `main@fc4f963247d68eed29425808cc14e7250f312d05`／已驗證 Android 44/正式 JSON/正式 PWA 不動。
+> - 依系統層次接續 `P30-L5-E StrollTimes aggregator first-party source lineage` → `P30-L6 G5J conservative reversible category/dedup` → `P30-L7 new isolated candidate JSON` → `P30-L8 G5K Android/PWA smoke/UAT`；未完成原始來源的 StrollTimes 頁面和缺展期的 FamiTicket 詳情只顯示官方連結／未知欄位，絕不憑「購票須知」推論最新售票狀態。
+>
+
+
+> **2026-10-26 P30-L5-C producer tour independent source lineage and sale timestamp HOLD architecture**
+>
+> - SRC [Draft PR #28](https://github.com/easonliu714/event_scraper_public/pull/28) `scripts/p30_l5c_nier_producer_lineage.py` 為獨立 readonly Python `requests + BeautifulSoup` source provenance Gate，先要求 Source parent `kind=EVENTRADAR_P30_L5B_IBON_CHANGE_NOTICE_CROSSCHECK_NOT_GOLDEN`、2 官方 numeric-ID、NieR `ActivityInfo/Details/39974`、`2027-02-20T18:00`／`2027-02-21T14:00` 精確來源場次、原 `notice.isNoChangesProven=false`、DORMANT/zero writer，再限定 HTTPS `www.nierconcert.com/12026`、`www.nierconcert.com/12026/taipei-2` 與二手轉售資料 `itix2go.com/guest/program/detail/ncrp0` 各最多一次 GET，禁 redirects/foreign/private APIs、限制 response content type/size、網路失敗不 retry。三類角色 `PRODUCER_TOUR_LIST`、`PRODUCER_EVENT_DETAIL`、`THIRD_PARTY_TICKET_RESALE_LISTING` 嚴格分開，不能把二手平台的售票時間升級為 organiser 政策。
+> - `producer_schedule()` 以**同一 Taipei, Taiwan 區塊**、英文完整年月日與 6PM/2PM、TICC venue 檢查原始製作方兩個場次，排除 Bangkok、其他城市/同 venue 偽陽性。`producer_added_event()` 驗 2/21 第一手活動頁的相同城市/日期/時間/場館/NieR title，並把 `announcementPublishedAt=null` 和 `announcementPublishTimeVerified=false` 設為硬契約；節目表上有新增場次，不代表已找到「加演公告初次發布的時間戳」。
+> - `secondary_sale()` 對 `itix2go.com` 只保留 `THIRD_PARTY_TICKET_RESALE_LISTING` 銷售整理角色，本次從 UTF-8 byte-decoded HTML 抽到 `2026-10-21T12:00` 加場售票整理文字；目前 producer live `On Sale Oct 21 09:00 UTC+8` 文字未在 GitHub Runner 現行頁面被抽取，屬 `NO_COMPARABLE_SALE_TIMES_OBSERVED`，不得宣稱現行 09 vs 12 已確認衝突或售票中。外部摘要先前曾顯示 09AM，不等於正式現在回應。票務／有效期／報名日期仍不能替代活動時間。
+> - 下游 `cross_source_review.json` 以 `status=PRODUCER_TWO_TAIPEI_SESSIONS_CORROBORATED_REVIEW_ONLY`、`producerOriginalTwoStartsSame=true`、`producerSessionCount=2`、`announcementPublicationTimestamp=null`、`additionalShowAnnouncementIndependentlyVerified=false`、`organiserChangeApproval=NOT_VERIFIED`、`dateStart/dateEnd=null`、`ticketStatus=UNKNOWN`、`price=null`、`formalFieldPromotionCount=0`、`goldenAccepted=false`、`published=false` 輸出。即使兩個 show dates 由 original producer 官網確認，也先保留在 isolation／可逆證據，不動 Android 已驗收 44 筆及正式 Pages。
+> - Native CI [Run 40305582187](https://github.com/easonliu714/event_scraper_public/actions/runs/40305582187) Success、20/20 offline origin and fake-event tests、frozen PR #27 Head `bd0612ee49d992cd0c4c8843ba6b0a09dd39f90d`、精確三新增檔 `scripts/p30_l5c_nier_producer_lineage.py`、`tests/p30/test_l5c_nier_producer_lineage.py`、`.github/workflows/eventradar_p30_l5c_nier_producer.yml`、前 Gate Artifact SHA、3 個 public HTTP200、producer 2/2 Taipei start crosscheck、isolated [Artifact 12642720340](https://github.com/easonliu714/event_scraper_public/actions/runs/40305582187/artifacts/12642720340) digest `sha256:d9456d4f9aab96c80d11a75a68c4b25a6a3be2758e245eb8dd5b16cee8050360` 皆 PASS。PR #28 HEAD `16bb4bda029e8eee3951396d9031aac14576ad74`；正式 Source `main@fc4f963247d68eed29425808cc14e7250f312d05`、`docs/data.json`、`docs/index.html`、`scraper.py` 不動。下一功能 P30-L5-D FamiTicket small sample official field roles + NieR timestamp evidence HOLD / StrollTimes first-party lineage，再接 L6 可逆去重、L7 fresh candidate、L8 Android E2E。
+>
+
+
+> **2026-10-26 P30-L5-B ibon change notice source-bound review-only architecture**
+>
+> - 在 Source [Draft PR #27](https://github.com/easonliu714/event_scraper_public/pull/27) 新增 `scripts/p30_l5b_ibon_change_notice.mjs`（公共官網 2 detail bounded Chromium/readonly）、`tests/p30/test_l5b_ibon_change_notice.mjs`（20 positive/negative）、`.github/workflows/eventradar_p30_l5b_ibon_notices.yml`（native pinned CI）。基於既有 PR #26 L5A 實際回應 Run `40301911354` Artifact SHA manifest；驗證上游 `kind=EVENTRADAR_P30_L5A_IBON_SESSION_ROLE_REVIEW_ONLY`、2 個來源 URL/標題、3 個 `eventStartLocal`、sourceRuntime DORMANT 和零正式日期／票價／售票／Golden promotion。不同 URL、HTTP403、非原標題或跨平台站點都 fail-closed。
+> - 資料路徑：`L5A session_candidates.json` → `P30-L5B pinned-parent SHA` → official bounded `ActivityInfo/Details/<numericId>` × 2 → `scheduleBlockEvidence()`／`decodeActivityBlock()` 對照 3 個開演時間 → `scopedNotice()` 對明確 `最新演出相關資訊／公告` 及其他合法 heading 區塊擷取 → `change_notice_review.json`。不探查私人 API／購票、正式 JSON/DB/PWA、排程或通知，所有輸出 isolating SHA archive only。
+> - 每筆 `details[]`：`{officialUrl,listTitle,httpStatus,scheduleParity,originalSampleEventStarts,currentSampleEventStarts,timezoneStillUnprovenForSomeSessions,notice:{state,sections,signals,isNoChangesProven:false},scheduleInlineAdditionEvidence,organiserChangeApproval:"NOT_VERIFIED",liveTicketAvailability:"UNKNOWN",dateStart:null,dateEnd:null,ticketStatus:"UNKNOWN",price:null,goldenVerified:false,published:false}`。Notice taxonomy：`EVENT_CANCELLATION_SIGNAL_REVIEW`、`EVENT_POSTPONEMENT_SIGNAL_REVIEW`、`ADDITIONAL_SESSION_SIGNAL_REVIEW`、`SALE_CHANGE_ONLY_NOT_EVENT_TIME`、`AMBIGUOUS_CHANGE_WORD_HOLD`；**公告缺失 ≠ NO_CHANGE_PROVEN**；時間段「追加場」只能是 `ADDITIONAL_SESSION_MARKER_IN_SCHEDULE_NOT_AN_INDEPENDENT_CHANGE_NOTICE`，不直接取得主辦認可；任何變更旗標都不得自動更改票況、延期或上下架。
+> - GitHub [Run 40303622151](https://github.com/easonliu714/event_scraper_public/actions/runs/40303622151) 20/20 offline negative PASS、2/2 exact ibon official HTTP200、3/3 時間與 L5A 抽樣 parity PASS、RUNIDRE limited notice unknown、NieR `ADDITIONAL_SESSION_SIGNAL_REVIEW` → organiser follow-up HOLD、SHA Artifact `12640444559`（digest `sha256:c1863e7c3024f6b6e329bdce71206ec931bf3d8077c6ee69d256e62e9082a7da`）PASS。Source PR #27 HEAD `bd0612ee49d992cd0c4c8843ba6b0a09dd39f90d`、Source main `fc4f963247d68eed29425808cc14e7250f312d05` 不動；原 Android 44 user-attested PASS 及正式 PWA/JSON/RUNTIME unchanged。
+> - 下個 `P30-L5-C` 專注辦理單位官方 change-notice source identity / publication timestamp / additional-session effective date / change resolution，保留未知時區不猜，無證據一律 HOLD。FamiTicket 需擴展官方 detail role QA；StrollTimes 必須追到第一手主辦者再分層，不得直接 Golden。經 L6/L7 隔離候選整併後，才提供新的 Android L8 實機包。
+>
+
+
+> **2026-10-26 P30-L5-A ibon explicit event start versus admission role evidence architecture**
+>
+> - Source 新 [Draft PR #26](https://github.com/easonliu714/event_scraper_public/pull/26)，基於 P30-L4-D3 PR #25 frozen HEAD `622a52221d6fded07d0829486f3877835e372da40`，**只新增** `scripts/p30_l5a_ibon_session_roles.mjs`、`tests/p30/test_l5a_ibon_session_roles.mjs`、`.github/workflows/eventradar_p30_l5a_ibon_sessions.yml`。Node 純離線轉換 `L4D2 diagnostics.json`（CI 內先用既有公眾 ibon official Chromium 1 list + 2 detail bounded fetch），強制檢查來源 `kind`、`OFFICIAL_TICKET_PLATFORM`、HTTP200、同源 numeric-ID URL `requestedOfficialUrl===responseUrl`、兩筆 exact heading、上游 `RAW_UNPROMOTED_EVIDENCE`/observed full-year date parity、DORMANT/未發布／零 Golden／零 notifier/writer；只輸出 review-only `session_candidates.json`。
+> - `samples[].proposedSessions[]` 結構：`{eventDate,eventStartLocal,admissionStartLocal,sourceTimeZone,sourceTimeZoneStatus,dateRole:"OFFICIAL_DETAIL_EVENT_START_CANDIDATE",admissionRole:"OFFICIAL_DETAIL_ADMISSION_TIME_CANDIDATE",admissionIsNotEventStart:true,proposedOnly:true,verifiedAgainstOrganiser:false,verifiedAgainstChangeNotices:false,approvalState:"REQUIRES_L5_CROSS_EVIDENCE_REVIEW"}`。這與 `samples[].dateStart=null,dateEnd=null,saleWindow=null,registrationWindow=null,voucherValidity=null,ticketStatus="UNKNOWN",price=null,goldenVerified=false` 分層，任何 source `入場時間` 不得成為開演時間、來源售票/報名/使用期限不可成為活動期間。
+> - 日期解析限 YYYY 年完整數字，月/日長 token 優先、真實西元曆驗證、官方括號星期標記相符、原文取消/改期/延期標記 fail-closed，同場入場不得晚於開演（跨午夜除非明確證據）、同活動場次不能重複。Taiwan zone 只允許當活動時間 block 本身標註 `台灣時間`：一筆 RUNIDRE `2026-12-19 16:00/17:00` 標示 Asia/Taipei，NieR 二場 `2027-02-20 17:00/18:00` 及 `2027-02-21 13:00/14:00` 因擷取文字未明確時區，皆 `sourceTimeZone=null`。時間僅為同頁原文語義證據，**尚未查驗後續官方延期/主辦異動**。
+> - 最終 native [CI 40301911354](https://github.com/easonliu714/event_scraper_public/actions/runs/40301911354) completed/success：22/22 parser/provenance/negative tests、ibon list 23／real details 2／true event-start candidates 3／admission-time candidates 3／explicit timezone only one／SHA archive [12640209144](https://github.com/easonliu714/event_scraper_public/actions/runs/40301911354/artifacts/12640209144) PASS。PR #26 HEAD `b7e16cb39fc187cea927cf1521ee972d621f8a2a`，Source main `fc4f963247d68eed29425808cc14e7250f312d05` unchanged, 44 accepted Android events/正式 Pages/JSON unchanged。下階段 L5-B 變更公告 lineage 和場次 role → L6 跨來源去重 → L7 isolated fresh JSON → L8 Android UAT；StrollTimes third-party aggregator NOT_GOLDEN / FamiTicket 0/2 raw title hold + 1/1 public Chromium exact title preserved。
+>
+
+
+> **2026-10-26 P30-L4-D3 FamiTicket official rendered detail exact image-alt identity**
+>
+> - 新 Source [Draft PR #25](https://github.com/easonliu714/event_scraper_public/pull/25) `scripts/p30_l4d3_famiticket_browser.mjs` 以 Chrome/Playwright 原生 public browser 只開 `https://www.famiticket.com.tw/Home` 一次並限同站 opaque-ID `/Home/Activity/Info/<id>` detail 一次，不使用登入、購票、stealth、繞過驗證碼、非公開 API 或任意外網轉址。清單 DOM 231 anchors；同標題「2026 ITF 台灣國際旅展」在 `img alt`，分類 `textContent` 有時是「展覽」。四種可見標題欄位各自做 **exact title equality**，以 URL 去重後必須只有一個活動 ID；不能因標題相似而合併不同活動。詳細頁 Chromium HTTP 200、H1/H2/H3/H4 取得唯一相符標題，與純 requests 之前連續兩次 200 卻無標題的變異分別記錄，不能直接宣稱 47 筆品質全證實。
+> - Source PR #25 final `622a5221d6fded07d0829486f3877835e372da40`；native [CI Run 40299649653](https://github.com/easonliu714/event_scraper_public/actions/runs/40299649653) Success、16/16 offline guard tests、parent Source PR #24 frozen SHA、正式 `docs/data.json`/`docs/index.html`/`scraper.py` blob identity、三新增檔路徑精確、real public HTTP + exact title、diagnostic/SHA PASS。Artifact 12639478214。新 `detail` 診斷欄位 `eventDateStart=null,eventDateEnd=null,price=null,ticketStatus=UNKNOWN,fieldPromotion=0,goldenVerified=false`，即使詳情標題可見也絕不推測活動日期/票務。
+> - 下個 Source 層 L5：FamiTicket 進一步有限抽樣官方詳情中有角色標籤的時間／場地／票券期限，ibon 目前 2 件標準官方 DOM 取得的 event-time blocks 規範化並與開場時間/多場次/售票時間分離，StrollTimes `sourceRole=THIRD_PARTY_EVENT_AGGREGATOR` 維持無原官方證據不進 Golden。原 44 Android UAT 不變、Source `main@fc4f963247d68eed29425808cc14e7250f312d05` 未動，未開啟正式 PWA/Writer/通知/排程。
+>
+
+
+> **2026-10-26 P30-L4-D1 / L4-D2 official detail role and stability architecture**
+>
+> - 新 Source [PR #23](https://github.com/easonliu714/event_scraper_public/pull/23) `scripts/p30_l4d1_famiticket_detail_roles.py`：匯入已驗證 `p30_l3b_a_famiticket.py` 限定 HTTPS list/detail 函式，單次首頁 JSON 標題／opaque URL 身分綁定，分隔兩次 public official detail GET。每次保存 HTTPS status、SHA256/byte、headings exact identity、明確標籤角色 `EVENT_OCCURRENCE_EVIDENCE` vs `SALE_WINDOW_NOT_EVENT`／`REGISTRATION_WINDOW_NOT_EVENT`／`VOUCHER_VALIDITY_NOT_EVENT`；嚴格四位西元年與合法日期，所有解析結果僅 `UNPROMOTED_ROLE_ONLY`。CI 40297130466 19/19 offline PASS，首頁 47、兩次詳情 HTTP200 但皆無標題，**資料品質必須 HOLD**（非平台無活動或付款狀態）。`docs/data.json`、`docs/index.html`、`scraper.py` 仍 immutable。
+> - 新 Source [PR #24](https://github.com/easonliu714/event_scraper_public/pull/24) `scripts/p30_l4d2_ibon_detail_roles.mjs` 匯入既有 `p30_l3bb_ibon_browser.mjs` 官方 domain/URL/link identity，使用 stock Chromium 渲染清單並只開 **2 筆清單出現過且 numeric ID 唯一**的 ibon 官方頁。DOM `h1/h2/h3` 精確相符才取 `roleEvidence` 與 `scheduleBlockEvidence[]`，雙型態 `【活動時間（台灣時間）】` 後相鄰欄位、`日期/時間｜YYYY.MM.DD HH:MM …`；僅有原始 `observedFullYearDates`／`rawExcerpt`，禁止將 `售票時間`、`使用期限` 或一般敘述數字推定為活動日期。**JS `fullDate` regex 已加 (?!\d) 防止 19→1、20→02 的前綴誤讀**，以 19 個 offline tests 封鎖回歸。兩筆正式 HTTP200／2/2 exact 標題、帶標籤 event-time 分別有 2026-12-19 和 2027-02-20/21 原始日期證據：最後 CI [40298499664](https://github.com/easonliu714/event_scraper_public/actions/runs/40298499664) PASS；Artifact 12638968553。
+> - schema `sample_candidates.json` 仍為 `{platform,title,officialUrl,dateStart:null,dateEnd:null,dateRole:"UNKNOWN",price:null,ticketStatus:"UNKNOWN",detailIdentity:"EXACT_LIST_DETAIL_HEADING",eventTimeVerified:false,goldenVerified:false,published:false}`；`diagnostics.json` 可有帶標籤的 `scheduleBlockEvidence`，但**診斷 evidence 不等於 accepted event schedule**，尚無欄位升級。所有新 Gate scope 僅新增 source/test/workflow 3 檔，Source main `fc4f963247d68eed29425808cc14e7250f312d05` 及 Android 44 PASS、StrollTimes aggregator originalOfficialUrl=NULL 不動。資料作業寫入、通知、排程及正式 PWA 上線仍 LOCKED。
+> - 下個可實作：`P30-L4-D3` FamiTicket public browser detail identity recovery，再依 `P30-L5-B` ibon annotated date/registration/sale/timezone/session consolidation 和 `P30-L6` source lineage + conservative G5J 去重，最後 `P30-L7/8` isolated fresh JSON + Android smoke。不得重跑已驗收 CKSMH/TWTC 的 44 Android UAT，除非新候選確有合併和回歸必要。
+>
+
+
+> **2026-10-26 P30-L3-B-C StrollTimes third-party sourceRole tree**
+>
+> - SRC `scripts/p30_l3bc_strolltimes.mjs`（Source [Draft PR #22](https://github.com/easonliu714/event_scraper_public/pull/22)）獨立 public Chromium 1x homepage `https://strolltimes.com/` + 1x same-host `/events/<city>/<12–18-digit-id>/` article；HTTPS exact hosts、limited CDN、only 100 allowed requests、no stealth/login/verification bypass/purchase/API guessing/persisted session. `tests/p30/test_l3bc_strolltimes.mjs` 11 cases for URI/CTA/role/title/provenance. CI `.github/workflows/eventradar_p30_l3bc_strolltimes.yml` GitHub-specific immutable three-file diff and production blobs; **never changes `docs/data.json`**.
+> - Immutable candidate schema sample: `{ platform: "StrollTimes", title, aggregatorUrl, originalOfficialUrl: null, originalOfficialIdentityState: "NOT_VERIFIED", sourceRole: "THIRD_PARTY_EVENT_AGGREGATOR", sourceLevel: "AGGREGATOR_LIST_IDENTITY_ONLY", dateStart: null, dateEnd: null, dateRole: "UNKNOWN_NEEDS_ORGANISER_VERIFICATION", price: null, ticketStatus: "UNKNOWN", classification: "待分類", goldenVerified: false, published: false }`. **Aggregator `aggregatorUrl` != primary official URL**；其他平台不能因標題相似就自動複製日期或提升 Golden/售票狀態。
+> - Article identity: StrollTimes homepage `2026新竹市萬聖節` / same-site article H1 `2026新竹市萬聖節（10/16~10/31）`。僅允許有錨定的末尾純 `(MM/DD～MM/DD)` 展示標記，不能將標記當作官方展期，也不能使用一般 fuzzy title 對兩篇無關文章認列相同 ID。原主辦官方來源欄位保持 **NULL/HOLD**，L4-L6 才能來源對照。
+> - Native [Run 40295191261](https://github.com/easonliu714/event_scraper_public/actions/runs/40295191261) 11/11 offline PASS、rendered 113 anchor /24 unique aggregator articles/1 sample detail same-site title+HTTP200 PASS、original primary authority count=0。Artifact `12638155320`, SHA manifest PASS，PR #22 HEAD `e7e13c845d042b4a0b13cc98bdd51ba03d836fa8`；JS asset-block pageerrors=24 應列診斷監控、不當作官方資料。Repo main `fc4f963247d68eed29425808cc14e7250f312d05`、44 Android accepted data、FamiTicket 47、ibon 23 previous branches unchanged。Next `P30-L4/L5` lineaged first-party evidence, classification G5J and Android G5K only once candidate is usable。
+>
+
+
+> **2026-10-26 P30-L3-B-B ibon headless JS display-only list 23（Source Draft PR #20/21）**
+>
+> - `scripts/p30_l3bb_ibon.py`（PR #20）安全純 HTTP 雙官方清單入口 → requests GET 200/200、固定 5,766 bytes JS shell，`<script>` 11、DOM link 0、visible text 8；13/13 offline tests PASS，但抽不到可驗證活動，該純 HTTP Gate **HOLD**，不嘗試非公開 API、登入或驗證碼繞過。原 Source `docs/data.json` 不變。
+> - `scripts/p30_l3bb_ibon_browser.mjs`（PR #21）為獨立的 **readonly Chromium one-page public browser rendering diagnostic**：只開 `https://ticket.ibon.com.tw/Index/entertainment`，無 stealth/代理繞過/購票/登入/憑證/Service Worker，限制 ibon HTTPS host、單次導航／90 網路請求上限、最多 80 候選，封鎖第三方及圖片/字型。公眾頁面渲染得到 DOM 70 anchors，萃取 `/ActivityInfo/Details/<numericId>` 並以 hostname+path+title 嚴格 identity（含 URL alias `/Web/`、`/WebV3/`），本次 23 unique candidates。
+> - JSON 候選欄位仍為 `platform=ibon`、`title`、`officialUrl`、`dateStart/dateEnd=NULL`、`dateRole=UNKNOWN`、`ticketStatus=UNKNOWN`、`price=NULL`、`category=待分類`、`classificationEvidence=UNVERIFIED`、`detailStatus=NOT_CHECKED`、`goldenVerified=false`。不得因官網顯示「售票中／即將開賣」標籤便推定正式票況。此 browser **沒有點入詳情**，L4/L5 顯示待驗證而非 FAIL 或 Golden。
+> - Native CI [40292155453](https://github.com/easonliu714/event_scraper_public/actions/runs/40292155453) `completed/success`、7/7 Offline security、Source main Blob Guard、23 HTTP asset requests、4 external blocked、41 passive resources skipped、0 JS errors、isolated candidate/diagnostics/SHA artifact `12635589126`。PR #20/21 均 Draft stacked；正式 Pages/UI, Android accepted 44, runtime scheduler, notifications, GitHub main HEAD `fc4f963247d68eed29425808cc14e7250f312d05` untouched。下一為 StrollTimes L3-B-C + L4/L5 來源詳情補強後，才有理由重建新 Android 來源整併候選。
+>
+
+
+> **2026-10-26 P30-L3-B-A FamiTicket isolated official list recovery source module**
+>
+> - 確認 P30-L4-C Android local `8770` 使用者截圖驗收 PASS（限來源日期角色/場地/清單/詳情/不回歸），不重新開始 L4-B/C 來源開發。新增 FamiTicket SRC[PR #19](https://github.com/easonliu714/event_scraper_public/pull/19)，分支堆疊 PR #18 `2656c43fc1fa4486fcbd8be641531e4d15220104`，三個新增檔案**無 UI/Android/formal docs 改動**。
+> - `scripts/p30_l3b_a_famiticket.py` 的 `allowed/canonical/fetch` 只接受 `https://www.famiticket.com.tw/Home` 與固定 same-host `/Home/Activity/Info/<opaque-id>`；最多 1 listing + 1 sampled detail；TLS/HTTP 200、Content-Type、SHA256、HTML body 限 2 MB、無 GET retry/登入/購票流程。卡片解析優先 heading、去重 unique detail URL，保留 title、official_url、rawScheduleText、`rawScheduleRole=UNCLASSIFIED_LISTING_TEXT`；尚未證實日期/票價/票況/分類，全部 UNKNOWN/NULL/待分類。
+> - 同一 ITF 已被觀察到 GitHub Runner 連續樣本變動：實際清單始終 HTTP200 並產 47 unique rows，但詳情有時包含 `h2` 精確標題，有時 200 HTML 無 heading；這屬 `DETAIL_TITLE_CONTENT_INTERMITTENT_HOLD`，不誤認為整個清單恢復失敗或整批詳情 Golden。最終 CI [Run 40289865032](https://github.com/easonliu714/event_scraper_public/actions/runs/40289865032) Success、12/12 offline、47 LIST、1 正確 detail identity、SHA manifest PASS；Artifact 12636240385；PR #19 HEAD `17acb05b8da6066883113e91d68e852ba3db080f`。
+> - 尚未串接 `docs/data.json` 或已驗收 44 Android rows，正式 PWA/Web/UI 的 FamiTicket 新平台維持 **NOT_DEPLOYED**。L3-B-B ibon、L3-B-C StrollTimes = OPEN；需要更完整詳情來源與欄位語義、活動身份和跨平台重複確認才可產 Android 新候選。
+>
+
+
+> **2026-10-26 P30-L4-C CKSMH EVENT_SESSION versus REGISTRATION_WINDOW semantic model**
+>
+> - P30-L4-B Android 真機部分 PASS，但多場次時間來源角色錯誤：官方 `場次：` 標題明確列 *活動實際時間*，其下 `報 名 期 間` 為 **REGISTER WINDOW**。L4-C 新讀取層先以固定 5 筆 HTTPS actId/標題驗證，再按個別 `場次：` 區塊截斷 `報名期間`；標題內接受 `YYYY/MM/DD (星期) HHmm-HHmm` 或 `YYYY/MM/DD HH:MM～YYYY/MM/DD HH:MM`，不允許以未標記長區間冒充場次。有活動日期卻含多個未命名日期時 fail-closed，不推測。「自由花蕊」名稱不可混淆不同 actId（61021 為系列講座、51331 為免費參觀常設展）。
+> - 新候選欄位 `sessions[].{start,end,venue,role=OFFICIAL_EVENT_SESSION_TIME,registration}` + `registrationWindows[].{start,end,role=OFFICIAL_REGISTRATION_WINDOW}` + `timeRole=OFFICIAL_EVENT_SESSION_BOUNDS`；`dateStart/dateEnd` 僅代表有證據的**活動場次涵蓋日期**。對常設展 actId 51331，`listPeriodStart/End` 保留 2025/11/24～2030/12/31，`timeRole=OFFICIAL_LIST_PERIOD_UNCLASSIFIED`，`dateStart/End=NULL`，UI 說明「官方清單所列期間／非每日場次，實際開放以官方為準」，不得自行寫成報名或每日場次。
+> - Android `scripts/p30_l7a_smoke_index.html` 結構不增加權限：列表「活動場次：日期範圍（非報名期間）」、modal 每場顯示活動時間、個別場地、報名開始結束並註明「非活動時間」，清單期間單獨呈現。仍只使用 `textContent` 避免 XSS。平台其他 39 TWTC rows 位元級相同；FinTech 原訂／暫定／confirmed NULL 不變。沒有 PWA Scope/Service Worker、Golden、票況可信資料或正式 JSON 發布。
+> - [Draft PR #18](https://github.com/easonliu714/event_scraper_public/pull/18) HEAD `2656c43fc1fa4486fcbd8be641531e4d15220104`，CI [40287542387](https://github.com/easonliu714/event_scraper_public/actions/runs/40287542387) completed/success：12/12 tests、5 HTTP 200、10 real event sessions、8 registration windows，actId 51331 long listing interval separate、Android local Artifact `12634941609` SHA256 manifest PASS，port 8770 真機待使用者驗收。全 Repo `docs/data.json`／`scraper.py`／`docs/index.html` 保持原 Blob，PR #8 文件更新只在治理分支。
+>
+
+
+> **2026-10-26 P30-L4-B 最終清單與場次時態 UI 保護**
+>
+> - CKSMH `OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE` 改成 UI 明確「官方清單期間」而非無條件活動場次，`OFFICIAL_MULTIPLE_SESSIONS_BOUNDS` 顯示涵蓋日期並展開獨立 sessions（非每日舉辦），多場次無唯一場地保留 `venueNote`。CKSMH source role 轉繁體中文可理解標示。
+> - PR #17 HEAD `d79de853c007ac965d02b56cc2e556f8ad5f1bff`。最終 CI Run `40285154986` completed/success，14/14 test + JS + 五件詳情/清單綁定 + 44 Id／39 TWTC immutable + SHA 4/4。**Android 最終 Artifact 12633104025**，舊 12633399655 只保留歷史；Android 實機未 PASS 前保持 `WAITING_USER`。不寫 formal Pages，不發通知，不更動 G5J/G5K 或 Golden。
+>
+
+
+> **2026-10-26 P30-L4-B CKSMH 活動詳情場次來源分欄（PR #17 Draft，Android 8769 待回報）**
+>
+> - `scripts/p30_l4b_cksmh_details.py` 使用已驗證 L7-D 44 rows 的五個 CKSMH 官方活動 actId URL，逐一 HTTPS GET (5)，另對官方 `Query.list.ctr` GET (1)；嚴格 TLS、限定 `event.culture.tw` 官方 actId 路徑、同 ID redirect、HTML byte budget、無重試。優先以詳情 top title 精確匹配（僅移除尾端「圖片說明」alt）、`場次資料` 區取得毫秒以下的 YYYY/MM/DD HH:MM 開始/結束，保留獨立 `sessions[]`（多場次不可當作每日連續開放），單場地僅在 Google Map 官方 anchor 唯一時成立，`活動內容介紹` 區取得最長 360 字摘要；缺值保留未知。
+> - 對 actId 51331「自由花蕊」之詳情**未提供活動場次日期**，獨立允許官方清單 `/mocweb/reg/CKSMH/Query.list.ctr` 同一 `actId+title` 之活動卡片 `活動時間` 2025/11/24～2030/12/31，回填 `timeRole=OFFICIAL_LIST_ACTID_BOUND_DATE_RANGE`，不可假冒「詳情場次」或以全站日期推測。其它有 session 的四筆以詳情為準；兩筆多場次無法證明唯一場地，UI 透過 `venueNote` 顯示「多場次：各場次地點請依官方明細確認」。
+> - `scripts/p30_l7a_smoke_index.html` 僅在 PR #17 隔離分支修改：CKSMH `dateStart/dateEnd`、`venue`、`venueNote`、`summary`、`sessions[]`、官方證據 label；多場次清單顯示涵蓋日期和「詳見個別場次」，modal 展開每個 `start/end` 臺灣時間，不用 `innerHTML`；舊金融科技展延期原訂/暫定/未確認三種欄位維持。
+> - CI Run [40284806144](https://github.com/easonliu714/event_scraper_public/actions/runs/40284806144) 14/14 tests + JS + 完整父資料 SHA PASS，5/5 title、5/5 date、3/5 unique venue、5/5摘要、2 multi-session；Android-only Artifact `12633399655`，SHA manifest PASS。44 IDs 不變、39 TWTC rows 完全不變；不更動正式 `docs/data.json`、`docs/index.html`、`scraper.py`、PWA Scope/Service Worker、Writer、通知、Golden。Android 8769 尚未實測。
+>
+
+
+> **2026-10-26 P30-L7-D 官方機構雙角色延期候選與 Android UI（PR #16 Draft）**
+>
+> - 新 source `scripts/p30_l7d_official_fallback.py`：三個固定 HTTPS 入口，一次一站、有限位元組、嚴格網域路徑與 redirect allowlist、不得重試與停用 TLS；`TWTC_DETAIL`=官方原訂時間與延期標題、`FINANCIAL_FEDERATION_NOTICE`=聯合主辦/金融總會延期暨正式確認未完成、`NCCC_NOTICE`=聯卡中心對預定 12/18～19 的公告。各來源 HTTP status/sha256/URL/parse 對應證據寫入隔離 `schedule_roles.json`／`diagnostics.json`。聯卡中心 canonical HTTPS host 為 `www.nccc.com.tw`；原 bare host 故障不被當成 HTML 解析問題。
+> - 僅更新 FinTech 2026 一筆候選：`scheduleStatus=POSTPONED_PENDING_FINAL_CONFIRMATION`、`originalDateStart/End=2026-10-23/24`、`tentativeDateStart/End=2026-12-18/19`、`confirmedDateStart/End=NULL`、`dateStart/End=NULL`，附上機構公告來源。其餘 43 筆與全部 44 個 id 不變，來源詳細日期 38 仍保留。Android `when()` 顯示「已延期／正式展期待確認」，modal 分列「原訂日期」、「預定改期」、「正式日期」及官方證據連結，不把預定當正式確定。
+> - 最終 GitHub Actions Run `40281136558` 3/3 HTTPS HTTP 200、13/13 Python offline、JS Node syntax、SHA immutable old UAT、精確四路徑、五檔 SHA256 全 PASS；可供 Android 本機 `127.0.0.1:8768` 煙霧測試的 Artifact `12632108815`。**Android 新版使用者實測尚未回報**，PR #16 與 PR #15 仍 Draft 未 Merge，正式 Pages/通知/排程/Writer/Golden 全未啟用。
+>
+
+
+> **2026-10-26 P30-L7-C FINTECH POSTPONEMENT SEMANTIC DATA ROLES**
+>
+> - Source TWTC 清單 `延期未定` + TWTC 詳情 `展出日期：2026/10/23～2026/10/24` 並非不同 HTML 日期格式，為同一活動**取消原訂／預定另定日期**的狀態切換。現有 P30-L4-A `raw_period_matches()` 將 `延期未定` 拒絕與正常 MM/DD 日期同等對照，產出 `LIST_DETAIL_PERIOD_CONFLICT` 防止原訂日期誤作有效日期。
+> - 大會正式公告 2026/10/20 `https://www.fintechtaipei.tw/Announcement/19` 表示「預定延期至 2026/12/18～12/19」，**仍待正式確認**。新 PR #15 隔離候選 schema 準備 `originalDateStart/End`、`tentativeDateStart/End`、`confirmedDateStart/End=NULL`、`scheduleStatus`、HTTP SHA256/來源與公告連結，顯示原訂與暫定各自標籤，不得填 `dateStart/End` 為已確認。
+> - 11/11 Python 離線測試 PASS，Node frontend JS Syntax PASS。P30-L7-C GitHub Run `40275813585` 對 TWTC detail HTTP OK、對大會 announcement 為 `SSLError`，故 Gate **HOLD**，沒有生成新的 Android candidate；只保存 `hold_diagnostics.json` 至 Artifact `12630675096`。這是網站對 GitHub Runner 憑證信任／TLS 連線驗證問題，非 HTML Parser 合約通過或否定；禁止 TLS verify=false 繞過。
+> - 使用者已回報 P30-L7-B Android 截圖符合預期，舊已驗收版仍有效；此 PR #15 未成功更新發布資料及 Android ZIP。未來有可信第二來源後再做独立 UAT／收斂至正式資料架構。
+>
+
+
+> **2026-10-26 L4-A / L7-B 完整年份回填與 Android CI 實證**
+>
+> - L4-A 新 `scripts/p30_l4a_twtc_detail_dates.py`（PR #13）實際以 L3-A Run 40270383643 原始 39 筆為身份參照，39 次限流官方詳情 GET，來源資料 Evidence 僅標準化 `DATE_VERIFIED_BY_OFFICIAL_DETAIL_CANDIDATE` 38 件，延期活動一件 HOLD。Run 40273199767 CI SUCCESS，13/13 tests；來源 Artifact 12629371018。這裡的 DATE_VERIFIED 仍為候選證據，不是人工 Golden。
+> - L7-B 新 `scripts/p30_l7b_date_overlay.py` 對固定原 44 筆 Android candidate 與 L4-A 原始 39 筆來源 SHA 進行雙向 lineage Gate，只有正確活動網址/標題/原始展期的 38 筆填入 `dateStart/dateEnd`、`OFFICIAL_EXHIBITION_DATE`、`dateEvidenceRunId`、`dateEvidenceSHA256`，一件延期維持 NULL；CKSMH 五件完全保留、44 活動 IDs 未改、票況 UNKNOWN、validity UNCERTAIN。新的 UI `when()` 能顯示 YYYY-MM-DD，延期優先顯示「展覽延期／日期未定」，`sourceLabel()` 將 LIST_TABLE_ONLY 等技術代號翻譯為易懂文字。
+> - PR #14 `feat/eventradar-p30-l7b-android-date-uat` 與已通過的 PR #12 採**新增分支／隔離差異**，不改既有 Android 7/7 PASS 原始版本。Run [40273949404](https://github.com/easonliu714/event_scraper_public/actions/runs/40273949404) 10/10 Offline、Node syntax、Immutable SHA、44/38/1 實際 Artifact + 四檔 SHA Gate PASS。最終 Artifact 12628754512；**使用者 L7-B Android UAT 尚未執行**。
+> - 後續發展：先 P30-L7-B Android 日期回填 UI 煙霧測試；其後 L3-B FamiTicket/ibon/StrollTimes 列表、CKSMH 詳情欄位、TWTC 延期語義、全來源 Category/Golden/可逆有效性，再進入正式 PWA、單 Writer/發版及雙 Repo 退役。
+>
+
+
+> **2026-10-26 P30-L4-A TWTC date evidence 結構修正（PR #13 Draft）**
+>
+> - 使用者 Android 畫面證明：TWTC 清單 LIST_TABLE_ONLY 只有 MM/DD～MM/DD，許多活動仍標示年份待核對，然而官方 exhibition_more.aspx?id=... 詳情有 YYYY/MM/DD～YYYY/MM/DD。原 L3-A run() 只抽樣第一筆，所以其餘不自動回填。
+> - 隔離 L4-A source-only 實作 p30_l4a_twtc_detail_dates.py，復用 L3-A get_html()、parse_detail_date()；每筆走 HTTPS allowlist → URL Detail ID 一致 → H1/H2/H3 活動標題一致 → 完整官方日期合法 → 與原始清單 MM/DD 一致的 Gate，通過才輸出 start/end/source_time_role/response_sha256。缺詳情、403、重定向活動 ID、延期、時間衝突皆 HOLD。
+> - PR #13 目前只生產 GitHub Artifact 日期證據，不更動 PR #11 與 PR #12 原始程式、Android UI 或正式 docs/。L7-B 方可依固定 SHA 合約回填 dateStart/dateEnd 並重新驗證 Android；票價、票況仍 UNKNOWN，GOLDEN_ACCEPTED=0、AUTO_HIDDEN=0、APP_DATA_PUBLISHED=false。
+>
+
+
+> **2026-10-26 P30-L7-A USER-ATTESTED Android 7/7 PASS**
+>
+> - Android 本機 `127.0.0.1:8766` 候選 UI 已由使用者回報七項 PASS：44 筆首頁、CKSMH 5／TWTC 39、關鍵字及類別、詳情 modal/關閉與無重疊、未知日期票價票況提示、官方 HTTPS 連結。對應 PR #12 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc`、Run `40271164263`、Artifact `12628147623`。不改動 UI/PWA 正式 `docs/index.html`、`docs/data.json`。
+> - 架構狀態升級只適用 `ANDROID_LOCAL_TWO_SOURCE_SMOKE=PASS`，不得延伸為 PWA Install/Offline Scope、19 平台全面來源回歸、官方 Golden、有效性可逆引擎或已部署 Pages PASS。後續 P30-L3-B 需維持可追溯的 GET→LIST→DETAIL→FIELDS 來源分層證據，個別失敗不得污染已過 Gate。
+>
+
+
+> **P30-L7-A Android Portable Manifest 修復驗證**：PR #12 最新 HEAD `76171eae8352818721a5480d18a1cc4c0e283ccc` 僅更新 workflow 打包命令，在 Artifact 內使用相對檔名的 `SHA256SUMS.txt`，CI 先在 `p30-smoke/` 下 `sha256sum -c`，三檔 OK。正式 GitHub Run `40271164263` SUCCESS，最終 Android-only Artifact `12628147623`，須使用此包、不要使用前版 `12629030170`。瀏覽器測試必須以同支 Android `127.0.0.1:8766` loopback HTTP 服務載入，非正式 Pages、非安裝型 PWA、無外部數據寫入。Android 實機尚待使用者執行，不得將 Actions SUCCESS 當 Android UAT PASS。
+>
+
+
+> **P30-L3-A 與 L7-A Android 隔離 UI 實作 2026-10-26（PR #11 / #12 仍 Draft）**
+>
+> - L3-A 官方展覽檔期（PR #11）：`scripts/p30_l3a_twtc.py` 以 TWTC `/exhibition?p=home` HTML 表格逐列解析 title/organizer/venue/rawPeriod/本網站 `exhibition_more.aspx?id`；對只含月日的清單日期保留 `date=null`、`EXHIBITION_PERIOD_RAW_UNNORMALIZED`；只有抽樣詳情頁**來源身分及完整年份展期都匹配**才產生日期候選。正式 Run 40270383643：HTTP 200、39 清單、11/11 offline、單筆詳情日期候選；非 Golden。Workflow `.github/workflows/eventradar_p30_l3a_twtc.yml` 限一清單與一詳情 GET。
+> - L7-A Android local smoke（PR #12）：`scripts/p30_l7a_build_candidate.py` 將 L2-B CKSMH 5 件與 L3-A TWTC 39 件 Artifact 唯讀轉 `P30-CANDIDATE-1` Schema（來源名稱、原始網址、日期欄位角色、分類依據、UNKNOWN 票況、UNCERTAIN 有效性、id SHA）；嚴格禁用假 Golden/Writer/已發布與非允許來源；不連網，不讀舊 JSON。CI Run 40270957865 PASS，8/8 offline + Node syntax；結果 Artifact 12629030170。
+> - Mobile UI `scripts/p30_l7a_smoke_index.html`：單檔 CSS/JS、`fetch('./data.json')`、來源與類別篩選、關鍵字搜尋、活動清單、詳情 modal、官方 HTTPS 連結、缺值以官方為準、固定候選免責聲明；**不含** Service Worker/安裝 PWA/正式 UI 合併/正式資料 Writer、外部 JS/CDN。Artifact `index.html + data.json + README.txt + SHA256SUMS.txt` 由 Android 同機 loopback HTTP server 讀取，不改原 Pages scope。
+> - 狀態層級：`L7A_CI_PASS` / `ANDROID_LOCAL_SMOKE_READY`，但 `ANDROID_UAT=NOT_ATTESTED`、`GOLDEN_ACCEPTED=0`、`AUTO_HIDDEN=0`、`APP_DATA_PUBLISHED=false`。此 UI 是最小候選驗證面板，不等於完整 P20 Preview UI 功能已合併或真實 G5K 已結案。
+>
+
+> **2026-10-26 CKSMH 官方入口實作（PR #10，尚未併入 main）**：新增 `scripts/p30_l2b_cksmh.py`（兩個官網 allowlisted HTTPS GET + 最多一筆詳情、分段 HTTP/HTML digest、actId 去 session/tracking、LIST_ONLY 不推定票況）；`tests/p30/test_l2b_cksmh.py`（11/11 Offline）；`.github/workflows/eventradar_p30_l2b_cksmh.yml`（自動隔離 Gate，原 JSON/UI/Runtime 不變）。Run [40269917573](https://github.com/easonliu714/event_scraper_public/actions/runs/40269917573) SUCCESS，Query.list.ctr **200 / LIST=5**、`/CKSMH` **200 / LIST=0**、一筆 DETAIL_HTTP_OK；報告 Artifact `12627554765`。以上只代表清單與回應層次，可用來源修復，不代表 Golden/PWA 發布。
+>
+
+> **L2-B 可用來源入口候選（尚未程式實作）：** 中正紀念堂（`event.culture.tw`）以 `https://event.culture.tw/CKSMH` 或 `https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr` 作唯讀官網資料入口提案；原診斷基線 `https://event.culture.tw/mocweb/reg/CKSMH/` 回 404。**入口存在不代表 Python Runner 200、清單/詳情欄位可解析**。後續需要 allowlist/事件連結解析、受控單次 HTTP 及 CI/Artifact，未達成則 L2-B HOLD。
+>
+
+> **SRC-P30-L2-A 實作證據（2026-10-26，Source PR #9 Draft，未併入 main）**
+>
+> - `scripts/p30_l2_http_triage.py`：只解析 P30-L1 GitHub Artifact 的 `diagnostics.json`，逐平台原樣保留 HTTP code、observed URL、redirect trail、Content-Type、HTML SHA256、list/detail 計數；僅輸出 L2_HTTP_FAILURE_REVIEW、L3_LIST_EMPTY_REVIEW、L4_DETAIL_SAMPLE_NEXT 三類，不發活動網站 HTTP，不推定 SOURCE_GONE/過期/售票情況，不允許 AUTO_HIDE。
+> - `tests/p30/test_http_triage.py`：9 個離線正反向案例（錯誤狀態碼、計數不符、重複來源、Writer/通知/Golden/發布旗標、403/404/429 等 FAIL CLOSED）。
+> - `.github/workflows/eventradar_p30_l2a_offline.yml`：P30-L2-A 單分支唯讀 push Gate，檢查相對 PR #7 **恰好三檔新增**、主線 `docs/data.json` / `scraper.py` / `docs/index.html` 不變、Python 離線測試、從既有 Run 40196442965 下載診斷 Artifact 並產出獨立 triage 報告，不抓活動網站、不寫正式資料。
+> - Run `40266605126` SUCCESS，Job `121390275278`、9/9 測試、19/4/4/11 重播全 PASS；下個 L2-B 以 403: KKTIX/拓元/BeClass，404: 中正紀念堂；HTTP 200/LIST=0: FamiTicket/ibon/台北世貿/StrollTimes 為優先對象。可解析 11 平台繼續 L4，不等待其他來源解除 HOLD。
+> - L2-A 的 Source PR #9 Head `7fd14010f5dbc3ef383919ee67eb21283904afe2`，其 PR base 為未合併 PR #7，非正式 main；任何 P30-L2-A 正式併入 main 須先解決堆疊祖先/Review/授權及獨立 Read-back。
+>
+
+> **2026-10-26 最新功能架構檢核（PR #8 候選；僅 Source 最終保留）**
+>
+> - 實際 GitHub 權威：Source main `fc4f963247d68eed29425808cc14e7250f312d05`；Preview `03e515d65e827d5ed67fe341d079907a96bf784a`；ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`。Source PR #6 是凍結 Snapshot 遷移候選（CI PASS 但已被「新資料優先」決策取代）；#7 是一次性診斷工具；#8 是此文件治理候選。
+> - L2 HTTP fault buckets：`HTTP_ERROR` 4（KKTIX、拓元、BeClass、中正紀念堂）；L3 HTML `HTTP_OK/LIST=0` 4（FamiTicket、ibon、台北世貿、StrollTimes）；其他 11 平台已有非空清單候選，**只有取樣 11 筆詳情成功，非正式覆蓋率**。證據為 Source Actions `40196442965` 的 Job `121178174230`，Report Artifact `12600795314`。
+> - L2 最小架構：純函式 `classify_http(outcome)`、受控官方 URL allowlist、HTTP code/redirect/content-type/byte SHA + error bucket 的資料結構、offline fixture；禁止以 HTML 200 代理 LIST 成功、不能用 403/404 直接判定 SOURCE_GONE、更不能用繞過限制或重試轟炸修正錯誤。
+> - L3～L5 架構優先繫結 `platform→list URL→event URL→detail response→canonical event identity→field role/evidence`，欄位可 NULL/UNKNOWN、保留官方連結；L6 可逆 ledger；L7 新一輪 candidate JSON+run_id+SHA，不讀入歷史 JSON；L8 隔離 UI Android UAT，L9 明確授權單 Writer/正式 Pages，L10 兩庫外部依賴核查後再授權 Archive。
+> - 已有 P1～P29 Android/P29 原生 CI Gate 保留且不重做；Source 原 PR #1 writer / notification / schedule HIGH_RISK_HOLD，Source P20 PR #2 與 Preview P20 PR #1 暫不 Merge。完整各 Gate 測試、優先序與驗收狀態唯一參照同版本 `ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md`。
+>
+
+
+> **最新架構增量候選｜2026-10-25 P30 重新抓取優先（Docs-only Draft；尚未併入 main）**
+>
+> GitHub 即時身分：Source main `fc4f963247d68eed29425808cc14e7250f312d05`、Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`、ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`。SRC-P29 Source PR #5/Preview PR #2 **MERGED**，原 P20 HEAD 各 1 個 GitHub native check SUCCESS，歷史下文舊「P29 候選」「HEAD 0 checks」不再代表現況；SRC-P1～P28 Android 實測 PASS 繼續有效。
+>
+> 本節把本輪最新討論的分段 Gate 明確繫結到 **UI／API／Parser／Data／CI**；詳細分層 Gate、驗收契約、狀態詞與優先順序由相同 GitHub Commit 的 `docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md` 唯一對應，不可另建平行 Roadmap。舊正文完整保留。
+
+## SRC-P30 即時來源品質導向 UI／API／資料架構
+
+```text
+GitHub easonliu714/event_scraper_public  [最終單一權威目標; 目前尚未正式整併]
+├─ main@fc4f963247d6... [已部署歷史狀態，禁止本 Gate 覆蓋]
+│  ├─ scraper.py [舊版同步/非同步抓取+寫 docs/data.json+通知，會有副作用]
+│  ├─ docs/index.html, docs/manifest.json [正式 Pages 舊入口；保持不變]
+│  ├─ docs/data.json [8,436 筆舊靜態資料；最新內容未被證明]
+│  └─ docs/{ROADMAP_PR_ISSUE_CLOSURE_AUDIT,UI_API_DB_FEATURE_ARCHITECTURE_TREE}.md [兩份唯一治理]
+├─ PR #7: feat/eventradar-p30-live-diagnostic@959324cb3bad... [DRAFT, NO MERGE]
+│  ├─ scripts/p30_live_acquisition.py [P30-L1 僅診斷；單次有限量 public HTTPS]
+│  │  ├─ Stage 1 HTTP [原始/最後網址、狀態碼、HTML、redirect、安全白名單]
+│  │  ├─ Stage 2 LIST [HTML anchor → 清單候選 title/url/platform，不推測日期]
+│  │  ├─ Stage 3 DETAIL [每平台最多抽樣一頁，標 HTTP 與來源身分]
+│  │  ├─ Stage 4 FIELDS [date/location/price/description 獨立證據，允許 UNKNOWN]
+│  │  └─ Runtime 只產生 p30-artifacts，不 import 主程式、不呼叫通知/寫入功能
+│  ├─ tests/p30/test_live_acquisition.py [HTTP block, redirect, URL, list, unknowns 等離線負例]
+│  ├─ docs/P30_LIVE_ACQUISITION_DIAGNOSTIC.md [非正式運作的技術候選說明]
+│  └─ .github/workflows/eventradar_p30_live_diagnostic.yml [P30 專用隔離分支 push]
+│     ├─ CI 校驗正式 docs/data.json / scraper.py Git Blob 沒變、P20 純 parser SHA
+│     ├─ P20 PR #2 event_details.py@4c2c9ec... [僅作純解析器，未合併/未執行 show_news]
+│     └─ Run 40196442965 SUCCESS → Artifact 12600795314 [新鮮 338 筆抽樣候選]
+│        ├─ candidate.json [短期候選，非完整資料、非 Golden、非正式 Pages]
+│        └─ diagnostics.json [19 平台 HTTP / 清單 / 詳情 / 欄位品質與失敗原因]
+├─ PR #6: feat/eventradar-p30-preview-isolated@1402df1bd32a... [DRAFT, SUPERSEDED]
+│  └─ docs/p30-preview/data-parts/* [歷史 9,850 筆 byte-preserving CI PASS，非新 PWA 資料來源]
+├─ PR #2: feat/eventradar-source-only-p20@4c2c9ec... [DRAFT, DORMANT]
+│  ├─ show_news.py [複合抓取/排程/通知；不得直接執行]
+│  └─ event_details.py [JSON-LD/DOM 身分及欄位候選；已被 P30-L1 SHA 限定讀用]
+├─ PR #1@26888422e486... [DRAFT, Cloud Scheduler/Writer HIGH-RISK HOLD]
+└─ Future P30 source-quality modules [尚未實作]
+   ├─ source_catalog / http_probe [L2: 官方來源入口 + 403/404/429/redirect 診斷]
+   ├─ list_parser / fixture tests [L3: 正確清單、URL、去重、分頁]
+   ├─ detail_parser / identity tests [L4: 詳情身分、多場次/合集、缺頁]
+   ├─ field_evidence / source_roles [L5: 活動日期 vs 售票期間、地點、票價、摘要]
+   ├─ reversible_validity_ledger [L6/G5J: ACTIVE/EXPIRED/NON_EVENT/SOURCE_GONE/UNCERTAIN]
+   ├─ candidate-json / schema / sha / report [L7/R3C-O3: 新鮮隔離資料 + 官方 Golden]
+   ├─ docs/p30-fresh-qa/ [L8/G5K: 新資料隔離 PWA 與 Android UAT，路徑待 Gate 核准]
+   ├─ single-authorized-writer / production QA [L9: 完整驗證+另案發布授權]
+   └─ repo-consolidation [L10: Source 最終單 Repo；Preview/ShowNews 不自動封存/刪除]
+
+Separate Preview main@03e515d65e... [舊 9,850 筆測試快照與 G5C/G5D visibility UI；不當新數據]
+└─ PR #1@b55b367308... [九卡片/詳情 Android UAT PASS, HEAD 原生 CI SUCCESS, STILL DRAFT]
+
+Separate ShowNews main@85fed3e85ff5... [歷史 FastAPI/七平台/Telegram，Render 仍 UNKNOWN]
+└─ /test-crawl 可能觸發網路抓取+推播；禁止在唯讀/QA 中呼叫
+```
+
+### 新資料契約與 PWA 介面角色（規格，非已發布）
+
+| 節點 | 最小可安全使用的輸出 | 必須保留的證據／邊界 |
+| --- | --- | --- |
+| HTTP network (L2) | platform, requested/final_url, status, timestamp, content_type | 403/404/429/Redirect/非 HTML ≠ HTTP PASS；域名白名單，不繞過限制 |
+| List parser (L3) | title, official_url, platform, list_observed_at, list_status | URL 去重、清單身份、連結是活動而非導覽；空清單/JS-only 明示 HOLD |
+| Detail parser (L4) | detail_http, canonical_identity, source_page_type, session evidence | 可核實的來源身分，集合頁/多場次不得誤綁單場 |
+| Field roles (L5) | date?, location?, price?, description?, type?, evidence and UNKNOWN | 日期必須是活動角色而非促銷／開賣日期；不得捏造票價、票況 |
+| Validity (L6/G5J) | reversible validity_status + reason + original record | 五種狀態；單次來源失效不自動下架 |
+| Candidate JSON (L7) | isolated new snapshot + run_id + acquisition time + report/hash | 舊 8,436/9,850 不混用；Schema、欄位完整率、來源清單 |
+| PWA list (L8) | card title / official URL / source / available verified fields | 允許局部資訊；空值顯示「未確認／請見官方」，不顯示假精度 |
+| PWA detail (L8) | source-linked detail and session disambiguation | 票價／日期／場次若條件性或來源不確定，標示以官方公告為準 |
+| Publish (L9) | approved data.json via single writer, manifest/URL parity & rollback | 尚 LOCKED；Android 新資料驗證不能借用舊 P20 測試代替 |
+
+**Stage-to-Gate Crosswalk**：`P30-L2` HTTP → `P30-L3` LIST → `P30-L4` DETAIL → `P30-L5` FIELDS → `P30-L6` G5J VALIDITY → `P30-L7` R3C-O3 GOLDEN+NEW JSON → `P30-L8` G5K ANDROID UAT → `P30-L9` controlled production → `P30-L10` repo consolidation。下一個開發點為 **START P30-L2-A HTTP 失敗類型與官方入口修復**；先用 Run `40196442965` 的 `diagnostics.json` 分流 403/404/429 和 HTML 200 但無清單，建立來源負例，再定點更正；避免原樣重跑全部 19 平台。
+
+**治理固定旗標**：`SOURCE_RUNTIME=DORMANT`; `GOLDEN_ACCEPTED=0`; `AUTO_HIDDEN=0`; `APP_DATA_PUBLISHED=false`。即使使用者允許忽略/將來刪除舊 JSON，也不是允許本 PR 改寫正式 JSON、清空 Pages、啟動 Cloud Writer、通知、Schedule、改開 PR 狀態或 Archive Repo。將來正式新資料可取代舊資料之前，必須有單 Writer、SHA、回復、UAT 與獨立授權。
+
+---
+
+
 > **SRC-P29 受控 PR CI 候選｜2026-10-25（Asia/Taipei）**
 >
 > 本段為新 CI 分支上的候選；未合併前不取代 main 正式治理權威。P24／P25／P26 以下歷史全文保留。
@@ -1063,3 +2412,1528 @@ EventRadar CI governance branch (Preview Repo, based on frozen main)
       └─ no deployment / no data write / no notifications
 ```
 **Release policy:** SRC-P22 Android Workflow SHA PASS；SRC-P23 GitHub publish and Runner **待 Android/Remote 讀回**。CI 治理分支的 GitHub Check 與 P20 PR HEAD Checks 必須分開記錄，`CI_RUNNER_PASS != PR_HEAD_CI_PASS`。
+
+## 2026-10-29 23:00 — P30-L9-AM / VENUE-01F source-first topology architecture
+
+```text
+SOURCE MAIN fbf4ca02... [FROZEN; formal data blob 7fc4fe32; status e19ca37c]
+├─ A / ACCUPASS [existing platform #02; no new platform identity]
+│  └─ PR #83 Draft HEAD 8a25ccb73d37ea2084fdc46212c49722effe8414
+│     ├─ scripts/p30_l9am_accupass_live_heading.py [ADD]
+│     │  ├─ reuses L9-AH normal Chromium list/detail identity, max two details
+│     │  ├─ reuses L9-AK heading-near 400-container/hidden-ancestor refusal
+│     │  └─ same-session source: list HTTP200, detail 2/2 HTTP200/title REVIEW
+│     ├─ tests/p30/test_l9am_accupass_live_heading.py [ADD; 8 tests]
+│     ├─ .github/workflows/eventradar_p30_l9am_live_heading.yml [ADD; read-only]
+│     ├─ exact-head CI #40896979730 SUCCESS; Artifact #12906139116 SHA/CRC PASS
+│     └─ 2/2 HOLD_MULTIPLE_HEADING_REGIONS (9 headings/9 regions each)
+├─ B / Taipei Arena [VENUE-01; announcement DataSN ≠ ticket Event ID]
+│  └─ PR #82 Draft HEAD 19fb68d293b99caf33e6db6074a51b85d40b3d50
+│     ├─ scripts/p30_venue01f_live_detail.py [ADD; one no-redirect HTTPS GET]
+│     │  ├─ official News_Content HTTP200 and exact URL
+│     │  ├─ limited HTMLParser H1/H2=0; explicit scoped labels=0
+│     │  └─ HOLD_NO_DETAIL_HEADING, no same-session title parity
+│     ├─ tests/p30/test_venue01f_live_detail.py [ADD; 8 tests]
+│     ├─ .github/workflows/eventradar_p30_venue01f_live_detail.yml [ADD; read-only]
+│     └─ exact-head CI #40896863072 SUCCESS; Artifact #12906977737 SHA/CRC PASS
+├─ Governance PR #8 [DRAFT; append-only historical preservation]
+│  ├─ docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+│  └─ docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+├─ Formal PWA: https://easonliu714.github.io/event_scraper_public/
+│  └─ no deployment or event/status data change; live HTTP UNVERIFIED
+└─ Release: HARD_HOLD_NO_PUBLICATION; accepted FIELD 0 / Golden 0
+```
+
+- **Next A:** source-bound exact *matching* heading region selection with strict ambiguity rejection, not global date regex; if blocked, advance next source Gate. **Next B:** P0 Taipei nonduplicate source discovery (Taipei Dome/TMC/TICC/TPAC), avoid redoing CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue separate from OPENTIX #05. Both have new SOURCE_QUALITY diagnostics, offline-only streak 0. Existing CKSMH 5 / TWTC 39 Android and L8 UI PASS preserved, ibon 39961 OPEN.
+
+
+## 2026-10-30 01:12 — A/B source diagnosis architecture (PR #86 / #85)
+
+```text
+Source main fbf4ca02... [FROZEN; formal data/status blobs unchanged]
+A / ACCUPASS platform #02 P30-L9-AN
+  PR #86 Draft HEAD 23af881cbbc207e42522c460b1de0dae65a065ce
+  base #83 8a25ccb73d37ea2084fdc46212c49722effe8414
+  scripts/p30_l9an_accupass_matched_heading.py [ADD]
+    exact normalized H1/H2 expected title -> unique visible heading
+    nearest <=400-container ancestor with exactly one heading
+    local explicit label/value sibling evidence, no global regex
+    ROOT-CAUSE CANDIDATE: nearest heading-only wrapper hides later siblings
+  tests/p30/test_l9an_accupass_matched_heading.py [ADD; 14]
+  .github/workflows/eventradar_p30_l9an_matched_heading.yml [ADD]
+  CI #40918460947 SUCCESS 36/36, Artifact #12916088449
+  official 2 details -> HOLD_MATCHED_HEADING_OR_IDENTITY
+B / TAIPEI_MUSIC_CENTER_OFFICIAL P30-VENUE-02B [new P0 venue, not 19-platform duplicate]
+  PR #85 Draft HEAD 4b7792066dbec130d21e4db01d082363fc6ca031
+  base #84 3aa3d60ae807a9555bb0e6deef5de8882cdc66ba
+  scripts/p30_venue02b_tmc_title_identity.py [ADD]
+    same-path list anchor title vs visible H1/H2 exact normalized title
+    hidden/duplicate/redirect/generic/HTTP errors -> HOLD
+    ROOT-CAUSE CANDIDATES: generic anchor, heading topology, HTMLParser scope
+  tests/p30/test_venue02b_tmc_title_identity.py [ADD; 18]
+  .github/workflows/eventradar_p30_venue02b_tmc_title_identity.yml [ADD]
+  CI #40918260178 SUCCESS 33/33, Artifact #12916139029
+  live exactTitleMatches=0 -> HOLD_TITLE_IDENTITY
+Governance Draft PR #8 [DOCS ONLY; sequential update, no main write]
+  docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+  docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+Formal PWA https://easonliu714.github.io/event_scraper_public/
+  UI prior USER_ATTESTED_PASS; new Pages build UNVERIFIED
+  data.json/status.json no write; fields 0, Golden 0, no Android full E2E
+  HARD_HOLD_NO_PUBLICATION
+```
+
+- Next A: first read sanitized per-detail local HOLD subdecision; test heading-only-wrapper versus role-bearing ancestor, fail closed on multiple candidate ancestors, no field promotion; rotate platform on persistent HOLD. Next B: inspect sanitized list/detail HOLD subdecision, correct demonstrable parser defect or move to nonduplicate Taipei Dome/TICC/TPAC source discovery. No repeated empty GET or synthetic-only gate loop.
+- Dedup contract: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 reuse existing platform source IDs. NTCH venue != OPENTIX #05 ticket source. Venue DataSN != ticket Event ID; each field needs source/observed_at/role/decision. P0 Taipei -> P0 New Taipei -> P1 other North -> P2 Central -> P3 South -> P4 East.
+- CI artifact ZIP digests from runner logs, independent CRC/download readback still UNVERIFIED this cycle. Both streams new live SOURCE_QUALITY HOLD, offline-only streak 0; accepted fields/Golden/publication 0.
+
+
+## 2026-10-30 01:20 — L9-AO / VENUE-02C verified engineering and source identity graph
+
+```text
+A / ACCUPASS platform #02 [Draft PR #88, no publication]
+  base #86 23af881cbbc207e42522c460b1de0dae65a065ce
+  HEAD 115fd3bc9309c0dfc59467808a1e5e879ba7b2af
+  scripts/p30_l9ao_accupass_role_ancestor.py [ADD]
+    nearest heading-only wrapper -> bounded role-bearing ancestor
+    exact heading, hidden/script/form/iframe and 400-container guards
+    conflicting role values or divergent ancestor scope => HOLD
+  tests/p30/test_l9ao_accupass_role_ancestor.py [ADD, 12 new]
+  .github/workflows/eventradar_p30_l9ao_role_ancestor.yml [ADD]
+  CI #40919876024 SUCCESS 48/48 after first true test-fixture repair
+  Artifact #12917138725 ZIP/CRC/SHA/manifest independent PASS
+  LIVE listHttp=null; details=0; source quality=0; HOLD
+B / TAIPEI_MUSIC_CENTER_OFFICIAL [Draft PR #87, P0 Taipei]
+  base #85 4b7792066dbec130d21e4db01d082363fc6ca031
+  HEAD fb82a5456ab0138680fee8f0a5e818a5d035bb10
+  scripts/p30_venue02c_tmc_card_heading.py [ADD]
+    official list card: category + title + date + venue [NOT a title]
+    one visible H2/H3/H4 within same official card -> exact detail H1/H2
+    hidden/ambiguous/redirect/other host -> HOLD
+  tests/p30/test_venue02c_tmc_card_heading.py [ADD, 13 new]
+  .github/workflows/eventradar_p30_venue02c_tmc_card_heading.yml [ADD]
+  CI #40919589752 SUCCESS 46/46; Artifact #12918066003 verified
+  LIVE list HTTP200 11 distinct paths -> detail HTTP200 same official path
+  exact card title == 1 of 2 detail headings -> REVIEW identity, not Golden
+Formal registry 19 platforms [NO CHANGE]
+  #17 CKSMH, #14 Songshan, #13 Huashan, #16 TWTC REUSE
+  NTCH venue distinct from OPENTIX #05 ticket source
+Formal PWA / docs/data.json / docs/platform_status.json / Pages [NO WRITE]
+  source fields=0, Golden=0, published=false, Android full E2E unverified
+  HARD_HOLD_NO_PUBLICATION
+```
+
+- Next A: classify missing list HTTP with safe enum on next permitted cycle or rotate to next platform; do not repeat failed GET or infer HTTP status. Next B: bounded source-local field roles and external ticket link provenance for one exact TMC event, retaining title identity REVIEW only; alternatively continue next P0 Taipei venue. Ticket platform claim is not a verified ticket Event ID. Field edges require `source`, `observed_at`, `role`, `decision`.
+- CI runner SHA artifacts independently read back, but source identity REVIEW is not accepted EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION, and neither PR can be merged without new Owner authorization. Existing Android CKSMH/TWTC and L8 UI PASS unchanged.
+
+## 2026-10-30 02:00 — isolated A/B source-first Gate architecture (PR #89 / #90)
+
+```text
+SOURCE MAIN fbf4ca02... [FROZEN; data blob 7fc4fe32; status blob e19ca37c]
+├─ A / ACCUPASS platform #02
+│  └─ L9-AP Draft PR #89 HEAD 4a888374a24e5515e6c1c98e33b0428b112d4fec
+│     ├─ base #88 115fd3bc9309c0dfc59467808a1e5e879ba7b2af
+│     ├─ scripts/p30_l9ap_accupass_list_cause.py [ADD]
+│     │  └─ intercept AH listDecision; safe enum; same one bounded GET; no raw persistence
+│     ├─ tests/p30/test_l9ap_accupass_list_cause.py [ADD; 8 tests]
+│     ├─ .github/workflows/eventradar_p30_l9ap_list_cause.yml [ADD]
+│     ├─ exact-head CI #40926608319 [STARTED; FINAL UNVERIFIED]
+│     └─ prior #88 listHttp=null/details=0; no assumed HTTP status or formal fields
+├─ B / TAIPEI_MUSIC_CENTER_OFFICIAL (P0 Taipei, not in 19 platform IDs)
+│  └─ VENUE-02D Draft PR #90 HEAD 6351af3f2cbdfe383b0a02d906ce7c9725358d18
+│     ├─ base #87 fb82a5456ab0138680fee8f0a5e818a5d035bb10
+│     ├─ scripts/p30_venue02d_tmc_field_provenance.py [ADD]
+│     │  ├─ one official list + <=1 same-path detail
+│     │  ├─ exact visible card heading == detail H1/H2 prerequisite
+│     │  └─ title-local explicit dt/dd or th/td; source/observed_at/role/decision
+│     ├─ tests/p30/test_venue02d_tmc_field_provenance.py [ADD; 9 tests]
+│     ├─ .github/workflows/eventradar_p30_venue02d_tmc_field_provenance.yml [ADD]
+│     ├─ exact-head CI #40926619059 [STARTED; FINAL UNVERIFIED]
+│     └─ prior #87 list HTTP200/11 paths; one detail exact title REVIEW; not Golden
+├─ Governance Draft PR #8 [DOCS ONLY; append-only, no main write]
+│  ├─ docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+│  └─ docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+└─ Formal PWA https://easonliu714.github.io/event_scraper_public/
+   ├─ docs/data.json + docs/platform_status.json [NO WRITE]
+   ├─ Android CKSMH 5 / TWTC 39 and L8 UI [HISTORICAL PASS PRESERVED]
+   └─ accepted fields=0 / Golden=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+- Engineering changes are not SOURCE_QUALITY acceptance. New live CI results and artifact independent SHA/CRC readback are PENDING; no PR may be merged or promoted. A list navigation failure must be classified before retry; B role ambiguity must HOLD and move to next nonduplicate P0 Taipei venue rather than generate endless synthetic PRs.
+- Source identity dedup remains binding: CKSMH #17, Songshan #14, Huashan #13, TWTC #16 reuse; NTCH venue != OPENTIX #05. DataSN != ticket Event ID; announcement date != performance date; claimed ticket platform != verified ticket URL/ID.
+
+### 2026-10-30 02:02 — exact-head evidence closure (no release promotion)
+
+```text
+A #89 L9-AP 4a888374... CI 40926608319 SUCCESS
+  ├─ artifact 12920103177 ZIP SHA256 91ad463a... CRC/manifest PASS
+  ├─ list HTTP200 REVIEW; detail 2/2 HTTP200 and exact title REVIEW
+  └─ 2/2 HOLD_NO_EXPLICIT_LOCAL_ROLE_PAIR; FIELD 0; Golden 0
+B #90 VENUE-02D 6351af3f... CI 40926619059 SUCCESS
+  ├─ artifact 12919199930 ZIP SHA256 d635cd68... CRC/manifest PASS
+  ├─ TMC list HTTP200/11 distinct paths; detail HTTP200/1 exact title REVIEW
+  └─ HOLD_FIELD_NO_BOUNDED_TITLE_REGION; FIELD 0; Golden 0
+NEXT A: rotate platform source/field Gate, not another empty synthetic ACCUPASS test
+NEXT B: P0 Taipei Dome/TICC/TPAC official LIST/DETAIL discovery, no duplicate platform
+FORMAL: data/status unchanged; HARD_HOLD_NO_PUBLICATION; Android PASS retained
+```
+
+- SOURCE_QUALITY live new evidence A/B both YES; offline-only streak 0/0. Artifact ZIPs independently CRC/SHA checked against runner digests and manifest. CI PASS != FIELD/GOLDEN/PWA publication PASS.
+
+### 2026-10-30 02:03 — VENUE-02D final-head safety correction
+
+- B Draft PR #90 final HEAD `1084ac72ec45143117f6f22a81ac74d3e061f5f8` (replaces earlier `6351af3...` within same PR), 3 ADD-only paths. `inspect`: visible H1/H2 with hidden ancestor -> HOLD; hidden role region -> HOLD; no field promotion. New regression test #10.
+- Exact-head CI #40926982220 SUCCESS (13 frozen + 10 new), artifact #12919848906 ZIP SHA256 `3981aa794a80483954c010a49ecf479ab7c89b399db419bc1e2b21a2fa62e440`, independent CRC/manifest PASS. B official title identity REVIEW; FIELD `HOLD_FIELD_NO_BOUNDED_TITLE_REGION`. A #89 exact-head CI #40926608319 SUCCESS and artifact #12920103177 CRC/manifest PASS. Formal FIELD 0/Golden 0/Publication HOLD; next B P0 Taipei new venue discovery.
+
+
+## 2026-10-30 02:55 — A FamiTicket #07 / B TPAC P0 Taipei source-first branch architecture
+```text
+SOURCE MAIN fbf4ca02... [FROZEN; data 7fc4fe32; status e19ca37c; 19 platforms]
+├─ A / FamiTicket existing platform #07 [reuse, no duplicate adapter]
+│  └─ P30-L9-AQ Draft PR #91 HEAD be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+│     ├─ base #89 4a888374a24e5515e6c1c98e33b0428b112d4fec
+│     ├─ scripts/p30_l9aq_famiticket_iframe_boundary.py [ADD]
+│     ├─ tests/p30/test_l9aq_famiticket_iframe_boundary.py [ADD]
+│     ├─ .github/workflows/eventradar_p30_l9aq_famiticket_iframe.yml [ADD]
+│     ├─ public source: official Home cards -> one iframe-shell detail
+│     └─ CI OFFLINE ONLY, exact-head/artifact FINAL PENDING; TITLE/FIELD HOLD
+├─ B / TPAC official venue (new P0 Taipei, not ticket-platform duplicate)
+│  └─ P30-VENUE-02E Draft PR #92 HEAD 641db6d7bde2968c05513c828789b64eac0656c8
+│     ├─ base #90 1084ac72ec45143117f6f22a81ac74d3e061f5f8
+│     ├─ scripts/p30_venue02e_tpac_session_cancel.py [ADD]
+│     ├─ tests/p30/test_venue02e_tpac_session_cancel.py [ADD]
+│     ├─ .github/workflows/eventradar_p30_venue02e_tpac_cancel.yml [ADD]
+│     ├─ official /program -> /program/2053 title REVIEW
+│     ├─ five session rows, two explicitly canceled [independent public source]
+│     └─ CI OFFLINE ONLY, exact-head/artifact FINAL PENDING; FIELD/GOLDEN HOLD
+├─ Governance Draft PR #8 [DOCS ONLY, sequential SHA compare, never main]
+└─ Formal PWA https://easonliu714.github.io/event_scraper_public/
+   ├─ data/status [UNCHANGED], publication HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH 5 + TWTC 39 Android USER_ATTESTED_PASS [PRESERVED]
+   └─ accepted fields 0 / Golden 0 / full Android E2E UNVERIFIED
+```
+- SOURCE_QUALITY evidence was independently read from public official web pages, not from these offline-only CI jobs; no CI live GET. Taipei Dome shell DISCOVERY/HOLD, not LIST_PASS. OPENTIX #05 ticket source != TPAC venue identity. Cancellation labels do not authorize active-session promotion. New tests/CI cannot authorize merge, publisher, scheduler, notifier, Pages or Golden.
+
+
+### 2026-10-30 03:01 — final exact-head CI / artifact provenance for source-first rotation
+```text
+A / FamiTicket #07 L9-AQ PR #91 HEAD be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+  CI #40935997678 SUCCESS [frozen 12 + new 10 = 22 offline tests]
+  Artifact #12924981165 ZIP SHA256 544c49b2... CRC/manifest independently PASS
+  sourceQualityThisCI UNVERIFIED_NO_LIVE_GET; public iframe-shell detail HOLD
+B / TPAC P0 Taipei VENUE-02E PR #92 HEAD 641db6d7bde2968c05513c828789b64eac0656c8
+  CI #40936004898 SUCCESS [13 offline tests]
+  Artifact #12924443307 ZIP SHA256 bf238f64... CRC/manifest independently PASS
+  sourceQualityThisCI UNVERIFIED_NO_LIVE_GET; public list/detail title REVIEW
+  five observed session entries / two canceled; no CI live DOM acceptance
+FORMAL accepted fields 0 / Golden 0 / publication HARD_HOLD_NO_PUBLICATION
+Source main/data/status and Preview/ShowNews main UNCHANGED
+CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS PRESERVED
+```
+- Both workflows are offline-only safety Gates, not live adapter source-quality or formal PWA/Android release evidence. Next A/B require bounded official source DOM/identity and field-level provenance before promotion.
+
+
+### 2026-10-30 03:03 — VENUE-02E final-head TPAC date-role conflict correction
+```text
+B / TPAC P0 Taipei VENUE-02E Draft PR #92 [same isolated branch]
+  final HEAD e5aac6b09d668de782de416e5e01b4f4f30b7ad4
+  changed files remain 3 ADD-only; compare_date_ranges() + 4 regressions
+  official list card 2026-10-28..2026-10-31
+  official detail 2026-10-29..2026-11-01
+  five session rows / two explicitly canceled [independent public read]
+  HOLD_LIST_DETAIL_DATE_RANGE_CONFLICT; rangeRole UNKNOWN; accepted fields 0
+  final exact-head CI #40936359223 SUCCESS 17/17 OFFLINE
+  artifact #12923619565 ZIP c2558342... CRC/manifest independent PASS
+  prior HEAD 641db6d7... / CI #40936004898 historical, not final
+A / FamiTicket L9-AQ #91 HEAD be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+  CI #40935997678 SUCCESS 22/22; artifact #12924981165 independently PASS
+CI live official GET A=0/B=0; independent source observations REVIEW/HOLD
+Formal FIELD 0 / Golden 0 / PWA release HARD_HOLD_NO_PUBLICATION
+```
+- TPAC index/date role conflict must remain reversible and field-provenance UNKNOWN; never override source detail or promote canceled sessions. A/B offline CI PASS is not a source adapter live PASS. CKSMH/TWTC/L8 Android PASS retained.
+
+
+### 2026-10-30 03:53 Asia/Taipei — Source-quality evidence rotation, A FamiTicket #07 / B Taipei Dome P0
+
+- FIRST fresh-read Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`; formal platform_status blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` (19 existing platform identities), formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`. Source main frozen. Prior A PR #91 exact HEAD `be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3` CI #40935997678 SUCCESS 22/22 OFFLINE; prior B PR #92 exact HEAD `e5aac6b09d668de782de416e5e01b4f4f30b7ad4` CI #40936359223 SUCCESS 17/17 OFFLINE. No new engineering commit this cycle; new SOURCE_QUALITY diagnostic only, not new CI.
+- A P30-L9-AR PREPARED / FamiTicket platform #07 (reuse existing source): independent public official Home list at https://www.famiticket.com.tw/Home shows `CC同人創作展` and a separate exact official detail https://www.famiticket.com.tw/Home/Activity/Info/RQA3AHUAbwBwAEgANwBzAFIAQQA1AGEAbABEADgAcABqAGMAbwBaAC8ARgBGAEcAVwBWAEUAdQBXAFEAeQBUAFcAcgAyADUARgBFADUAbgBWADQAdwA9AA2 headed `CC同人創作展`; its description explicitly distinguishes event dates `2026.11.21-22`, event hours `10:30-16:00`, venue `松山文創園區 五號倉庫`, and ticket-price text `單日票200元 / 雙日票350元`. This is an independently observed official list/detail same-title REVIEW and explicit text-role candidate, **not** adapter CI source GET, not formal FIELD, not verified ticket Event ID, and not Golden. Next Gate: one bounded same-ID/URL and title-local label topology, distinguish date/time/price and ticket voucher/reservation role; fail closed if missing/ambiguous, no iframe following or bulk requests. Prior #91 iframe-shell sample remains HOLD; a different detail shape does not resolve its identity.
+- B P30-VENUE-02F PREPARED / Taipei Dome official (new P0 Taipei venue, not in 19 platforms): independent official https://www.taipeidome.com.tw/Web/dome/ current October 2026 calendar explicitly contains both `場館已安排使用` / `場館已承租` (occupancy-only) and separate named `演唱會` / `球賽` entries. Example Oct 29/30 are occupancy-only, Oct 31 has named `《流光穿梭✦十年傳說》 GCS 2026 夏季總決賽、傳說十週年演唱會`. Distinguish venue booking/occupancy from public event; calendar day is not verified performance timestamp, and no sale/price/ticket ID. Next Gate: bounded one official calendar card + at most one genuine official detail, exact identity and event/booking role refusal; if no detail, HOLD_DETAIL_NOT_VERIFIED, do not infer LIST_PASS or publish.
+- New source-quality signals A=YES (distinct official detail role text), B=YES (official calendar occupancy-vs-event semantics), but engineering increment this cycle=0/0; offline-only consecutive SOURCE_QUALITY-less rounds A=0/B=0. New formal accepted fields=0, Golden=0, PWA event publication=HARD_HOLD_NO_PUBLICATION. No changes to docs/data.json, docs/platform_status.json, Golden, Writer/Scheduler/Notifier, main, Pages, Android CKSMH 5/TWTC 39 USER_ATTESTED_PASS, L8 UI PASS. CI and independent artifact readback are historical only, not new this cycle. Future engineering Writer must fresh-read heads and avoid overlapping writes.
+
+
+## 2026-10-30 05:00 — Dual-line role boundary architecture, A L9-AR / B VENUE-02F
+
+```text
+Source main fbf4ca02... [FROZEN, no production/Pages/JSON writes]
+├─ A / existing FamiTicket platform #07
+│  └─ L9-AR Draft PR #93 HEAD 7767c74779c6323214b12f4ffe663378428254dd
+│     ├─ base #91 be0a94b076991e75e9ae1ff4f5b2cf0d8a9c70c3
+│     ├─ scripts/p30_l9ar_famiticket_role_text.py [ADD]
+│     │  └─ inspect_public_text(): unique 《活動資訊》 section / exact title
+│     │     event range ≠ hours ≠ two ticket variants ≠ outside refund cutoff
+│     │     malformed/duplicate/ambiguous -> HOLD, fields accepted 0
+│     ├─ tests/p30/test_l9ar_famiticket_role_text.py [ADD, 14]
+│     ├─ .github/workflows/eventradar_p30_l9ar_famiticket_role_text.yml [ADD]
+│     ├─ exact-head CI #40953953547 SUCCESS, 10 frozen + 14 = 24/24 OFFLINE
+│     └─ Artifact #12931219153 ZIP SHA256 4bad1b47... CRC/manifest PASS
+├─ B / new P0 Taipei Dome official venue [not any 19 ticket platforms]
+│  └─ VENUE-02F Draft PR #94 HEAD faac5d180359cb5bebcdbda6bc4c5dd52e03b440
+│     ├─ base #92 e5aac6b09d668de782de416e5e01b4f4f30b7ad4
+│     ├─ scripts/p30_venue02f_dome_calendar_role.py [ADD]
+│     │  └─ inspect_calendar_cell(): VENUE_OCCUPANCY_ONLY ≠ PUBLIC_EVENT
+│     │     one cell with GCS final + concert -> UNKNOWN_MULTI_EVENT
+│     │     calendar day ≠ performance timestamp; no verified detail link
+│     ├─ tests/p30/test_venue02f_dome_calendar_role.py [ADD, 15]
+│     ├─ .github/workflows/eventradar_p30_venue02f_dome_calendar_role.yml [ADD]
+│     ├─ exact-head CI #40953958782 SUCCESS, 17 frozen + 15 = 32/32 OFFLINE
+│     └─ Artifact #12930979389 ZIP SHA256 ed4e9c5b... CRC/manifest PASS
+├─ Governance Draft PR #8 [docs-only, sequential SHA compare]
+│  ├─ ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md [APPEND]
+│  └─ UI_API_DB_FEATURE_ARCHITECTURE_TREE.md [APPEND]
+└─ Formal release boundary
+   ├─ docs/data.json blob 7fc4fe32... / platform_status.json e19ca37c... [FROZEN]
+   ├─ Source 19 platform identity dedup: CKSMH #17 / Songshan #14 /
+   │  Huashan #13 / TWTC #16 REUSE; OPENTIX #05 ≠ NTCH venue
+   ├─ Source quality: role diagnostic from public/indexed text only
+   │  new raw official HTTP/DOM A=0/B=0; CI live GET A=0/B=0
+   ├─ accepted fields=0, Golden=0, published=false
+   └─ HARD_HOLD_NO_PUBLICATION; Android CKSMH 5 / TWTC 39 + L8 PASS preserved
+```
+
+- **Contract:** Both classifiers are bounded, deterministic, review-only and fail closed; CI does not fetch official websites, does not verify full DOM, and does not imply that an indexed calendar cell is a published event or one FamiTicket detail text is a verified session/price record. Official text retrieval may be cached. Preserve independent `source/observed_at/role/decision` per field before future promotion. No iframe following, login, anti-bot bypass, payment, or raw sensitive page storage.
+- **NEXT A L9-AS:** bounded one exact official FamiTicket detail HTML DOM + same-source identity/role verification, or source block HOLD and rotate. **NEXT B VENUE-02G:** one official Dome calendar card and at most one genuine same-origin detail, identity vs occupancy vs multi-event decision; if detail inaccessible, HOLD and rotate another nonduplicate P0 Taipei source. No endless synthetic Gate chain.
+
+### 2026-10-30 05:55 Asia/Taipei — L9-AS and VENUE-02G exact-head source-first closure
+
+```text
+Source main fbf4ca02... [FROZEN]
+├─ A / formal FamiTicket platform #07 [REUSE]
+│  └─ P30-L9-AS Draft #95 HEAD 0d86f69f10dc56966bbdbdd30bf8981c945398e1
+│     ├─ base Draft #93 HEAD 7767c74779c6323214b12f4ffe663378428254dd
+│     ├─ scripts/p30_l9as_famiticket_live_dom.py [ADD, one official GET only]
+│     │  ├─ HTML200 / 128352B / 1 visible exact heading / 1 visible info marker / iframe 0
+│     │  ├─ hidden/duplicate/iframe/body cap/network -> HOLD
+│     │  └─ identity REVIEW; accepted FIELD=0; ticket ID=NULL
+│     ├─ tests/p30/test_l9as_famiticket_live_dom.py [ADD, 13]
+│     ├─ workflow [ADD, exact-head] CI #40962223044 SUCCESS 27/27
+│     └─ Artifact #12935433816 ZIP 2d6d8980... CRC/SHA PASS
+├─ B / new P0 Taipei TAINEX venue [NOT one of 19 ticket platforms]
+│  └─ P30-VENUE-02G Draft #96 HEAD daeb78277f693e6c83146dfebf23a6c5678831ca
+│     ├─ base Draft #94 HEAD faac5d180359cb5bebcdbda6bc4c5dd52e03b440
+│     ├─ official list /event: 7 visible candidates [independent web]
+│     ├─ official detail /event/690: exact title, 2026-11-13~16, 1館, floor venue
+│     ├─ scripts/p30_venue02g_tainex_parity.py [ADD, offline]
+│     │  ├─ venueLocalIdReview=690 ≠ ticketEventId
+│     │  ├─ exhibitionPeriod ≠ show/session timestamp
+│     │  ├─ organizerLink ≠ verified ticket URL
+│     │  └─ field provenance source/observed_at/role/decision REVIEW only
+│     ├─ tests/p30/test_venue02g_tainex_parity.py [ADD, 14]
+│     ├─ workflow [ADD, exact-head] CI #40962313405 SUCCESS 29/29
+│     └─ Artifact #12936486973 ZIP 5add619d... CRC/SHA PASS
+├─ Docs Draft #8 [serial append, not main]
+│  ├─ ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md
+│  └─ UI_API_DB_FEATURE_ARCHITECTURE_TREE.md
+└─ Formal release boundary [unchanged]
+   ├─ data.json blob 7fc4fe... / platform_status.json e19ca37...
+   ├─ CKSMH #17, Songshan #14, Huashan #13, TWTC #16 REUSE
+   ├─ NTCH venue != OPENTIX #05; TAINEX new venue source
+   ├─ A CI official GET=1; B CI official GET=0
+   ├─ accepted FIELD=0 / Golden=0 / published=false
+   └─ HARD_HOLD_NO_PUBLICATION; Android CKSMH5/TWTC39 and L8 PASS
+```
+
+- **Next A L9-AT:** unique source-local DOM role association only after exact visible title and marker; avoid global dates and role conflation, no promotion.
+- **Next B VENUE-02H:** one bounded official TAINEX list/detail adapter observation, venue identity + per-field evidence; HOLD on ambiguity and rotate P0 Taipei/New Taipei.
+- **No production change:** Source/Preview/ShowNews main and formal JSON untouched, Pages live deploy UNVERIFIED. Exact-head CI and independent ZIP SHA/CRC/manifest readback are engineering evidence, not official publication or Android E2E.
+
+### 2026-10-30 06:55 Asia/Taipei — L9-AT / VENUE-02H identity and locality architecture
+
+```text
+Source main fbf4ca02... / formal JSON unchanged [HARD_HOLD_NO_PUBLICATION]
+├─ A / FamiTicket #07 [REUSE existing ticket platform]
+│  └─ L9-AT Draft #97 HEAD fc08271acbe309ccb0f55180356738b7ffac5128
+│     ├─ scripts/p30_l9at_famiticket_local_dom.py [ADD]
+│     │  ├─ frozen L9-AS exact heading+marker -> local semantic-section gate
+│     │  ├─ official GET=1 HTTP200, 128352B, heading parent div, marker parent p
+│     │  ├─ no shared section/article -> HOLD_NO_SHARED_SEMANTIC_EVENT_SECTION
+│     │  └─ no event/price/session/ticket ID accepted, no raw HTML
+│     ├─ tests/p30/test_l9at_famiticket_local_dom.py [ADD, 10]
+│     ├─ exact-head CI #40969667118 SUCCESS 23/23
+│     └─ Artifact #12940115947 SHA256 906faf93... CRC/manifest PASS
+├─ B / P0 Taipei TAINEX [new venue source, not one of 19 ticket platforms]
+│  └─ VENUE-02H Draft #98 HEAD b1f4ea1b0ada362aa0db1772434212c9b69ecca9
+│     ├─ scripts/p30_venue02h_tainex_live_identity.py [ADD]
+│     │  ├─ official LIST /event + DETAIL /event/689 HTTP200/200
+│     │  ├─ exact anchor=1, heading=1, venue role labels present
+│     │  ├─ /event/689 coffee != /event/690 tea even with same period/hall/organizer
+│     │  └─ venueLocalId != ticketEventId, accepted FIELD=0
+│     ├─ tests/p30/test_venue02h_tainex_live_identity.py [ADD, 14]
+│     ├─ exact-head CI #40969673735 SUCCESS 28/28
+│     └─ Artifact #12939228326 SHA256 7de0da81... CRC/manifest PASS
+├─ Governance Draft #8 [docs-only, sequential append; not merged to main]
+└─ Release lock [CKSMH 5 / TWTC 39 Android PASS + L8 UI PASS preserved]
+   ├─ SourceQuality A structural HOLD / B list-detail REVIEW
+   ├─ accepted FIELD=0 / Golden=0 / publication HARD_HOLD_NO_PUBLICATION
+   └─ Pages runtime/Android new E2E UNVERIFIED
+```
+
+- **First true issue identified:** the predecessor A count-only heading+marker contract permitted an unrelated DOM section to satisfy both global counts. The new locality guard correctly rejects that actual live DOM shape; do not weaken it to make a green field Gate. Next A must inspect source-local common-`div` ancestry with bounded distance/label ownership, not global regex.
+- **B anti-collapse evidence:** TAINEX /event/689 coffee and /event/690 tea are distinct source-local records despite identical exhibition period, hall and organizer. Use independent `source/observed_at/role/decision` per field; exhibition period != session start; organizer link != ticket sale link; same date/location/organizer != identity.
+- **NEXT:** A L9-AU bounded source-local ancestry proof or HOLD/rotate; B VENUE-02I provenance and cross-record distinctness. CI SUCCESS != source-field acceptance, Golden, PWA publish or Android PASS.
+
+
+### 2026-10-30 07:55 Asia/Taipei — A L9-AU / B VENUE-02I source-first exact-head engineering and independent artifact audit
+
+- **Fresh authority:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad` (last confirmed); formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`; `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` (19 platforms). No main/formal JSON/production writer/publisher/scheduler/notifier/Pages/Android changes. Pages runtime GET UNVERIFIED.
+- **A / P30-L9-AU ENGINEERING:** [Draft #99](https://github.com/easonliu714/event_scraper_public/pull/99) exact HEAD `255d7fccd3941c7d6067df5cfdfac772e0543d03`, isolated base #97 `fc08271acbe309ccb0f55180356738b7ffac5128`, three ADD-only files (ancestry diagnostic, negative tests, exact-head workflow). [CI #40976366472](https://github.com/easonliu714/event_scraper_public/actions/runs/40976366472) SUCCESS, job #123805271141 all steps PASS; 10 predecessor + 10 new offline regressions, one official bounded GET. [Artifact #12942702654](https://github.com/easonliu714/event_scraper_public/actions/runs/40976366472/artifacts/12942702654) ZIP SHA256 `9c0c465b788df5f749a227961d6a83766cd6fb1d939a967c6e9b85595a38d63c`, independently downloaded ZIP CRC + audit SHA manifest PASS.
+- **A / NEW SOURCE_QUALITY:** FamiTicket platform #07 same official detail returned HTTP **200 but only 796 bytes**, body SHA256 `c03813767f87fa4dbcfffebbd497d8d2cffded2d9c7b708d5d0f28aa430159bc`, observed `2026-10-29T23:55:49Z`. Previous L9-AT live source was 128352 bytes with visible heading and marker; current parser sees `HOLD_IFRAME_ONLY_NO_TITLE` and downstream `HOLD_PRIOR_IDENTITY`. **New source-shape drift/root cause; not FIELD PASS.** Do not follow iframe, bypass or repeatedly retry same URL. Rotate to next lawful existing platform/source Gate; preserve prior 128352B observation as historical only. A direct-source-zero streak=0 (new negative evidence), accepted fields=0, Golden=0.
+- **B / P30-VENUE-02I ENGINEERING:** [Draft #100](https://github.com/easonliu714/event_scraper_public/pull/100) exact HEAD `2c3dc12640b3049aac972b39c29e71d2fca069ee`, isolated base #98 `b1f4ea1b0ada362aa0db1772434212c9b69ecca9`, three ADD-only files (one-detail provenance, negative tests, exact-head workflow). [CI #40976369881](https://github.com/easonliu714/event_scraper_public/actions/runs/40976369881) SUCCESS, job #123805282969 all steps PASS; 14 predecessor + 10 new offline regressions, one official bounded GET. [Artifact #12941823947](https://github.com/easonliu714/event_scraper_public/actions/runs/40976369881/artifacts/12941823947) ZIP SHA256 `bcf43ac34816df2f3324cf9fecbe3a2b3cce3fdffa1e7a5b8cd9cec628ce0baa`, independent ZIP CRC + manifest PASS.
+- **B / NEW SOURCE_QUALITY:** TAINEX P0 Taipei official `https://www.tainex.com.tw/event/690` HTTP **200**, 25598 bytes, body SHA256 `67b1584bd00fed3eff13df8ef0fb4a7ac43886609e649e1606d8fd317ce49fa0`, observed `2026-10-29T23:55:51Z`. Unique exact title and each of three role labels (exhibition period, venue, organizer) observed once; separate `source/observed_at/role/decision` provenance REVIEW, no values formally accepted. Venue-local ID 690 != earlier official 689; no merge by same date/hall/organizer, no ticket ID inference. B direct-source-zero streak=0, accepted fields=0, Golden=0.
+- **Formal release:** A/B Engineering CI PASS; A SOURCE_QUALITY structural drift HOLD, B SOURCE_QUALITY official detail REVIEW; neither equals Golden. `HARD_HOLD_NO_PUBLICATION`, formal accepted fields 0, Golden 0, published 0. Existing CKSMH #17 five and TWTC #16 thirty-nine Android USER_ATTESTED_PASS, L8 Core UI PASS preserved; ibon 39961 mismatch OPEN. Source dedup: Songshan #14/Huashan #13/TWTC #16/CKSMH #17 reuse; OPENTIX #05 distinct from NTCH venue.
+- **NEXT:** A P30-L9-AV rotate to next existing ticket-platform blocker with one bounded lawful same-source identity/field-role probe (FamiTicket current iframe-only sample remains HOLD; no unbounded retries). B P30-VENUE-02J prioritize P0 Taipei/new Taipei venue-source live LIST/DETAIL with explicit venue-local field provenance and conflict checks; TAINEX 689/690 identity REVIEW does not establish ticket/session time. No release or merge without authorization.
+
+
+### 2026-10-30 08:54 Asia/Taipei — L9-AV / VENUE-02J dual-source architecture and release isolation
+
+```text
+Source main fbf4ca02... [FROZEN] / formal 19 ticket-platform identities
+├─ A: ERA #08 existing ticket platform [REUSE, no duplicate]
+│  └─ L9-AV Draft PR #101 HEAD 48044fdbaccb69c75dce14d072386e2200ecfcc3
+│     ├─ base #99 255d7fccd3941c7d6067df5cfdfac772e0543d03
+│     ├─ scripts/p30_l9av_era_source_role.py + tests + exact-head workflow [3 ADD]
+│     ├─ official HOME/DETAIL HTTP200/200; 88868B/85144B; PRODUCT_ID=P1GFK34F
+│     ├─ unique list anchor/detail H1; session vs refund headings separated
+│     ├─ source identity REVIEW, PRODUCT_ID not accepted global Event ID
+│     ├─ CI #40982374572 SUCCESS 19/19; Artifact #12945392225 ZIP SHA256 0604336a...
+│     └─ accepted FIELD=0 / Golden=0 / published=false
+├─ B: Zepp New Taipei P0 New Taipei official venue [NOT in 19 ticket platforms]
+│  └─ VENUE-02J Draft PR #102 HEAD 4babae6f5528fdc65cddad6f26b9b4c5f3b576f8
+│     ├─ base #100 2c3dc12640b3049aac972b39c29e71d2fca069ee
+│     ├─ scripts/p30_venue02j_zepp_newtaipei.py + tests + exact-head workflow [3 ADD]
+│     ├─ official LIST/DETAIL HTTP200/200; 339236B/310465B
+│     ├─ unique venue-local rid=162473, artist 40 Fingers, START 19:30
+│     ├─ KKTIX = VENUE_CLAIMED_PLATFORM_ONLY; not verified ticket Event ID
+│     ├─ source body-cap HOLD 220KB fixed to bounded 512000B, 513KB negative
+│     ├─ intermediate test-source newline syntax CI FAIL repaired without skip
+│     ├─ final CI #40982473329 SUCCESS 20/20; Artifact #12945915452 SHA256 dc32cf15...
+│     └─ PRICE unscoped; accepted FIELD=0 / Golden=0 / published=false
+├─ Governance Draft PR #8 [two canonical docs, SHA-checked serial append; not main]
+└─ Formal release boundary
+   ├─ docs/data.json blob 7fc4fe... / platform_status.json e19ca37c... [FROZEN]
+   ├─ SOURCE_QUALITY A/B=YES, offline-only consecutive A/B=0
+   ├─ HARD_HOLD_NO_PUBLICATION; accepted FIELD=0 / Golden=0 / published=false
+   ├─ Android CKSMH 5/TWTC 39 USER_ATTESTED_PASS + L8 Core UI PASS preserved
+   └─ Pages live runtime and new Android E2E UNVERIFIED
+```
+
+- **NEXT A L9-AW:** ERA same-PRODUCT_ID detail session table vs refund deadline exact section-local label/value provenance; refuse ambiguous/global dates, no formal FIELD promotion. **NEXT B VENUE-02K:** Zepp same-rid START/OPEN vs external ticket URL role and source-bound identity; venue claim alone cannot establish ticket Event ID. Rotate within P0 New Taipei if blocked. Existing CKSMH #17/Songshan #14/Huashan #13/TWTC #16 reused; NTCH venue != OPENTIX #05; ibon39961 mismatch OPEN. No main/Golden/production/Pages writes.
+
+### 2026-10-30 10:04 Asia/Taipei — A L9-AW / B VENUE-02K source-bound architecture addendum
+
+```text
+Source main fbf4ca02... [FROZEN; 19 canonical ticket source IDs]
+├─ A existing ERA #08 [reuse] → Draft #103 HEAD 25e14e60708677e40fd25b701ac211bfc0ffed50
+│  ├─ predecessor #101 HEAD 48044fdb... → 3 ADD-only script/test/workflow
+│  ├─ exact PRODUCT_ID P1GFK34F HOME/DETAIL HTTP200/200, one list link + H1
+│  ├─ section-local <=4 sibling scan: HOLD_NO_SESSION_LOCAL_TABLE
+│  ├─ refund cutoff must not become EVENT/SALE/SESSION date; no accepted fields
+│  └─ exact-head CI #40989430932 SUCCESS 19/19; Artifact #12948636061 CRC/SHA PASS
+├─ B Zepp New Taipei official venue [not one of 19 ticket sources]
+│  └─ Draft #104 HEAD 66abfb279e597fde03d3a8c737ceb04013c76342
+│     ├─ predecessor #102 HEAD 4babae6f... → 3 ADD-only script/test/workflow
+│     ├─ official same-rid 162473 LIST/DETAIL HTTP200/200
+│     ├─ START local marker 1 / OPEN local marker 0, time association ambiguous
+│     ├─ KKTIX = venue-claimed platform, not verified ticket Event ID/URL
+│     └─ exact-head CI #40989270451 SUCCESS 20/20; Artifact #12948706138 CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs, serial SHA-guarded append, NOT main]
+└─ Release lock [accepted FIELD A/B=0/0; Golden=0; published=0]
+   ├─ source-quality new diagnostic evidence A/B=YES/YES, offline-only streak 0/0
+   ├─ docs/data.json 7fc4fe... / platform_status.json e19ca37c... [unchanged]
+   ├─ HARD_HOLD_NO_PUBLICATION, no writer/publisher/scheduler/notifier or Pages write
+   ├─ Android CKSMH 5 / TWTC 39 USER_ATTESTED_PASS + L8 UI PASS preserved
+   └─ Pages live runtime and new Android E2E UNVERIFIED; ibon 39961 OPEN
+```
+
+- **Root cause / next:** A has no bounded immediate sibling table despite exact list/detail headings; next inspect real source-local DOM topology or rotate existing source, never global-date promotion. B START text cannot uniquely bind a time and OPEN is absent at selected local-tag level; rotate P0 New Taipei rather than repeatedly GET same rid. Independent artifact ZIP CRC, SHA256SUMS and manifest validated. A initial CI failures were fixed on final exact HEAD without skipping regressions. Next A L9-AX; B VENUE-02L. All new role candidates remain REVIEW/HOLD, not formal FIELD/GOLDEN/PWA/Android PASS.
+
+### 2026-10-30 10:58 Asia/Taipei — A L9-AX / B VENUE-02L source topology and announcement identity architecture
+
+```text
+Source main fbf4ca02... [FROZEN] / formal 19 ticket platforms
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ P30-L9-AX Draft #106 exact HEAD fa91b729683813f8988273b56ce82237d4b70057
+│     ├─ base #103 HEAD 25e14e60708677e40fd25b701ac211bfc0ffed50
+│     ├─ 3 ADD-only: bounded DOM topology script / negative tests / exact-head workflow
+│     ├─ official DETAIL GET=1 HTTP200, 85144B; exact H1 and one session heading
+│     ├─ depth 0 heading-parent div: 0 table; depth 1 parent div: 1 following div -> 1 table
+│     ├─ one date-token hint is diagnostic only; no row/date/price/event ID promoted
+│     ├─ CI #40994721273 SUCCESS 19/19; artifact #12950643340 CRC/SHA PASS
+│     └─ NEXT L9-AY bounded table row label/role ownership, refund isolation
+├─ B New Taipei Arts Center [P0 New Taipei, separate VENUE source, NOT ticket platform]
+│  └─ P30-VENUE-02L Draft #105 exact HEAD 252e7c6b200da89634f0cee28a1602520e27877a
+│     ├─ base #104 HEAD 66abfb279e597fde03d3a8c737ceb04013c76342
+│     ├─ 3 ADD-only: same-SID monthly bulletin guard / 10 negatives / exact-head workflow
+│     ├─ official index/detail GET=2 HTTP200/200; 60789B/61111B
+│     ├─ exact index sid+title anchor=0 -> HOLD_LIST_SID_TITLE_NOT_UNIQUE
+│     ├─ monthly bulletin SID != individual performance Event ID; same title != same SID
+│     ├─ venue claims ERA/OPENTIX are not verified ticket Event IDs or sale times
+│     ├─ CI #40994655518 SUCCESS 20/20; artifact #12950313009 CRC/SHA PASS
+│     └─ NEXT VENUE-02M bounded index-link root cause or P0 New Taipei rotation
+├─ Governance Draft #8 [two canonical docs serial SHA-guarded append, NOT main]
+└─ Formal release lock [accepted FIELD A/B=0/0; Golden=0; published=0]
+   ├─ ENGINEERING CI A/B PASS/PASS; new SOURCE_QUALITY A/B YES/YES; offline-only 0/0
+   ├─ formal data.json 7fc4fe... / platform_status.json e19ca37c... unchanged
+   ├─ HARD_HOLD_NO_PUBLICATION, no main/production/Pages/Android write
+   ├─ CKSMH #17 5 and TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS preserved
+   └─ Pages live runtime UNVERIFIED; ibon 39961 mismatch OPEN
+```
+
+- **Evidence separation:** A's ancestor table is a source-derived structural candidate only, not a session field. B's HTTP200/200 is source access only; zero exact index anchors means source-local identity HOLD. No publication, Golden or Android promotion from engineering CI. Official detail and index evidence may be individually valid without a confirmed link edge.
+- **Dedup:** Songshan #14, Huashan #13, TWTC #16 and CKSMH #17 are existing ticket/source identities; NTCH venue and OPENTIX #05 are distinct sources. ERA #08 is reused, NTPC Arts Center is a new venue identity. Toolkit path/permission remains UNKNOWN from current accessible repository records; no local Toolkit invocation.
+
+
+### 2026-10-30 12:01 Asia/Taipei — A L9-AY / B VENUE-02M source-bound architecture (NO PUBLISH)
+
+~~~text
+Source main fbf4ca02... [FROZEN; 19 canonical ticket-platform IDs]
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ L9-AY Draft #107 HEAD 177ec7960c37cefc69fd04719591120a43559130
+│     ├─ base #106 fa91b729...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official detail GET=1 HTTP200, 85144B; PRODUCT_ID P1GFK34F exact H1
+│     ├─ bounded session-heading-owned table=1, rows=2, row-local date hints=1
+│     ├─ refund/ambiguous row isolation; REVIEW hint only, no SESSION ID/field
+│     └─ CI #41000485930 30/30 SUCCESS; Artifact #12952943416 CRC/SHA PASS
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not one of 19 ticket platforms]
+│  └─ VENUE-02M Draft #108 HEAD c65efb5f6b977e9ae24ae0572a1f316b73824fe7
+│     ├─ base #105 252e7c6b...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official homepage GET=1 HTTP200, 57492B; same-origin links=59
+│     ├─ two event-index candidates -> HOLD_INDEX_DISCOVERY_ZERO_OR_AMBIGUOUS
+│     ├─ no second GET, no LIST/DETAIL/IDENTITY/field/ticket ID acceptance
+│     └─ CI #41000492179 31/31 SUCCESS; Artifact #12952788796 CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs serial SHA-guarded append, NOT main]
+└─ Release boundary [FIELD A/B=0/0, Golden=0, published=0]
+   ├─ NEW SOURCE_QUALITY A/B=YES/YES; offline-only streak=0/0
+   ├─ HARD_HOLD_NO_PUBLICATION, formal data/status blobs unchanged
+   ├─ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS, L8 UI PASS retained
+   └─ Pages live runtime UNVERIFIED; ibon 39961 mismatch OPEN
+~~~
+
+- **NEXT:** A L9-AZ only bounded same-source row/cell semantic ownership or rotate another existing platform if no unique session identity; B VENUE-02N only bounded two-candidate Xinzhuang index-link disambiguation or rotate next P0 New Taipei source. Neither source evidence nor CI alone authorizes formal FIELD, Golden, publication, Pages or Android PASS.
+
+
+### 2026-10-30 12:53 Asia/Taipei — A/B isolated source-evidence architecture, no release
+
+```text
+Source main fbf4ca02... [FROZEN, 19 canonical source identities]
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ L9-AZ Draft #109 HEAD d95788c3550c9ec80f64afceab89d74ec6bfff57
+│     ├─ base #107 HEAD 177ec796...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official same PRODUCT_ID detail GET=1 HTTP200 / 85144B
+│     ├─ exact heading-owned table=1, header row=3 th, data row=3 td
+│     ├─ data row: date token=1, time token=1, anchor=1; session attr=0
+│     ├─ strict date/time header role=0/0; no session identity/field promotion
+│     └─ CI #41005326759 SUCCESS; artifact #12955665120 CRC/SHA PASS
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not a ticket platform]
+│  └─ VENUE-02N Draft #110 HEAD b2320eaacbaead8424170549ffe1dc055fe52ba5
+│     ├─ base #108 HEAD c65efb5f...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official homepage GET=1 HTTP200 / 57492B, same-origin links=59
+│     ├─ candidate /submenu usein=2 psid=0G286667437547603307
+│     ├─ candidate /submenu usein=5 psid=0G313393761267791561
+│     ├─ both labels 展演活動; distinct index roles, no LIST_PASS/DETAIL/ID
+│     └─ CI #41005330183 SUCCESS; artifact #12954923603 CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs serial SHA-guarded, NOT main]
+└─ Release boundary FIELD A/B=0/0, Golden=0, published=0
+   ├─ new SOURCE_QUALITY A/B YES/YES, offline-only streak 0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; no main/formal JSON/production/Pages/Android write
+   ├─ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS preserved
+   └─ Pages live runtime UNVERIFIED; ibon 39961 mismatch OPEN
+```
+
+- **NEXT:** A inspect row-local anchor same-product/session identity (one bounded source edge only) or rotate existing ticket platform if identity absent; B one controlled candidate `/submenu` GET to distinguish `usein` roles, otherwise rotate next P0 New Taipei venue. Do not infer ticket ID from venue, session time from announcement, or formal FIELD from CI.
+
+
+### 2026-10-30 13:54 Asia/Taipei — A/B isolated source-evidence architecture, no release
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN, 19 canonical source IDs]
+├─ A existing ERA ticket platform #08 [REUSE]
+│  └─ L9-BA Draft #111 HEAD 39c47e1c0b80be366cbeee18d08aa4751494b5d5
+│     ├─ base Draft #109 HEAD d95788c3...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ official same PRODUCT_ID P1GFK34F detail GET=1 HTTP200 / 85143B
+│     ├─ heading-owned table 1 candidate date+time row, 1 row-local anchor
+│     ├─ anchor URL strict scheme/credential/port guard: HOLD_UNSAFE_ANCHOR_URL
+│     ├─ no row-anchor navigation, session ID, accepted date/time/field
+│     └─ CI #41010935815 SUCCESS 40/40; artifact #12957074291 ZIP CRC/SHA PASS
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not an existing ticket platform]
+│  └─ VENUE-02O Draft #112 HEAD 9ff0438d8606a7bdee355ea3566e7f6f723f1fac
+│     ├─ base Draft #110 HEAD b2320eaa...; 3 ADD-only script/tests/exact-head workflow
+│     ├─ one official /submenu?usein=2&psid=0G286667437547603307 GET HTTP200 / 34926B
+│     ├─ 1 event-bearing heading, 46 same-origin links, 6 detail-link hints
+│     ├─ example path /xmdoc/cont?xsmsid=... [key only; ID not verified]
+│     ├─ REVIEW_SUBMENU_DETAIL_LINK_HINTS_NO_LIST_PASS, no title/ID/date accepted
+│     └─ CI #41010940348 SUCCESS 41/41; artifact #12957701480 ZIP CRC/SHA PASS
+├─ Governance Draft PR #8 [two canonical docs serial SHA-guarded append, NOT main]
+└─ Release boundary FIELD A/B=0/0, Golden=0, published=0
+   ├─ NEW SOURCE_QUALITY A/B=YES/YES; offline-only consecutive 0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; no main/formal JSON/production/Pages/Android write
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS preserved
+   ├─ ibon 39961 title mismatch OPEN; Pages live runtime UNVERIFIED
+   └─ Toolkit local path/permission UNKNOWN, not invoked
+~~~
+
+- **NEXT A L9-BB:** classify unsafe row anchor component without repeat GET if possible; otherwise rotate existing ticket platform, do not relax URL validation. **NEXT B VENUE-02P:** one bounded official same-origin detail URL derived from one of six candidate index links and verify index-to-detail identity; no LIST_PASS from link hints alone. P0 New Taipei venue priority continues; existing CKSMH/Songshan/Huashan/TWTC sources must not be duplicated, and NTCH venue != OPENTIX #05.
+
+
+### 2026-10-30 14:53 Asia/Taipei — A/B official source failure taxonomy and venue detail edge
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 ticket-platform IDs]
+├─ A ERA #08 existing ticket source [REUSE, no duplicate platform]
+│  └─ L9-BB Draft #113 exact HEAD 256b51777b60e00729552fa931dcf9ec9fb6c27b
+│     ├─ base #111 HEAD 39c47e1c0b80be366cbeee18d08aa4751494b5d5
+│     ├─ 3 ADD-only script/tests/exact-head workflow; CI #41016639794 48/48 PASS
+│     ├─ one official detail GET HTTP200 / 85144B, SHA 744f98a5e2b5...
+│     ├─ row-local anchor failure root classification NON_HTTPS_SCHEME
+│     ├─ no unsafe navigation, session ID, accepted FIELD or Golden
+│     └─ artifact #12959707275 independent CRC/SHA/manifest PASS; NEXT L9-BC rotate existing source
+├─ B Xinzhuang Arts Center P0 New Taipei venue [not one of 19 ticket sources]
+│  └─ VENUE-02P Draft #114 exact HEAD 6fc5e2701467e859d9d51ac7d08ba5c36cf2309a
+│     ├─ base #112 HEAD 9ff0438d8606a7bdee355ea3566e7f6f723f1fac
+│     ├─ 3 ADD-only script/tests/exact-head workflow; CI #41016643327 50/50 PASS
+│     ├─ official submenu GET HTTP200 / 34926B, 6 detail link hints
+│     ├─ one source-derived /xmdoc/cont?xsmsid=[sanitized] GET HTTP302
+│     ├─ no redirect followed, no exact title or venue event ID accepted
+│     └─ artifact #12958979022 independent CRC/SHA/manifest PASS; NEXT VENUE-02Q redirect taxonomy or P0 rotation
+├─ Governance Draft PR #8 [two canonical docs, serial SHA-guarded append, NOT main]
+└─ HARD_HOLD_NO_PUBLICATION [FIELD A/B=0/0, Golden=0, published=0]
+   ├─ new official SOURCE_QUALITY A/B YES/YES; offline-only streak 0/0
+   ├─ formal data/status blobs unchanged; no main/production/Pages/Android write
+   ├─ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS + L8 UI PASS preserved
+   └─ ibon 39961 title mismatch OPEN; Pages live runtime UNVERIFIED; Toolkit UNKNOWN
+~~~
+
+- **Source identity dedup:** Existing CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 must not be duplicated. NTCH venue remains distinct from OPENTIX #05. Redirect status and non-HTTPS anchor are source-derived negative-quality evidence, not publication permission.
+
+
+### 2026-10-30 15:55 Asia/Taipei — A P30-L9-BC / B P30-VENUE-02Q independent source-quality Gate (NO PUBLISH)
+
+- **Fresh authority / Writer isolation:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` (19 platform identities). No main/formal JSON writes; Docs exclusively Draft PR #8, not main. Prior PR #113/#114 HEAD unchanged before isolated new branches. Toolkit local path/permissions UNKNOWN, not invoked.
+- **A ENGINEERING L9-BC:** [Draft PR #115](https://github.com/easonliu714/event_scraper_public/pull/115), exact HEAD `675678e68b4448e23df608878671b59499f0f8a9`, base predecessor #113 HEAD `256b51777b60e00729552fa931dcf9ec9fb6c27b`; three ADD-only script/test/workflow files. [Exact-head CI #41022953825](https://github.com/easonliu714/event_scraper_public/actions/runs/41022953825) SUCCESS **20/20** (8 predecessor + 12 new). [Artifact #12962132177](https://github.com/easonliu714/event_scraper_public/actions/runs/41022953825/artifacts/12962132177) independently downloaded ZIP SHA256 `1ea768482dfeb8a9051de35bab11f227616ce7cd76ee28b7c0e0634c31885c82`, ZIP CRC, SHA256SUMS and manifest PASS.
+- **A NEW SOURCE_QUALITY:** Rotated from ERA #08 unsafe non-HTTPS anchor to **existing TixFun platform #09** (not a new source). One normal first-party homepage GET HTTP200 / 69,694 bytes, SHA256 `a5d77c15eaf99fbcf6fd558a600797ed5aba695a372ececf2a711b90c86ee461`; one exact same-origin source-derived `PRODUCT_ID=Q01ZROKD` detail GET HTTP200 / 43,986 bytes, SHA256 `f9b0f6b75c04cf0563b678b28d9ed2620ac5502c46034602953f57d6971bb3d2`, observed `2026-10-30T07:54:37Z`. Exactly one bounded detail title-heading marker match. Decision `REVIEW_SAME_PRODUCT_TITLE_HEADING_NO_FIELDS`; **not** accepted Event ID/session/date/price. NEXT **L9-BD** inspect one same-product source-local date/price label ownership, reject sales/refund/interactive ambiguity, or rotate if no safe semantic edge; no synthetic-only loops.
+- **B ENGINEERING VENUE-02Q:** [Draft PR #116](https://github.com/easonliu714/event_scraper_public/pull/116), exact HEAD `60fb431f3d63646e717362722c23a45cf2cd5bf4`, base predecessor #114 HEAD `6fc5e2701467e859d9d51ac7d08ba5c36cf2309a`; three ADD-only script/test/workflow files. [Exact-head CI #41022958427](https://github.com/easonliu714/event_scraper_public/actions/runs/41022958427) SUCCESS **19/19** (9 predecessor + 10 new). [Artifact #12962536655](https://github.com/easonliu714/event_scraper_public/actions/runs/41022958427/artifacts/12962536655) independently downloaded ZIP SHA256 `ad85f3d9f0004667fee890334963dee30ff7680762b27d6ac2a6e652378685d5`, ZIP CRC, SHA256SUMS and manifest PASS.
+- **B NEW SOURCE_QUALITY:** Xinzhuang Arts Center official `/submenu` index GET HTTP200 / 34,926 bytes, SHA256 `37ce3317f660497c5d8b39a499d5ecb779c7e1993df234ce939fc16b164fab1a`; six source-derived detail-link candidates; one same-origin `/xmdoc/cont` GET HTTP302, **no redirect followed**. Sanitized `Location` classified `NON_DETAIL_TARGET` / `OTHER_PATH` with no query keys, not a valid activity detail target. Decision `HOLD_UNSAFE_OR_MISSING_REDIRECT_TARGET`; no detail identity/title or LIST_PASS. **NEXT VENUE-02R:** stop repeat Xinzhuang GET; rotate to another nonduplicate **P0 New Taipei** official venue (Shulin/Cloud Gate/Fuzhong15 etc.) with bounded source LIST/DETAIL discovery, preserve Xinzhuang HOLD.
+- **Release/quality separation:** A/B new official SOURCE_QUALITY **YES/YES**, offline-only consecutive **0/0**; engineering CI SUCCESS/SUCCESS. Formal accepted FIELD A/B **0/0**, Golden **0**, published **0**, `HARD_HOLD_NO_PUBLICATION`. No merge/main/production Scraper/Writer/Publisher/Scheduler/Notifier/formal JSON/Pages/Android write. CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS and L8 UI PASS preserved; ibon 39961 historical title mismatch OPEN. Official Pages live runtime read attempted but inaccessible: UNVERIFIED. No Owner action needed.
+
+
+### 2026-10-30 16:53 Asia/Taipei — A L9-BD / B VENUE-02R isolated source-first engineering (CI PENDING)
+
+- **Fresh audit:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` and `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` (19 identities) unchanged. No active earlier Writer HEAD drift at audit; Toolkit path/permissions UNKNOWN; Pages live runtime UNVERIFIED. Existing CKSMH #17, Songshan #14, Huashan #13, TWTC #16 not duplicated; NTCH venue distinct from OPENTIX #05.
+- **A ENGINEERING:** [Draft PR #117](https://github.com/easonliu714/event_scraper_public/pull/117) `P30-L9-BD` exact HEAD `e13e6988ab85a929b248c919eef1043e180c86bd`, base #115 HEAD `675678e68b4448e23df608878671b59499f0f8a9`. Three ADD-only script/test/exact-head read-only CI files. One allowlisted official TixFun #09 same-PRODUCT_ID detail GET, local heading-owned exact label classification for PERFORMANCE_DATE / PRICE / SALE_TIME / REFUND; never accept field values. [CI #41029345199](https://github.com/easonliu714/event_scraper_public/actions/runs/41029345199) **QUEUED/PENDING** at governance append; SOURCE_QUALITY outcome **PENDING** (do not claim official GET succeeded before artifact readback).
+- **B ENGINEERING:** [Draft PR #118](https://github.com/easonliu714/event_scraper_public/pull/118) `P30-VENUE-02R` exact HEAD `e55c8f22ca287c2e38da749697359691f8a29a8d`, base #116 HEAD `60fb431f3d63646e717362722c23a45cf2cd5bf4`. Three ADD-only script/test/exact-head read-only CI files. Rotate from Xinzhuang NON_DETAIL_TARGET redirect HOLD to nonduplicate P0 New Taipei Shulin Arts Center official index, exactly one normal GET and HTTPS same-origin link-role diagnostics; no detail navigation. [CI #41029352597](https://github.com/easonliu714/event_scraper_public/actions/runs/41029352597) **QUEUED/PENDING** at governance append; SOURCE_QUALITY outcome **PENDING**.
+- **Release and next:** A/B accepted FIELD 0/0, Golden 0, published 0, `HARD_HOLD_NO_PUBLICATION`. CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS retained; ibon 39961 mismatch OPEN. No main/production/Pages/Android/formal JSON write, no merge. NEXT independently read exact-head CI job steps and artifacts; if failure fix first true root cause on isolated PR branches; then A evaluate local label ownership vs sales/refund ambiguity and B advance only if Shulin LIST/DETAIL evidence genuinely supports it. Offline-only streak pending CI/source receipts, not invented.
+
+
+### 2026-10-30 17:55 Asia/Taipei — A/B source-first diagnostic architecture (Draft-only)
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical platform IDs]
+├─ A TixFun #09 existing ticket source [REUSE, not new platform]
+│  ├─ L9-BD #117 exact HEAD e13e6988ab85a929b248c919eef1043e180c86bd
+│  │  └─ CI #41029345199 SUCCESS 21/21; artifact #12965570890 CRC/SHA PASS
+│  │     1 official detail HTTP200, heading=1, 0 local exact labels
+│  └─ L9-BE #119 exact HEAD f9061f2d1e4c9a2ef991ea07ce593a29f359d43e
+│     ├─ initial CI #41037244174 FAIL (scope crossed main/footer)
+│     ├─ root fix: stop at main/document; no weakened test
+│     ├─ corrected CI #41037311140 SUCCESS 15/15
+│     ├─ artifact #12968761706 independent ZIP CRC/SHA256SUMS/manifest PASS
+│     ├─ 1 official detail GET HTTP200/43984B, heading=1
+│     ├─ 5 bounded ancestor scopes, exact performance/price/sale/refund labels 0
+│     └─ HOLD_NO_EXACT_SCOPE_LABELS_ROTATE_SOURCE; NEXT L9-BF other existing source
+├─ B Shulin Arts Center P0 New Taipei [nonduplicate venue source]
+│  ├─ VENUE-02R #118 HEAD e55c8f22ca287c2e38da749697359691f8a29a8d
+│  │  └─ CI #41029352597 SUCCESS 18/18; artifact #12965142009 CRC/SHA PASS
+│  │     1 official index GET HTTP200, 6 xmdoc link-role groups, no LIST_PASS
+│  └─ VENUE-02S #120 exact HEAD d83e7a8b6da4e11e7df213f04a71d422ba7d4215
+│     ├─ CI #41037248016 SUCCESS 16/16; artifact #12968796405 CRC/SHA PASS
+│     ├─ index GET HTTP200/49836B, 9 strict same-origin detail candidates
+│     ├─ 1 selected source-derived detail GET HTTP200/41047B
+│     ├─ index label vs detail heading exact matches=0
+│     └─ HOLD_DETAIL_TITLE_MISMATCH_OR_AMBIGUITY; NEXT VENUE-02T P0 NTPC rotation
+├─ Governance Draft PR #8 [two canonical docs serialized SHA-guarded, NOT main]
+└─ Release boundary FIELD A/B=0/0, Golden=0, published=0
+   ├─ NEW SOURCE_QUALITY A/B YES/YES; offline-only consecutive 0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; no production/main/formal JSON/Pages/Android write
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages runtime UNVERIFIED; Toolkit UNKNOWN
+~~~
+
+- **Source dedup:** Reuse CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue source distinct from OPENTIX #05. No venue DataSN as ticket ID, no announcement date as performance time. **NEXT:** A rotate away from TixFun zero labels; B rotate away from Shulin title mismatch, prioritize other nonduplicate P0 New Taipei official source; no synthetic-only repeat loops.
+
+### 2026-10-30 18:59 Asia/Taipei — A P30-L9-BF / B P30-VENUE-02T source-first Gate, independent exact-head CI (NO PUBLISH)
+
+- **Fresh authority and Writer isolation:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`; Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` and `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` unchanged; 19 canonical source identities. Parent #119/#120 exact HEAD re-read and unchanged; isolated branches only. Toolkit local path/permissions UNKNOWN/not invoked. Official Pages runtime read attempted but inaccessible, UNVERIFIED.
+- **A ENGINEERING L9-BF:** [Draft PR #121](https://github.com/easonliu714/event_scraper_public/pull/121), base frozen #119 HEAD `f9061f2d1e4c9a2ef991ea07ce593a29f359d43e`, exact HEAD `0e06522defba61f642c4085d58641db491efb43d`; 3 ADD-only script/test/workflow files, immutable data guard. [Exact-head CI #41044766796](https://github.com/easonliu714/event_scraper_public/actions/runs/41044766796) SUCCESS, predecessor 6/6 + new 11/11 tests. [Artifact #12971138504](https://github.com/easonliu714/event_scraper_public/actions/runs/41044766796/artifacts/12971138504) ZIP SHA256 `09deacdd1a8703de1ed905f880032ad559d78d85b435e2cc93099ce6a8afb4fc`; independent ZIP CRC, audit manifest SHA256 and SHA256SUMS readback PASS.
+- **A NEW SOURCE_QUALITY:** rotate away from TixFun #09 exact local role-label zero to existing **Event Go #10** (canonical reuse). One official homepage GET HTTP200/124532 bytes, 40 source-derived distinct HTTPS list/detail title edges; one selected same-origin detail GET HTTP200/65083 bytes, 9 H1/H2 headings, exact index title/detail heading matches **0**. Decision **`HOLD_DETAIL_TITLE_MISMATCH_OR_AMBIGUITY`**, not verified Event ID, date, price, session or FIELD. Two legal normal GET, no redirect, no raw HTML persisted. **NEXT A L9-BG:** diagnose bounded Event Go list-title vs detail heading mismatch from existing receipts without repeat GET where possible; if structural mismatch persists, rotate to another existing source with positive same-ID identity; do not create synthetic-only loop.
+- **B ENGINEERING VENUE-02T:** [Draft PR #122](https://github.com/easonliu714/event_scraper_public/pull/122), base frozen #120 HEAD `d83e7a8b6da4e11e7df213f04a71d422ba7d4215`, exact HEAD `1dfe24da6282dfc85e52cfb804e1f432c0517c01`; 3 ADD-only script/test/workflow files, immutable data guard. [Exact-head CI #41044773243](https://github.com/easonliu714/event_scraper_public/actions/runs/41044773243) SUCCESS, predecessor 8/8 + new 12/12 tests. [Artifact #12972181139](https://github.com/easonliu714/event_scraper_public/actions/runs/41044773243/artifacts/12972181139) ZIP SHA256 `2f67b35a273128920932a6bf1e376e2e879185f12ab6f369e69334a2f3e4dcc2`; independent ZIP CRC, audit manifest SHA256 and SHA256SUMS readback PASS.
+- **B NEW SOURCE_QUALITY:** after Shulin #120 identity mismatch, rotate to nonduplicate **Cloud Gate Theater P0 New Taipei**. One official `https://www.cloudgate.org.tw/cgt` GET HTTP200/123426 bytes; strict HTTPS same-origin performance/event/program/show path candidates **0**. No second GET; decision **`HOLD_NO_SOURCE_DERIVED_DETAIL_EDGE`**, no LIST_PASS, venue Event ID, ticket ID or FIELD. **NEXT B VENUE-02U:** do not repeat Cloud Gate synthetic path checks; prioritize another nonduplicate P0 New Taipei official source (Fuzhong15 or Ceramics) for a bounded real index/detail edge, or diagnose route structure only from permitted new source evidence.
+- **Engineering/source/release separation:** A/B new official SOURCE_QUALITY diagnostic YES/YES (negative identity/path evidence, not formal acceptance); offline-only consecutive **0/0**. Accepted formal FIELD A/B **0/0**, Golden **0**, published **0**, `HARD_HOLD_NO_PUBLICATION` persists. No merge/main/production Scraper/Writer/Publisher/Scheduler/Notifier/formal JSON/Pages/Android write. Preserve CKSMH #17 5, TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS; ibon 39961 mismatch OPEN. Songshan #14/Huashan #13/TWTC #16/CKSMH #17 dedup; NTCH venue source distinct from OPENTIX #05. No Owner action required.
+
+### 2026-10-30 20:02 Asia/Taipei — A L9-BG / B VENUE-02U exact-head architecture and source-role evidence
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical ticket platform IDs]
+├─ A existing UDN ticket platform #06 [REUSE, no duplicate]
+│  └─ L9-BG Draft #123 exact HEAD 3885b2b1ce299cc795bd2ac8b3b6a47d83809cc1
+│     ├─ predecessor #121 HEAD 0e06522defba61f642c4085d58641db491efb43d
+│     ├─ 3 ADD-only: bounded same-origin UDN source script, 14 negative tests, exact-head CI
+│     ├─ official index/detail HTTP200/200; 89964B/153256B; 6 strict source-derived edges
+│     ├─ 3 detail H1/H2/H3; exact index-title matches=0 → HOLD_TITLE_MISMATCH_OR_AMBIGUITY
+│     ├─ CI #41052180894 SUCCESS 25/25; Artifact #12974827452 ZIP CRC/SHA PASS
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT L9-BH OPENTIX #05 identity role
+├─ B 府中15 P0 New Taipei official screening venue [NOT in 19 ticket platforms]
+│  └─ VENUE-02U Draft #124 exact HEAD 272b0909caaba3849769fa1f21144520f0b036bb
+│     ├─ predecessor #122 HEAD 1dfe24da6282dfc85e52cfb804e1f432c0517c01
+│     ├─ 3 ADD-only: strict same-sid screening script, 16 negatives, exact-head CI
+│     ├─ official index/detail HTTP200/200; 94372B/54926B; 45 source-derived screening edges
+│     ├─ one exact index/detail heading + one 放映日期 label → REVIEW only
+│     ├─ screening sid ≠ ticket Event ID; label ≠ accepted date value; no sale/admission inference
+│     ├─ CI #41052188097 SUCCESS 28/28; Artifact #12974424424 ZIP CRC/SHA PASS
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT VENUE-02V row/date/session provenance
+├─ Governance Draft PR #8 [serial SHA-guarded two-doc append; NOT main]
+└─ Formal release boundary
+   ├─ docs/data.json 7fc4fe... / platform_status.json e19ca37c... [FROZEN]
+   ├─ NEW SOURCE_QUALITY A/B=YES/YES; offline-only consecutive A/B=0/0
+   ├─ HARD_HOLD_NO_PUBLICATION; accepted FIELD A/B=0/0, Golden=0, published=0
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 Core UI PASS
+   └─ ibon 39961 mismatch OPEN; official Pages runtime UNVERIFIED; Toolkit UNKNOWN
+~~~
+
+- **Source identity and provenance:** CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 remain existing sources; OPENTIX #05 is distinct from NTCH venue. 府中15 is a New Taipei venue discovery identity only; `sid` and `xsmsid` are venue URL parameters, not a verified ticket Event ID. Exact heading/date-role REVIEW cannot promote event datetime, ticket sale status or Golden. Every future accepted field requires source/observed_at/role/decision and conflict rejection.
+- **Safety:** Two isolated Draft PRs, exact-head immutable-data guards, independent artifact SHA256SUMS/manifest/CRC; no merge, main write, production writer/publisher/scheduler/notifier, formal JSON, Pages or Android changes. A next L9-BH and B next VENUE-02V remain parallel.
+
+### 2026-10-30 21:02 Asia/Taipei — A L9-BH / B VENUE-02V exact-head source-quality architecture
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN; 19 canonical platform IDs]
+├─ A existing OPENTIX ticket platform #05 [REUSE; distinct from NTCH venue]
+│  └─ L9-BH Draft #125 exact HEAD 027876e9f27444456f3822917ccc3f185ee63258
+│     ├─ frozen parent #123 3885b2b1ce299cc795bd2ac8b3b6a47d83809cc1
+│     ├─ 3 ADD-only: source-derived /event/<digits> title, 17 tests, exact-head CI
+│     ├─ CI #41059836503 SUCCESS 31/31; artifact #12978741251 CRC/SHA PASS
+│     ├─ 2 official GET HTTP200/200; 64 index edges; 1 exact detail H1
+│     ├─ 1 ticket section, 1 venue chooser, 1 session chooser, 1 refund label
+│     ├─ REVIEW only; labels do not prove session datetime, price, sale or refund value
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT L9-BI source-local value roles
+├─ B 府中15 P0 New Taipei venue [nonduplicate; NOT ticket platform]
+│  └─ VENUE-02V Draft #126 exact HEAD d023f55434a17a84630e97a7aba14c694b9c5a0b
+│     ├─ frozen parent #124 272b0909caaba3849769fa1f21144520f0b036bb
+│     ├─ 3 ADD-only: five-cell row-local date/time, 16 negatives, exact-head CI
+│     ├─ CI #41059843014 SUCCESS 32/32; artifact #12977774158 CRC/SHA PASS
+│     ├─ 2 official GET HTTP200/200; 47 index row candidates
+│     ├─ exact film heading=1; local 放映日期 label=1; row↔detail datetime parity=1
+│     ├─ sid is film/detail ID not verified unique screening or ticket Event ID
+│     ├─ 售/報/索 are admission markers, not sale proof; REVIEW only
+│     └─ FIELD=0 / Golden=0 / published=false; NEXT VENUE-02W multi-showing conflicts
+├─ Governance Draft PR #8 [two canonical docs sequential SHA-guarded; NOT main]
+└─ Release boundary HARD_HOLD_NO_PUBLICATION
+   ├─ docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [FROZEN]
+   ├─ platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124 [FROZEN]
+   ├─ SOURCE_QUALITY A/B YES/YES; offline-only streak A/B 0/0
+   ├─ accepted FIELD A/B 0/0; Golden 0; published 0
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages runtime and Toolkit UNKNOWN/UNVERIFIED
+~~~
+
+- **Per-field provenance contract:** Preserve source / observed_at / role / decision per independent field; never equate OPENTIX ticket sections with verified session values, venue film `sid` with ticket Event ID, or date-label text with a published timestamp. Multi-date film details require row-specific venue screening identity and conflict rejection before any acceptance. New A/B evidence is SOURCE_QUALITY REVIEW, not Golden/PWA publication or Android verification.
+- **Safety and dedup:** No main, merge, production scraper/writer/publisher/scheduler/notifier, Golden, formal JSON, Pages or Android write. CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 remain canonical reused sources; NTCH venue and OPENTIX #05 remain distinct. Both artifact ZIPs independently verified against CRC, SHA256SUMS and manifest. Next A L9-BI and B VENUE-02W proceed independently; no Owner action required.
+
+### 2026-10-30 21:53 Asia/Taipei — A P30-L9-BI / B VENUE-02W source-role architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN, 19 canonical platforms]
+├─ A: OPENTIX #05 existing ticket platform
+│  └─ P30-L9-BI Draft #127 exact HEAD b9a4f48880aa67ae7c7ddea7088d1f0b2b825553
+│     ├─ exact-head CI #41066834815 SUCCESS (17+13=30 tests)
+│     ├─ Artifact #12981629739 ZIP SHA256 deea9d8c95cfa19e584192de07462a685f0ce06e67fe6525381e792e4fda53cf; independent CRC/manifest PASS
+│     ├─ HTTP200 index/detail; 64 event edges, exact title 1
+│     ├─ ticket-section local 4 siblings/166B; venue label 1, session label 1, refund label 0
+│     └─ REVIEW_LOCAL_SESSION_LABEL_NO_VALUE; FIELD=0; NEXT L9-BJ local value ownership or rotate
+├─ B: 府中15 P0 New Taipei venue [not a canonical ticket source]
+│  └─ VENUE-02W Draft #128 exact HEAD f5c5af8442ad294c61bb137bd911b3a36abe46b3
+│     ├─ exact-head CI #41066843386 SUCCESS (16+12=28 tests)
+│     ├─ Artifact #12981589842 ZIP SHA256 1704f8b3a279b6d66b5c1dba9adf0c296750e5d6415e4797fb221274095964a5; independent CRC/manifest PASS
+│     ├─ HTTP200 index/detail; 47 screening rows, same film 2 distinct showings, duplicate 0
+│     ├─ exact detail title 1, 放映日期 label 1, detail datetime 2, row parity 1
+│     └─ REVIEW_MULTISHOWING_FILM_NOT_UNIQUE_SESSION; FIELD=0; NEXT VENUE-02X
+├─ Governance Draft #8 [two canonical docs sequential SHA-guarded, NOT main]
+├─ Formal data/status blobs unchanged; Golden=0; published=0; HARD_HOLD_NO_PUBLICATION
+└─ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS preserved; ibon 39961 OPEN
+```
+
+- **Per-field provenance:** A local session chooser label is not a verified session value; multiple screenings sharing one venue film/detail URL require distinct row date/time identity with independent `source/observed_at/role/decision`. Refund, sale, admission, screening and performance dates remain separate roles; ambiguity stays HOLD.
+- **Safety/dedup:** No main, merge, production scraper/writer/publisher/scheduler/notifier, Golden, formal JSON, Pages or Android write. P0 Taipei/New Taipei dedup enforced; CKSMH #17, Songshan #14, Huashan #13 and TWTC #16 reused; NTCH venue distinct from OPENTIX #05. Both lines new source-quality evidence; offline-only 0/0.
+
+### 2026-10-30 22:57 Asia/Taipei — A L9-BJ / B VENUE-02X read-only source-quality architecture
+
+```text
+EventRadar Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+  production docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [NO WRITE]
+  production docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124 [19 IDs; NO WRITE]
+  Docs Draft PR #8 [SEQUENTIAL UPDATE; never main]
+  A / OPENTIX canonical platform #05
+    P30-L9-BJ Draft PR #129 HEAD 7d9a260624b900cf26208cf65a90fa82ff21c072
+    scripts/p30_l9bj_opentix_value_topology.py [ADD]
+      section_roles -> unique title/H2/<=24 sibling/<=2400 bytes
+      exact local 選擇場次 -> immediate sibling only
+      reject interactive/JS-only, sale/refund mixed role, invalid/multiple datetime
+      timezone, actual session ID, price, sale and ticket Event ID remain UNKNOWN
+    tests/p30/test_l9bj_opentix_value_topology.py [ADD, 14/14]
+    .github/workflows/eventradar_p30_l9bj.yml [ADD; exact HEAD, read-only]
+    CI #41076150901 SUCCESS (13 predecessor + 14 new)
+    artifact #12987525681 ZIP CRC/SHA/manifest independently PASS
+    official GET 2/2 HTTP200; 64 event edges; 4 local nodes/166 bytes
+    decision HOLD_JS_OR_UNBOUND_SESSION_VALUE; accepted FIELD 0
+    NEXT L9-BK rotate source, no repeated OPENTIX synthetic-only loop
+  B / FUZHONG15_P0_NEW_TAIPEI [distinct from canonical 19 ticket sources]
+    P30-VENUE-02X Draft PR #130 HEAD 0af602111623772e8ec65c15c5dfac7b18da3ffb
+    scripts/p30_venue02x_fuzhong15_allshow.py [ADD]
+      index_rows + year_hint + showing_groups -> one same-film group
+      detail_screening_dates -> exact full set/multiset equality
+      missing/extra/duplicate/invalid calendar/title ambiguity => HOLD
+      film sid != unique venue screening ID != ticket Event ID
+    tests/p30/test_venue02x_fuzhong15_allshow.py [ADD, 13/13]
+    .github/workflows/eventradar_p30_venue02x.yml [ADD; exact HEAD, read-only]
+    CI #41076158652 SUCCESS (12 predecessor + 13 new)
+    artifact #12988230108 ZIP CRC/SHA/manifest independently PASS
+    official GET 2/2 HTTP200; 47 rows; 2/2 all-showing exact date/time parity
+    decision REVIEW_ALL_SHOWINGS_EXACT_PARITY_NO_SESSION_ID; accepted FIELD 0
+    NEXT VENUE-02Y rotate to P0 New Taipei Ceramics official source discovery
+  release gates: Golden 0 / publish 0 / HARD_HOLD_NO_PUBLICATION
+  unchanged: CKSMH #17 Android 5, TWTC #16 Android 39, L8 Core UI PASS
+  dedup: Songshan #14, Huashan #13, TWTC #16, CKSMH #17
+  NTCH venue source != OPENTIX #05; ibon 39961 title mismatch OPEN
+  official Pages runtime UNVERIFIED; Toolkit local path/permission UNKNOWN
+```
+
+- **Independent evidence:** A [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41076150901) / [artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41076150901/artifacts/12987525681) ZIP SHA256 `30041a754eb4822b4a2ecaa93582312b6b9291bbce2eca0bc9c980fc393881f1`; B [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41076158652) / [artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41076158652/artifacts/12988230108) ZIP SHA256 `692243eaf8f8ad63a1e1f94912378cc9ee8be12e7e59d609f8c5bae26d3026e5`. Both artifacts independently passed ZIP CRC, SHA256SUMS and audit manifest. SOURCE_QUALITY YES/YES, offline-only consecutive 0/0, zero formal fields/Golden/publish; no main, Pages, Android or production writer mutations.
+
+### 2026-10-30 23:00 Asia/Taipei — VENUE-02X final exact-head correction / source GET discipline
+
+```text
+B VENUE-02X Draft PR #130 FINAL HEAD 6f37c6181fcf1f848cdfe9739bee852cf6b2a99d
+  supersedes interim 0af602111623772e8ec65c15c5dfac7b18da3ffb
+  scripts/p30_venue02x_fuzhong15_allshow.py
+    new source row weekday-vs-calendar verification [fail closed]
+    invalidWeekdayCount now measured, not constant-zero
+  tests/p30/test_venue02x_fuzhong15_allshow.py [14/14; adds mismatch refusal]
+  CI #41076522426 SUCCESS (12/12 predecessor + 14/14 new)
+  artifact #12988290506 CRC / SHA256SUMS / manifest independent PASS
+  ZIP SHA256 1897badff2ff3e73ae96d081ba714d0ad56433d87fbf940ef5e7f7203af3a44b
+  official HTTP200/HTTP200, 47 row-local screenings, all-showing 2/2 exact
+  invalid weekday 0; missing 0; extra 0; duplicate 0
+  REVIEW_ALL_SHOWINGS_EXACT_PARITY_NO_SESSION_ID
+  accepted FIELD 0, Golden 0, published 0; HARD_HOLD_NO_PUBLICATION
+  caveat: intermediate synchronize CI #41076507788 caused repeated GET
+  next Writer must atomically commit corrections / avoid intermediate live CI
+A L9-BJ #129 exact HEAD 7d9a260624b900cf26208cf65a90fa82ff21c072
+  CI #41076150901 SUCCESS; HOLD_JS_OR_UNBOUND_SESSION_VALUE unchanged
+  NEXT A L9-BK rotate existing platform; NEXT B VENUE-02Y rotate P0 New Taipei Ceramics
+```
+
+### 2026-10-30 23:59 Asia/Taipei — A L9-BK / B VENUE-02Y source-first exact-head evidence (NO PUBLISH)
+
+~~~text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ A existing Songshan platform #14 [REUSE, not duplicate venue source]
+│  └─ L9-BK Draft #131 HEAD abcd61bff97a08ace5f9c221a39f256115f2055c
+│     ├─ base #129 HEAD 7d9a260624b900cf26208cf65a90fa82ff21c072
+│     ├─ 3 ADD-only script/test/workflow; exact-head CI #41085556226 SUCCESS (14+12=26)
+│     ├─ Artifact #12991147600 ZIP SHA256 55fa52b09724994645dd4b93eff3efa868495d2eeefe7ae97a3d2072fbbc92a5
+│     ├─ 2 official GET HTTP200/HTTP200; 25 source-derived UUID detail edges
+│     ├─ selected detail exact heading 0 → HOLD_DETAIL_TITLE_MISMATCH_OR_AMBIGUITY
+│     └─ FIELD 0; NEXT L9-BL bounded identity root cause / rotate
+├─ B P0 新北市鶯歌陶瓷博物館 [NEW venue identity, not ticket platform]
+│  └─ VENUE-02Y Draft #132 HEAD 4276d0f3ddc95997ca52b527a511a8da426daacf
+│     ├─ base #130 HEAD 6f37c6181fcf1f848cdfe9739bee852cf6b2a99d
+│     ├─ 3 ADD-only script/test/workflow; exact-head CI #41085604504 SUCCESS (14+13=27)
+│     ├─ Artifact #12992240410 ZIP SHA256 40928d531e491be6f1e10d2674cfc09e82ffb754284570a11173a22089ea794a
+│     ├─ 2 official GET HTTP200/HTTP200; 6 source-derived edges, 1 registration excluded
+│     ├─ exact exhibition title 1; date-role label 1; registration role 0
+│     ├─ REVIEW_EXHIBITION_IDENTITY_ROLE_NO_FIELDS; ticket Event ID UNKNOWN
+│     └─ FIELD 0; NEXT VENUE-02Z date-range/location provenance fail-closed
+├─ Governance Draft PR #8 [sequential SHA-guarded append to BOTH canonical docs; NOT main]
+└─ Formal docs/data.json 7fc4fe... / platform_status.json e19ca37c... [FROZEN]
+   ├─ SOURCE_QUALITY new YES/YES; offline-only consecutive 0/0
+   ├─ FIELD A/B 0/0, Golden 0, published 0, HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages runtime/Toolkit UNKNOWN
+~~~
+
+- **Independent evidence:** Both artifact ZIPs downloaded and independently checked: CRC clean, manifest SHA256 and SHA256SUMS match. A [PR #131](https://github.com/easonliu714/event_scraper_public/pull/131) / [CI #41085556226](https://github.com/easonliu714/event_scraper_public/actions/runs/41085556226); B [PR #132](https://github.com/easonliu714/event_scraper_public/pull/132) / [CI #41085604504](https://github.com/easonliu714/event_scraper_public/actions/runs/41085604504).
+- **CI root cause / remediation:** Both first-run exact-head checks failed before official GET because workflow `printf` was double-escaped. One atomic multi-file correction commit per branch fixed workflow escaping and Python regex; final exact-head CI passed without weakening guard. Do not equate Songshan list HTTP200 with identity PASS or Ceramics exhibit date label with accepted date/time, sale, admission, ticket Event ID or Golden. Per-field `source/observed_at/role/decision` and conflict refusal remain mandatory.
+- **Safety/dedup:** No main, merge, production Scraper/Writer/Publisher/Scheduler/Notifier, formal JSON, Pages or Android writes. Reuse Songshan #14, Huashan #13, TWTC #16, CKSMH #17; NTCH venue != OPENTIX #05. Local Toolkit path/permissions UNKNOWN, not invoked; formal Pages live UI UNVERIFIED. No Owner action required.
+
+
+### 2026-10-31 00:59 Asia/Taipei — A P30-L9-BL / B P30-VENUE-02Z — dual workstream architecture/evidence boundary (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ A canonical platform #13 Huashan (reuse ID; no duplicate adapter)
+│  └─ L9-BL Draft #133 HEAD c8ff4835083d794562272a144d428af1e2a3c4d6
+│     ├─ base #131 abcd61bff97a08ace5f9c221a39f256115f2055c
+│     ├─ 3 ADD-only files; exact-head CI #41094843830 SUCCESS (12+11=23)
+│     ├─ artifact #12996041125 SHA256 966a558048fae55791c02ff6922cc78c2ac9d4e0b4a27c2039dce410ca202579
+│     ├─ index HTTP200 318407B, strict detail edges 0; detail GET 0
+│     └─ HOLD_LIST_ZERO_OR_TITLE_CONFLICT; Songshan #14 mismatch remains OPEN
+├─ B P0 New Taipei Ceramics venue (not canonical 19 ticket platforms)
+│  └─ VENUE-02Z Draft #134 HEAD 126d797bf999d640c8250be92c888c54b6ed6b1f
+│     ├─ base #132 4276d0f3ddc95997ca52b527a511a8da426daacf
+│     ├─ 3 ADD-only files; exact-head CI #41094853593 SUCCESS (13+10=23)
+│     ├─ artifact #12995626775 SHA256 7d6df24f11421d5d1c2725d09cbc50d06be8030a108f51959a9680f1fc08b71d
+│     ├─ index/detail HTTP200/200; edges 6, registration excluded 1, exact title 1
+│     ├─ bounded exhibition date ranges 0, venue candidates 2
+│     └─ HOLD_DATE_RANGE_MISSING_INVALID_OR_AMBIGUOUS; no accepted fields
+├─ Docs Draft #8 canonical docs [sequential SHA-guarded append; NOT main]
+└─ Formal data/status blobs 7fc4fe... / e19ca37c... [FROZEN]
+   ├─ SOURCE_QUALITY new negative evidence YES/YES; offline-only 0/0
+   ├─ FIELD A/B 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH #17 5 / TWTC #16 39 Android USER_ATTESTED_PASS; L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Pages/Toolkit UNVERIFIED
+```
+
+- **NEXT:** A L9-BM classify Huashan list path/title mismatch without repeating unchanged GET; rotate another canonical source if blocked. B VENUE-02AA diagnose date/venue DOM role scope from existing evidence or rotate within P0 New Taipei. Do not promote field values from unbound labels or duplicate venue candidates.
+- **Independent evidence:** [A CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41094843830) / [A Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41094843830/artifacts/12996041125); [B CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41094853593) / [B Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41094853593/artifacts/12995626775). Both ZIP CRC, SHA256SUMS and manifest independently verified. Main, formal data/status, Pages, Android and production writer untouched; `HARD_HOLD_NO_PUBLICATION` persists.
+
+
+### 2026-10-31 01:55 Asia/Taipei — A L9-BM / B VENUE-02AA source-observed root-cause delta (NO PUBLISH)
+
+- **Fresh authority:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`; Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Production `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` and 19-platform `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` frozen. Existing governance Draft #8 only; no main merge. Pages live fetch UNVERIFIED; local Toolkit path/permissions UNKNOWN, not invoked.
+- **A SOURCE_QUALITY (independent official public reader, not CI GET):** [Huashan /exhibition](https://www.huashan1914.com/exhibition) links to a percent-encoded Chinese detail slug [official example](https://www.huashan1914.com/exhibition/%E9%A2%A8%E5%9C%9F%E9%9B%BB%E5%BD%B1%E9%99%A2). Frozen L9-BL `safe_detail` ASCII-only slug `[A-Za-z0-9_-]` excludes this real route; this is a concrete root-cause explanation for strict LIST zero, **not** proof of full index coverage, list-title parity or event identity. Official detail H1 contains activity title and separate activity time/venue, but the index anchor includes date and venue; do not equate whole-card text with H1. [Draft PR #135](https://github.com/easonliu714/event_scraper_public/pull/135) L9-BM HEAD `6e59197a9e199ece48fda523efb152f24ece5612`, base #133 exact `c8ff4835083d794562272a144d428af1e2a3c4d6`; add-only route diagnostic, 11 fail-closed tests and offline exact-head workflow. [CI #41102494088](https://github.com/easonliu714/event_scraper_public/actions/runs/41102494088) **QUEUED / NOT YET PASS** at this append; official GET in CI **0 by design**, artifact independent verification PENDING. NEXT L9-BN: source card-local title vs H1 identity and role boundaries, bounded new detail only if justified; retain Songshan #14 title mismatch and ibon 39961 OPEN.
+- **B SOURCE_QUALITY (independent official public reader, not CI GET):** [Ceramics index](https://www.ceramics.ntpc.gov.tw/xmdoc?XsmSId=0J148497613881029302) and [selected official detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302) show exact title and explicit `展覽日期:2026年10月16日至2026年11月15日/展覽地點:b1陶藝長廊` after long narrative. Frozen VENUE-02Z skips parent nodes >260 chars and reported two venue candidates; text-node locality is a plausible date-missing cause, but **venue conflict remains HOLD**, no formal field accepted. [Draft PR #136](https://github.com/easonliu714/event_scraper_public/pull/136) VENUE-02AA HEAD `1d4349bf5b80c8de2cf32343d8276cc8925ea48e`, base #134 exact `126d797bf999d640c8250be92c888c54b6ed6b1f`; add-only bounded leaf role diagnostic, 10 negative tests and offline exact-head workflow. [CI #41102498719](https://github.com/easonliu714/event_scraper_public/actions/runs/41102498719) **QUEUED / NOT YET PASS** at this append; official GET in CI **0 by design**, artifact independent verification PENDING. NEXT VENUE-02AB: diagnose two venue DOM candidates/section ownership from source evidence, then rotate P0 New Taipei if ambiguity persists.
+- **Safety/metrics:** A/B engineering commits and Draft PRs created; exact-head CI **PENDING/PENDING**, not claimed PASS. Both lines independent new SOURCE_QUALITY topology evidence **YES/YES**; CI itself offline-only, no repeated official GET; consecutive cycles without any source evidence A/B **0/0**. Accepted FIELD A/B **0/0**, Golden **0**, published **0**, `HARD_HOLD_NO_PUBLICATION` unchanged. No main/merge/force push/production Scraper/Writer/Publisher/Scheduler/Notifier/Golden/formal JSON/Pages/Android writes. Preserve CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 UI PASS; Songshan #14/Huashan #13 reused, NTCH venue != OPENTIX #05.
+
+### 2026-10-31 — A L9-BN / B VENUE-02AB source-bound architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ 19 canonical ticket sources: platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124 [FROZEN]
+│  └─ A Huashan platform #13 [REUSE, NOT NEW VENUE PLATFORM]
+│     ├─ Prior L9-BM Draft #135 HEAD 6e59197a9e199ece48fda523efb152f24ece5612
+│     │  ├─ CI #41102494088 SUCCESS 22/22, artifact #12998208865 independent CRC/SHA/manifest PASS
+│     │  └─ route topology REVIEW; accepted FIELD 0
+│     └─ L9-BN Draft #137 HEAD 1c8c2426f3310921dfff273daa4cd5f6daac6156
+│        ├─ scripts/p30_l9bn_huashan_card_identity.py [ADD]
+│        │  ├─ source-observed encoded Unicode slug including fullwidth ！
+│        │  ├─ require unique same-route card-local heading + exact detail H1
+│        │  └─ reject unsafe URL, duplicate cards/headings, whole-card text identity
+│        ├─ tests/p30/test_l9bn_huashan_card_identity.py [ADD, 11 source-derived/negative]
+│        ├─ .github/workflows/eventradar_p30_l9bn.yml [ADD, exact-head, read-only]
+│        ├─ CI #41111749743 QUEUED at append; official GET=0; artifact pending
+│        └─ NEXT L9-BO real DOM card-heading binding or rotate; FIELD=0
+├─ B P0 New Taipei Ceramics venue [DISTINCT FROM 19 TICKET PLATFORMS]
+│  ├─ Prior VENUE-02AA Draft #136 HEAD 1d4349bf5b80c8de2cf32343d8276cc8925ea48e
+│  │  ├─ CI #41102498719 SUCCESS 20/20, artifact #12999791771 independent CRC/SHA/manifest PASS
+│  │  └─ date/venue leaf role REVIEW; previous 2 venue candidates unresolved
+│  └─ VENUE-02AB Draft #138 HEAD c6e27a4ba16c2cbc72abee20cab79d4bb62caf8e
+│     ├─ scripts/p30_venue02ab_ceramics_role_ownership.py [ADD]
+│     │  ├─ distinguish separate date/venue labels vs inline slash-separated
+│     │  ├─ duplicate same-value role => HOLD, conflicting role => HOLD
+│     │  └─ unique source-local label => REVIEW only, never accepted FIELD
+│     ├─ tests/p30/test_venue02ab_ceramics_role_ownership.py [ADD, 12]
+│     ├─ .github/workflows/eventradar_p30_venue02ab.yml [ADD, exact-head, read-only]
+│     ├─ CI #41111758065 QUEUED at append; official GET=0; artifact pending
+│     └─ NEXT VENUE-02AC selected detail DOM ownership or rotate P0 New Taipei
+├─ Governance Draft PR #8 [TWO CANONICAL DOCS ONLY, SHA-GUARDED, NOT main]
+└─ Production docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [FROZEN]
+   ├─ independent official source topology signal YES/YES; CI GET 0/0
+   ├─ accepted FIELD 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+   ├─ Android CKSMH #17 5 / TWTC #16 39 USER_ATTESTED_PASS; L8 UI PASS
+   └─ Songshan #14 and ibon 39961 mismatch OPEN; Pages/Toolkit UNVERIFIED
+```
+
+- **Source-bound observation:** [Huashan index](https://www.huashan1914.com/exhibition) card includes date/title/venue, while [same-link detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8) has title H1, activity time/location and outbound ACCUPASS link. This is a source-observed single page, not accepted event/session/ticket identity. Ceramics [second detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302) uses separate date and location lines; prior [selected detail](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302) uses inline slash labels. Different exhibit IDs must not be merged or cross-corroborated; previous duplicate venue candidates remain HOLD.
+- **Safety and exact-head:** A/B PRs each 3 ADD-only files on isolated branches based on exact previous Gate HEAD. Prior A/B artifacts independently checked CRC, SHA256SUMS and audit manifest, including headSHA; new CI pending at append, not claimed PASS. No main/merge/production/Golden/formal data/Pages/Android mutation. Canonical-source dedup maintained (CKSMH #17, Songshan #14, Huashan #13, TWTC #16; NTCH venue != OPENTIX #05). No Owner action required.
+
+### 2026-10-31 — L9-BN / VENUE-02AB final exact-head artifact integrity (supersedes pending)
+
+```text
+A canonical Huashan #13 L9-BN Draft #137
+  HEAD 1c8c2426f3310921dfff273daa4cd5f6daac6156
+  CI #41111749743 SUCCESS: predecessor 11 + new 11 = 22/22
+  Artifact #13002939397 SHA256 5a53b376d704f7b40cced9a323761e4e375bfe2538727586caca8bb2ff3c83f4
+  independent ZIP CRC / SHA256SUMS / manifest / exact headSHA PASS
+B P0 New Taipei Ceramics VENUE-02AB Draft #138
+  HEAD c6e27a4ba16c2cbc72abee20cab79d4bb62caf8e
+  CI #41111758065 SUCCESS: predecessor 10 + new 12 = 22/22
+  Artifact #13002998660 SHA256 243106f1798d70800804c3ce579cd670b59a7d04e6fc18f2943f3017f54fb0f8
+  independent ZIP CRC / SHA256SUMS / manifest / exact headSHA PASS
+Both: first true CI failure NONE; official CI GET 0; no accepted FIELD/Golden/publish
+Next: A L9-BO source-card DOM binding; B VENUE-02AC selected-detail DOM owner
+Safety: HARD_HOLD_NO_PUBLICATION; no main, formal data, production or Android writes
+```
+
+- Earlier same-round `QUEUED` status is historical and superseded by the above exact-head SUCCESS readback. Source-observed sample regressions are not live adapter identity/field acceptance. Independent official-source topology evidence is separate from CI; do not interpret two different Ceramics exhibit IDs as corroboration or the Huashan outbound ACCUPASS link as verified ticket ID. CKSMH #17 Android 5 / TWTC #16 Android 39 USER_ATTESTED_PASS and L8 UI PASS retained; source dedup and `HARD_HOLD_NO_PUBLICATION` unchanged.
+
+
+### 2026-10-31 03:55 Asia/Taipei — Dual-line source-bound identity architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [FROZEN]
+├─ A canonical Huashan platform #13 [REUSE]
+│  └─ L9-BO Draft PR #139 HEAD 9c719011f09e4b48cec89f00ecca6864d0359740
+│     ├─ base #137 exact 1c8c2426f3310921dfff273daa4cd5f6daac6156
+│     ├─ 3 ADD-only script/test/read-only exact-head workflow
+│     ├─ two official 2026-10-31 cards share date+venue but differ in route/H1
+│     ├─ 這樣啊！ 16:00–17:30; 台灣滋味 10:30–12:00
+│     ├─ source URL/H1 distinct; no venue/date identity collapse; ticket IDs UNKNOWN
+│     ├─ CI #41119325923 SUCCESS predecessor 11 + new 10 = 21/21; GET=0
+│     └─ Artifact #13006973703 ZIP SHA256 34301eda1b613daab6d4d472ed88490c5423dac58a00600719c19583ec65df78
+├─ B Ceramics P0 New Taipei [OFFICIAL VENUE, NOT NEW 19-PLATFORM SOURCE]
+│  └─ VENUE-02AC Draft PR #140 HEAD 454dc37c2b0555b202c2eb13bd76ed5a6f01730d
+│     ├─ base #138 exact c6e27a4ba16c2cbc72abee20cab79d4bb62caf8e
+│     ├─ 3 ADD-only script/test/read-only exact-head workflow
+│     ├─ SID 0Q218338899799849722 = 山彩疊疊-唐榕個展, 10/16–11/15
+│     ├─ SID 0Q238554544743104681 = 殼之巢 — 情景之階, 10/13–11/10
+│     ├─ prior AB TITLE=殼之巢 paired with selected SID=0Q218... = WRONG ID
+│     ├─ strict SID/title/query anti-cross-record refusal; FIELD still HOLD
+│     ├─ CI #41119333456 SUCCESS predecessor 12 + new 12 = 24/24; GET=0
+│     └─ Artifact #13007042752 ZIP SHA256 fab2cf4dc250aa637e884edd8320a0eabb9c8bf6bce32ab0a9f4e12e7e23dadf
+├─ Governance Draft PR #8 [two canonical docs SHA-guarded, NOT main]
+└─ Formal docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+   / docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124
+   ├─ independent ZIP CRC/SHA256SUMS/manifest/headSHA PASS both
+   ├─ SOURCE_QUALITY YES/YES, offline-only consecutive 0/0; CI GET=0/0
+   ├─ accepted FIELD 0/0, Golden 0, published 0, HARD_HOLD_NO_PUBLICATION
+   ├─ CKSMH #17 5, TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS
+   └─ ibon 39961 mismatch OPEN; Toolkit and Pages live runtime UNVERIFIED
+```
+
+- **Official readback:** [Huashan index](https://www.huashan1914.com/exhibition), [first detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8), [second detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E5%8F%B0%E7%81%A3%E6%BB%8B%E5%91%B3); [Ceramics first SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302), [second SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302). These are bounded public observations, not CI official GET, live Adapter PASS or accepted FIELD.
+- **NEXT:** A L9-BP real Huashan card title/date/time role ownership or rotate existing canonical platform. B VENUE-02AD correct prior selected SID/title fixture and field-node ownership, or rotate another P0 New Taipei venue after HOLD. No main/production/Golden/Pages/Android writes.
+
+### 2026-10-31 04:55 Asia/Taipei — source-first A L9-BP / B VENUE-02AD architecture (NO PUBLISH)
+
+- **Frozen authority:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`; canonical platform status `e19ca37c4c80c10b7278d0813b8ff1047535d124` (19 platforms); formal data `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`. Governance Draft #8 only, not main. Preview/ShowNews main unchanged. No PWA/Pages or Android write.
+- **A platform #13 Huashan REUSE:** #139 exact HEAD `9c719011f09e4b48cec89f00ecca6864d0359740` -> [Draft #141](https://github.com/easonliu714/event_scraper_public/pull/141) exact HEAD `3b69b8789fffcf86bdcf843d5e683ed21d87c22e`. Added `scripts/p30_l9bp_huashan_live_card_probe.py`, `tests/p30/test_l9bp_huashan_live_card_probe.py`, `.github/workflows/eventradar_p30_l9bp.yml`. One normal source index GET, no redirects/cookies, 1.5MB cap, SHA-only receipt, raw HTML never retained. HTTP200/318684 bytes, selected card anchor count 0, `HOLD_CARD_MISSING_OR_DUPLICATE`. [CI #41127040397](https://github.com/easonliu714/event_scraper_public/actions/runs/41127040397) SUCCESS 18/18, Artifact #13011645803 independent CRC/SHA/manifest/headSHA PASS. NEXT L9-BQ source route DOM shape; no synthetic-only loop.
+- **B P0 New Taipei Ceramics distinct venue source:** #140 exact HEAD `454dc37c2b0555b202c2eb13bd76ed5a6f01730d` -> [Draft #142](https://github.com/easonliu714/event_scraper_public/pull/142) exact HEAD `b99e5fee03191ddc8a82bf448cf533693d154455`. Corrected `tests/p30/test_venue02ab_ceramics_role_ownership.py` cross-SID inline fixture; added `scripts/p30_venue02ad_ceramics_live_sid_probe.py`, `tests/p30/test_venue02ad_ceramics_live_sid_probe.py`, `.github/workflows/eventradar_p30_venue02ad.yml`. One normal exact SID detail GET, no redirects/cookies, 1.5MB cap, SHA-only receipt. HTTP200/43071 bytes, same-SID H3 match 1, `HOLD_INVALID_OR_MIXED_FIELD_ROLE`. [CI #41127046255](https://github.com/easonliu714/event_scraper_public/actions/runs/41127046255) SUCCESS 30/30, Artifact #13010524660 independent CRC/SHA/manifest/headSHA PASS. NEXT VENUE-02AE bounded leaf role diagnosis or rotate P0 New Taipei.
+- **Provenance/decision:** A official HTTP receipt does not establish card identity; B same-SID H3 does not establish valid field ownership. Source-level receipts observed at 2026-10-30T20:55:46Z/20:55:47Z, both with field decision HOLD. Formally accepted EVENT/SALE/ADMISSION/REGISTRATION/VOUCHER/VENUE/PRICE/SESSION 0/0, Golden 0, published 0, `HARD_HOLD_NO_PUBLICATION`. Preserve CKSMH #17 5 and TWTC #16 39 Android USER_ATTESTED_PASS, L8 UI PASS. Pages live runtime and Toolkit path/permissions UNKNOWN; no new deployment claim.
+
+
+### 2026-10-31 06:00 Asia/Taipei — A P30-L9-BQ / B VENUE-02AE exact-head source-root-cause Gate (NO PUBLISH)
+
+- **Fresh authority:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`; Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal `docs/data.json` Git blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`; 19-platform `docs/platform_status.json` Git blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`. Governance remains **Draft PR #8, not main**. No concurrent predecessor HEAD drift at write preflight. Local Toolkit path/permission UNKNOWN; Pages live runtime UNVERIFIED.
+- **A ENGINEERING:** [Draft PR #143](https://github.com/easonliu714/event_scraper_public/pull/143) **L9-BQ**, base exact #141 `3b69b8789fffcf86bdcf843d5e683ed21d87c22e`, HEAD `7b25df824a012e0acc97dc26b7c7c4b2cfaad868`, three ADD-only script/test/workflow files. [Exact-head CI #41135136770](https://github.com/easonliu714/event_scraper_public/actions/runs/41135136770) **SUCCESS**, predecessor BP **8/8** plus new BQ **9/9 = 17/17**, all steps including frozen production guard PASS, first true failure NONE. [Artifact #13016920300](https://github.com/easonliu714/event_scraper_public/actions/runs/41135136770/artifacts/13016920300) ZIP SHA256 `e439774cf1e0fb9d4e2deab46d87589888b46934c4d0557e54dda16be4f08826`; independent ZIP CRC, SHA256SUMS, manifest and headSHA **PASS**.
+- **A NEW SOURCE_QUALITY (official CI GET=1):** One bounded normal [Huashan platform #13 index](https://www.huashan1914.com/exhibition) HTTP200, 318684 bytes, source SHA256 `ade9d47c95a918cfffe71531b2ff087975136b739c6fbdc87f3ece0675ff803c`, observed `2026-10-30T22:00:46Z`. **64 anchors, 17 exhibition href anchors, 4 strict detail hrefs, 13 rejected href shapes; selected decoded path appears in 1 anchor but strict canonical URL matches 0**. Decision `HOLD_URL_CANONICALIZATION_OR_QUERY`: the BP zero-card result is not proof of missing event; route normalization/query/encoding ownership is the next bounded root cause. NEXT **L9-BR**: classify the one actual href difference with safe URL policy and source-derived local identity, **no new GET unless justified**; if still ambiguous rotate existing platform #13, not endless synthetic Gate. Accepted FIELD 0.
+- **B ENGINEERING:** [Draft PR #144](https://github.com/easonliu714/event_scraper_public/pull/144) **VENUE-02AE**, base exact #142 `b99e5fee03191ddc8a82bf448cf533693d154455`, HEAD `2584b1c13c9343be6d636331935ad347dbe359a4`, three ADD-only script/test/workflow files. [Exact-head CI #41135143244](https://github.com/easonliu714/event_scraper_public/actions/runs/41135143244) **SUCCESS**, predecessor AD **6/6** plus new AE **8/8 = 14/14**, all steps including frozen production guard PASS, first true failure NONE. [Artifact #13016630426](https://github.com/easonliu714/event_scraper_public/actions/runs/41135143244/artifacts/13016630426) ZIP SHA256 `2f28cf52c90c042108473a902f9fca8d80b20d67df2db6b2ea4015a4de8f3e1a`; independent ZIP CRC, SHA256SUMS, manifest and headSHA **PASS**.
+- **B NEW SOURCE_QUALITY (official CI GET=1):** One bounded normal [Ceramics selected official SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302) HTTP200, 43071 bytes, source SHA256 `225ad43708eea9da047e4aa4bd42fbbdb4552d5198828268394dedd7d80c65aa`, observed `2026-10-30T22:00:51Z`. Exact SID/H3 title matched **1**. One date-role and one venue-role **separate span text nodes**, each with regex miss **1**, no inline both-role node, no sale/registration mixed node. Decision `HOLD_REGEX_OR_INLINE_NODE_OWNERSHIP`: leaf label/value may be separated; **do not infer value from sibling/parent without structural proof**. NEXT **VENUE-02AF**: offline source-derived adjacent label/value DOM topology with strict section/SID ownership, or rotate next P0 New Taipei venue on continued ambiguity; no repeated unchanged GET. Accepted FIELD 0.
+- **Two-line metrics and safety:** ENGINEERING CI PASS/PASS; SOURCE_QUALITY new root-cause evidence YES/YES; official GET 1/1; independent source-signal-free consecutive rounds **A=0/B=0**. Live FIELD decisions HOLD/HOLD; formally accepted FIELD A/B **0/0**, Golden **0**, published **0**, `HARD_HOLD_NO_PUBLICATION` remains. Preserve CKSMH #17 Android 5 and TWTC #16 Android 39 USER_ATTESTED_PASS, L8 Core UI PASS; ibon 39961 mismatch OPEN; Huashan #13 is existing canonical platform, Ceramics separate New Taipei venue. No main/merge/force push, Production Scraper/Writer/Publisher/Scheduler/Notifier, formal data/status, Pages or Android changes. No Owner operation required.
+
+
+### 2026-10-31 06:50 Asia/Taipei — L9-BR / VENUE-02AF source-derived identity architecture
+
+```text
+Source main (read-only): fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Preview main: 03e515d65e827d5ed67fe341d079907a96bf784a
+ShowNews main: 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad
+Governance: Draft PR #8 only, NOT main
+A platform #13 Huashan REUSE:
+  L9-BQ #143 7b25df824a012e0acc97dc26b7c7c4b2cfaad868
+  -> L9-BR Draft #145 54518a63466872b4893ed453ab1746f389e565a0
+  -> decoded path != canonical URL; query/fragment, percent-encoding,
+     foreign origin, duplicates separately classified; no route promotion
+  -> source-derived offline diagnostic + 8 tests, CI #41140927342 initially running
+  -> NEXT L9-BS bounded new evidence or rotate existing source; FIELD=0
+B P0 New Taipei Ceramics (distinct venue, no duplicate 19-platform ID):
+  VENUE-02AE #144 2584b1c13c9343be6d636331935ad347dbe359a4
+  -> VENUE-02AF Draft #146 bb327cd2710db8d053b025c3b15af68023e1ab0d
+  -> same SID + unique H3 prerequisite; direct adjacent span label/value
+     only within one p/li; cross-section, invalid chronology, duplicates HOLD
+  -> source-derived offline diagnostic + 9 tests, CI #41140933850 initially running
+  -> NEXT VENUE-02AG source section ownership or rotate P0 New Taipei; FIELD=0
+A/B this round official GET=0/0, new independent SOURCE_QUALITY=NO/NO,
+offline-only consecutive rounds=1/1 (previous round official GET=1/1).
+Accepted FIELD=0/0; Golden=0; published=0; HARD_HOLD_NO_PUBLICATION.
+Formal docs/data.json and docs/platform_status.json blobs frozen.
+No merge/main/production scraper/writer/publisher/scheduler/notifier/Pages/Android writes.
+CKSMH #17 Android 5 + TWTC #16 Android 39 USER_ATTESTED_PASS and L8 UI PASS retained.
+Toolkit local path/permissions UNKNOWN; Pages runtime UNVERIFIED.
+```
+
+
+### 2026-10-31 06:50 — L9-BR / VENUE-02AF final exact-head CI and independent Artifact verification
+
+- A Draft #145 HEAD `54518a63466872b4893ed453ab1746f389e565a0`, [exact-head CI #41140927342](https://github.com/easonliu714/event_scraper_public/actions/runs/41140927342) **SUCCESS 17/17** (BQ 9 + BR 8), all steps PASS, first true failure NONE. Artifact #13018798469 ZIP SHA256 `40218888a53ab410562207677522eed3f93cba3f99b76e1f199d782178925555`; independent ZIP CRC/SHA256SUMS/manifest/headSHA PASS.
+- B Draft #146 HEAD `bb327cd2710db8d053b025c3b15af68023e1ab0d`, [exact-head CI #41140933850](https://github.com/easonliu714/event_scraper_public/actions/runs/41140933850) **SUCCESS 17/17** (AE 8 + AF 9), all steps PASS, first true failure NONE. Artifact #13018803315 ZIP SHA256 `8e577c57068f7ce603154b11453cdeb03c3f1f33d635972402b1ba5fa0e97bb6`; independent ZIP CRC/SHA256SUMS/manifest/headSHA PASS.
+- Both source audits: officialGET=0, new SOURCE_QUALITY=NO/NO, offline-only streak A/B=1/1, accepted FIELD=0/0, Golden=0, published=0, HARD_HOLD_NO_PUBLICATION. Next source-first or rotate; no production write.
+
+
+### 2026-10-31 08:03 Asia/Taipei — A L9-BS / B VENUE-02AG source-linked candidate evidence / fail-closed field architecture
+
+```text
+Authority: Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance: Draft PR #8 only, NOT main; formal JSON/Pages unchanged
+A P30-L9-BS Draft #147 exact HEAD b3f6cbebb4f6c4ce1fa48e7ed6d65ba0833edb29
+  platform #13 Huashan official list -> same official detail
+  -> direct first-party ticket link to ACCUPASS canonical #02 /event/2609240212371623247500
+  -> shared core title + EVENT_SESSION 2026-10-31 16:00-17:30
+  -> ROOM CONFLICT Huashan 中3A館 2樓拱廳 != ACCUPASS 中3館2樓拱廳
+  -> 8 candidate provenance receipts; HOLD, not formal accepted fields
+  -> exact-head CI 41147936781 SUCCESS 19/19
+  -> artifact 13021463298 ZIP SHA 8de499945c9007cdec40d9d51bc4cf25a6bd5e2f55aec3d6b5360e2bd7247015
+B P30-VENUE-02AG Draft #148 exact HEAD d2d594197276b6a38fe45bb605c3afdb1cdd110a
+  Ceramics New Taipei official SID 0Q218... title 山彩疊疊-唐榕個展
+    -> EXHIBITION_DATE_RANGE 2026-10-16..2026-11-15
+    -> EXHIBITION_VENUE b1陶藝長廊
+  distinct SID 0Q238... title 殼之巢 — 情景之階：佐藤雅之個展
+    -> EXHIBITION_DATE_RANGE 2026-10-13..2026-11-10
+    -> EXHIBITION_VENUE 1樓陽光特展室
+  -> 4 REVIEW candidate fields, strict cross-SID rejection
+  -> initial CI 41147940297 FAIL one test expected wrong HOLD category;
+     exact-head corrected CI 41147968285 SUCCESS 20/20, no relaxed validator
+  -> artifact 13021782466 ZIP SHA 5fddaf826125b5eaa1b6a66e5c53cca7d8917fd1048bbb2662d409c61c848aa4
+A/B independent public source-quality YES/YES, CI officialGET=0/0
+Last 3 rounds new source evidence A/B 2/3; same-root-cause-only predecessor A/B 2/2
+Formal FIELD A/B 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+```
+
+**Identity/provenance contract:** A direct venue-to-ticket URL is a strong cross-source evidence edge, but it does not authorize merging conflicting venue-room strings. EVENT_SESSION is distinct from SALE/REGISTRATION/ADMISSION; exhibition date ranges are not single performance sessions. Ceramics `sid` is an official venue document identity, not an ACCUPASS Event ID. Every field candidate requires independent `source`, `observed_at`, `role`, `decision`, and `valueSHA256`; conflict stays HOLD. Text rendered by the public reader does **not** establish actual HTML leaf/sibling ownership, which remains an explicit next Gate. No field is FORMAL FIELD PASS until independent acceptance and authorization. Preserve CKSMH #17 5 and TWTC #16 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, ibon 39961 mismatch OPEN. No production, main, formal data/status, Pages or Android write.
+
+**Next A L9-BT:** independently adjudicate Huashan room `中3A館` vs ACCUPASS `中3館` from explicit same-source room evidence; otherwise keep HOLD and rotate existing 19-platform source. **Next B VENUE-02AH:** obtain truly source-bound DOM leaf ownership for both distinct Ceramics SIDs or rotate next P0 New Taipei venue; no repeated unchanged GET. Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
+
+### 2026-10-31 09:58 Asia/Taipei — P30-L9-BT / VENUE-02AH field provenance and refusal tree
+
+```text
+Authority: Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance: Draft #8 ONLY (not main); frozen formal blobs data 7fc4fe32..., status e19ca37c...
+A canonical #13 Huashan -> canonical #02 ACCUPASS (no duplicate platform)
+  predecessor L9-BS #147 b3f6cbebb4f6c4ce1fa48e7ed6d65ba0833edb29
+  -> L9-BT Draft #149 ac4d174865c9ae16d874f8bca94aabb5d2be49b8
+  -> same official Huashan page HEADER_VENUE_ROOM "中3A館 2樓拱廳"
+     vs BODY_VENUE_ROOM "華山1914文化創意產業園區 中3館2樓拱廳"
+  -> direct ACCUPASS link does NOT resolve same-page room conflict
+  -> exact role+source URL+observed_at+value SHA; no implicit normalization
+  -> HOLD_SAME_SOURCE_HEADER_BODY_ROOM_CONFLICT; formal FIELD=0
+  -> exact-head CI #41158031995 SUCCESS predecessor 11 + new 10 = 21/21
+  -> Artifact #13026056618 exists; independent ZIP hash readback UNVERIFIED
+  -> NEXT rotate canonical platform after frozen conflict evidence
+B P0 New Taipei Ceramics venue (distinct from existing 19-platform sources)
+  predecessor VENUE-02AG #148 d2d594197276b6a38fe45bb605c3afdb1cdd110a
+  -> VENUE-02AH Draft #150 5283df1033a6fbceadb702492b7a159c3f534962
+  -> SID 0Q218... EXHIBITION_DATE_RANGE Oct16-Nov15
+     ARTICLE_UPDATED_AT Oct15, SITE_CONTENT_UPDATED_AT Oct30
+  -> SID 0Q238... EXHIBITION_DATE_RANGE Oct13-Nov10
+     ARTICLE_UPDATED_AT Oct12, SITE_CONTENT_UPDATED_AT Oct30
+  -> article/site update != event/session/sale; SID != ticket event ID
+  -> two SID provenance sets; no cross-SID join, no DOM leaf proof
+  -> REVIEW only, formal FIELD=0
+  -> exact-head CI #41158093785 SUCCESS predecessor 11 + new 11 = 22/22
+  -> Artifact #13025658512 exists; independent ZIP hash readback UNVERIFIED
+  -> NEXT rotate P0 New Taipei source, retain Ceramics role/DOM HOLD
+A/B new independent source observations YES/YES; official CI GET 0/0
+Last 3 cycles new SOURCE_QUALITY A 2/3, B 2/3
+Repeated root cause A room 2 cycles; B DOM leaf unresolved 2+ prior Gates
+Formal FIELD 0/0; Golden 0; publication 0; HARD_HOLD_NO_PUBLICATION
+No main, merge, production, formal data/status, Pages or Android changes
+CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS; L8 UI PASS
+```
+
+**Source evidence:** [Huashan official detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8), [Ceramics first SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302), [Ceramics second SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302). Current ACCUPASS fresh read UNVERIFIED. New source-role text is independent public reader evidence, not official GET in CI or live adapter acceptance. Read-only exact-head jobs passed all steps; ZIP CRC/SHA manifest independently **not verified** in this cycle. Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
+
+### 2026-10-31 10:02 — dual-line immutable artifact verification readback
+
+```text
+A L9-BT #149 HEAD ac4d174865c9ae16d874f8bca94aabb5d2be49b8
+  CI 41158031995 SUCCESS 21/21; Artifact 13026056618
+  ZIP SHA256 3ac061f1acfd755baea79805f4b7a83abc176577a3d3d4155af98e9606e521e9
+  ZIP CRC + SHA256SUMS + manifest file hashes + audit headSHA PASS
+B VENUE-02AH #150 HEAD 5283df1033a6fbceadb702492b7a159c3f534962
+  CI 41158093785 SUCCESS 22/22; Artifact 13025658512
+  ZIP SHA256 e130e56212c3c96e11b1f77e578e5f6e76b38ead5962c9d114e061679f216e78
+  ZIP CRC + SHA256SUMS + manifest file hashes + audit headSHA PASS
+Source quality: independent official page roles YES/YES; CI GET=0/0
+Accepted fields=0/0; Golden=0; published=0; HARD_HOLD_NO_PUBLICATION
+Pages live fetch unavailable, Android PASS retained; no formal data/status change
+```
+
+This supersedes earlier Artifact-independent-verification UNVERIFIED statements for these two exact artifacts only; source HTML DOM leaf and independent FORMAL FIELD acceptance remain HOLD. Next A rotate canonical platform, B rotate nonduplicate P0 New Taipei venue.
+
+
+### 2026-10-31 10:59 Asia/Taipei — source-bound fail-closed rotation architecture (L9-BU / VENUE-02AI)
+
+```text
+Authority Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance Draft PR #8 ONLY; formal data/status frozen; HARD_HOLD_NO_PUBLICATION
+A canonical platform #07 FamiTicket (REUSE, not new source adapter)
+  Prior L9-BT #149 ac4d174865c9ae16d874f8bca94aabb5d2be49b8
+  -> L9-BU Draft #151 HEAD 40bf097137ca9d3a139390d0e9bf56195be38314
+  -> first-party /Home LIST title/date + mixed 展覽/演唱會 classification
+  -> exact opaque /Home/Activity/Info/... link renders iframe-only
+  -> no independently verified same-ID detail H1, EVENT/SALE/SESSION/PRICE
+  -> 3 candidate LIST role hashes REVIEW; accepted FIELD=0
+  -> HOLD_MIXED_LIST_CATEGORY_AND_IFRAME_IDENTITY
+  -> CI 41162325839 SUCCESS 21/21; artifact 13027652162
+     SHA256 3780cf46e7766290ca85970db3c478219f310dd9af2d644676e995139de1fc77
+B P0 New Taipei Zepp (existing VENUE-02J/K history, no duplicate adapter)
+  Prior VENUE-02AH #150 5283df1033a6fbceadb702492b7a159c3f534962
+  -> VENUE-02AI Draft #152 HEAD f027092f88848a6dedef5a7db2243e494c6a661b
+  -> first-party schedule -> exact same-rid=163025 detail/title/date
+  -> index START 13:00 != exhaustive session list
+  -> detail explicitly 13:00 AlmondProgress, 19:30 SkyNani
+  -> direct TicketPlus activity URL, body 購票網址｜網頁建置中
+  -> external ticket title/identity not independently verified (JS-only)
+  -> 6 source-bound candidate role hashes REVIEW; accepted FIELD=0
+  -> HOLD_TWO_SESSIONS_TICKET_DETAIL_AND_BODY_STATUS_UNVERIFIED
+  -> CI 41162328563 SUCCESS 23/23; artifact 13027731172
+     SHA256 82ea5a45ce49fcac0f38ab27e0fecb4044945c070373c8e6c09a874caffe0b16
+Both initial CI checkout failures from escaped GitHub SHA expression repaired;
+  final exact-head all steps PASS, independent artifact ZIP CRC/SHA/manifest/head PASS
+Last 3 rounds SOURCE_QUALITY A/B 3/3; formally accepted fields A/B 0/0
+Same-root prior loop A Huashan 2, B Ceramics 2+; rotated A/B this round
+CI official GET 0/0; independent official reader source observation YES/YES
+Golden 0; publication 0; Android CKSMH 5 / TWTC 39 / L8 UI PASS retained
+NEXT A L9-BV different canonical source; NEXT B VENUE-02AJ ticket parity or rotate
+```
+
+**Field provenance boundary:** A opaque detail URL is a source link, not proof of EVENT identity or date role. B first-party `rid` identifies a Zepp schedule document, not a verified TicketPlus event ID; two explicit performance sessions are distinct from the index's single START and from sale/registration/price. Every REVIEW candidate remains tied to source URL, observed date, role and value SHA256; missing external ticket parity or contradictory body status stays HOLD. Source links: [FamiTicket index](https://www.famiticket.com.tw/Home), [Zepp index](https://www.zepp.co.jp/hall/newtaipei/schedule/), [Zepp rid detail](https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=163025), [TicketPlus linked activity](https://ticketplus.com.tw/activity/a3cb941035a5a7e6898f4000f76bd25c). No production, main, formal JSON, Pages or Android writes.
+
+
+### 2026-10-31 11:55 — L9-BV / VENUE-02AJ provenance architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance Draft #8 ONLY; formal data/status frozen; HARD_HOLD_NO_PUBLICATION
+A canonical #18 iNDIEVOX; predecessor L9-BU #151 40bf097137ca9d3a139390d0e9bf56195be38314
+  -> Draft #153 L9-BV d14677446c131ecfa64bf467bda8ef43587ab84d
+  -> homepage LIST -> same-ID detail/26_iv04280c7 -> game/26_iv04280c7
+  -> six source-explicit EVENT_SESSION rows (12/05,06,12,13,19,20 at 20:00)
+  -> three generic PRICE classes; two SALE starts (10/29 and 10/30)
+  -> per-session PRICE mapping and live inventory NOT proven; REVIEW only
+  -> exact-head CI 41166350240 SUCCESS 22/22; Artifact 13029004010
+B P0 New Taipei Zepp; predecessor VENUE-02AI #152 f027092f88848a6dedef5a7db2243e494c6a661b
+  -> Draft #154 VENUE-02AJ 264534158666204319e7cd5c796017c07c0aadb4
+  -> official same rid=163025, two named EVENT_SESSION times
+  -> nine generic PRICE tiers and two SALE starts are distinct role classes
+  -> TicketPlus linked JS-only page cannot independently verify title/sessions
+  -> body 購票網址｜網頁建置中 conflicts with implied link readiness
+  -> per-session price/sale association UNKNOWN; REVIEW only
+  -> exact-head CI 41166354001 SUCCESS 23/23; Artifact 13028994095
+Both: CI officialGET=0, independent public first-party reader observations YES
+  source_url / observed_at / role / valueSHA256 / decision on each candidate
+  no dynamic ticket inventory claims; no cross-source ID substitution
+  formally accepted FIELD A/B=0/0, Golden=0, published=0
+  artifacts uploaded, independent ZIP CRC/SHA readback UNVERIFIED
+  last 3 source evidence rounds A/B=3/3, repeated root cause rotated
+  no production, main, merge, force-push, formal JSON, Pages or Android writes
+  CKSMH #17 Android 5 / TWTC #16 Android 39 / L8 UI USER_ATTESTED_PASS retained
+  ibon 39961 historical title mismatch OPEN
+```
+
+**Gate decision graph:** First-party URL allowlist → exact same event ID and title across LIST/DETAIL/GAME (A), or exact venue `rid` (B) → source-explicit EVENT_SESSION, SALE_START, PRICE_CLASS roles → independent per-session allocation and ticket identity check. If ticket page is JS-only or a generic price table is not mapped to individual sessions, preserve candidates as REVIEW and return HOLD. The source document's event ID is not an external ticket event ID; an available ticket link is not ticket title/session parity. Next A L9-BW only pursue independently source-verifiable session-price/availability role, otherwise rotate canonical platform. Next B VENUE-02AK only attempt legal bounded TicketPlus parity with a new falsifiable hypothesis, otherwise rotate next P0 New Taipei source. FORMAL FIELD requires independent acceptance; publication requires separate Owner authorization. Toolkit path/permission UNKNOWN, Pages deployment UNVERIFIED.
+
+
+### 2026-10-31 11:56 — independent immutable evidence artifacts readback
+
+```text
+A L9-BV #153 HEAD d14677446c131ecfa64bf467bda8ef43587ab84d
+  CI 41166350240 SUCCESS 22/22; Artifact 13029004010
+  ZIP SHA256 d4c18b911c9e1ec81e3b249823fb73809dda9ca0b49747cd2af960d384fbb483
+  ZIP CRC + SHA256SUMS + manifest + exact audit headSHA PASS
+B VENUE-02AJ #154 HEAD 264534158666204319e7cd5c796017c07c0aadb4
+  CI 41166354001 SUCCESS 23/23; Artifact 13028994095
+  ZIP SHA256 43d6569aa6142d40b1362e5e22c9eb0115e275a50d973623c4adce6f36b98e24
+  ZIP CRC + SHA256SUMS + manifest + exact audit headSHA PASS
+Accepted fields 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+```
+
+This supersedes earlier artifact verification UNVERIFIED for these exact two artifacts only; no ticket identity, per-session price, formal FIELD or publication acceptance is implied.
+
+
+### 2026-10-31 12:55 Asia/Taipei — A L9-BW / B VENUE-02AK source provenance, acceptance HOLD
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance Docs Draft PR #8 ONLY; no main merge or formal data/status changes
+A canonical #18 iNDIEVOX, no new platform source:
+  L9-BV #153 d14677446c131ecfa64bf467bda8ef43587ab84d
+  -> L9-BW Draft #155 1d386dfb8b1ae4bf1776bb53d42721bfef7b1efa
+  -> official same-ID detail/game 26_iv04280c7; six event-session rows
+  -> game reader snapshot two rows with 'No tickets available' UI text
+  -> snapshot text != independently verified live ticket inventory
+  -> generic price classes and sale windows != per-session price mapping
+  -> 10 strict regression tests; exact-head CI 41170451988 IN_PROGRESS
+  -> HOLD_DYNAMIC_STATUS_AND_PER_SESSION_PRICE_NOT_VERIFIED; FIELD=0
+B P0 New Taipei Art Center venue (not among canonical 19 platform sources):
+  VENUE-02AJ #154 264534158666204319e7cd5c796017c07c0aadb4
+  -> VENUE-02AK Draft #156 219a2c2c43faf786db53a83abd5f140fa7a6a82d
+  -> official sitesearch -> bulletin SID 0Q152372523738311866
+  -> same bulletin title; eight distinct event groups, NOT eight event IDs
+  -> group-local performance dates and venue-attributed ticket claims
+  -> 2026-11-10 is Tuesday, bulletin says 11/10(日) -> calendar conflict
+  -> one bulletin SID != individual event identity or ticket Event ID
+  -> 11 strict regression tests; exact-head CI 41170455331 IN_PROGRESS
+  -> HOLD_BULLETIN_NOT_EVENT_ID_AND_WEEKDAY_CONFLICT; FIELD=0
+A/B candidate fields carry source_url, observed_at, role, valueSHA256,
+decision=REVIEW_NOT_FORMALLY_ACCEPTED; no independent field acceptance.
+3-round official-reader evidence A 3/3, B 3/3; formal field delta 0/0.
+A iNDIEVOX price/session root 2 rounds -> rotate canonical platform.
+B Zepp external ticket root 2 rounds -> rotated P0 New Taipei Art Center.
+Both CI officialGET=0; exact-head CI/artifacts PENDING at initial append.
+Golden=0, publication=0, HARD_HOLD_NO_PUBLICATION unchanged.
+CKSMH #17 Android 5 / TWTC #16 Android 39 USER_ATTESTED_PASS,
+L8 Core UI and formal PWA visual PASS retained; ibon39961 mismatch OPEN.
+```
+
+**Source links:** [iNDIEVOX detail](https://www.indievox.com/activity/detail/26_iv04280c7), [iNDIEVOX game](https://www.indievox.com/activity/game/26_iv04280c7), [Art Center index](https://www.culture.ntpc.gov.tw/artcenter_chi/sitesearch), [Art Center bulletin](https://www.culture.ntpc.gov.tw/artcenter_chi/xmdoc/cont?sid=0Q152372523738311866&sq=&xsmsid=0G269629106251547168). Official public reader source observations are **not** CI-run GET or independently accepted Golden fields. Next A L9-BX rotate after frozen session-price/status HOLD; next B VENUE-02AL resolve source-local bulletin group identity or rotate, not synthetic-only loops. No Owner action or publication authorization.
+
+
+### 2026-10-31 12:57 — immutable exact-head CI evidence verification (supersedes pending)
+
+```text
+A L9-BW #155 HEAD 1d386dfb8b1ae4bf1776bb53d42721bfef7b1efa
+  CI 41170451988 SUCCESS; frozen 11 + new 10 = 21/21
+  Artifact 13030568136 ZIP SHA256
+  5083ee71cecf05678ea8cf31110fa48f94559d973f3d00633d07c0da786c58f3
+B VENUE-02AK #156 HEAD 219a2c2c43faf786db53a83abd5f140fa7a6a82d
+  CI 41170455331 SUCCESS; frozen 11 + new 11 = 22/22
+  Artifact 13030961682 ZIP SHA256
+  716150fdf6a93830d4cfd8f20fdc8c6f084f241ac43d20e167b7705455cb629c
+Both ZIP CRC, SHA256SUMS, manifest and audit exact headSHA PASS
+Both CI officialGET=0; independent public reader evidence separate
+Accepted FIELD=0/0, Golden=0, publication=0, HARD_HOLD_NO_PUBLICATION
+```
+
+No main, merge, production JSON, Pages or Android writes; prior Android PASS preserved.
+
+
+### 2026-10-31 13:55 Asia/Taipei — source-first dual-line L9-BX / VENUE-02AL (NO PUBLISH)
+
+- **Authority:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`; Governance Draft PR #8 only (not main). Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, 19-platform `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` frozen. Local Toolkit path/permissions UNKNOWN; Pages live runtime UNVERIFIED.
+- **A ENGINEERING:** predecessor [L9-BW Draft #155](https://github.com/easonliu714/event_scraper_public/pull/155) `1d386dfb8b1ae4bf1776bb53d42721bfef7b1efa` → [L9-BX Draft #157](https://github.com/easonliu714/event_scraper_public/pull/157) exact HEAD `56275e2693d82f3f2bd1bf4843c496bff215fa13`; 3 ADD-only script, 10 negative tests, read-only exact-head workflow. [CI #41174492027](https://github.com/easonliu714/event_scraper_public/actions/runs/41174492027) initially IN_PROGRESS; exact-head PASS, artifact SHA/CRC independently verified status PENDING at initial append.
+- **A SOURCE_QUALITY:** rotated canonical existing #10 Event Go ([official index](https://eventgo.bnextmedia.com.tw/) → [same-ID detail](https://eventgo.bnextmedia.com.tw/event/detail/217fef2dc4986456b0a0da9b113f8dec)); exact linked title, Nov 04 09:00–12:00 and Hsinchu venue shown by independent public reader. Detail simultaneously says `結束售票` and a `熱賣中` NT$0 registration ticket badge. Distinguish EVENT_TIME / VENUE / PRICE_CLASS / SALE_BANNER / TICKET_BADGE; **HOLD_CONFLICTING_SALE_BANNER_AND_TICKET_BADGE**, never infer registration open or inventory. Six source-bound candidate role hashes REVIEW; FORMAL FIELD=0. Official CI GET=0; reader observation is not independent field acceptance.
+- **B ENGINEERING:** predecessor [VENUE-02AK Draft #156](https://github.com/easonliu714/event_scraper_public/pull/156) `219a2c2c43faf786db53a83abd5f140fa7a6a82d` → [VENUE-02AL Draft #158](https://github.com/easonliu714/event_scraper_public/pull/158) exact HEAD `efa78b4323ebca073a060365466086a8c1128ae6`; 3 ADD-only script, 6 negative tests, read-only exact-head workflow. [CI #41174495631](https://github.com/easonliu714/event_scraper_public/actions/runs/41174495631) initially QUEUED; exact-head PASS and artifact SHA/CRC independent verification PENDING at initial append.
+- **B SOURCE_QUALITY:** rotated to P0 New Taipei Xinzhuang Cultural Arts Center, distinct from canonical 19 ([official quarter index](https://www.xzcac.ntpc.gov.tw/xmdoc?XsmSId=0O093511499740188930) → [same SID detail](https://www.xzcac.ntpc.gov.tw/xmdoc/cont?sid=0Q292597022385142603&xsmsid=0O093511499740188930)). Detail is 2026 Oct–Dec joint-program PDF attachment with `更新日期 2026-10-19`; update date is **not** event/session date; bulletin SID is not event or ticket ID. PDF content not parsed, individual events not identified. Three provenance hashes REVIEW; **HOLD_PDF_ATTACHMENT_NO_EVENT_LEVEL_IDENTITY**, FIELD=0; official CI GET=0.
+- **Near-three-round evidence:** A #153/#155/#157 independent official source observations **3/3**, repeated iNDIEVOX price/status root 2 then rotated #10 Event Go; B #154/#156/#158 independent official source observations **3/3**, Zepp ticket-parity 2 then NTPC Art Center bulletin 1 then Xinzhuang attachment 1. Formal FIELD increment **0/0**. OFFLINE-only consecutive rounds **0/0** by separate first-party reader observations; CI official GET **0/0**. Current new root-cause each 1; neither ticket status nor PDF source proves event-level acceptance.
+- **NEXT:** A L9-BY must independently resolve contradictory Event Go registration state only with a novel safe test; otherwise rotate to a different existing #01–#19 canonical source with usable same-ID DETAIL. B VENUE-02AM must verify lawful event-level Xinzhuang program content only if permitted and accessible; otherwise record PDF barrier and rotate next nonduplicate P0 New Taipei source, not another synthetic attachment Gate. **Acceptance readiness:** source-bound candidate role receipts exist, but independent formal field acceptance A/B **0/0**, Golden **0**, publication **0**; `HARD_HOLD_NO_PUBLICATION`. No merge/main/force-push, formal JSON, production writer/scheduler/notifier, Pages or Android writes. CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS and L8 UI PASS retained; ibon 39961 mismatch OPEN. Owner operation NONE; publication authorization not requested.
+
+
+### 2026-10-31 13:57 — exact-head CI and independent artifact readback (supersedes PENDING)
+- **A L9-BX [Draft #157](https://github.com/easonliu714/event_scraper_public/pull/157)** HEAD `56275e2693d82f3f2bd1bf4843c496bff215fa13`; [CI #41174492027](https://github.com/easonliu714/event_scraper_public/actions/runs/41174492027) **SUCCESS**, predecessor 10 + new 10 = **20/20**; first true failure NONE. Artifact **#13032517730** ZIP SHA256 `8a0b48061fccabeb1f107eb81c9f4d4fcf6d1c0fa96caa80c3599ac0e2b0eef0`.
+- **B VENUE-02AL [Draft #158](https://github.com/easonliu714/event_scraper_public/pull/158)** HEAD `efa78b4323ebca073a060365466086a8c1128ae6`; [CI #41174495631](https://github.com/easonliu714/event_scraper_public/actions/runs/41174495631) **SUCCESS**, predecessor 11 + new 6 = **17/17**; first true failure NONE. Artifact **#13032557588** ZIP SHA256 `22d175f2012cf30636cc658203ea464a4cc523dd17db0e16ff10925d767e5eec`.
+- Both independently downloaded and verified ZIP CRC, GitHub digest SHA256, `SHA256SUMS.txt`, manifest hashes and exact `audit.json.headSHA`. Both CI official GET=0, formal accepted FIELD=0, Golden=0, publication=0, `HARD_HOLD_NO_PUBLICATION`. Source-bound independent reader observations remain REVIEW only; no production/main/Android writes.
+
+
+### 2026-10-31 14:53 Asia/Taipei — dual-line source-first venue-to-ticket identity Gate (NO PUBLISH)
+
+- **Fresh authority:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`; Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`; 19-platform `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` frozen. Docs remain **Draft PR #8 only**, never main.
+- **A ENGINEERING:** existing #05 OPENTIX (no duplicate platform), predecessor [L9-BX #157](https://github.com/easonliu714/event_scraper_public/pull/157) `56275e2693d82f3f2bd1bf4843c496bff215fa13` → [L9-BY Draft #159](https://github.com/easonliu714/event_scraper_public/pull/159) exact `907168369fe605f4f895ecd28ce721555de0f849`, 3 ADD-only script/12 tests/read-only exact-head workflow. CI/Artifact **PENDING** at this append; no claim of CI PASS.
+- **B ENGINEERING:** P0 New Taipei Xinzhuang Cultural Arts Center, predecessor [VENUE-02AL #158](https://github.com/easonliu714/event_scraper_public/pull/158) `efa78b4323ebca073a060365466086a8c1128ae6` → [VENUE-02AM Draft #160](https://github.com/easonliu714/event_scraper_public/pull/160) exact `5bb8f31c9b637b15650df1cce39f563dbfc354da`, 3 ADD-only script/12 tests/read-only exact-head workflow. CI/Artifact **PENDING** at this append.
+- **NEW B SOURCE_QUALITY:** official [Xinzhuang stage index](https://www.xzcac.ntpc.gov.tw/xmdoc?xsmsid=0G286655201682579075) → [same SID bulletin](https://www.xzcac.ntpc.gov.tw/xmdoc/cont?sid=0Q252550255605202263&xsmsid=0G286655201682579075) `0Q252550255605202263`. Unlike earlier quarter-PDF-only route, HTML detail contains **nine row-local program groups**. Row #4 explicitly gives `「Da Capo」2026年彩虹城市管樂團年度音樂會`, 2026-12-05 14:00, 400/500 venue-declared price classes, and a direct [OPENTIX event link](https://www.opentix.life/event/2089995501384269825). Bulletin article date 2026-09-09 and update 2026-10-02 are **not** event dates; bulletin SID is **not** ticket Event ID.
+- **NEW A SOURCE_QUALITY:** independent public reader followed that exact OPENTIX #05 event ID `2089995501384269825`; ticket detail shows exact event title, `新莊文化藝術中心演藝廳` and `13:30 入場 / 14:00 開演`, but its static view does **not** independently prove a dated 2026-12-05 ticket session, per-session 400/500 price, current inventory or sale status. Cross-source title/venue/direct Event URL evidence is **REVIEW**, not formal FIELD PASS. Strict role separation: venue row date, ticket admission/start, ticket Event ID, venue bulletin SID, venue-declared price classes.
+- **SOURCE_QUALITY/ACCEPTANCE:** new first-party venue row-to-ticket ID edge 1; two independently opened official source pages, exact title and venue, source-bound provenance candidates. A/B accepted FORMAL FIELD **0/0**, Golden **0**, published **0**, CI official GET **0/0**. **HOLD_TICKET_SESSION_DATE_NOT_INDEPENDENTLY_VERIFIED** / **HOLD_VENUE_ROW_TO_TICKET_EVENT_LINK_SESSION_NOT_CONFIRMED**; no inventing session ID or release. Prior Event Go conflicting sale banner/ticket badge remains HOLD; quarter PDF large-file barrier remains HOLD, but new HTML stage route is viable.
+- **Near-three-rounds:** A #155/#157/#159 official-reader evidence 3/3, iNDIEVOX price/status root rotated to Event Go then OPENTIX; B #156/#158/#160 3/3, bulletin/PDF barrier rotated to stage HTML with direct ticket URL. Formal field increments 0/0, repeated identical root at current gate 0/0, OFFLINE-only consecutive 0/0 by separate official-reader evidence. New exact-head CI results and immutable artifacts require readback before PASS.
+- **NEXT:** A inspect a lawful OPENTIX session date on the **same** event ID only if source explicitly exposes it, otherwise preserve HOLD and rotate #01–#19; B independently validate row-local venue date ↔ OPENTIX session ID/date or preserve REVIEW and rotate another nonduplicate P0 New Taipei source. No extra source ID for OPENTIX #05; CKSMH #17 5 and TWTC #16 39 Android USER_ATTESTED_PASS, L8 Core UI PASS and formal PWA UI PASS retained. ibon 39961 mismatch OPEN. `HARD_HOLD_NO_PUBLICATION`; no merge/main/production JSON/Golden/Pages/Android changes. Owner action NONE.
+
+
+### 2026-10-31 14:54 — independently verified CI/artifact addendum (NO PUBLISH)
+
+- A `P30-L9-BY` [Draft #159](https://github.com/easonliu714/event_scraper_public/pull/159) HEAD `907168369fe605f4f895ecd28ce721555de0f849`: [exact-head CI #41178423799](https://github.com/easonliu714/event_scraper_public/actions/runs/41178423799) SUCCESS **22/22**, artifact #13034126001 ZIP SHA256 `ce18d712c2ee1d32315b647bdc59981f0c8817578e648465c6d844323f492188`.
+- B `P30-VENUE-02AM` [Draft #160](https://github.com/easonliu714/event_scraper_public/pull/160) HEAD `5bb8f31c9b637b15650df1cce39f563dbfc354da`: [exact-head CI #41178426615](https://github.com/easonliu714/event_scraper_public/actions/runs/41178426615) SUCCESS **18/18**, artifact #13034320590 ZIP SHA256 `ab9e4b22059834e7c0f29174fb95ed96e3f789ecac87c8dea8daf214d2f1f20e`.
+- Independent downloaded ZIP SHA256, CRC, exact three members, SHA256SUMS, manifest and exact `audit.json.headSHA` **PASS** for both. No first-party GET in CI; source observations are separate REVIEW, accepted FIELD A/B=0/0, Golden=0, published=0, `HARD_HOLD_NO_PUBLICATION`. Android CKSMH 5 / TWTC 39 USER_ATTESTED_PASS and L8 Core UI PASS retained.
+
+
+### 2026-10-31 15:56 — P30-L9-BZ / P30-VENUE-02AN source-role boundaries and rotation (Draft ONLY)
+
+```text
+AUTHORITY: Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Preview main 03e515d65e827d5ed67fe341d079907a96bf784a
+ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad
+FORMAL_BLOBS: docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+              docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124
+CANONICAL_SOURCE_DEDUP: A OPENTIX #05; B ERA 年代售票 #08
+B VENUE_ID: P0 New Taipei Xinzhuang (not a new ticket platform)
+VENUE_BULLETIN_SID: 0Q252550255605202263 (nine groups, NOT ticket Event ID)
+A ROW1: direct OPENTIX Event 2071939794940801025
+  venue title != ticket title (nonexact punctuation/order)
+  venue performance date 2026-10-03 19:30; ticket dated session UNKNOWN
+  OPENTIX "本節目已下架" != verified sold-out/live inventory
+  HOLD_DIRECT_LINK_BUT_NONEXACT_TITLE_AND_DELISTED
+  L9-BZ Draft #161 HEAD ea83b37fbe756ab4cb4d41906d3e2fb4f7f613f6
+  exact-head CI 41182559622 initially IN_PROGRESS; artifact PENDING
+B ROW2: direct ERA #08 URL PRODUCT_ID=P1CXDGLJ
+  venue date 2026-10-17 14:30; six venue-declared price tiers
+  ticket static reader only "節目資訊"/"場次列表" headings
+  ticket title/date/venue/session/price mapping/inventory UNVERIFIED
+  PRODUCT_ID != verified ticket Event ID or Session ID
+  HOLD_ERA_TICKET_TITLE_DATE_SESSION_NOT_RENDERED
+  VENUE-02AN Draft #162 HEAD 3348f8207725ae780347559bbd7784cda93ab394
+  exact-head CI 41182561753 initially IN_PROGRESS; artifact PENDING
+FIELD_PROVENANCE: source, exact URL, observed_at, role, valueSHA256, decision
+FORMAL_FIELD_A/B=0/0; GOLDEN=0; PUBLISHED=0; officialGETinCI=0/0
+HARD_HOLD_NO_PUBLICATION; no main/merge/production JSON/Pages/Android writes
+ANDROID CKSMH #17 5 and TWTC #16 39 USER_ATTESTED_PASS; L8 UI PASS retained
+```
+
+Both isolated PRs add strict no-network source-role validators, negative regressions and exact-head read-only CI. A/B independent first-party reader source observations **3/3 each** over #157/#159/#161 and #158/#160/#162; repeated current root **1/1**, formally accepted field increments **0/0**, offline-only consecutive rounds **0/0** by separate source observations. Do not promote nonexact venue/ticket titles, `已下架` status, venue-declared price classes, or opaque `PRODUCT_ID` to ticket session identity. Next A `L9-CA` rotate to another canonical source unless a truly independent dated OPENTIX session is accessible; next B `VENUE-02AO` rotate to another P0 New Taipei source or an actual ticket-rendered session, not repeated opaque shell. Exact run/artifact final result must be appended separately after verification. Toolkit local path/permissions UNKNOWN; Pages runtime UNVERIFIED. No Owner action.
+
+
+### 2026-10-31 15:58 — exact-head engineering verification for A/B source-bound HOLD
+
+```text
+A L9-BZ Draft #161 HEAD ea83b37fbe756ab4cb4d41906d3e2fb4f7f613f6
+  CI 41182559622 SUCCESS 24/24; first true failure NONE
+  Artifact 13035233491 SHA256 02fe0bc9aecfd2679d280d06bf984dd8a82c98f802fed91630baedd2661282c8
+B VENUE-02AN Draft #162 HEAD 3348f8207725ae780347559bbd7784cda93ab394
+  CI 41182561753 SUCCESS 27/27; first true failure NONE
+  Artifact 13035612738 SHA256 8cbf958a69fcad718e02446150812815dc68776bf004d4a4ef09fd1705189524
+INDEPENDENT: downloaded ZIP SHA256 + ZIP CRC + three exact members +
+  SHA256SUMS + manifest.json + audit.json.headSHA ALL PASS
+officialGETinCI=0/0; formal accepted FIELD=0/0; Golden=0; published=0
+HARD_HOLD_NO_PUBLICATION; no main/merge/formal data/status/Pages/Android write
+```
+
+Source-first independent public reader findings remain **REVIEW/HOLD**, not formal FIELD PASS; this final addendum supersedes initial CI/Artifact PENDING for these two exact PR heads only. Preserve CKSMH #17 5, TWTC #16 39 Android USER_ATTESTED_PASS and L8 Core UI PASS.
+
+
+### 2026-10-31 17:00 Asia/Taipei — A L9-CA / B VENUE-02AO source-role quality Gate (DRAFT, NO PUBLISH)
+
+- **Fresh authority:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`, Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Production `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, formal 19-platform `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`, unchanged. Canonical governance ONLY on Draft PR #8. Toolkit local path/permission UNKNOWN, GitHub Pages runtime UNVERIFIED.
+- **A ENGINEERING:** predecessor [L9-BZ Draft #161](https://github.com/easonliu714/event_scraper_public/pull/161) exact `ea83b37fbe756ab4cb4d41906d3e2fb4f7f613f6` → [L9-CA Draft #163](https://github.com/easonliu714/event_scraper_public/pull/163) exact HEAD `1569af8dd11499187f6f25c7a864dfb8911914fe`. 3 ADD-only source-role validator / 15 tests / read-only exact-head workflow. [CI #41186953468](https://github.com/easonliu714/event_scraper_public/actions/runs/41186953468), initial status PENDING; artifact SHA/CRC readback PENDING until independently checked. Canonical OPENTIX #05 reused.
+- **A NEW SOURCE_QUALITY:** independent first-party [OPENTIX Event 2089995501384269825](https://www.opentix.life/event/2089995501384269825) explicitly states early-bird cutoff **2026-10-11 23:59**, eligible price classes 500/400, 13:30 admission, 14:00 show start, and 新莊文化藝術中心演藝廳. Official [Xinzhuang bulletin row #4](https://www.xzcac.ntpc.gov.tw/xmdoc/cont?sid=0Q252550255605202263&xsmsid=0G286655201682579075) states 2026-12-05 14:00. **Discount cutoff is not a performance date**; ticket static detail does not independently expose dated session ID, inventory, or per-session price. Eight field-role candidate receipts REVIEW; decision `HOLD_DISCOUNT_DEADLINE_NOT_DATED_TICKET_SESSION`. FORMAL FIELD=0.
+- **B ENGINEERING:** predecessor [VENUE-02AN Draft #162](https://github.com/easonliu714/event_scraper_public/pull/162) exact `3348f8207725ae780347559bbd7784cda93ab394` → [VENUE-02AO Draft #164](https://github.com/easonliu714/event_scraper_public/pull/164) exact HEAD `7ed3dd8e45d3c6daa9433160de4200c7b8a75d3c`. 3 ADD-only validator / 14 tests / read-only exact-head workflow. [CI #41186956608](https://github.com/easonliu714/event_scraper_public/actions/runs/41186956608), initial status PENDING; artifact SHA/CRC readback PENDING.
+- **B NEW SOURCE_QUALITY:** independent official [Xinzhuang stage bulletin row #3](https://www.xzcac.ntpc.gov.tw/xmdoc/cont?sid=0Q252550255605202263&xsmsid=0G286655201682579075) lists 朱宗慶打擊樂新莊大新教學中心2026年度音樂會, **2026-10-18 11:00 and 15:00** (two distinct showtime candidates), `索票` without a direct ticket Event URL. `索票` is not verified zero price, inventory or a ticket session ID; bulletin SID not event ID. Six source-local provenance receipts REVIEW; decision `HOLD_TWO_VENUE_SHOWTIMES_NO_TICKET_SESSION_ID`. FORMAL FIELD=0.
+- **Near-three-round evidence:** A #159/#161/#163 official-reader source evidence **3/3**; B #160/#162/#164 **3/3**; both CI official GET **0**, independently accepted FORMAL FIELD increments **0/0**, Golden **0**, published **0**. A dated ticket session unresolved across 2 distinct OPENTIX events; B Xinzhuang bulletin-to-ticket session gap repeated across three distinct rows. Source-root repetition **A 2/3, B 3/3**; OFFLINE-only consecutive **0/0** because each round has new independent official-page role evidence (not CI GET). **Rotate next:** A to a different existing canonical #01–#19 source with source-local same-ID detail, not another OPENTIX discount synthetic Gate; B to a different nonduplicate P0 New Taipei official venue, not another Xinzhuang bulletin row without a ticket identity.
+- **ACCEPTANCE / HOLD:** A/B formal accepted FIELD **0/0**, Golden **0**, publication **0**, `HARD_HOLD_NO_PUBLICATION`. No merge/main/formal JSON/Golden/Production Scraper/Writer/Publisher/Scheduler/Notifier/Pages/Android write. CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 Core UI/formal PWA UI PASS retained; ibon 39961 mismatch OPEN. Owner action NONE; no publication authorization. CI success must be separately verified against exact SHA and artifact manifest.
+
+
+### 2026-10-31 17:02 — exact-head CI / immutable Artifact independent readback (supersedes PENDING)
+
+- **A L9-CA [Draft #163](https://github.com/easonliu714/event_scraper_public/pull/163)** exact HEAD `1569af8dd11499187f6f25c7a864dfb8911914fe`: [CI #41186953468](https://github.com/easonliu714/event_scraper_public/actions/runs/41186953468) SUCCESS; predecessor 12 + new 15 = **27/27** unittest cases, all job steps PASS, first true failure NONE. Artifact [#13036389270](https://github.com/easonliu714/event_scraper_public/actions/runs/41186953468/artifacts/13036389270) ZIP SHA256 `9ad683651aab52734e5068ef2f9c559ab943b91da8fc10af67eeda5317bba6ca`.
+- **B VENUE-02AO [Draft #164](https://github.com/easonliu714/event_scraper_public/pull/164)** exact HEAD `7ed3dd8e45d3c6daa9433160de4200c7b8a75d3c`: [CI #41186956608](https://github.com/easonliu714/event_scraper_public/actions/runs/41186956608) SUCCESS; predecessor 15 + new 14 = **29/29** unittest cases, all job steps PASS, first true failure NONE. Artifact [#13036984756](https://github.com/easonliu714/event_scraper_public/actions/runs/41186956608/artifacts/13036984756) ZIP SHA256 `28d7e714faf3fa3974a01a59e9ea1cfe9244f8d52757f7f3249971d6024c8fd8`.
+- **Independent local readback:** both downloaded ZIPs match GitHub SHA256 digest, ZIP CRC PASS, exact three members `audit.json`/`manifest.json`/`SHA256SUMS.txt`, manifest/SHA256SUMS hashes PASS, and `audit.json.headSHA` equals exact PR HEAD. CI official GET **0/0**; source observations were separate first-party reader visits, not CI. FORMAL FIELD A/B **0/0**, Golden **0**, publication **0**, `HARD_HOLD_NO_PUBLICATION`. No production or main write, no merge. Android historical PASS preserved.
+
+### 2026-10-31 17:52 — P30-L9-CB / P30-VENUE-02AP source-first architecture evidence (NO PUBLISH)
+
+```text
+AUTHORITY Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Preview main 03e515d65e827d5ed67fe341d079907a96bf784a
+ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad
+FORMAL_BLOBS docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+             docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124
+A P30-L9-CB / canonical TWTC #16 (no duplicate adapter)
+  LIST https://twtc.com.tw/exhibition?p=home
+    -> same ID 29251 DETAIL https://twtc.com.tw/exhibition_more.aspx?id=29251&p=home
+  title exact; 2026-11-06~09; 世貿一館; detail hours 10:00~18:00
+  organizer 生動國際展覽事業股份有限公司
+  admission: contact organizer => NOT verified free/paid admission
+  detail 29251 != ticket Event/Session ID; ticket URL, price, inventory UNKNOWN
+  ENGINEERING Draft #165 HEAD d82b4765a9bad1bacee28553935a4a010a0859c7
+  BASE #163 1569af8dd11499187f6f25c7a864dfb8911914fe
+  3 ADD-only files, 15 strict new tests, exact-head CI 41190443492 initially PENDING
+B P30-VENUE-02AP / P0 New Taipei Cloud Gate (distinct venue source)
+  LIST https://www.cloudgate.org.tw/cgt
+    -> same-title DETAIL https://www.cloudgate.org.tw/cgt/theater-event/1680
+    -> official direct ticket https://www.opentix.life/event/2086059234803216385?previewTime=1787200144171
+  official venue and ticket exact title + venue + two postponements agree
+  four venue sessions 2026-10-17 13:30/16:30, 2026-12-19 13:30/16:30
+  old 2026-11-14 two sessions postponed to 2026-12-19
+  OPENTIX Event ID 2086059234803216385 != per-session ID
+  previewTime != session time; venue-declared price 400 != verified ticket inventory
+  ENGINEERING isolated B branch create SAFETY_BLOCKED; PR/CI/Artifact NONE
+  independent official-reader evidence NEW, but ticket dated session picker UNKNOWN
+B and A FIELD=0, Golden=0, Publication=0; SOURCE_QUALITY REVIEW
+Last 3: A source 3/3, repeated OPENTIX root 2/3 then rotate TWTC
+        B source 3/3, repeated Xinzhuang root 2/3 then rotate Cloud Gate
+        formal FIELD increments 0/0, offline-only consecutive 0/0
+HARD_HOLD_NO_PUBLICATION; no merge/main/formal data/status/Golden/Pages/Android
+CKSMH#17 Android 5, TWTC#16 Android 39 USER_ATTESTED_PASS, L8 UI PASS preserved
+ibon 39961 mismatch OPEN; Toolkit path UNKNOWN; Pages runtime UNVERIFIED
+```
+
+**NEXT:** A verify exact-head CI/artifact for #165 and address first true failure if any. B resume VENUE-02AP on a new isolated branch only when GitHub safety allows, with source-local role/provenance and four-session postponement negatives. Neither CI nor official HTTP200 implies formal field acceptance. No Owner action currently.
+
+### 2026-10-31 17:53 — exact-head CI and independent artifact verification (A L9-CB; B safety HOLD)
+
+- A [Draft #165](https://github.com/easonliu714/event_scraper_public/pull/165) HEAD `d82b4765a9bad1bacee28553935a4a010a0859c7`; [CI #41190443492](https://github.com/easonliu714/event_scraper_public/actions/runs/41190443492) **SUCCESS 30/30** (15 predecessor + 15 new), all job steps PASS, first true failure NONE; CI official GET=0. [Artifact #13038712041](https://github.com/easonliu714/event_scraper_public/actions/runs/41190443492/artifacts/13038712041) ZIP SHA256 `179a1e30951ef60246f60b88bf68471e071f12214709ab697f9ea610df397a00`. Independent downloaded ZIP verification: exact 3 members, CRC PASS, SHA256SUMS PASS, manifest audit SHA PASS, audit.headSHA exact PASS, acceptedFields=0, Golden=0, published=false. This supersedes A initial CI PENDING.
+- B VENUE-02AP official Cloud Gate→OPENTIX same-title/event-path/postponement evidence is SOURCE_REVIEW only; **branch create safety-blocked**, so B GitHub HEAD/PR/CI/Artifact **NONE**. No attempt to bypass tool safety. This does not undo prior B VENUE-02AO Draft #164 SUCCESS 29/29 or existing Android PASS.
+- Both source fields formally accepted **0**, Golden **0**, published **0**; `HARD_HOLD_NO_PUBLICATION`. Continue next round B engineering priority after fresh safety/branch audit, A source-first distinct platform or a concrete ticket admission hypothesis. No main/formal data/status/Pages/Android writes.
+
+
+### 2026-10-31 19:02 Asia/Taipei — A L9-CC / B VENUE-02AP architecture evidence, exact-head engineering (NO PUBLISH)
+
+A canonical source: UDN #06 (existing platform, no duplicate adapter)
+  LIST official UDN index (observed redirect query; strict URL ownership)
+    -> same-title/detail PRODUCT_ID=P1FSZGF7
+    -> https://tickets.udnfunlife.com/Application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1FSZGF7
+  exact title: 2026 ITF台灣國際旅展; date range 2026-11-06..09; 南港展覽館一館
+  price banner NT$180 != checkout/inventory; 3 role-bound windows:
+    early-bird 2026-10-13..14 NT$150
+    presale 2026-10-15..11-05 NT$180
+    exhibition 2026-11-06..09 NT$200
+  visit hours: 11/06 12:00..18:00; 11/07..09 10:00..18:00
+  sale windows != event sessions; PRODUCT_ID != ticket Session ID
+  validator scripts/p30_l9cc_udn_itf_price_roles.py
+  tests tests/p30/test_l9cc_udn_itf_price_roles.py (20 new, 15 predecessor)
+  workflow .github/workflows/eventradar_p30_l9cc.yml (read-only, exact-head, no GET)
+  Draft #167 HEAD 2cefb9730933939fb366629586bd809dec19f75b
+  CI 41195125269 SUCCESS 35/35; artifact 13040800660 SHA256 d64c831f9e3edd19f0cf028f530c31d4321f81dd74c02a387aeec39dce4f6a0d
+  source/observed_at/role/valueSHA256/decision = 11 REVIEW candidates; formal FIELD=0
+  HOLD_PRODUCT_NOT_SESSION_AND_CHECKOUT_UNVERIFIED
+
+B venue source: Cloud Gate Theater P0 New Taipei (not canonical ticket platform)
+  DETAIL https://www.cloudgate.org.tw/cgt/theater-event/1680
+    -> direct OPENTIX canonical platform #05 Event 2086059234803216385
+    -> https://www.opentix.life/event/2086059234803216385
+  exact title/venue cross-source; four venue showtimes:
+    2026-10-17 13:30,16:30; 2026-12-19 13:30,16:30
+  postponed old 2026-11-14 13:30/16:30 -> 2026-12-19 same respective times
+  venue price label 400 != ticket per-session price; previewTime != Session ID
+  ticket event ID != ticket session ID; inventory UNKNOWN
+  validator scripts/p30_venue02ap_cloudgate_postponement.py
+  tests tests/p30/test_venue02ap_cloudgate_postponement.py (19 new, 14 predecessor)
+  workflow .github/workflows/eventradar_p30_venue02ap.yml (read-only, exact-head, no GET)
+  Draft #166 HEAD 56e28d121c3f8d84fbecefc74ef46bfbdec2f69c
+  CI 41195048645 SUCCESS 33/33; artifact 13040795453 SHA256 2f7b55a79b820ab06cfea1fc47199ee330d6f3034b2f7c5335da37abcb080a66
+  source/observed_at/role/valueSHA256/decision = 11 REVIEW candidates; formal FIELD=0
+  HOLD_TICKET_SESSION_ID_AND_INVENTORY_UNVERIFIED
+
+INDEPENDENT_ARTIFACT_READBACK: both downloaded ZIP SHA256, CRC, exact three members,
+  SHA256SUMS, manifest audit SHA and audit.headSHA PASS; first true CI failure NONE.
+LAST_THREE: A #163/#165/#167 new official source evidence 3/3; B #162/#164/#166 3/3;
+  newest-root repeat A/B 0/0 after rotation, formal accepted FIELD increments 0/0,
+  consecutive offline-only 0/0 by independent first-party observations; CI GET 0/0.
+ACCEPTANCE: A/B FORMAL FIELD=0/0, Golden=0, published=0, HARD_HOLD_NO_PUBLICATION.
+FROZEN: Source/Preview/ShowNews main, docs/data.json and docs/platform_status.json,
+  production Scraper/Writer/Publisher/Scheduler/Notifier, Pages and Android unchanged.
+CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 UI PASS preserved;
+ibon 39961 title mismatch OPEN; Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
+NEXT A: independent ticket session/checkout or safe canonical source rotation.
+NEXT B: independent OPENTIX session ID or nonduplicate P0 New Taipei venue rotation.
+
+
+### 2026-10-31 19:05 — exact-head fail-closed correction, supersedes 19:02 initial SHA/CI
+
+A / P30-L9-CC / UDN #06
+  malformed PRODUCT_ID query ValueError now returns False (fail-closed)
+  strict malformed query regression added; new test count 21 + predecessor 15
+  CURRENT Draft #167 HEAD e7384f246578aa6a2ded349641abe5b3f2863392
+  exact-head CI 41195292961 SUCCESS 36/36, first true failure NONE
+  artifact 13040189161 SHA256 8146c828e29e33d3c37a22f389a2aa656dd60a09dd9900be1a5cec8da32cc169
+B / P30-VENUE-02AP / Cloud Gate P0 New Taipei + canonical OPENTIX #05
+  malformed previewTime query ValueError now returns False (fail-closed)
+  strict malformed query regression added; new test count 20 + predecessor 14
+  CURRENT Draft #166 HEAD 7c21a1e6cfb5a8aaa0a46bf07a1986c45a078c17
+  exact-head CI 41195281508 SUCCESS 34/34, first true failure NONE
+  artifact 13040600533 SHA256 2eb5895e39ca6baf8c4a853c0ab434b0a1c89cb86096e2e3d3b60bd5bcff60d7
+INDEPENDENT READBACK both ZIP SHA256/CRC/exact three members/SHA256SUMS/manifest/audit.headSHA PASS.
+Both 3 ADD-only paths relative to frozen predecessor, CI official GET 0/0.
+19:02 source evidence retained REVIEW; FORMAL FIELD A/B 0/0, Golden 0, published 0.
+HARD_HOLD_NO_PUBLICATION; no main/production/Pages/Android writes.
+
+
+### 2026-10-31 19:51 Asia/Taipei — A/B first-party access-boundary root-cause audit (SOURCE REVIEW; NO PUBLISH)
+
+- **Authority before append:** Docs Draft PR #8 exact HEAD `5f834667cfcc73bdc1561e28cb88c21c283ba60a`; Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`; Preview `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, 19-platform `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124`. No main/production write. Toolkit local path/permissions UNKNOWN; Pages runtime UNVERIFIED.
+- **A P30-L9-CC new SOURCE_QUALITY root cause:** independent read of first-party [UDN ITF product detail](https://tickets.udnfunlife.com/Application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1FSZGF7) confirms public detail `PRODUCT_ID=P1FSZGF7` and public `快速訂購` button, **but purchase instructions explicitly require UDN membership before checkout** (official page `購票方式 How to Buy`). The public HTML exposes display NT$180 and three sale-period prices, **not a verified ticket session ID, per-session inventory, or authenticated checkout price**. Root cause now classified `ACCESS_BOUNDARY_MEMBER_CHECKOUT_NO_PUBLIC_SESSION_ID`; no login, transaction, or access-control bypass authorized. This is a new *reasoned source constraint*, not an accepted field, and does not repeat a GET for the same payload without a new hypothesis. NEXT A rotate to another canonical #01–#19 with public same-ID detail and explicit session role, or a safe source-provided unauthenticated ticket-session URL. Existing [Draft #167](https://github.com/easonliu714/event_scraper_public/pull/167) HEAD `e7384f246578aa6a2ded349641abe5b3f2863392`, exact-head CI [#41195292961](https://github.com/easonliu714/event_scraper_public/actions/runs/41195292961) SUCCESS 36/36, artifact #13040189161 GitHub SHA256 `8146c828e29e33d3c37a22f389a2aa656dd60a09dd9900be1a5cec8da32cc169` (prior independent ZIP/CRC readback PASS; current metadata/jobs readback PASS). No new A engineering commit/CI in this supplementary audit.
+- **B P30-VENUE-02AP new SOURCE_QUALITY root cause:** independent first-party [OPENTIX Event 2086059234803216385](https://www.opentix.life/event/2086059234803216385) shows **`選擇場次` label but no dated ticket-session row or per-session ID in accessible public text**; it separately exposes a **2026-08-26..12-19 package sale period**, **2026-11-14 refund deadline** for postponed performances, and original 11/14 → new 12/19 showtimes. [Cloud Gate venue detail](https://www.cloudgate.org.tw/cgt/theater-event/1680) independently states four actual venue showtimes. Package sale interval and refund deadline are not performance sessions; event-path ID `2086059234803216385` is not a session ID. Root cause `STATIC_SESSION_CHOOSER_NO_DATED_TICKET_SESSION_ROWS`, HOLD; no speculative DOM scraping, purchase, login, or invented ticket inventory. NEXT B rotate to a different nonduplicate P0 New Taipei venue if no safe public session evidence. Existing [Draft #166](https://github.com/easonliu714/event_scraper_public/pull/166) HEAD `7c21a1e6cfb5a8aaa0a46bf07a1986c45a078c17`, exact-head CI [#41195281508](https://github.com/easonliu714/event_scraper_public/actions/runs/41195281508) SUCCESS 34/34, artifact #13040600533 GitHub SHA256 `2eb5895e39ca6baf8c4a853c0ab434b0a1c89cb86096e2e3d3b60bd5bcff60d7` (prior independent ZIP/CRC readback PASS; current metadata/jobs readback PASS). No new B engineering commit/CI in this supplementary audit.
+- **Quality / 3-round window:** previous A #163/#165/#167, B #162/#164/#166 new independent first-party source observations **3/3 each**; this audit refines both blockers with *new role/access-boundary hypotheses*, but adds **zero formal accepted fields** and **zero new engineering PRs**. Repeated root cause on current source A/B **1/1**; consecutive OFFLINE-only **0/0** when source-root evidence counts (CI official GET 0/0); do not count this audit as a new completed Gate. Acceptance readiness still HOLD; FORMAL FIELD A/B 0/0, Golden 0, publication 0. Next writer must prioritize substantive field quality or source rotation, not create another same-source synthetic-only Gate.
+- **Safety:** `HARD_HOLD_NO_PUBLICATION`; no merge, main, Golden, formal JSON, Production Scraper/Writer/Publisher/Scheduler/Notifier, Pages or Android writes. Preserve CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 Core UI/formal PWA UI PASS, and ibon 39961 mismatch OPEN. Owner action NONE; no publication authorization.
