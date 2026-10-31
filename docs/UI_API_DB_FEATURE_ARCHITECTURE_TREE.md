@@ -3810,3 +3810,43 @@ Source-first independent public reader findings remain **REVIEW/HOLD**, not form
 - **A L9-CA [Draft #163](https://github.com/easonliu714/event_scraper_public/pull/163)** exact HEAD `1569af8dd11499187f6f25c7a864dfb8911914fe`: [CI #41186953468](https://github.com/easonliu714/event_scraper_public/actions/runs/41186953468) SUCCESS; predecessor 12 + new 15 = **27/27** unittest cases, all job steps PASS, first true failure NONE. Artifact [#13036389270](https://github.com/easonliu714/event_scraper_public/actions/runs/41186953468/artifacts/13036389270) ZIP SHA256 `9ad683651aab52734e5068ef2f9c559ab943b91da8fc10af67eeda5317bba6ca`.
 - **B VENUE-02AO [Draft #164](https://github.com/easonliu714/event_scraper_public/pull/164)** exact HEAD `7ed3dd8e45d3c6daa9433160de4200c7b8a75d3c`: [CI #41186956608](https://github.com/easonliu714/event_scraper_public/actions/runs/41186956608) SUCCESS; predecessor 15 + new 14 = **29/29** unittest cases, all job steps PASS, first true failure NONE. Artifact [#13036984756](https://github.com/easonliu714/event_scraper_public/actions/runs/41186956608/artifacts/13036984756) ZIP SHA256 `28d7e714faf3fa3974a01a59e9ea1cfe9244f8d52757f7f3249971d6024c8fd8`.
 - **Independent local readback:** both downloaded ZIPs match GitHub SHA256 digest, ZIP CRC PASS, exact three members `audit.json`/`manifest.json`/`SHA256SUMS.txt`, manifest/SHA256SUMS hashes PASS, and `audit.json.headSHA` equals exact PR HEAD. CI official GET **0/0**; source observations were separate first-party reader visits, not CI. FORMAL FIELD A/B **0/0**, Golden **0**, publication **0**, `HARD_HOLD_NO_PUBLICATION`. No production or main write, no merge. Android historical PASS preserved.
+
+### 2026-10-31 17:52 — P30-L9-CB / P30-VENUE-02AP source-first architecture evidence (NO PUBLISH)
+
+```text
+AUTHORITY Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Preview main 03e515d65e827d5ed67fe341d079907a96bf784a
+ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad
+FORMAL_BLOBS docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+             docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124
+A P30-L9-CB / canonical TWTC #16 (no duplicate adapter)
+  LIST https://twtc.com.tw/exhibition?p=home
+    -> same ID 29251 DETAIL https://twtc.com.tw/exhibition_more.aspx?id=29251&p=home
+  title exact; 2026-11-06~09; 世貿一館; detail hours 10:00~18:00
+  organizer 生動國際展覽事業股份有限公司
+  admission: contact organizer => NOT verified free/paid admission
+  detail 29251 != ticket Event/Session ID; ticket URL, price, inventory UNKNOWN
+  ENGINEERING Draft #165 HEAD d82b4765a9bad1bacee28553935a4a010a0859c7
+  BASE #163 1569af8dd11499187f6f25c7a864dfb8911914fe
+  3 ADD-only files, 15 strict new tests, exact-head CI 41190443492 initially PENDING
+B P30-VENUE-02AP / P0 New Taipei Cloud Gate (distinct venue source)
+  LIST https://www.cloudgate.org.tw/cgt
+    -> same-title DETAIL https://www.cloudgate.org.tw/cgt/theater-event/1680
+    -> official direct ticket https://www.opentix.life/event/2086059234803216385?previewTime=1787200144171
+  official venue and ticket exact title + venue + two postponements agree
+  four venue sessions 2026-10-17 13:30/16:30, 2026-12-19 13:30/16:30
+  old 2026-11-14 two sessions postponed to 2026-12-19
+  OPENTIX Event ID 2086059234803216385 != per-session ID
+  previewTime != session time; venue-declared price 400 != verified ticket inventory
+  ENGINEERING isolated B branch create SAFETY_BLOCKED; PR/CI/Artifact NONE
+  independent official-reader evidence NEW, but ticket dated session picker UNKNOWN
+B and A FIELD=0, Golden=0, Publication=0; SOURCE_QUALITY REVIEW
+Last 3: A source 3/3, repeated OPENTIX root 2/3 then rotate TWTC
+        B source 3/3, repeated Xinzhuang root 2/3 then rotate Cloud Gate
+        formal FIELD increments 0/0, offline-only consecutive 0/0
+HARD_HOLD_NO_PUBLICATION; no merge/main/formal data/status/Golden/Pages/Android
+CKSMH#17 Android 5, TWTC#16 Android 39 USER_ATTESTED_PASS, L8 UI PASS preserved
+ibon 39961 mismatch OPEN; Toolkit path UNKNOWN; Pages runtime UNVERIFIED
+```
+
+**NEXT:** A verify exact-head CI/artifact for #165 and address first true failure if any. B resume VENUE-02AP on a new isolated branch only when GitHub safety allows, with source-local role/provenance and four-session postponement negatives. Neither CI nor official HTTP200 implies formal field acceptance. No Owner action currently.
