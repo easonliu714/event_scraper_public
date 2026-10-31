@@ -43,7 +43,7 @@ jobs:
           python - <<'PY'
           import hashlib,json,pathlib,subprocess
           p=pathlib.Path("evidence")
-          a={"gate":"P30-VENUE-02AY","headSHA":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"officialGETinCI":0,"sourceObservationDate":"2026-11-01","sourceEvidence":"Yingge official admission standards: 80 NTD general museum admission and conditional free categories; not individual exhibition ticket price. Older information PDF lists retired public servants, newer standard table does not: quarantine category difference, no automatic eligibility.","acceptedFields":0,"ticketSessionIdsVerified":0,"goldenAccepted":0,"published":False,"releaseState":"HARD_HOLD_NO_PUBLICATION"}
+          a={"gate":"P30-VENUE-02AY","headSHA":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"officialGETinCI":0,"sourceObservationDate":"2026-11-01","sourceEvidence":"Yingge official admission standards: 80 NTD general museum admission and conditional free categories; not individual exhibition ticket price. Separate official information PDF lists retired public servants, standards table does not: quarantine category difference, no automatic eligibility.","acceptedFields":0,"ticketSessionIdsVerified":0,"goldenAccepted":0,"published":False,"releaseState":"HARD_HOLD_NO_PUBLICATION"}
           (p/"audit.json").write_text(json.dumps(a,sort_keys=True)+"\n")
           (p/"manifest.json").write_text(json.dumps({"filesSHA256":{"audit.json":hashlib.sha256((p/"audit.json").read_bytes()).hexdigest()}},sort_keys=True)+"\n")
           PY
