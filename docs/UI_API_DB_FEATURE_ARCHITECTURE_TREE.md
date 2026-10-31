@@ -3908,3 +3908,23 @@ CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 UI PASS preserve
 ibon 39961 title mismatch OPEN; Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
 NEXT A: independent ticket session/checkout or safe canonical source rotation.
 NEXT B: independent OPENTIX session ID or nonduplicate P0 New Taipei venue rotation.
+
+
+### 2026-10-31 19:05 — exact-head fail-closed correction, supersedes 19:02 initial SHA/CI
+
+A / P30-L9-CC / UDN #06
+  malformed PRODUCT_ID query ValueError now returns False (fail-closed)
+  strict malformed query regression added; new test count 21 + predecessor 15
+  CURRENT Draft #167 HEAD e7384f246578aa6a2ded349641abe5b3f2863392
+  exact-head CI 41195292961 SUCCESS 36/36, first true failure NONE
+  artifact 13040189161 SHA256 8146c828e29e33d3c37a22f389a2aa656dd60a09dd9900be1a5cec8da32cc169
+B / P30-VENUE-02AP / Cloud Gate P0 New Taipei + canonical OPENTIX #05
+  malformed previewTime query ValueError now returns False (fail-closed)
+  strict malformed query regression added; new test count 20 + predecessor 14
+  CURRENT Draft #166 HEAD 7c21a1e6cfb5a8aaa0a46bf07a1986c45a078c17
+  exact-head CI 41195281508 SUCCESS 34/34, first true failure NONE
+  artifact 13040600533 SHA256 2eb5895e39ca6baf8c4a853c0ab434b0a1c89cb86096e2e3d3b60bd5bcff60d7
+INDEPENDENT READBACK both ZIP SHA256/CRC/exact three members/SHA256SUMS/manifest/audit.headSHA PASS.
+Both 3 ADD-only paths relative to frozen predecessor, CI official GET 0/0.
+19:02 source evidence retained REVIEW; FORMAL FIELD A/B 0/0, Golden 0, published 0.
+HARD_HOLD_NO_PUBLICATION; no main/production/Pages/Android writes.
