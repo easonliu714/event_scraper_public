@@ -3595,3 +3595,37 @@ NEXT A L9-BV different canonical source; NEXT B VENUE-02AJ ticket parity or rota
 ```
 
 **Field provenance boundary:** A opaque detail URL is a source link, not proof of EVENT identity or date role. B first-party `rid` identifies a Zepp schedule document, not a verified TicketPlus event ID; two explicit performance sessions are distinct from the index's single START and from sale/registration/price. Every REVIEW candidate remains tied to source URL, observed date, role and value SHA256; missing external ticket parity or contradictory body status stays HOLD. Source links: [FamiTicket index](https://www.famiticket.com.tw/Home), [Zepp index](https://www.zepp.co.jp/hall/newtaipei/schedule/), [Zepp rid detail](https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=163025), [TicketPlus linked activity](https://ticketplus.com.tw/activity/a3cb941035a5a7e6898f4000f76bd25c). No production, main, formal JSON, Pages or Android writes.
+
+
+### 2026-10-31 11:55 — L9-BV / VENUE-02AJ provenance architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance Draft #8 ONLY; formal data/status frozen; HARD_HOLD_NO_PUBLICATION
+A canonical #18 iNDIEVOX; predecessor L9-BU #151 40bf097137ca9d3a139390d0e9bf56195be38314
+  -> Draft #153 L9-BV d14677446c131ecfa64bf467bda8ef43587ab84d
+  -> homepage LIST -> same-ID detail/26_iv04280c7 -> game/26_iv04280c7
+  -> six source-explicit EVENT_SESSION rows (12/05,06,12,13,19,20 at 20:00)
+  -> three generic PRICE classes; two SALE starts (10/29 and 10/30)
+  -> per-session PRICE mapping and live inventory NOT proven; REVIEW only
+  -> exact-head CI 41166350240 SUCCESS 22/22; Artifact 13029004010
+B P0 New Taipei Zepp; predecessor VENUE-02AI #152 f027092f88848a6dedef5a7db2243e494c6a661b
+  -> Draft #154 VENUE-02AJ 264534158666204319e7cd5c796017c07c0aadb4
+  -> official same rid=163025, two named EVENT_SESSION times
+  -> nine generic PRICE tiers and two SALE starts are distinct role classes
+  -> TicketPlus linked JS-only page cannot independently verify title/sessions
+  -> body 購票網址｜網頁建置中 conflicts with implied link readiness
+  -> per-session price/sale association UNKNOWN; REVIEW only
+  -> exact-head CI 41166354001 SUCCESS 23/23; Artifact 13028994095
+Both: CI officialGET=0, independent public first-party reader observations YES
+  source_url / observed_at / role / valueSHA256 / decision on each candidate
+  no dynamic ticket inventory claims; no cross-source ID substitution
+  formally accepted FIELD A/B=0/0, Golden=0, published=0
+  artifacts uploaded, independent ZIP CRC/SHA readback UNVERIFIED
+  last 3 source evidence rounds A/B=3/3, repeated root cause rotated
+  no production, main, merge, force-push, formal JSON, Pages or Android writes
+  CKSMH #17 Android 5 / TWTC #16 Android 39 / L8 UI USER_ATTESTED_PASS retained
+  ibon 39961 historical title mismatch OPEN
+```
+
+**Gate decision graph:** First-party URL allowlist → exact same event ID and title across LIST/DETAIL/GAME (A), or exact venue `rid` (B) → source-explicit EVENT_SESSION, SALE_START, PRICE_CLASS roles → independent per-session allocation and ticket identity check. If ticket page is JS-only or a generic price table is not mapped to individual sessions, preserve candidates as REVIEW and return HOLD. The source document's event ID is not an external ticket event ID; an available ticket link is not ticket title/session parity. Next A L9-BW only pursue independently source-verifiable session-price/availability role, otherwise rotate canonical platform. Next B VENUE-02AK only attempt legal bounded TicketPlus parity with a new falsifiable hypothesis, otherwise rotate next P0 New Taipei source. FORMAL FIELD requires independent acceptance; publication requires separate Owner authorization. Toolkit path/permission UNKNOWN, Pages deployment UNVERIFIED.
