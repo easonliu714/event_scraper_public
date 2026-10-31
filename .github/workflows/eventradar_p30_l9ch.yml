@@ -1,0 +1,56 @@
+name: EventRadar P30-L9-CH strict official field roles (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9cg-accupass-workshop-rows]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  exact-head:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9ch-accupass-capacity-refund'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head ADD-only and production freeze
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=a305ee74afbb2519c97c12227a3b7d45b12dc654
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9ch_accupass_capacity_refund.py' 'tests/p30/test_l9ch_accupass_capacity_refund.py' '.github/workflows/eventradar_p30_l9ch.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Predecessor and new strict regressions
+        run: |
+          python -m py_compile scripts/p30_l9ch_accupass_capacity_refund.py tests/p30/test_l9ch_accupass_capacity_refund.py
+          python -m unittest discover -s tests/p30 -p 'test_l9cg_accupass_workshop_rows.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_l9ch_accupass_capacity_refund.py' -v
+      - name: Sanitized exact-head audit and SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json,pathlib,subprocess,hashlib
+          p=pathlib.Path("evidence")
+          a={"gate":"P30-L9-CH","headSHA":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"officialGETinCI":0,"sourceObservationDate":"2026-11-01","sourceEvidence":"ACCUPASS per-workshop capacity 20, refund relative 24h/8d, 10pct, waitlist not inventory","ticketSessionIdsVerified":0,"acceptedFields":0,"goldenAccepted":0,"published":False,"releaseState":"HARD_HOLD_NO_PUBLICATION"}
+          (p/"audit.json").write_text(json.dumps(a,sort_keys=True)+"\n")
+          (p/"manifest.json").write_text(json.dumps({"filesSHA256":{"audit.json":hashlib.sha256((p/"audit.json").read_bytes()).hexdigest()}},sort_keys=True)+"\n")
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-l9ch_accupass_terms-evidence
+          path: evidence/
+          if-no-files-found: ignore
