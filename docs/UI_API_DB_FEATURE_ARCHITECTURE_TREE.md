@@ -3739,3 +3739,38 @@ No main, merge, production JSON, Pages or Android writes; prior Android PASS pre
 - A `P30-L9-BY` [Draft #159](https://github.com/easonliu714/event_scraper_public/pull/159) HEAD `907168369fe605f4f895ecd28ce721555de0f849`: [exact-head CI #41178423799](https://github.com/easonliu714/event_scraper_public/actions/runs/41178423799) SUCCESS **22/22**, artifact #13034126001 ZIP SHA256 `ce18d712c2ee1d32315b647bdc59981f0c8817578e648465c6d844323f492188`.
 - B `P30-VENUE-02AM` [Draft #160](https://github.com/easonliu714/event_scraper_public/pull/160) HEAD `5bb8f31c9b637b15650df1cce39f563dbfc354da`: [exact-head CI #41178426615](https://github.com/easonliu714/event_scraper_public/actions/runs/41178426615) SUCCESS **18/18**, artifact #13034320590 ZIP SHA256 `ab9e4b22059834e7c0f29174fb95ed96e3f789ecac87c8dea8daf214d2f1f20e`.
 - Independent downloaded ZIP SHA256, CRC, exact three members, SHA256SUMS, manifest and exact `audit.json.headSHA` **PASS** for both. No first-party GET in CI; source observations are separate REVIEW, accepted FIELD A/B=0/0, Golden=0, published=0, `HARD_HOLD_NO_PUBLICATION`. Android CKSMH 5 / TWTC 39 USER_ATTESTED_PASS and L8 Core UI PASS retained.
+
+
+### 2026-10-31 15:56 — P30-L9-BZ / P30-VENUE-02AN source-role boundaries and rotation (Draft ONLY)
+
+```text
+AUTHORITY: Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Preview main 03e515d65e827d5ed67fe341d079907a96bf784a
+ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad
+FORMAL_BLOBS: docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+              docs/platform_status.json e19ca37c4c80c10b7278d0813b8ff1047535d124
+CANONICAL_SOURCE_DEDUP: A OPENTIX #05; B ERA 年代售票 #08
+B VENUE_ID: P0 New Taipei Xinzhuang (not a new ticket platform)
+VENUE_BULLETIN_SID: 0Q252550255605202263 (nine groups, NOT ticket Event ID)
+A ROW1: direct OPENTIX Event 2071939794940801025
+  venue title != ticket title (nonexact punctuation/order)
+  venue performance date 2026-10-03 19:30; ticket dated session UNKNOWN
+  OPENTIX "本節目已下架" != verified sold-out/live inventory
+  HOLD_DIRECT_LINK_BUT_NONEXACT_TITLE_AND_DELISTED
+  L9-BZ Draft #161 HEAD ea83b37fbe756ab4cb4d41906d3e2fb4f7f613f6
+  exact-head CI 41182559622 initially IN_PROGRESS; artifact PENDING
+B ROW2: direct ERA #08 URL PRODUCT_ID=P1CXDGLJ
+  venue date 2026-10-17 14:30; six venue-declared price tiers
+  ticket static reader only "節目資訊"/"場次列表" headings
+  ticket title/date/venue/session/price mapping/inventory UNVERIFIED
+  PRODUCT_ID != verified ticket Event ID or Session ID
+  HOLD_ERA_TICKET_TITLE_DATE_SESSION_NOT_RENDERED
+  VENUE-02AN Draft #162 HEAD 3348f8207725ae780347559bbd7784cda93ab394
+  exact-head CI 41182561753 initially IN_PROGRESS; artifact PENDING
+FIELD_PROVENANCE: source, exact URL, observed_at, role, valueSHA256, decision
+FORMAL_FIELD_A/B=0/0; GOLDEN=0; PUBLISHED=0; officialGETinCI=0/0
+HARD_HOLD_NO_PUBLICATION; no main/merge/production JSON/Pages/Android writes
+ANDROID CKSMH #17 5 and TWTC #16 39 USER_ATTESTED_PASS; L8 UI PASS retained
+```
+
+Both isolated PRs add strict no-network source-role validators, negative regressions and exact-head read-only CI. A/B independent first-party reader source observations **3/3 each** over #157/#159/#161 and #158/#160/#162; repeated current root **1/1**, formally accepted field increments **0/0**, offline-only consecutive rounds **0/0** by separate source observations. Do not promote nonexact venue/ticket titles, `已下架` status, venue-declared price classes, or opaque `PRODUCT_ID` to ticket session identity. Next A `L9-CA` rotate to another canonical source unless a truly independent dated OPENTIX session is accessible; next B `VENUE-02AO` rotate to another P0 New Taipei source or an actual ticket-rendered session, not repeated opaque shell. Exact run/artifact final result must be appended separately after verification. Toolkit local path/permissions UNKNOWN; Pages runtime UNVERIFIED. No Owner action.
