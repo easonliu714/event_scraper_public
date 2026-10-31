@@ -3646,3 +3646,41 @@ Accepted fields 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
 ```
 
 This supersedes earlier artifact verification UNVERIFIED for these exact two artifacts only; no ticket identity, per-session price, formal FIELD or publication acceptance is implied.
+
+
+### 2026-10-31 12:55 Asia/Taipei — A L9-BW / B VENUE-02AK source provenance, acceptance HOLD
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance Docs Draft PR #8 ONLY; no main merge or formal data/status changes
+A canonical #18 iNDIEVOX, no new platform source:
+  L9-BV #153 d14677446c131ecfa64bf467bda8ef43587ab84d
+  -> L9-BW Draft #155 1d386dfb8b1ae4bf1776bb53d42721bfef7b1efa
+  -> official same-ID detail/game 26_iv04280c7; six event-session rows
+  -> game reader snapshot two rows with 'No tickets available' UI text
+  -> snapshot text != independently verified live ticket inventory
+  -> generic price classes and sale windows != per-session price mapping
+  -> 10 strict regression tests; exact-head CI 41170451988 IN_PROGRESS
+  -> HOLD_DYNAMIC_STATUS_AND_PER_SESSION_PRICE_NOT_VERIFIED; FIELD=0
+B P0 New Taipei Art Center venue (not among canonical 19 platform sources):
+  VENUE-02AJ #154 264534158666204319e7cd5c796017c07c0aadb4
+  -> VENUE-02AK Draft #156 219a2c2c43faf786db53a83abd5f140fa7a6a82d
+  -> official sitesearch -> bulletin SID 0Q152372523738311866
+  -> same bulletin title; eight distinct event groups, NOT eight event IDs
+  -> group-local performance dates and venue-attributed ticket claims
+  -> 2026-11-10 is Tuesday, bulletin says 11/10(日) -> calendar conflict
+  -> one bulletin SID != individual event identity or ticket Event ID
+  -> 11 strict regression tests; exact-head CI 41170455331 IN_PROGRESS
+  -> HOLD_BULLETIN_NOT_EVENT_ID_AND_WEEKDAY_CONFLICT; FIELD=0
+A/B candidate fields carry source_url, observed_at, role, valueSHA256,
+decision=REVIEW_NOT_FORMALLY_ACCEPTED; no independent field acceptance.
+3-round official-reader evidence A 3/3, B 3/3; formal field delta 0/0.
+A iNDIEVOX price/session root 2 rounds -> rotate canonical platform.
+B Zepp external ticket root 2 rounds -> rotated P0 New Taipei Art Center.
+Both CI officialGET=0; exact-head CI/artifacts PENDING at initial append.
+Golden=0, publication=0, HARD_HOLD_NO_PUBLICATION unchanged.
+CKSMH #17 Android 5 / TWTC #16 Android 39 USER_ATTESTED_PASS,
+L8 Core UI and formal PWA visual PASS retained; ibon39961 mismatch OPEN.
+```
+
+**Source links:** [iNDIEVOX detail](https://www.indievox.com/activity/detail/26_iv04280c7), [iNDIEVOX game](https://www.indievox.com/activity/game/26_iv04280c7), [Art Center index](https://www.culture.ntpc.gov.tw/artcenter_chi/sitesearch), [Art Center bulletin](https://www.culture.ntpc.gov.tw/artcenter_chi/xmdoc/cont?sid=0Q152372523738311866&sq=&xsmsid=0G269629106251547168). Official public reader source observations are **not** CI-run GET or independently accepted Golden fields. Next A L9-BX rotate after frozen session-price/status HOLD; next B VENUE-02AL resolve source-local bulletin group identity or rotate, not synthetic-only loops. No Owner action or publication authorization.
