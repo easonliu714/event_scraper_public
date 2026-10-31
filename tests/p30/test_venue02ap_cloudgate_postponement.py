@@ -44,6 +44,8 @@ class Gate(unittest.TestCase):
         a,b=fixture();a["ticket_url"]="https://opentix.life/event/"+m.EVENT_ID;self.assert_hold("HOLD_DIRECT_TICKET_URL",venue=a)
     def test_bad_ticket_query(self):
         a,b=fixture();a["ticket_url"]+="&sessionId=123";self.assert_hold("HOLD_DIRECT_TICKET_URL",venue=a)
+    def test_malformed_query_fails_closed(self):
+        a,b=fixture();a["ticket_url"]=m.TICKET_URL+"?previewTime=1787200144171&bad";self.assert_hold("HOLD_DIRECT_TICKET_URL",venue=a)
     def test_ticket_query_not_session(self):
         a,b=fixture();a["ticket_url"]=m.TICKET_URL;self.assert_hold("HOLD_TICKET_SESSION_ID_AND_INVENTORY_UNVERIFIED",venue=a)
     def test_ticket_event_id(self):
