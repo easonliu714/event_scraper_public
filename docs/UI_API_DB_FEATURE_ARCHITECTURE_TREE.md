@@ -4013,3 +4013,10 @@ NEAR-3: A #170/#172/#174 and B #171/#173/#175 = 3/3 each
 ```
 
 - Independent official source references: [ACCUPASS 16 classes](https://www.accupass.com/event/2609041147021848655729), [OPENTIX BEL](https://www.opentix.life/event/2099700588990402561), [OPENTIX BODY](https://www.opentix.life/event/2099688567429373953), [OPENTIX bundle](https://www.opentix.life/ticketpackage/2102208181225205761). Direct shortlink redirects remain unverified; do not conflate title/date candidate matching with canonical redirect verification. Toolkit local path/permissions UNKNOWN, live Pages runtime UNVERIFIED. Owner action NONE.
+
+
+#### 2026-10-31 23:56 — Exact-head CI / independent ZIP manifest closure
+
+- A P30-L9-CG [Draft #174](https://github.com/easonliu714/event_scraper_public/pull/174) HEAD `a305ee74afbb2519c97c12227a3b7d45b12dc654`: [CI #41217108507](https://github.com/easonliu714/event_scraper_public/actions/runs/41217108507) SUCCESS **25/25** (12 predecessor + 13 new), artifact #13048303256 ZIP SHA256 `b84c82555240ed74ab44bc47ccc645aa9036f0bbd129f30e1e8e9b5b91e09fe3`, CRC + 3-member SHA256SUMS + manifest + audit exact HEAD PASS.
+- B P30-VENUE-02AT [Draft #175](https://github.com/easonliu714/event_scraper_public/pull/175) HEAD `a889b1e66dcb666d7ab937a9035801e32ee68119`: [CI #41217144730](https://github.com/easonliu714/event_scraper_public/actions/runs/41217144730) SUCCESS **30/30** (13 predecessor + 17 new), artifact #13048473249 ZIP SHA256 `8abb5d0f8c8a5591a64c09d5be824ea1c383363da00d66de0856fa11a40fa285`, CRC + 3-member SHA256SUMS + manifest + audit exact HEAD PASS.
+- Independent artifact readback completed; CI official GET=0/0, source evidence REVIEW, accepted FIELD=0/0, Golden=0, published=0. `HARD_HOLD_NO_PUBLICATION` and prior CKSMH/TWTC Android attestations preserved.
