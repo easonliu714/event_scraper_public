@@ -1,0 +1,56 @@
+name: EventRadar P30-L9-CJ exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9ci-opentix-venue-parity]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  exact-head:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9cj-opentix-sale-admission-refund'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact-head ADD-only and frozen formal data
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=e780f37646f38b9ff751ef2c97fe665ddd37d57c
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9cj_opentix_role_boundaries.py' 'tests/p30/test_l9cj_opentix_role_boundaries.py' '.github/workflows/eventradar_p30_l9cj.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Predecessor and new regression
+        run: |
+          python -m py_compile scripts/p30_l9cj_opentix_role_boundaries.py tests/p30/test_l9cj_opentix_role_boundaries.py
+          python -m unittest discover -s tests/p30 -p 'test_l9ci_opentix_multi_venue_identity.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_l9cj_opentix_role_boundaries.py' -v
+      - name: SHA256 manifest exact HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path("evidence")
+          a={"gate":"P30-L9-CJ","headSHA":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"officialGETinCI":0,"sourceObservationDate":"2026-11-01","sourceEvidence":"OPENTIX #05 same Event ID: two explicit 2026 Aug–Sep discount SALE windows; 30-minute pre-show admission, 95-minute runtime (80+15), relative 10-day refund policy and 10% fee are NOT ticket sessions or absolute deadlines. 9 venue chooser entries remain venues, not sessions. Formal FIELD=0; no live CI GET.","acceptedFields":0,"ticketSessionIdsVerified":0,"goldenAccepted":0,"published":False,"releaseState":"HARD_HOLD_NO_PUBLICATION"}
+          (p/"audit.json").write_text(json.dumps(a,sort_keys=True)+"\n")
+          (p/"manifest.json").write_text(json.dumps({"filesSHA256":{"audit.json":hashlib.sha256((p/"audit.json").read_bytes()).hexdigest()}},sort_keys=True)+"\n")
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9-cj-source-evidence
+          path: evidence/
+          if-no-files-found: ignore
