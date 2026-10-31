@@ -3629,3 +3629,20 @@ Both: CI officialGET=0, independent public first-party reader observations YES
 ```
 
 **Gate decision graph:** First-party URL allowlist → exact same event ID and title across LIST/DETAIL/GAME (A), or exact venue `rid` (B) → source-explicit EVENT_SESSION, SALE_START, PRICE_CLASS roles → independent per-session allocation and ticket identity check. If ticket page is JS-only or a generic price table is not mapped to individual sessions, preserve candidates as REVIEW and return HOLD. The source document's event ID is not an external ticket event ID; an available ticket link is not ticket title/session parity. Next A L9-BW only pursue independently source-verifiable session-price/availability role, otherwise rotate canonical platform. Next B VENUE-02AK only attempt legal bounded TicketPlus parity with a new falsifiable hypothesis, otherwise rotate next P0 New Taipei source. FORMAL FIELD requires independent acceptance; publication requires separate Owner authorization. Toolkit path/permission UNKNOWN, Pages deployment UNVERIFIED.
+
+
+### 2026-10-31 11:56 — independent immutable evidence artifacts readback
+
+```text
+A L9-BV #153 HEAD d14677446c131ecfa64bf467bda8ef43587ab84d
+  CI 41166350240 SUCCESS 22/22; Artifact 13029004010
+  ZIP SHA256 d4c18b911c9e1ec81e3b249823fb73809dda9ca0b49747cd2af960d384fbb483
+  ZIP CRC + SHA256SUMS + manifest + exact audit headSHA PASS
+B VENUE-02AJ #154 HEAD 264534158666204319e7cd5c796017c07c0aadb4
+  CI 41166354001 SUCCESS 23/23; Artifact 13028994095
+  ZIP SHA256 43d6569aa6142d40b1362e5e22c9eb0115e275a50d973623c4adce6f36b98e24
+  ZIP CRC + SHA256SUMS + manifest + exact audit headSHA PASS
+Accepted fields 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+```
+
+This supersedes earlier artifact verification UNVERIFIED for these exact two artifacts only; no ticket identity, per-session price, formal FIELD or publication acceptance is implied.
