@@ -37,6 +37,8 @@ class Gate(unittest.TestCase):
         a,b=fixture();a["url"]="https://example.com";self.assert_hold("HOLD_OFFICIAL_LIST_DETAIL_LINK",row=a)
     def test_list_link(self):
         a,b=fixture();a["detail_url"]+="&SESSION=1";self.assert_hold("HOLD_OFFICIAL_LIST_DETAIL_LINK",row=a)
+    def test_malformed_product_query_fails_closed(self):
+        a,b=fixture();a["detail_url"]=m.DETAIL_URL+"&bad";self.assert_hold("HOLD_OFFICIAL_LIST_DETAIL_LINK",row=a)
     def test_detail_url(self):
         a,b=fixture();b["url"]="http://tickets.udnfunlife.com/Application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1FSZGF7";self.assert_hold("HOLD_PRODUCT_ID_URL",detail=b)
     def test_detail_product_id(self):
