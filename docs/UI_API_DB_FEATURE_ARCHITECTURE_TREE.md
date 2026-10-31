@@ -3856,3 +3856,55 @@ ibon 39961 mismatch OPEN; Toolkit path UNKNOWN; Pages runtime UNVERIFIED
 - A [Draft #165](https://github.com/easonliu714/event_scraper_public/pull/165) HEAD `d82b4765a9bad1bacee28553935a4a010a0859c7`; [CI #41190443492](https://github.com/easonliu714/event_scraper_public/actions/runs/41190443492) **SUCCESS 30/30** (15 predecessor + 15 new), all job steps PASS, first true failure NONE; CI official GET=0. [Artifact #13038712041](https://github.com/easonliu714/event_scraper_public/actions/runs/41190443492/artifacts/13038712041) ZIP SHA256 `179a1e30951ef60246f60b88bf68471e071f12214709ab697f9ea610df397a00`. Independent downloaded ZIP verification: exact 3 members, CRC PASS, SHA256SUMS PASS, manifest audit SHA PASS, audit.headSHA exact PASS, acceptedFields=0, Golden=0, published=false. This supersedes A initial CI PENDING.
 - B VENUE-02AP official Cloud Gate→OPENTIX same-title/event-path/postponement evidence is SOURCE_REVIEW only; **branch create safety-blocked**, so B GitHub HEAD/PR/CI/Artifact **NONE**. No attempt to bypass tool safety. This does not undo prior B VENUE-02AO Draft #164 SUCCESS 29/29 or existing Android PASS.
 - Both source fields formally accepted **0**, Golden **0**, published **0**; `HARD_HOLD_NO_PUBLICATION`. Continue next round B engineering priority after fresh safety/branch audit, A source-first distinct platform or a concrete ticket admission hypothesis. No main/formal data/status/Pages/Android writes.
+
+
+### 2026-10-31 19:02 Asia/Taipei — A L9-CC / B VENUE-02AP architecture evidence, exact-head engineering (NO PUBLISH)
+
+A canonical source: UDN #06 (existing platform, no duplicate adapter)
+  LIST official UDN index (observed redirect query; strict URL ownership)
+    -> same-title/detail PRODUCT_ID=P1FSZGF7
+    -> https://tickets.udnfunlife.com/Application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1FSZGF7
+  exact title: 2026 ITF台灣國際旅展; date range 2026-11-06..09; 南港展覽館一館
+  price banner NT$180 != checkout/inventory; 3 role-bound windows:
+    early-bird 2026-10-13..14 NT$150
+    presale 2026-10-15..11-05 NT$180
+    exhibition 2026-11-06..09 NT$200
+  visit hours: 11/06 12:00..18:00; 11/07..09 10:00..18:00
+  sale windows != event sessions; PRODUCT_ID != ticket Session ID
+  validator scripts/p30_l9cc_udn_itf_price_roles.py
+  tests tests/p30/test_l9cc_udn_itf_price_roles.py (20 new, 15 predecessor)
+  workflow .github/workflows/eventradar_p30_l9cc.yml (read-only, exact-head, no GET)
+  Draft #167 HEAD 2cefb9730933939fb366629586bd809dec19f75b
+  CI 41195125269 SUCCESS 35/35; artifact 13040800660 SHA256 d64c831f9e3edd19f0cf028f530c31d4321f81dd74c02a387aeec39dce4f6a0d
+  source/observed_at/role/valueSHA256/decision = 11 REVIEW candidates; formal FIELD=0
+  HOLD_PRODUCT_NOT_SESSION_AND_CHECKOUT_UNVERIFIED
+
+B venue source: Cloud Gate Theater P0 New Taipei (not canonical ticket platform)
+  DETAIL https://www.cloudgate.org.tw/cgt/theater-event/1680
+    -> direct OPENTIX canonical platform #05 Event 2086059234803216385
+    -> https://www.opentix.life/event/2086059234803216385
+  exact title/venue cross-source; four venue showtimes:
+    2026-10-17 13:30,16:30; 2026-12-19 13:30,16:30
+  postponed old 2026-11-14 13:30/16:30 -> 2026-12-19 same respective times
+  venue price label 400 != ticket per-session price; previewTime != Session ID
+  ticket event ID != ticket session ID; inventory UNKNOWN
+  validator scripts/p30_venue02ap_cloudgate_postponement.py
+  tests tests/p30/test_venue02ap_cloudgate_postponement.py (19 new, 14 predecessor)
+  workflow .github/workflows/eventradar_p30_venue02ap.yml (read-only, exact-head, no GET)
+  Draft #166 HEAD 56e28d121c3f8d84fbecefc74ef46bfbdec2f69c
+  CI 41195048645 SUCCESS 33/33; artifact 13040795453 SHA256 2f7b55a79b820ab06cfea1fc47199ee330d6f3034b2f7c5335da37abcb080a66
+  source/observed_at/role/valueSHA256/decision = 11 REVIEW candidates; formal FIELD=0
+  HOLD_TICKET_SESSION_ID_AND_INVENTORY_UNVERIFIED
+
+INDEPENDENT_ARTIFACT_READBACK: both downloaded ZIP SHA256, CRC, exact three members,
+  SHA256SUMS, manifest audit SHA and audit.headSHA PASS; first true CI failure NONE.
+LAST_THREE: A #163/#165/#167 new official source evidence 3/3; B #162/#164/#166 3/3;
+  newest-root repeat A/B 0/0 after rotation, formal accepted FIELD increments 0/0,
+  consecutive offline-only 0/0 by independent first-party observations; CI GET 0/0.
+ACCEPTANCE: A/B FORMAL FIELD=0/0, Golden=0, published=0, HARD_HOLD_NO_PUBLICATION.
+FROZEN: Source/Preview/ShowNews main, docs/data.json and docs/platform_status.json,
+  production Scraper/Writer/Publisher/Scheduler/Notifier, Pages and Android unchanged.
+CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 UI PASS preserved;
+ibon 39961 title mismatch OPEN; Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
+NEXT A: independent ticket session/checkout or safe canonical source rotation.
+NEXT B: independent OPENTIX session ID or nonduplicate P0 New Taipei venue rotation.
