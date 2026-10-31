@@ -3850,3 +3850,9 @@ ibon 39961 mismatch OPEN; Toolkit path UNKNOWN; Pages runtime UNVERIFIED
 ```
 
 **NEXT:** A verify exact-head CI/artifact for #165 and address first true failure if any. B resume VENUE-02AP on a new isolated branch only when GitHub safety allows, with source-local role/provenance and four-session postponement negatives. Neither CI nor official HTTP200 implies formal field acceptance. No Owner action currently.
+
+### 2026-10-31 17:53 — exact-head CI and independent artifact verification (A L9-CB; B safety HOLD)
+
+- A [Draft #165](https://github.com/easonliu714/event_scraper_public/pull/165) HEAD `d82b4765a9bad1bacee28553935a4a010a0859c7`; [CI #41190443492](https://github.com/easonliu714/event_scraper_public/actions/runs/41190443492) **SUCCESS 30/30** (15 predecessor + 15 new), all job steps PASS, first true failure NONE; CI official GET=0. [Artifact #13038712041](https://github.com/easonliu714/event_scraper_public/actions/runs/41190443492/artifacts/13038712041) ZIP SHA256 `179a1e30951ef60246f60b88bf68471e071f12214709ab697f9ea610df397a00`. Independent downloaded ZIP verification: exact 3 members, CRC PASS, SHA256SUMS PASS, manifest audit SHA PASS, audit.headSHA exact PASS, acceptedFields=0, Golden=0, published=false. This supersedes A initial CI PENDING.
+- B VENUE-02AP official Cloud Gate→OPENTIX same-title/event-path/postponement evidence is SOURCE_REVIEW only; **branch create safety-blocked**, so B GitHub HEAD/PR/CI/Artifact **NONE**. No attempt to bypass tool safety. This does not undo prior B VENUE-02AO Draft #164 SUCCESS 29/29 or existing Android PASS.
+- Both source fields formally accepted **0**, Golden **0**, published **0**; `HARD_HOLD_NO_PUBLICATION`. Continue next round B engineering priority after fresh safety/branch audit, A source-first distinct platform or a concrete ticket admission hypothesis. No main/formal data/status/Pages/Android writes.
