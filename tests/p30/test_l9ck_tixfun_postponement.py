@@ -3,7 +3,7 @@ import importlib.util,pathlib,unittest
 p=pathlib.Path(__file__).resolve().parents[2]/"scripts/p30_l9ck_tixfun_postponement.py"
 s=importlib.util.spec_from_file_location("gate",p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 def fixture():
-    return {"list_url":m.LIST_URL,"list_title":m.TITLE,"detail_url":m.DETAIL_URL,"product_id":m.PRODUCT_ID,
+    return {"list_url":m.LIST_URL,"list_title":m.LIST_TITLE,"detail_url":m.DETAIL_URL,"product_id":m.PRODUCT_ID,
      "detail_title":m.TITLE,"header_range":m.HEADER,"price_band":(800,3200),
      "original":m.ORIGINAL,"postponed":m.POSTPONED,"change_role":"ONE_CHIAYI_SHOW_RESCHEDULE_NOT_ALL_SHOWS",
      "refund_exception_cutoff":"2026-09-05","refund_exception_role":"PAST_RESCHEDULE_EXCEPTION_NOT_CURRENT_POLICY",
