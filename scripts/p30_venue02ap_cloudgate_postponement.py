@@ -34,7 +34,10 @@ def _valid_ticket_link(url):
         return False
     if not parts.query:
         return True
-    values = parse_qs(parts.query, keep_blank_values=True, strict_parsing=True)
+    try:
+        values = parse_qs(parts.query, keep_blank_values=True, strict_parsing=True)
+    except ValueError:
+        return False
     return set(values) == {"previewTime"} and len(values["previewTime"]) == 1 and bool(re.fullmatch(r"\d{13}", values["previewTime"][0]))
 
 def inspect(venue, ticket, observed_at):
