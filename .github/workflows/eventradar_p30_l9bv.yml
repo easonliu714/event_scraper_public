@@ -1,0 +1,58 @@
+name: EventRadar P30-L9-BV source-bound field roles (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9bu-famiticket-iframe-boundary]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  indievox-roles:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9bv-indievox-session-sale-role'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head, three ADD-only files and frozen formal JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=40bf097137ca9d3a139390d0e9bf56195be38314
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9bv_indievox_session_sale_role.py' 'tests/p30/test_l9bv_indievox_session_sale_role.py' '.github/workflows/eventradar_p30_l9bv.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen predecessor and new source-bound role tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile 'scripts/p30_l9bv_indievox_session_sale_role.py' 'tests/p30/test_l9bv_indievox_session_sale_role.py'
+          python -m unittest discover -s tests/p30 -p 'test_l9bu_famiticket_iframe_boundary.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_l9bv_indievox_session_sale_role.py' -v
+      - name: Sanitized exact-head source provenance SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_l9bv-evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('eventradar_l9bv-evidence')
+          a={'gate':'P30-L9-BV','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'source':'iNDIEVOX#18','officialGETinCI':0,'sourceObservationDate':'2026-10-31','independentOfficialReader':True,'acceptedFields':0,'goldenAccepted':0,'published':False,'decision':'HOLD_PER_SESSION_PRICE_AND_INDEPENDENT_ACCEPTANCE','releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True)+'\n')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd eventradar_l9bv-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_l9bv-evidence
+          path: eventradar_l9bv-evidence/
+          if-no-files-found: ignore
