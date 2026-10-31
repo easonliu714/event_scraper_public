@@ -3465,3 +3465,37 @@ Toolkit local path/permissions UNKNOWN; Pages runtime UNVERIFIED.
 - A Draft #145 HEAD `54518a63466872b4893ed453ab1746f389e565a0`, [exact-head CI #41140927342](https://github.com/easonliu714/event_scraper_public/actions/runs/41140927342) **SUCCESS 17/17** (BQ 9 + BR 8), all steps PASS, first true failure NONE. Artifact #13018798469 ZIP SHA256 `40218888a53ab410562207677522eed3f93cba3f99b76e1f199d782178925555`; independent ZIP CRC/SHA256SUMS/manifest/headSHA PASS.
 - B Draft #146 HEAD `bb327cd2710db8d053b025c3b15af68023e1ab0d`, [exact-head CI #41140933850](https://github.com/easonliu714/event_scraper_public/actions/runs/41140933850) **SUCCESS 17/17** (AE 8 + AF 9), all steps PASS, first true failure NONE. Artifact #13018803315 ZIP SHA256 `8e577c57068f7ce603154b11453cdeb03c3f1f33d635972402b1ba5fa0e97bb6`; independent ZIP CRC/SHA256SUMS/manifest/headSHA PASS.
 - Both source audits: officialGET=0, new SOURCE_QUALITY=NO/NO, offline-only streak A/B=1/1, accepted FIELD=0/0, Golden=0, published=0, HARD_HOLD_NO_PUBLICATION. Next source-first or rotate; no production write.
+
+
+### 2026-10-31 08:03 Asia/Taipei — A L9-BS / B VENUE-02AG source-linked candidate evidence / fail-closed field architecture
+
+```text
+Authority: Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance: Draft PR #8 only, NOT main; formal JSON/Pages unchanged
+A P30-L9-BS Draft #147 exact HEAD b3f6cbebb4f6c4ce1fa48e7ed6d65ba0833edb29
+  platform #13 Huashan official list -> same official detail
+  -> direct first-party ticket link to ACCUPASS canonical #02 /event/2609240212371623247500
+  -> shared core title + EVENT_SESSION 2026-10-31 16:00-17:30
+  -> ROOM CONFLICT Huashan 中3A館 2樓拱廳 != ACCUPASS 中3館2樓拱廳
+  -> 8 candidate provenance receipts; HOLD, not formal accepted fields
+  -> exact-head CI 41147936781 SUCCESS 19/19
+  -> artifact 13021463298 ZIP SHA 8de499945c9007cdec40d9d51bc4cf25a6bd5e2f55aec3d6b5360e2bd7247015
+B P30-VENUE-02AG Draft #148 exact HEAD d2d594197276b6a38fe45bb605c3afdb1cdd110a
+  Ceramics New Taipei official SID 0Q218... title 山彩疊疊-唐榕個展
+    -> EXHIBITION_DATE_RANGE 2026-10-16..2026-11-15
+    -> EXHIBITION_VENUE b1陶藝長廊
+  distinct SID 0Q238... title 殼之巢 — 情景之階：佐藤雅之個展
+    -> EXHIBITION_DATE_RANGE 2026-10-13..2026-11-10
+    -> EXHIBITION_VENUE 1樓陽光特展室
+  -> 4 REVIEW candidate fields, strict cross-SID rejection
+  -> initial CI 41147940297 FAIL one test expected wrong HOLD category;
+     exact-head corrected CI 41147968285 SUCCESS 20/20, no relaxed validator
+  -> artifact 13021782466 ZIP SHA 5fddaf826125b5eaa1b6a66e5c53cca7d8917fd1048bbb2662d409c61c848aa4
+A/B independent public source-quality YES/YES, CI officialGET=0/0
+Last 3 rounds new source evidence A/B 2/3; same-root-cause-only predecessor A/B 2/2
+Formal FIELD A/B 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
+```
+
+**Identity/provenance contract:** A direct venue-to-ticket URL is a strong cross-source evidence edge, but it does not authorize merging conflicting venue-room strings. EVENT_SESSION is distinct from SALE/REGISTRATION/ADMISSION; exhibition date ranges are not single performance sessions. Ceramics `sid` is an official venue document identity, not an ACCUPASS Event ID. Every field candidate requires independent `source`, `observed_at`, `role`, `decision`, and `valueSHA256`; conflict stays HOLD. Text rendered by the public reader does **not** establish actual HTML leaf/sibling ownership, which remains an explicit next Gate. No field is FORMAL FIELD PASS until independent acceptance and authorization. Preserve CKSMH #17 5 and TWTC #16 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, ibon 39961 mismatch OPEN. No production, main, formal data/status, Pages or Android write.
+
+**Next A L9-BT:** independently adjudicate Huashan room `中3A館` vs ACCUPASS `中3館` from explicit same-source room evidence; otherwise keep HOLD and rotate existing 19-platform source. **Next B VENUE-02AH:** obtain truly source-bound DOM leaf ownership for both distinct Ceramics SIDs or rotate next P0 New Taipei venue; no repeated unchanged GET. Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
