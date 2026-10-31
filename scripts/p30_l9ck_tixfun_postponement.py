@@ -5,6 +5,7 @@ LIST_URL="https://tixfun.com/UTK0102_?TYPE=0"
 DETAIL_URL="https://tixfun.com/UTK0201_?PRODUCT_ID=Q023RA4H"
 PRODUCT_ID="Q023RA4H"
 TITLE="故事工廠 第24回作品《婚禮上的小抄》"
+LIST_TITLE=TITLE+"Footnotes for Forever"
 ORIGINAL=("2026-09-05","14:30","嘉義縣表演藝術中心 演藝廳")
 POSTPONED=("2027-03-06","14:30","嘉義縣表演藝術中心 演藝廳")
 HEADER=("2026-11-06","2027-03-06")
@@ -12,7 +13,7 @@ def inspect(x,observed_at):
     out={"gate":"P30-L9-CK","acceptedFields":0,"ticketSessionIdsVerified":0,"goldenAccepted":0,"published":False,"provenance":[]}
     try: date.fromisoformat(observed_at)
     except (ValueError,TypeError): return dict(out,decision="HOLD_OBSERVATION")
-    if not isinstance(x,dict) or x.get("list_url")!=LIST_URL or x.get("list_title")!=TITLE:
+    if not isinstance(x,dict) or x.get("list_url")!=LIST_URL or x.get("list_title")!=LIST_TITLE:
         return dict(out,decision="HOLD_LIST_IDENTITY")
     u=urlsplit(x.get("detail_url",""))
     if x.get("detail_url")!=DETAIL_URL or u.netloc!="tixfun.com" or u.path!="/UTK0201_" or parse_qs(u.query)!={"PRODUCT_ID":[PRODUCT_ID]} or x.get("product_id")!=PRODUCT_ID:
