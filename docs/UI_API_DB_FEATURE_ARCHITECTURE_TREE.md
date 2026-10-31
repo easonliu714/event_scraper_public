@@ -3556,3 +3556,42 @@ Pages live fetch unavailable, Android PASS retained; no formal data/status chang
 ```
 
 This supersedes earlier Artifact-independent-verification UNVERIFIED statements for these two exact artifacts only; source HTML DOM leaf and independent FORMAL FIELD acceptance remain HOLD. Next A rotate canonical platform, B rotate nonduplicate P0 New Taipei venue.
+
+
+### 2026-10-31 10:59 Asia/Taipei — source-bound fail-closed rotation architecture (L9-BU / VENUE-02AI)
+
+```text
+Authority Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance Draft PR #8 ONLY; formal data/status frozen; HARD_HOLD_NO_PUBLICATION
+A canonical platform #07 FamiTicket (REUSE, not new source adapter)
+  Prior L9-BT #149 ac4d174865c9ae16d874f8bca94aabb5d2be49b8
+  -> L9-BU Draft #151 HEAD 40bf097137ca9d3a139390d0e9bf56195be38314
+  -> first-party /Home LIST title/date + mixed 展覽/演唱會 classification
+  -> exact opaque /Home/Activity/Info/... link renders iframe-only
+  -> no independently verified same-ID detail H1, EVENT/SALE/SESSION/PRICE
+  -> 3 candidate LIST role hashes REVIEW; accepted FIELD=0
+  -> HOLD_MIXED_LIST_CATEGORY_AND_IFRAME_IDENTITY
+  -> CI 41162325839 SUCCESS 21/21; artifact 13027652162
+     SHA256 3780cf46e7766290ca85970db3c478219f310dd9af2d644676e995139de1fc77
+B P0 New Taipei Zepp (existing VENUE-02J/K history, no duplicate adapter)
+  Prior VENUE-02AH #150 5283df1033a6fbceadb702492b7a159c3f534962
+  -> VENUE-02AI Draft #152 HEAD f027092f88848a6dedef5a7db2243e494c6a661b
+  -> first-party schedule -> exact same-rid=163025 detail/title/date
+  -> index START 13:00 != exhaustive session list
+  -> detail explicitly 13:00 AlmondProgress, 19:30 SkyNani
+  -> direct TicketPlus activity URL, body 購票網址｜網頁建置中
+  -> external ticket title/identity not independently verified (JS-only)
+  -> 6 source-bound candidate role hashes REVIEW; accepted FIELD=0
+  -> HOLD_TWO_SESSIONS_TICKET_DETAIL_AND_BODY_STATUS_UNVERIFIED
+  -> CI 41162328563 SUCCESS 23/23; artifact 13027731172
+     SHA256 82ea5a45ce49fcac0f38ab27e0fecb4044945c070373c8e6c09a874caffe0b16
+Both initial CI checkout failures from escaped GitHub SHA expression repaired;
+  final exact-head all steps PASS, independent artifact ZIP CRC/SHA/manifest/head PASS
+Last 3 rounds SOURCE_QUALITY A/B 3/3; formally accepted fields A/B 0/0
+Same-root prior loop A Huashan 2, B Ceramics 2+; rotated A/B this round
+CI official GET 0/0; independent official reader source observation YES/YES
+Golden 0; publication 0; Android CKSMH 5 / TWTC 39 / L8 UI PASS retained
+NEXT A L9-BV different canonical source; NEXT B VENUE-02AJ ticket parity or rotate
+```
+
+**Field provenance boundary:** A opaque detail URL is a source link, not proof of EVENT identity or date role. B first-party `rid` identifies a Zepp schedule document, not a verified TicketPlus event ID; two explicit performance sessions are distinct from the index's single START and from sale/registration/price. Every REVIEW candidate remains tied to source URL, observed date, role and value SHA256; missing external ticket parity or contradictory body status stays HOLD. Source links: [FamiTicket index](https://www.famiticket.com.tw/Home), [Zepp index](https://www.zepp.co.jp/hall/newtaipei/schedule/), [Zepp rid detail](https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=163025), [TicketPlus linked activity](https://ticketplus.com.tw/activity/a3cb941035a5a7e6898f4000f76bd25c). No production, main, formal JSON, Pages or Android writes.
