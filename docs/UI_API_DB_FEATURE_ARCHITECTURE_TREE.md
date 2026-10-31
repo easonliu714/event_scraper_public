@@ -3774,3 +3774,21 @@ ANDROID CKSMH #17 5 and TWTC #16 39 USER_ATTESTED_PASS; L8 UI PASS retained
 ```
 
 Both isolated PRs add strict no-network source-role validators, negative regressions and exact-head read-only CI. A/B independent first-party reader source observations **3/3 each** over #157/#159/#161 and #158/#160/#162; repeated current root **1/1**, formally accepted field increments **0/0**, offline-only consecutive rounds **0/0** by separate source observations. Do not promote nonexact venue/ticket titles, `已下架` status, venue-declared price classes, or opaque `PRODUCT_ID` to ticket session identity. Next A `L9-CA` rotate to another canonical source unless a truly independent dated OPENTIX session is accessible; next B `VENUE-02AO` rotate to another P0 New Taipei source or an actual ticket-rendered session, not repeated opaque shell. Exact run/artifact final result must be appended separately after verification. Toolkit local path/permissions UNKNOWN; Pages runtime UNVERIFIED. No Owner action.
+
+
+### 2026-10-31 15:58 — exact-head engineering verification for A/B source-bound HOLD
+
+```text
+A L9-BZ Draft #161 HEAD ea83b37fbe756ab4cb4d41906d3e2fb4f7f613f6
+  CI 41182559622 SUCCESS 24/24; first true failure NONE
+  Artifact 13035233491 SHA256 02fe0bc9aecfd2679d280d06bf984dd8a82c98f802fed91630baedd2661282c8
+B VENUE-02AN Draft #162 HEAD 3348f8207725ae780347559bbd7784cda93ab394
+  CI 41182561753 SUCCESS 27/27; first true failure NONE
+  Artifact 13035612738 SHA256 8cbf958a69fcad718e02446150812815dc68776bf004d4a4ef09fd1705189524
+INDEPENDENT: downloaded ZIP SHA256 + ZIP CRC + three exact members +
+  SHA256SUMS + manifest.json + audit.json.headSHA ALL PASS
+officialGETinCI=0/0; formal accepted FIELD=0/0; Golden=0; published=0
+HARD_HOLD_NO_PUBLICATION; no main/merge/formal data/status/Pages/Android write
+```
+
+Source-first independent public reader findings remain **REVIEW/HOLD**, not formal FIELD PASS; this final addendum supersedes initial CI/Artifact PENDING for these two exact PR heads only. Preserve CKSMH #17 5, TWTC #16 39 Android USER_ATTESTED_PASS and L8 Core UI PASS.
