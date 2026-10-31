@@ -11,7 +11,14 @@ VENUE_URL = "https://www.culture.ntpc.gov.tw/artcenter_chi/xmdoc/cont?sid=0Q1523
 OPENTIX_URL = "https://www.opentix.life/event/2086734015886159873"
 EVENT_ID = "2086734015886159873"
 TITLE = "銀河谷音劇團《屁屁偵探》南方島嶼的神秘遺跡"
+VENUE_TITLE = "《屁屁偵探》南方島嶼的神秘遺跡"
 VENUE = "新北市藝文中心演藝廳"
+VENUES = (
+    "新北市藝文中心演藝廳", "桃園展演中心展演廳", "基隆表演藝術中心演藝廳",
+    "臺中市中山堂", "嘉義市政府文化局音樂廳", "高雄市文化中心至德堂",
+    "彰化縣文化局員林演藝廳表演廳", "臺中市葫蘆墩文化中心演奏廳",
+    "臺北市政大樓親子劇場",
+)
 SHOWS = (("2026-11-07", "14:30", "六"), ("2026-11-08", "10:30", "日"), ("2026-11-08", "14:30", "日"))
 WEEKDAYS = "一二三四五六日"
 
@@ -33,12 +40,12 @@ def inspect(record, observed_at):
         return dict(out, decision="HOLD_CANONICAL_EVENT_ID")
     if record.get("linked_event_canonical_url") != OPENTIX_URL:
         return dict(out, decision="HOLD_DIRECT_LINK_PARITY")
-    if record.get("venue_title") != TITLE or record.get("opentix_title") != TITLE:
+    if record.get("venue_title") != VENUE_TITLE or record.get("opentix_title") != TITLE:
         return dict(out, decision="HOLD_CROSS_SOURCE_TITLE")
     if record.get("venue") != VENUE or record.get("opentix_venue") != VENUE:
         return dict(out, decision="HOLD_CROSS_SOURCE_VENUE")
     venues = record.get("opentix_venues")
-    if not isinstance(venues, list) or len(venues) != 9 or len(set(venues)) != 9 or VENUE not in venues:
+    if not isinstance(venues, list) or venues != list(VENUES):
         return dict(out, decision="HOLD_NINE_DISTINCT_VENUES")
     if record.get("ticket_session_ids") is not None or record.get("inventory") is not None or record.get("session_price") is not None:
         return dict(out, decision="HOLD_NO_STATIC_TICKET_SESSION")
