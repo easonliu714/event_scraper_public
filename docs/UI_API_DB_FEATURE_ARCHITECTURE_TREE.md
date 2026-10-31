@@ -3684,3 +3684,22 @@ L8 Core UI and formal PWA visual PASS retained; ibon39961 mismatch OPEN.
 ```
 
 **Source links:** [iNDIEVOX detail](https://www.indievox.com/activity/detail/26_iv04280c7), [iNDIEVOX game](https://www.indievox.com/activity/game/26_iv04280c7), [Art Center index](https://www.culture.ntpc.gov.tw/artcenter_chi/sitesearch), [Art Center bulletin](https://www.culture.ntpc.gov.tw/artcenter_chi/xmdoc/cont?sid=0Q152372523738311866&sq=&xsmsid=0G269629106251547168). Official public reader source observations are **not** CI-run GET or independently accepted Golden fields. Next A L9-BX rotate after frozen session-price/status HOLD; next B VENUE-02AL resolve source-local bulletin group identity or rotate, not synthetic-only loops. No Owner action or publication authorization.
+
+
+### 2026-10-31 12:57 — immutable exact-head CI evidence verification (supersedes pending)
+
+```text
+A L9-BW #155 HEAD 1d386dfb8b1ae4bf1776bb53d42721bfef7b1efa
+  CI 41170451988 SUCCESS; frozen 11 + new 10 = 21/21
+  Artifact 13030568136 ZIP SHA256
+  5083ee71cecf05678ea8cf31110fa48f94559d973f3d00633d07c0da786c58f3
+B VENUE-02AK #156 HEAD 219a2c2c43faf786db53a83abd5f140fa7a6a82d
+  CI 41170455331 SUCCESS; frozen 11 + new 11 = 22/22
+  Artifact 13030961682 ZIP SHA256
+  716150fdf6a93830d4cfd8f20fdc8c6f084f241ac43d20e167b7705455cb629c
+Both ZIP CRC, SHA256SUMS, manifest and audit exact headSHA PASS
+Both CI officialGET=0; independent public reader evidence separate
+Accepted FIELD=0/0, Golden=0, publication=0, HARD_HOLD_NO_PUBLICATION
+```
+
+No main, merge, production JSON, Pages or Android writes; prior Android PASS preserved.
