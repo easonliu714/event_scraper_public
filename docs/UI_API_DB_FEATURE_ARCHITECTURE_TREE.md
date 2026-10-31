@@ -3499,3 +3499,42 @@ Formal FIELD A/B 0/0; Golden 0; published 0; HARD_HOLD_NO_PUBLICATION
 **Identity/provenance contract:** A direct venue-to-ticket URL is a strong cross-source evidence edge, but it does not authorize merging conflicting venue-room strings. EVENT_SESSION is distinct from SALE/REGISTRATION/ADMISSION; exhibition date ranges are not single performance sessions. Ceramics `sid` is an official venue document identity, not an ACCUPASS Event ID. Every field candidate requires independent `source`, `observed_at`, `role`, `decision`, and `valueSHA256`; conflict stays HOLD. Text rendered by the public reader does **not** establish actual HTML leaf/sibling ownership, which remains an explicit next Gate. No field is FORMAL FIELD PASS until independent acceptance and authorization. Preserve CKSMH #17 5 and TWTC #16 39 Android USER_ATTESTED_PASS, L8 Core UI PASS, ibon 39961 mismatch OPEN. No production, main, formal data/status, Pages or Android write.
 
 **Next A L9-BT:** independently adjudicate Huashan room `中3A館` vs ACCUPASS `中3館` from explicit same-source room evidence; otherwise keep HOLD and rotate existing 19-platform source. **Next B VENUE-02AH:** obtain truly source-bound DOM leaf ownership for both distinct Ceramics SIDs or rotate next P0 New Taipei venue; no repeated unchanged GET. Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
+
+### 2026-10-31 09:58 Asia/Taipei — P30-L9-BT / VENUE-02AH field provenance and refusal tree
+
+```text
+Authority: Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+Governance: Draft #8 ONLY (not main); frozen formal blobs data 7fc4fe32..., status e19ca37c...
+A canonical #13 Huashan -> canonical #02 ACCUPASS (no duplicate platform)
+  predecessor L9-BS #147 b3f6cbebb4f6c4ce1fa48e7ed6d65ba0833edb29
+  -> L9-BT Draft #149 ac4d174865c9ae16d874f8bca94aabb5d2be49b8
+  -> same official Huashan page HEADER_VENUE_ROOM "中3A館 2樓拱廳"
+     vs BODY_VENUE_ROOM "華山1914文化創意產業園區 中3館2樓拱廳"
+  -> direct ACCUPASS link does NOT resolve same-page room conflict
+  -> exact role+source URL+observed_at+value SHA; no implicit normalization
+  -> HOLD_SAME_SOURCE_HEADER_BODY_ROOM_CONFLICT; formal FIELD=0
+  -> exact-head CI #41158031995 SUCCESS predecessor 11 + new 10 = 21/21
+  -> Artifact #13026056618 exists; independent ZIP hash readback UNVERIFIED
+  -> NEXT rotate canonical platform after frozen conflict evidence
+B P0 New Taipei Ceramics venue (distinct from existing 19-platform sources)
+  predecessor VENUE-02AG #148 d2d594197276b6a38fe45bb605c3afdb1cdd110a
+  -> VENUE-02AH Draft #150 5283df1033a6fbceadb702492b7a159c3f534962
+  -> SID 0Q218... EXHIBITION_DATE_RANGE Oct16-Nov15
+     ARTICLE_UPDATED_AT Oct15, SITE_CONTENT_UPDATED_AT Oct30
+  -> SID 0Q238... EXHIBITION_DATE_RANGE Oct13-Nov10
+     ARTICLE_UPDATED_AT Oct12, SITE_CONTENT_UPDATED_AT Oct30
+  -> article/site update != event/session/sale; SID != ticket event ID
+  -> two SID provenance sets; no cross-SID join, no DOM leaf proof
+  -> REVIEW only, formal FIELD=0
+  -> exact-head CI #41158093785 SUCCESS predecessor 11 + new 11 = 22/22
+  -> Artifact #13025658512 exists; independent ZIP hash readback UNVERIFIED
+  -> NEXT rotate P0 New Taipei source, retain Ceramics role/DOM HOLD
+A/B new independent source observations YES/YES; official CI GET 0/0
+Last 3 cycles new SOURCE_QUALITY A 2/3, B 2/3
+Repeated root cause A room 2 cycles; B DOM leaf unresolved 2+ prior Gates
+Formal FIELD 0/0; Golden 0; publication 0; HARD_HOLD_NO_PUBLICATION
+No main, merge, production, formal data/status, Pages or Android changes
+CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS; L8 UI PASS
+```
+
+**Source evidence:** [Huashan official detail](https://www.huashan1914.com/exhibition/%E6%9C%97%E8%AE%80%E6%B2%99%E9%BE%8D-%E9%80%99%E6%A8%A3%E5%95%8A%EF%BC%81%E9%82%A3%E4%BA%9B%E7%86%9F%E6%82%89%E5%8F%88%E9%99%8C%E7%94%9F%E7%9A%84%E6%97%A5%E5%B8%B8), [Ceramics first SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q218338899799849722&xsmsid=0J148497613881029302), [Ceramics second SID](https://www.ceramics.ntpc.gov.tw/xmdoc/cont?sid=0Q238554544743104681&xsmsid=0J148497613881029302). Current ACCUPASS fresh read UNVERIFIED. New source-role text is independent public reader evidence, not official GET in CI or live adapter acceptance. Read-only exact-head jobs passed all steps; ZIP CRC/SHA manifest independently **not verified** in this cycle. Toolkit path/permission UNKNOWN; Pages runtime UNVERIFIED.
