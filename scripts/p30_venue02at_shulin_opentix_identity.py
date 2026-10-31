@@ -14,6 +14,9 @@ def exact(url,expected):
  if not isinstance(url,str):return False
  a=urlsplit(url);b=urlsplit(expected)
  return (a.scheme,a.netloc,a.path,a.query,a.fragment)==(b.scheme,b.netloc,b.path,b.query,b.fragment)
+def normalize_title(value):
+ if not isinstance(value,str):return ""
+ return value.replace("．","・").replace("·","・")
 def inspect(venue,opentix,package,observed_at):
  out={"gate":"P30-VENUE-02AT","acceptedFields":0,"goldenAccepted":0,"published":False,"provenance":[]}
  try:datetime.date.fromisoformat(observed_at)
@@ -28,7 +31,7 @@ def inspect(venue,opentix,package,observed_at):
   url="https://www.opentix.life/event/"+expected["event_id"]
   if not exact(r.get("url"),url) or r.get("event_id")!=expected["event_id"]:
    return dict(out,decision="HOLD_OPENTIX_CANONICAL_ID")
-  if expected["title"] not in r.get("title","") or expected["title"] not in v.get("title",""):
+  if normalize_title(expected["title"]) not in normalize_title(r.get("title")) or normalize_title(expected["title"]) not in normalize_title(v.get("title")):
    return dict(out,decision="HOLD_INDEPENDENT_TITLE_PARITY")
   if v.get("venue")!="樹林藝文中心演藝廳" or r.get("venue")!="樹林藝文中心演藝廳":
    return dict(out,decision="HOLD_VENUE_PARITY")
