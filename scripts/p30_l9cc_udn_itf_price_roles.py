@@ -28,7 +28,10 @@ def _detail_url_valid(value):
         "https", "tickets.udnfunlife.com", "/Application/UTK02/UTK0201_.aspx", ""
     ):
         return False
-    return parse_qs(u.query, strict_parsing=True) == {"PRODUCT_ID": [PRODUCT_ID]}
+    try:
+        return parse_qs(u.query, strict_parsing=True) == {"PRODUCT_ID": [PRODUCT_ID]}
+    except ValueError:
+        return False
 
 def inspect(row, detail, observed_at):
     out = dict(gate="P30-L9-CC", source="UDN_CANONICAL_06", acceptedFields=0,
