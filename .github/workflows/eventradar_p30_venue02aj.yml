@@ -1,0 +1,58 @@
+name: EventRadar P30-VENUE-02AJ source-bound field roles (NO PUBLISH)
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02ai-zepp-session-ticket-role]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  zepp-price-sale:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02aj-zepp-price-sale-boundary'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head, three ADD-only files and frozen formal JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=f027092f88848a6dedef5a7db2243e494c6a661b
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02aj_zepp_price_sale_boundary.py' 'tests/p30/test_venue02aj_zepp_price_sale_boundary.py' '.github/workflows/eventradar_p30_venue02aj.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Frozen predecessor and new source-bound role tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile 'scripts/p30_venue02aj_zepp_price_sale_boundary.py' 'tests/p30/test_venue02aj_zepp_price_sale_boundary.py'
+          python -m unittest discover -s tests/p30 -p 'test_venue02ai_zepp_session_ticket_role.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02aj_zepp_price_sale_boundary.py' -v
+      - name: Sanitized exact-head source provenance SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p eventradar_venue02aj-evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('eventradar_venue02aj-evidence')
+          a={'gate':'P30-VENUE-02AJ','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'source':'Zepp New Taipei','officialGETinCI':0,'sourceObservationDate':'2026-10-31','independentOfficialReader':True,'acceptedFields':0,'goldenAccepted':0,'published':False,'decision':'HOLD_PRICE_SALE_TO_SESSION_MAPPING_AND_TICKET_PARITY','releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True)+'\n')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd eventradar_venue02aj-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_venue02aj-evidence
+          path: eventradar_venue02aj-evidence/
+          if-no-files-found: ignore
