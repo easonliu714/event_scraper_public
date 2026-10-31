@@ -3967,3 +3967,49 @@ HARD_HOLD_NO_PUBLICATION; no main/production/Pages/Android writes.
 - **Near-three-round quality:** A #168/#170/#172, B #169/#171/#173 = **3/3 independent first-party source-evidence rounds** each; same-root repeated 0/0 after source rotation; OFFLINE-only consecutive 0/0 by source reader (CI official GET remains 0/0); formally accepted FIELD increments 0/0, Golden 0, published 0. ACCEPTANCE_READINESS improves for A direct source-linked distinct ACCUPASS Event IDs and B mixed festival child identity, but **HOLD** for independent ticket session/field acceptance. Previous exact-head CI #170 32/32, #171 35/35 SUCCESS; new #172/#173 CI must be separately checked before claiming PASS.
 - **NEXT A:** verify two event IDs independently in official ACCUPASS, preserve per-pair vs per-workshop fee role and two vs 16 sessions, seek explicit public session IDs only if safe; otherwise rotate canonical #01–#19. **NEXT B:** resolve two OPENTIX shortlinks to official canonical Event IDs only via normal public redirect, then verify each independent performance identity; otherwise keep `SHORTLINK_UNRESOLVED` and rotate P0 New Taipei. Never conflate descriptive showtime with purchasable ticket session.
 - **Safety:** `HARD_HOLD_NO_PUBLICATION`; no merge/main/force-push, Golden, formal data/status, Production Scraper/Writer/Publisher/Scheduler/Notifier, Pages, Android writes. Preserve CKSMH #17 Android 5, TWTC #16 Android 39 USER_ATTESTED_PASS, L8 UI PASS; ibon 39961 mismatch OPEN. Owner action NONE; formal publication authorization not granted.
+
+
+### 2026-10-31 23:55 Asia/Taipei — A L9-CG / B VENUE-02AT source-local identity and role architecture (NO PUBLISH)
+
+```text
+Source main fbf4ca02b91159f2423caf3d79fb0ca4bb747069 [unchanged]
+Formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [unchanged]
+19-source platform status blob e19ca37c4c80c10b7278d0813b8ff1047535d124 [unchanged]
+Governance only Draft PR #8, never main
+A / P30-L9-CG [Draft #174; head a305ee74afbb2519c97c12227a3b7d45b12dc654]
+  Existing canonical #02 ACCUPASS; Event 2609041147021848655729
+  official event description -> 16 title/date/time-local WORKSHOP_DESCRIPTION rows
+  source page has 16 individually named classes; NT$100 PER_WORKSHOP
+  event ID != 16 purchasable ticket-session IDs
+  scripts/p30_l9cg_accupass_workshop_rows.py [ADD]
+  tests/p30/test_l9cg_accupass_workshop_rows.py [ADD]
+  .github/workflows/eventradar_p30_l9cg.yml [ADD]
+  exact-head CI 41217108507 SUCCESS; artifact 13048303256 (independent ZIP CRC pending)
+  official GET in CI=0; formal FIELD=0; Golden=0; publication=0
+B / P30-VENUE-02AT [Draft #175; head a889b1e66dcb666d7ab937a9035801e32ee68119]
+  P0 New Taipei Shulin official venue SID 0Q273522679833703495
+  -> venue claims OPENTIX shortlinks P5fece325/P142818f5
+  -> separate official OPENTIX #05 event pages:
+       BEL canonical candidate Event 2099700588990402561 (11/21 14:30)
+       BODY canonical candidate Event 2099688567429373953 (11/28 13:00; 11/29 11:00)
+  exact redirect edge shortlink -> Event ID UNKNOWN (source-reader shortlinks blocked)
+  OPENTIX ticketpackage 2102208181225205761 = BUNDLE_SALE 9/28–11/21,
+       NOT Event ID, ticket Session ID or showtime
+  scripts/p30_venue02at_shulin_opentix_identity.py [ADD]
+  tests/p30/test_venue02at_shulin_opentix_identity.py [ADD]
+  .github/workflows/eventradar_p30_venue02at.yml [ADD]
+  title normalization: narrowly reconcile official ・/． middle-dot typography
+  exact-head CI 41217144730 PENDING at governance write
+  official GET in CI=0; formal FIELD=0; Golden=0; publication=0
+NEAR-3: A #170/#172/#174 and B #171/#173/#175 = 3/3 each
+  new official SOURCE_QUALITY rounds; repeated same root 0/0
+  consecutive offline-only 0/0; formally accepted field increments 0/0
+  ACCEPTANCE_READINESS: descriptive class rows and event-page candidates REVIEW only
+  next A: safe public ticket-session IDs if available, else rotate canonical source
+  next B: safe shortlink resolution, else preserve HOLD and rotate P0 New Taipei
+  HARD_HOLD_NO_PUBLICATION; no main/merge/Golden/formal JSON/Pages/Android writes
+  retain CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS, L8 UI PASS
+  ibon 39961 historical mismatch OPEN
+```
+
+- Independent official source references: [ACCUPASS 16 classes](https://www.accupass.com/event/2609041147021848655729), [OPENTIX BEL](https://www.opentix.life/event/2099700588990402561), [OPENTIX BODY](https://www.opentix.life/event/2099688567429373953), [OPENTIX bundle](https://www.opentix.life/ticketpackage/2102208181225205761). Direct shortlink redirects remain unverified; do not conflate title/date candidate matching with canonical redirect verification. Toolkit local path/permissions UNKNOWN, live Pages runtime UNVERIFIED. Owner action NONE.
