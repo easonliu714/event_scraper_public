@@ -4556,3 +4556,8 @@ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS preserved
 ```
 
 - Source URLs: [OPENTIX LIST](https://www.opentix.life/), [same-ID DETAIL](https://www.opentix.life/event/2073011844495765504); [Fuzhong15 LIST](https://www.fuzhong15.ntpc.gov.tw/xcmovie?bdate=2026-11-01&edate=2026-11-30&xsmsid=0M361641875264878260), [same-SID DETAIL](https://www.fuzhong15.ntpc.gov.tw/xcmovie/cont?sid=0Q289827308277719165&xsmsid=0M361641875264878260). New A/B official evidence 1/1 source rounds, prior three source-offline rounds 0/3 each; formal accepted field delta 0/0. No second Writer, no main/formal data mutation.
+
+
+#### 2026-11-01 21:57 Asia/Taipei — field receipt role type guard and CI lineage
+
+- Draft #210 earlier `d50c7f79220c2cb3b80096e6e84e505b45c9683b` exact-head CI #41313632239 SUCCESS (16 Python tests, artifact #13085977765 digest sha256:0f21e0956874a73abada27edd09f9a7eed207010802221140a4fe334ceb00d88). The new optional-field gate additionally requires `isinstance(receipt.role,str)` before allowlist set membership, so malformed list/dict metadata fails closed rather than raising TypeError. Added malformed-list-role regression in same existing tests file. Sequential commits `7ee310c317ada534d02fac515f0e1af67fead754` and `e69f61ebc469f01306c25111a81aa2a15d1e8380`; final exact-head CI PENDING at append. No changes to formal data, status, Golden, publisher or main. Real Owner 18 rows still 0/18; L8 Android candidate UAT UNVERIFIED.
