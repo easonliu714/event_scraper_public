@@ -100,6 +100,47 @@ class CandidateQualityTests(unittest.TestCase):
             self.assertIn("data.json", manifest)
             self.assertIn("quality_report.json", manifest)
 
+    def test_audit_only_18_legacy_rows_reports_rejections_without_preview(self):
+        # This is a contract test using 18 untrusted legacy-shaped inputs,
+        # NOT the Owner's missing 18-record source dataset.
+        legacy = [
+            {"title": "待核活動", "url": "https://example.org/event/" + str(i),
+             "platform": "平台A" if i < 11 else "平台B",
+             "type": "其他", "scraped_at": "2026-11-01T17:00:00+08:00"}
+            for i in range(18)
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dest = root / "isolated-audit"
+            report = write_isolated_outputs(
+                legacy, dest, root, audit_only=True, expected_rows=18
+            )
+            self.assertEqual(report["inputRows"], 18)
+            self.assertEqual(report["previewRows"], 0)
+            self.assertEqual(report["rejectedRows"], 18)
+            self.assertEqual(report["inputPlatformCounts"], {"平台A": 11, "平台B": 7})
+            self.assertEqual(report["rejectedPlatformCounts"], {"平台A": 11, "平台B": 7})
+            self.assertEqual(report["rejectionReasonCounts"]["MISSING__CANDIDATE"], 18)
+            self.assertTrue(report["auditOnly"])
+            self.assertFalse(report["previewImportAllowed"])
+            self.assertFalse((dest / "data.json").exists())
+            self.assertTrue((dest / "quality_report.json").exists())
+            self.assertEqual(len((dest / "SHA256SUMS.txt").read_text().splitlines()), 1)
+
+    def test_expected_row_count_fail_closed_and_no_stale_preview(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dest = root / "audit"
+            with self.assertRaisesRegex(ValueError, "EXPECTED_INPUT_ROW_COUNT_MISMATCH"):
+                write_isolated_outputs([example()], dest, root,
+                                       audit_only=True, expected_rows=18)
+            self.assertFalse(dest.exists())
+            dest.mkdir()
+            (dest / "data.json").write_text("[]", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "AUDIT_ONLY_OUTPUT_HAS_STALE_PREVIEW_DATA"):
+                write_isolated_outputs([example()], dest, root,
+                                       audit_only=True, expected_rows=1)
+
     def test_oversized_input_rejected(self):
         with self.assertRaises(ValueError):
             build_candidate_dataset([example()] * 2001)
