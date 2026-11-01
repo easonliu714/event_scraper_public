@@ -105,14 +105,26 @@ def build_candidate_dataset(rows: object) -> tuple[list[dict], dict]:
     accepted: list[dict] = []
     rejected: list[dict] = []
     seen: set[tuple[str, str]] = set()
+    input_by_platform: Counter[str] = Counter()
+    rejected_by_platform: Counter[str] = Counter()
+    rejected_reasons: Counter[str] = Counter()
     for index, raw in enumerate(rows):
+        # Preserve the input platform label for diagnostics only; never infer a
+        # canonical ID or promote an unverified record into the preview feed.
+        label = raw.get("platform") if isinstance(raw, dict) else None
+        label = label.strip() if isinstance(label, str) and label.strip() else "UNKNOWN"
+        input_by_platform[label] += 1
         row, problems = normalize_record(raw)
         if problems:
             rejected.append({"index": index, "reasons": problems})
+            rejected_by_platform[label] += 1
+            rejected_reasons.update(problems)
             continue
         key = (row["_candidate"]["platform_id"], row["_candidate"]["source_event_id"])
         if key in seen:
             rejected.append({"index": index, "reasons": ["DUPLICATE_CANONICAL_ID"]})
+            rejected_by_platform[label] += 1
+            rejected_reasons["DUPLICATE_CANONICAL_ID"] += 1
             continue
         seen.add(key)
         accepted.append(row)
@@ -123,6 +135,9 @@ def build_candidate_dataset(rows: object) -> tuple[list[dict], dict]:
         "previewRows": len(accepted),
         "rejectedRows": len(rejected),
         "platformCounts": dict(sorted(Counter(x["platform"] for x in accepted).items())),
+        "inputPlatformCounts": dict(sorted(input_by_platform.items())),
+        "rejectedPlatformCounts": dict(sorted(rejected_by_platform.items())),
+        "rejectionReasonCounts": dict(sorted(rejected_reasons.items())),
         "rejected": rejected,
         "formalFieldAccepted": 0,
         "goldenAccepted": 0,
@@ -133,7 +148,10 @@ def build_candidate_dataset(rows: object) -> tuple[list[dict], dict]:
     return accepted, report
 
 
-def write_isolated_outputs(rows: object, dest: Path, repo_root: Path) -> dict:
+def write_isolated_outputs(
+    rows: object, dest: Path, repo_root: Path,
+    *, audit_only: bool = False, expected_rows: int | None = None
+) -> dict:
     root = repo_root.resolve()
     target = dest.resolve()
     if target == root or target == (root / "docs").resolve():
@@ -143,16 +161,29 @@ def write_isolated_outputs(rows: object, dest: Path, repo_root: Path) -> dict:
             raise ValueError("FORBIDDEN_PUBLICATION_PATH")
     if target.is_relative_to((root / "docs").resolve()):
         raise ValueError("NO_CANDIDATES_UNDER_PUBLIC_PAGES_DOCS")
+    if expected_rows is not None and (
+        expected_rows < 1 or not isinstance(rows, list) or len(rows) != expected_rows
+    ):
+        raise ValueError("EXPECTED_INPUT_ROW_COUNT_MISMATCH")
     candidates, report = build_candidate_dataset(rows)
-    if not candidates:
+    if not candidates and not audit_only:
         raise ValueError("EMPTY_REVIEW_CANDIDATES_NOT_PUBLISHED")
+    # Audit-only is deliberately usable for 18 legacy/untrusted rows with
+    # zero provenance-qualified candidates. It must not create a PWA import.
+    if audit_only and (target / "data.json").exists():
+        raise ValueError("AUDIT_ONLY_OUTPUT_HAS_STALE_PREVIEW_DATA")
     target.mkdir(parents=True, exist_ok=True)
-    data = json.dumps(candidates, ensure_ascii=False, indent=2) + "\n"
+    report["auditOnly"] = audit_only
+    report["previewImportAllowed"] = not audit_only
+    names = ["quality_report.json"]
+    if not audit_only:
+        data = json.dumps(candidates, ensure_ascii=False, indent=2) + "\n"
+        (target / "data.json").write_text(data, encoding="utf-8")
+        names.append("data.json")
     stats = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
-    (target / "data.json").write_text(data, encoding="utf-8")
     (target / "quality_report.json").write_text(stats, encoding="utf-8")
     manifest = {}
-    for name in ("data.json", "quality_report.json"):
+    for name in names:
         b = (target / name).read_bytes()
         manifest[name] = hashlib.sha256(b).hexdigest()
     (target / "SHA256SUMS.txt").write_text(
@@ -165,9 +196,16 @@ def main() -> None:
     p.add_argument("--input", required=True, type=Path)
     p.add_argument("--output-dir", required=True, type=Path)
     p.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    p.add_argument("--audit-only", action="store_true",
+                   help="Write rejection/quality report only; never create preview data.json")
+    p.add_argument("--expected-rows", type=int, default=None,
+                   help="Fail closed unless the input has exactly this many rows")
     args = p.parse_args()
     data = json.loads(args.input.read_text(encoding="utf-8"))
-    result = write_isolated_outputs(data, args.output_dir, args.repo_root)
+    result = write_isolated_outputs(
+        data, args.output_dir, args.repo_root,
+        audit_only=args.audit_only, expected_rows=args.expected_rows
+    )
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
 
 
