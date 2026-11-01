@@ -142,6 +142,7 @@ class CandidateQualityTests(unittest.TestCase):
         self.assertFalse(rows[0]["_candidate"]["formal_field_pass"])
         for key, bad in (("source", "https://example.org/other"),
                          ("role", "SALE_END"),
+                         ("role", ["EVENT_DATE"]),
                          ("observed_at", "2026-11-01T17:00:00"),
                          ("value", "other"), ("decision", "PASS")):
             changed = copy.deepcopy(e)
