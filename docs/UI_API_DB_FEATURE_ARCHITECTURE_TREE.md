@@ -4566,3 +4566,27 @@ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS preserved
 #### 2026-11-01 21:58 Asia/Taipei — final L7 exact-head CI PASS
 
 - Draft #210 final `e69f61ebc469f01306c25111a81aa2a15d1e8380` / [exact-head CI #41313723671](https://github.com/easonliu714/event_scraper_public/actions/runs/41313723671) SUCCESS, candidate-review job #124869282783 all steps PASS, artifact #13086303704 GitHub digest `sha256:bc77e12b564d7c3b790e1568eb3bd30d7016b070d97af52a8fe1a1e7adbcc8f7`; ZIP CRC independent UNVERIFIED. Source-bound field REVIEW receipt contract and malformed-role rejection covered; 18 actual Owner rows 0/18, L8 new Android UAT UNVERIFIED, no formal field/Golden/publication acceptance.
+
+### 2026-11-01 22:26 Asia/Taipei — Owner-approved PR #210 UI-only candidate import Merge and Pages deployment
+
+```text
+Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+├─ docs/index.html (blob dd93471fd6ef6d7681ca3153f29214c1eee91053)
+│  ├─ legacy data.json fetch/list/detail/cards/status/chips [UNCHANGED official behavior]
+│  └─ local-only JSON picker → candidate-review-list → candidate detail → return [DEPLOY SUCCESS; Android UAT UNVERIFIED]
+│     ├─ REVIEW-only metadata validation: HTTPS, HOLD reasons, not published/formal/Golden
+│     ├─ candidate data held in memory; never written to allEvents, browser read flags or notifications
+│     └─ safe DOM textContent/official HTTPS URL, separate from production event feed
+├─ scripts/p30_candidate_review_pipeline.py [offline only, tested, SHA manifest]
+├─ tests/p30/test_candidate_review_pipeline.py [positive/negative]
+├─ tests/fixtures/p30_candidate_review_synthetic.json [2 SYNTHETIC fixtures; no live activities]
+├─ .github/workflows/eventradar_p30_candidate_review.yml [exact-head CI SUCCESS #41313723671]
+├─ docs/data.json [FROZEN: 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+├─ docs/platform_status.json [FROZEN: cdeeb3b551e38f862c37759426a14b5129e1224d]
+└─ GitHub Pages build/deploy #41316070328 [SUCCESS]
+   └─ Android import/detail/list/return & direct Pages HTTP UAT [UNVERIFIED]
+```
+
+- Owner authorized only the PR #210 candidate-import UI Merge. [PR #210](https://github.com/easonliu714/event_scraper_public/pull/210) exact HEAD `e69f61ebc469f01306c25111a81aa2a15d1e8380` was merged to main as `9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb`. [CI #41313723671](https://github.com/easonliu714/event_scraper_public/actions/runs/41313723671) SUCCESS; Artifact #13086303704 GitHub SHA256 `bc77e12b564d7c3b790e1568eb3bd30d7016b070d97af52a8fe1a1e7adbcc8f7` metadata PASS; independently downloaded artifact content NOT VERIFIED in this interaction. Pages #41316070328 build/deploy/report-build-status SUCCESS. Main code and frozen data blobs independently read back. No new real event source, Golden, formal acceptance, or publication.
+- Original 18-row REVIEW JSON retained in current conversation filesystem, two ZIP copies consistent SHA256 `35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603`; structural check 18/18, source-level authenticity and real L7 pipeline independent acceptance remain HOLD. Do not repeatedly request Owner re-upload; Android user only needs to pick local file after download. Previous Android CKSMH 5 and TWTC 39 PASS preserved.
+- Owner UAT pending, no formal data replaced or authorization to lift `HARD_HOLD_NO_PUBLICATION`. Later L7 Golden and L9 data release require separate evidence and approval.
