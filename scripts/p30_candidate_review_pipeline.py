@@ -62,6 +62,11 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
     sources = m.get("sources")
     if not isinstance(sources, list) or not sources or not all(_https(x) for x in sources):
         reasons.append("OFFICIAL_SOURCE_EVIDENCE_MISSING")
+    elif raw.get("url") not in sources:
+        # Fail closed: a plausible HTTPS event URL is not field-level evidence
+        # unless the exact linked detail URL is among the source receipts.
+        # Venue index links and a different event ID cannot silently qualify it.
+        reasons.append("DETAIL_URL_NOT_IN_SOURCE_EVIDENCE")
     if not isinstance(m.get("hold_reasons"), list) or not m["hold_reasons"]:
         reasons.append("MISSING_HOLD_REASON")
     if reasons:
