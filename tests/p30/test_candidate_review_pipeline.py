@@ -124,6 +124,33 @@ class CandidateQualityTests(unittest.TestCase):
         self.assertIsNone(rows[0]["_candidate"]["ticket_session_id"])
         self.assertIsNone(rows[0]["_candidate"]["inventory"])
 
+    def test_review_field_provenance_is_exact_and_fail_closed(self):
+        e = example()
+        e["price"] = "100"
+        rows, report = build_candidate_dataset([e])
+        self.assertEqual(report["previewRows"], 1)
+        self.assertEqual(rows[0]["date"], "未確認")
+        self.assertEqual(rows[0]["location"], "未確認")
+        self.assertEqual(rows[0]["price"], "未確認")
+        self.assertIn("FIELD_PRICE_PROVENANCE_HOLD", rows[0]["_candidate"]["hold_reasons"])
+        receipt = {"value": e["date"], "source": e["url"],
+                   "observed_at": "2026-11-01T17:00:00+08:00",
+                   "role": "EVENT_DATE", "decision": "REVIEW"}
+        e["_candidate"]["field_evidence"] = {"date": receipt}
+        rows, _ = build_candidate_dataset([e])
+        self.assertEqual(rows[0]["date"], e["date"])
+        self.assertFalse(rows[0]["_candidate"]["formal_field_pass"])
+        for key, bad in (("source", "https://example.org/other"),
+                         ("role", "SALE_END"),
+                         ("observed_at", "2026-11-01T17:00:00"),
+                         ("value", "other"), ("decision", "PASS")):
+            changed = copy.deepcopy(e)
+            changed["_candidate"]["field_evidence"]["date"][key] = bad
+            rows, _ = build_candidate_dataset([changed])
+            self.assertEqual(rows[0]["date"], "未確認", key)
+            self.assertIn("FIELD_DATE_PROVENANCE_HOLD",
+                          rows[0]["_candidate"]["hold_reasons"])
+
     def test_duplicate_same_platform_event_id_rejected(self):
         first, second = example(), example("second", "1234")
         data, report = build_candidate_dataset([first, second])
