@@ -4266,3 +4266,32 @@ Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [unchanged]
 - **Evidence boundaries:** A official first-party LIST/DETAIL/GAME reader evidence newly examined but DETAIL/GAME may be cached up to two days; B Zepp SCHEDULE/DETAIL reader observed today. Both CI official GET=0, so SOURCE_QUALITY is observational, not live production extraction. Independent exact-head CI and downloaded artifact CRC, SHA256SUMS, manifest and audit.headSHA PASS; first true failure NONE. No ticket Session IDs, FORMAL accepted fields 0/0, Golden 0, publication 0.
 - **Near 3 rounds:** A #195/#197/#199 and B #196/#198/#200 each 3/3 new source-bound reading rounds, no same-root no-hypothesis repeats 0/0, offline-only 0/0; newly observed REVIEW candidate roles do not imply FORMAL acceptance. A should rotate to another canonical #01–#19 source with explicit Session evidence; B rotate next P0 New Taipei official venue with direct ticket link, do not re-GET unchanged Zepp Link-in-Bio.
 - **Release/PWA:** Owner-approved #192 status-only main merge and Pages deploy PASS; deployed engineering snapshot still A #190/B #191, not #199/#200. Direct Pages/Android latest status-page UAT UNVERIFIED. 19 platform dedup, historical CKSMH 5/TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS and ibon 39961 OPEN retained. `HARD_HOLD_NO_PUBLICATION` remains; no automatic main/status/event-feed update. Toolkit local path UNKNOWN.
+
+
+### 2026-11-01 12:50 Asia/Taipei — P30-L9-CT / P30-VENUE-02BG source-bound architecture (NO PUBLISH)
+
+```text
+Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [unchanged]
+├─ A / existing canonical KKTIX #01 / Draft #201 HEAD 94d32ae098a6f445e89c648c09a7bd7208f141d0
+│  ├─ EVENT https://sharalinmusic.kktix.cc/events/fdef73bb [first-party public]
+│  ├─ direct registration href https://kktix.com/events/fdef73bb/registrations/new [HTTP403]
+│  ├─ 2026-11-07 14:30 SHOW; 2026-10-06 12:00 SALE [distinct roles]
+│  ├─ NT$980 standard / NT$490 accessible [eligibility-specific]; NT$30 pickup FEE
+│  └─ registration HTTP403 != ticket Session ID / inventory / checkout / availability
+├─ B / new P0 New Taipei Cloud Gate Theater / Draft #202 HEAD 55f2631a927cb1750deeefa8c0b82835e96b5f4d
+│  ├─ LIST https://www.cloudgate.org.tw/cgt/latest-program
+│  ├─ DETAIL https://www.cloudgate.org.tw/cgt/theater-event/1680 [same-source link]
+│  ├─ original Nov14 13:30/16:30 [SUPERSEDED] -> Dec19 same times [REVISED]
+│  ├─ Sep24 announcement [NOTICE] / Nov14 refund cutoff [REFUND, NOT SHOW]
+│  ├─ Oct17 lectures unaffected; OPENTIX named but no direct ticket Event/Session URL
+│  └─ descriptive NT$400 / bundle discounts not independently accepted session prices
+├─ A exact-head CI #41274720603 SUCCESS 11/11; artifact #13070567301 CRC/SHA/head PASS
+├─ B exact-head CI #41274723455 SUCCESS 11/11; artifact #13071016512 CRC/SHA/head PASS
+├─ formal docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [frozen]
+└─ formal docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d [frozen]
+```
+
+- **Strict engineering footprint:** A three ADD-only paths `scripts/p30_l9ct_kktix_registration_guard.py`, `tests/p30/test_l9ct_kktix_registration_guard.py`, `.github/workflows/eventradar_p30_l9_ct.yml`; B three ADD-only paths `scripts/p30_venue02bg_cloudgate_postponement.py`, `tests/p30/test_venue02bg_cloudgate_postponement.py`, `.github/workflows/eventradar_p30_venue_02bg.yml`. Branch bases are predecessor #199 `c9ccf93317bfd7527f286413b5560859735ccd60` and #200 `9619876a631cda412e54ed9f65703bce96d2e5cb`; no production parser/API/DB/UI/Golden/Publisher modifications. Both workflows exact-head, read-only, frozen formal data and 19-platform assertions, official GET in CI 0.
+- **Evidence/provenance contract:** Each candidate includes `source`, `source_url`, `observed_at`, `role`, `decision=REVIEW`. A strict URL/ID/title guard rejects registration domain substitutions, sale/show swaps, fee/price conflation and guessed ticket sessions. B strict same-source list/detail ID guard and old/new date pairing prevent silent promotion of superseded Nov14 shows; refund date is never performance. Official [Cloud Gate notice](https://www.cloudgate.org.tw/cgt/theater-event/1680) explicitly revised Nov14 to Dec19. Ticket Session IDs, independently accepted FIELD, Golden, published events all **0**.
+- **CI and artifact:** A [#201](https://github.com/easonliu714/event_scraper_public/pull/201) [CI #41274720603](https://github.com/easonliu714/event_scraper_public/actions/runs/41274720603) 11/11 SUCCESS; artifact ZIP SHA256 `62b2174e5bf24dbbe917ccc4ea247c179433507af2ac70d851cd5a17ecfb7a6a`. B [#202](https://github.com/easonliu714/event_scraper_public/pull/202) [CI #41274723455](https://github.com/easonliu714/event_scraper_public/actions/runs/41274723455) 11/11 SUCCESS; artifact ZIP SHA256 `852bb128f1b9abbe1b7ff20e32b4aace03bf2361a6468a26c0010579a7fa1013`. Both independently downloaded, ZIP CRC/exact three members/SHA256SUMS/manifest/audit.headSHA and GitHub digest PASS, first true failure NONE.
+- **Quality / UI/PWA separation:** Near 3 A #197/#199/#201 and B #198/#200/#202 **3/3** source-bound observation rounds; no same-root no-new-hypothesis repeats **0/0**, offline-only consecutive **0/0**. A KKTIX 403 is a real explicit access blocker; B Cloud Gate postponement is new source-local date-role evidence. Formal FIELD increment **0/0**, ticket Session ID **0/0**, Golden **0**, publication **0**. Existing Owner-approved status-only #192 merged / Pages #41257349599 SUCCESS, but deployed additive snapshot still A #190/B #191 at 07:55, not #201/#202; public live Pages and latest Android status-card UAT UNVERIFIED. CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS, L8 UI PASS retained; ibon 39961 mismatch OPEN; `HARD_HOLD_NO_PUBLICATION` unchanged. Next A rotate to existing 19-platform first-party public session evidence, B continue distinct P0 New Taipei source or direct ticket edge, not repeated blocked GET. Toolkit local path UNKNOWN.
