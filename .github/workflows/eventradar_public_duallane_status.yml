@@ -1,0 +1,69 @@
+name: EventRadar public dual-line status snapshot read-only CI
+on:
+  pull_request:
+    paths:
+      - docs/platform_status.json
+      - docs/platform-status.html
+      - .github/workflows/eventradar_public_platform_status.yml
+      - .github/workflows/eventradar_public_duallane_status.yml
+permissions:
+  contents: read
+jobs:
+  snapshot-contract:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-public-status-duallane-safe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact PR head and frozen formal event source
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          base=fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          git merge-base --is-ancestor "$base" HEAD
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_public_duallane_status.yml' '.github/workflows/eventradar_public_platform_status.yml' 'docs/platform-status.html' 'docs/platform_status.json' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          echo PASS_EXACT_HEAD_FROZEN_EVENT_DATA_AND_FOUR_FILE_SCOPE
+      - name: Snapshot baseline, identity and release-safe HTML contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,subprocess,re
+          old=json.loads(subprocess.check_output(['git','show','fbf4ca02b91159f2423caf3d79fb0ca4bb747069:docs/platform_status.json']))
+          new=json.loads(Path('docs/platform_status.json').read_text())
+          snap=new.pop('latestEngineering')
+          assert old==new, 'historical 19 platforms or production baseline changed'
+          assert len(old['platforms'])==19
+          assert snap['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert snap['acceptedFieldsNew']==snap['goldenNew']==snap['publishedEventsNew']==0
+          assert len(snap['lines'])==2 and [x['id'] for x in snap['lines']]==['A','B']
+          assert all(x['acceptedFields']==0 and x['decision'] in ('REVIEW','REVIEW_WITH_HOLD') for x in snap['lines'])
+          assert all(re.fullmatch(r'[0-9a-f]{40}',x['head']) and x['draftPR']>0 and x['ciRun']>0 for x in snap['lines'])
+          assert snap['hourlyWriter']['isSingleWriter'] is True
+          h=Path('docs/platform-status.html').read_text()
+          assert h.count('id="recent-engineering"')==1 and 'drawRecentEngineering(d)' in h
+          assert h.count('HARD_HOLD_NO_PUBLICATION')>=2 and 'textContent' in h
+          assert 'innerHTML' not in h
+          print('PASS_FROZEN_19_ROWS_SAFE_DUAL_LINE_SNAPSHOT_AND_RENDER')
+          PY
+      - name: Parse browser inline JavaScript without execution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          h=Path('docs/platform-status.html').read_text()
+          scripts=re.findall(r'<script>(.*?)</script>',h,re.S)
+          assert len(scripts)==1
+          Path('/tmp/eventradar_platform_status.js').write_text(scripts[0])
+          PY
+          node --check /tmp/eventradar_platform_status.js
+          echo PASS_JS_SYNTAX
