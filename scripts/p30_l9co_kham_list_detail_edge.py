@@ -1,4 +1,4 @@
-"""P30-L9-CO: source-observed KHAM category LIST → exact PRODUCT_ID DETAIL edge.
+"""P30-L9-CO: source-observed KHAM partner-channel category LIST → exact PRODUCT_ID DETAIL edge.
 
 Evidence-only gate; no network, production scraping, sale automation or publication.
 """
@@ -49,7 +49,7 @@ def inspect(x, observed_at):
          "observed_at": observed_at, "role": "SAME_PRODUCT_DETAIL_TITLE", "decision": "REVIEW"}]
     out["provenance"] = [
         {"source": "KHAM_04", "source_url": LIST, "observed_at": observed_at,
-         "role": "PUBLIC_CATEGORY_LIST_NOT_TICKET_SESSION", "decision": "REVIEW"},
+         "role": "PUBLIC_PARTNER_CHANNEL_CATEGORY_LIST_NOT_GENERAL_INDEX", "decision": "REVIEW"},
         {"source": "KHAM_04", "source_url": ORDER, "observed_at": observed_at,
          "role": "SAME_PRODUCT_ORDER_ROW_NOT_BUTTON_HREF", "decision": "HOLD_BUTTON_HREF_UNVERIFIED"}]
     return dict(out, decision="REVIEW_LIST_TO_PRODUCT_DETAIL_HOLD_TICKET_SESSION")
