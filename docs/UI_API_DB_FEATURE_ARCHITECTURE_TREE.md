@@ -4238,3 +4238,31 @@ Both: source/observed_at/role/decision provenance; all candidates REVIEW
 ```
 
 - **Quality window:** A #193/#195/#197 official source rounds 3/3; B #194/#196/#198 3/3; repeated same root without hypothesis 0/0, offline-only streak 0/0, formal FIELD increment 0/0. A source rotation OPENTIX #05 → iNDIEVOX #18; B NTPC Art Center → Zepp, KKTIX #01 reused rather than duplicated. No UI/API/DB schema or production writer change. Next A ticket-session identity only with safe first-party proof; next B floor-category registration link/session boundary only if public, else rotate New Taipei P0 source. Preserve Taipei→New Taipei→other north ordering.
+
+
+### 2026-11-01 12:00 Asia/Taipei — A P30-L9-CS / B P30-VENUE-02BF source-role architecture (NO PUBLISH)
+
+```text
+Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [unchanged]
+├─ A / canonical #18 iNDIEVOX Draft #199 HEAD c9ccf93317bfd7527f286413b5560859735ccd60
+│  ├─ LIST /activity → DETAIL /activity/detail/26_iv0425761 → GAME /activity/game/26_iv0425761 [same ID]
+│  ├─ 2026-11-12 19:30 SHOW, 19:00 ADMISSION [different time roles]
+│  ├─ 1250 presale / 1500 door [descriptive PRICE, conditional door availability]
+│  ├─ 10/14 11:00 SALE start, 11/02 REFUND cutoff [not SHOW]
+│  └─ ticket Session ID, inventory, exact presale end and checkout [UNKNOWN/HOLD]
+├─ B / P0 New Taipei Zepp Draft #200 HEAD 9619876a631cda412e54ed9f65703bce96d2e5cb
+│  ├─ SCHEDULE LIST → PERSES rid=169301 [active] and AKASAKI rid=160673 [cancelled]
+│  ├─ both 11/28 18:00 [different venue event identities; no cancellation propagation]
+│  ├─ PERSES 7980/5980/4980/3980/2980 [each base+NT$1 welfare; not Session price]
+│  ├─ conditional accessible 2490, sale start 10/17 12:00
+│  └─ "KKTIX" + "Link in Bio" [VENUE CLAIM ONLY; no verified Event URL/Session ID]
+├─ A exact-head CI #41271332513 SUCCESS 31/31; Artifact #13070015064 CRC/SHA/head PASS
+├─ B exact-head CI #41271336817 SUCCESS 35/35; Artifact #13069880449 CRC/SHA/head PASS
+├─ main docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [frozen]
+└─ main docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d [frozen]
+```
+
+- **Change footprint:** A `scripts/p30_l9cs_indievox_bridge_dog_roles.py`, `tests/p30/test_l9cs_indievox_bridge_dog_roles.py`, `.github/workflows/eventradar_p30_l9cs.yml`; B `scripts/p30_venue02bf_zepp_perses_price_split.py`, `tests/p30/test_venue02bf_zepp_perses_price_split.py`, `.github/workflows/eventradar_p30_venue02bf.yml`. Each isolated Draft PR changes exactly three ADD-only files relative to its predecessor, not production scraper/API/DB/PWA/Golden. All candidate fields require `source/source_url/observed_at/role/decision=REVIEW`; exact URL/ID/title and semantic role guards reject false joins, cancellation leakage and invented ticket identity.
+- **Evidence boundaries:** A official first-party LIST/DETAIL/GAME reader evidence newly examined but DETAIL/GAME may be cached up to two days; B Zepp SCHEDULE/DETAIL reader observed today. Both CI official GET=0, so SOURCE_QUALITY is observational, not live production extraction. Independent exact-head CI and downloaded artifact CRC, SHA256SUMS, manifest and audit.headSHA PASS; first true failure NONE. No ticket Session IDs, FORMAL accepted fields 0/0, Golden 0, publication 0.
+- **Near 3 rounds:** A #195/#197/#199 and B #196/#198/#200 each 3/3 new source-bound reading rounds, no same-root no-hypothesis repeats 0/0, offline-only 0/0; newly observed REVIEW candidate roles do not imply FORMAL acceptance. A should rotate to another canonical #01–#19 source with explicit Session evidence; B rotate next P0 New Taipei official venue with direct ticket link, do not re-GET unchanged Zepp Link-in-Bio.
+- **Release/PWA:** Owner-approved #192 status-only main merge and Pages deploy PASS; deployed engineering snapshot still A #190/B #191, not #199/#200. Direct Pages/Android latest status-page UAT UNVERIFIED. 19 platform dedup, historical CKSMH 5/TWTC 39 Android USER_ATTESTED_PASS, L8 Core UI PASS and ibon 39961 OPEN retained. `HARD_HOLD_NO_PUBLICATION` remains; no automatic main/status/event-feed update. Toolkit local path UNKNOWN.
