@@ -56,6 +56,35 @@ check('price', ['EVENT_ADMISSION_PRICE'], '未確認', missing);
 const foreign = JSON.parse(JSON.stringify(meta));
 foreign.sources = ['https://example.org/events/other'];
 check('date', ['EVENT_DATE'], '未確認', foreign);
+// A-line #03 tixCraft: a VIP add-on URL is not the base concert's price
+// receipt, even when both HTTPS URLs are in the same REVIEW sources array.
+const baseConcert = 'https://tixcraft.com/activity/detail/26_wte';
+const vipAddon = 'https://tixcraft.com/activity/detail/26_wte_v';
+const baseRow = { url: baseConcert, price: 'NT$4,800' };
+const baseMeta = { sources: [baseConcert, vipAddon], field_evidence: {
+  price: { ...receipt(baseRow.price, 'EVENT_ADMISSION_PRICE'), source: vipAddon }
+}};
+assert.equal(candidateReviewField(baseRow, baseMeta, 'price', ['EVENT_ADMISSION_PRICE']).value, '未確認');
+baseMeta.field_evidence.price.source = baseConcert;
+baseMeta.field_evidence.price.role = 'VIP_ADDON_PRICE';
+assert.equal(candidateReviewField(baseRow, baseMeta, 'price', ['EVENT_ADMISSION_PRICE']).value, '未確認');
+// B-line New Taipei bulletin and OPENTIX multi-venue Event share a link,
+// not a verified ticket Session ID or interchangeable field ownership.
+const bulletin = 'https://www.culture.ntpc.gov.tw/artcenter_chi/xmdoc/cont?sid=0Q152372523738311866&sq=&xsmsid=0G269629106251547168';
+const ticket = 'https://www.opentix.life/event/2086734015886159873';
+const venueRow = { url: bulletin, date: '2026-11-07 14:30' };
+const venueMeta = { sources: [bulletin, ticket], field_evidence: {
+  date: { ...receipt(venueRow.date, 'VENUE_EVENT_DATE'), source: ticket }
+}};
+assert.equal(candidateReviewField(venueRow, venueMeta, 'date', ['EVENT_DATE', 'VENUE_EVENT_DATE']).value, '未確認');
+venueMeta.field_evidence.date.source = bulletin;
+venueMeta.field_evidence.date.role = 'VENUE_BULLETIN_PUBLICATION_DATE';
+assert.equal(candidateReviewField(venueRow, venueMeta, 'date', ['EVENT_DATE', 'VENUE_EVENT_DATE']).value, '未確認');
+// Same-host, different event is equally invalid; host allowlisting is not identity.
+const bleed = JSON.parse(JSON.stringify(meta));
+bleed.sources.push('https://example.org/events/456');
+bleed.field_evidence.date.source = 'https://example.org/events/456';
+check('date', ['EVENT_DATE'], '未確認', bleed);
 const absent = { url, date: '未確認' };
 assert.equal(candidateReviewField(absent, missing, 'date', ['EVENT_DATE']).hold, null);
 const unknown = { url, date: '詳內文' };
