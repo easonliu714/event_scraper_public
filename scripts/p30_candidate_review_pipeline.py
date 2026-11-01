@@ -82,7 +82,7 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
         "source_event_id": m["source_event_id"],
         "source_class": m.get("source_class", "UNKNOWN"),
         "sources": sources,
-        "hold_reasons": m["hold_reasons"],
+        "hold_reasons": list(m["hold_reasons"]),
         "sessions": m.get("sessions", []),
         "formal_field_pass": False,
         "golden_accepted": False,
@@ -94,7 +94,7 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
     # instead of stripping an unverified substring and pretending certainty.
     if isinstance(title, str):
         import re
-        if re.search(r"\d{4}-\d{2}-\d{2}", title) and len(title) > 75:
+        if re.search(r"\d{4}-\d{2}-\d{2}", title) and len(title) > 45:
             result["_candidate"]["hold_reasons"].append("TITLE_MIXED_WITH_DATE_REQUIRES_SOURCE_RECHECK")
     return result, []
 
