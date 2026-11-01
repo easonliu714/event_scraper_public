@@ -4173,3 +4173,31 @@ Formal Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [PR #192 MERGED]
 - **A / existing canonical ERA #08:** NTPC Art Center November bulletin `sid=0Q152372523738311866` → direct `ticket.com.tw/...PRODUCT_ID=P1FKLQFW` is a cross-source venue-to-ticket-product edge, not a new ticket source adapter. Known organizer prefix distinguishes venue 《秋意濃》 and ERA 紅瓦民族舞蹈團『秋意濃』. Venue performance `2026-11-01 14:30` and ERA header `2026-10-31 19:30–2026-11-01 23:59` have distinct provenance/roles; neither ERA product ID nor header range is ticket Session ID. `scripts/p30_l9cp_era_venue_product_window.py` outputs source/observed_at/role/decision REVIEW for 3 candidates, refuses guessed session/price/inventory/button href. [Draft #193](https://github.com/easonliu714/event_scraper_public/pull/193) HEAD `1f6d66459a86423aa3e2b0b1f44a806fec2acc69`, CI #41258691918 40/40.
 - **B / new P0 New Taipei Art Center venue:** site-search LIST → November stage bulletin `sid=0Q152372523738311866` → direct OPENTIX canonical #05 Event ID `2086734015886159873`; venue bulletin showtimes Nov 7 14:30, Nov 8 10:30/14:30 are descriptive showtimes, **not independently accepted ticket Session IDs**. Venue title and OPENTIX title use an explicit organizer-prefix relation, not fuzzy name match. Separate bulletin 11/10 Sunday text conflicts with actual Tuesday and remains HOLD. `scripts/p30_venue02bc_ntpc_opentix_bulletin.py` preserves source/observed_at/role/decision and negative URL/title/weekday/session tests. [Draft #194](https://github.com/easonliu714/event_scraper_public/pull/194) HEAD `03f8753f30b6b21067adf123cccdb5873f188114`, CI #41258694868 45/45.
 - **Production/PWA separation:** formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` frozen. Owner-approved status-only #192 main merge `309481985c20ab3abd628b2e82dc6da29f07f920`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d`, 19 original platforms preserved. `latestEngineering` snapshot is A #190 / B #191 at 07:55, not #193/#194; Pages deployment CI PASS but live browser/Android UAT UNVERIFIED. Both new Gates are evidence-only isolated Draft PRs. No API/DB/Golden/production feed change; accepted FIELD 0/0, Session IDs 0/0, Golden 0, publication 0, `HARD_HOLD_NO_PUBLICATION`.
+
+
+### 2026-11-01 — P30-L9-CQ / P30-VENUE-02BD source-bound evidence architecture (NO PUBLISH)
+
+```text
+Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [unchanged]
+├─ A / canonical platform #05 OPENTIX [Draft #195; HEAD b60097ad2f48dff4dd767f15f650c67ec42e3bc0]
+│  ├─ event/2087017782302437377 [EVENT ID, REVIEW]
+│  ├─ ticketpackage/2095777341620084737 [PACKAGE 20 / 75%, REVIEW]
+│  ├─ ticketpackage/2095778377743265793 [PACKAGE 50 / 70%, REVIEW]
+│  ├─ package sale window 2026-09-10..2027-01-17 [SALE, NOT SHOWTIME]
+│  └─ ticket Session ID / per-session price / inventory [UNKNOWN/HOLD]
+├─ B / P0 New Taipei Art Center venue [Draft #196; HEAD 4998fb3a9e96a1e981ec29283bd41231b03ab0cb]
+│  ├─ official November bulletin sid 0Q152372523738311866 [VENUE BULLETIN ID]
+│  ├─ direct OPENTIX event/2087017782302437377 [EVENT HREF, REVIEW]
+│  ├─ NTPC shows Nov 14 15:00/19:30, Nov 15 11:00/15:00 [VENUE SHOWS, REVIEW]
+│  ├─ OPENTIX venue chooser: NTPC / Weiwuying / Taichung [MULTIVENUE EVENT]
+│  └─ venue-specific ticket Session ID mapping [UNKNOWN/HOLD]
+├─ Independent exact-head CI A #41263491543 [40/40 PASS; artifact #13066230857 ZIP CRC/SHA PASS]
+├─ Independent exact-head CI B #41263493123 [38/38 PASS; artifact #13065928701 ZIP CRC/SHA PASS]
+├─ formal docs/data.json [frozen blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+└─ formal platform_status.json [frozen blob cdeeb3b551e38f862c37759426a14b5129e1224d]
+```
+
+- **Architecture impact:** A `scripts/p30_l9cq_opentix_bundle_roles.py` + `tests/p30/test_l9cq_opentix_bundle_roles.py` + dedicated read-only workflow; B `scripts/p30_venue02bd_ntpc_murray_multivenue.py` + `tests/p30/test_venue02bd_ntpc_murray_multivenue.py` + dedicated workflow. Both are exactly three ADD-only paths on distinct isolated Draft PR chains, no production parser, API, DB, PWA or Android change.
+- **Source-level provenance:** A fields carry `source=OPENTIX_05/source_url/observed_at/role/decision=REVIEW` separately for event and each package; package ID cannot be substituted for event/session ID. B bulletin `sid` and ticket Event ID remain separate identity namespaces; four venue showtimes are not verified ticket sessions or automatically mapped to three OPENTIX venue choices. No fuzzy matching, guessed href, inventory or ticket Session IDs.
+- **Verification:** A #195 exact HEAD `b60097ad2f48dff4dd767f15f650c67ec42e3bc0`, CI #41263491543 40/40 SUCCESS, artifact ZIP SHA256 `3d75ffc28e7acb5f2cdd24acf715202329e3ece9dd54ecbf7098360b3ae7babd`. B #196 exact HEAD `4998fb3a9e96a1e981ec29283bd41231b03ab0cb`, CI #41263493123 38/38 SUCCESS, ZIP SHA256 `a666b8f45415b2c2a33deadf4b4e715e1dceb46d8f3aa94ef01b1337cf7aad9d`. Both independent ZIP CRC, three-member SHA256SUMS/manifest/audit.headSHA PASS; CI official GET 0; no true failure.
+- **Readiness / release:** A/B near-3 fresh official source evidence 3/3 each, same-root repeats 0/0, offline-only 0/0. Formal accepted FIELD 0/0, ticket Session IDs 0/0, Golden 0, published 0. PWA status-only #192 main merge and Pages deploy PASS but status snapshot remains A #190 / B #191, live Pages/Android UAT UNVERIFIED. CKSMH 5, TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS retained; ibon 39961 OPEN; `HARD_HOLD_NO_PUBLICATION` unchanged.
