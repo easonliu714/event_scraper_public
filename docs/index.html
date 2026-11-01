@@ -227,6 +227,33 @@
         }
     });
 
+    // L8 REVIEW display boundary: row-level HTTPS and REVIEW flags do not prove
+    // an optional field. Only an exact source-bound REVIEW receipt may be shown.
+    // Missing/mismatched provenance stays 未確認, never a guessed event fact.
+    function candidateReviewField(row, meta, key, allowedRoles) {
+        const value = row[key];
+        if (typeof value !== 'string' || !value.trim()
+            || value.trim() === '未確認' || value.trim() === '詳內文')
+            return { value: '未確認', hold: null };
+        const receipt = meta.field_evidence && meta.field_evidence[key];
+        const sources = Array.isArray(meta.sources) ? meta.sources : [];
+        const timestamp = receipt && receipt.observed_at;
+        const validTime = typeof timestamp === 'string'
+            && /(Z|[+-]\\d{2}:\\d{2})$/i.test(timestamp)
+            && !Number.isNaN(Date.parse(timestamp));
+        const proven = receipt && typeof receipt === 'object'
+            && validTime && receipt.value === value
+            && typeof receipt.source === 'string'
+            && sources.includes(row.url) && sources.includes(receipt.source)
+            && isCandidateOfficialUrl(receipt.source)
+            && typeof receipt.role === 'string'
+            && allowedRoles.includes(receipt.role)
+            && receipt.decision === 'REVIEW';
+        return proven
+            ? { value, hold: null }
+            : { value: '未確認', hold: 'FIELD_' + key.toUpperCase() + '_PROVENANCE_HOLD' };
+    }
+
     // Review-only: an explicit local-file gesture, strict provenance and fail-closed checks.
     // The candidate dataset stays in memory and cannot trigger official activity notifications.
     async function loadCandidateReview(event) {
@@ -252,14 +279,25 @@
                     || typeof row.url !== 'string' || !isCandidateOfficialUrl(row.url)) {
                     throw new Error('第 ' + (i + 1) + ' 筆缺乏安全的 REVIEW 身分／官方 URL／未發布標記');
                 }
+                // Optional field values must have the same exact provenance
+                // contract as the isolated Python L7 review builder.
+                const fieldRoles = {
+                    date: ['EVENT_DATE', 'VENUE_EVENT_DATE'],
+                    location: ['EVENT_VENUE'],
+                    price: ['EVENT_ADMISSION_PRICE'],
+                    description: ['EVENT_DESCRIPTION']
+                };
+                const fields = Object.fromEntries(Object.entries(fieldRoles)
+                    .map(([key, roles]) => [key, candidateReviewField(row, meta, key, roles)]));
+                const holds = Object.values(fields).map(x => x.hold).filter(Boolean);
                 return {
                     title: row.title, url: row.url, platform: row.platform,
                     type: typeof row.type === 'string' ? row.type : '其他',
-                    date: typeof row.date === 'string' && row.date !== '詳內文' ? row.date : '未確認',
-                    location: typeof row.location === 'string' ? row.location : '未確認',
-                    price: typeof row.price === 'string' ? row.price : '未確認',
-                    description: typeof row.description === 'string' ? row.description : '',
-                    reasons: meta.hold_reasons.map(x => String(x)),
+                    date: fields.date.value,
+                    location: fields.location.value,
+                    price: fields.price.value,
+                    description: fields.description.value === '未確認' ? '' : fields.description.value,
+                    reasons: [...meta.hold_reasons.map(x => String(x)), ...holds],
                     decision: meta.decision
                 };
             });
