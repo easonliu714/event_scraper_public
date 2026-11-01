@@ -4840,3 +4840,44 @@ Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb [FROZEN]
 - **B P30-VENUE-02BN extended (ENGINEERING +1, SOURCE_QUALITY +1):** isolated [Draft #216](https://github.com/easonliu714/event_scraper_public/pull/216) HEAD `caf058c0635ad54160b6d048efd846fc8fe386cd`, [CI #41349035524](https://github.com/easonliu714/event_scraper_public/actions/runs/41349035524) source guard, tests, manifest, artifact upload steps SUCCESS (full run completion checked separately). Artifact #13100223777 digest `sha256:824da4341651cc6b80ba97be7ff1d3ef2226a964603ef3946b7c7561ab253ae0`. Official [TMC 5SOS DETAIL](https://www.tmc.taipei/tw/blog/show/5SOS2026) shows **article publication 2026-10-25**, distinct from **SHOW 2026-11-25 20:00**; **conditional disability prices NT$1,990/2,490** distinct from public admission minimum NT$3,380. Both newly source-bound REVIEW role candidates with negative refusal tests; direct [tixCraft Event](https://tixcraft.com/activity/detail/26_5sos) remains distinct source, ticket Session/stock unverified. Formal B fields=0.
 - **3-round anti-stall (03:00, 03:56, 04:53):** A new official source-reader evidence 2/3; B 3/3; A offline-only streak 1, B 0; repeated identical-payload GET 0; same-root-cause repeat 0; formally accepted field delta A/B=0/0. Rotate A to distinct canonical 19-platform source with new verifiable LIST→DETAIL/role evidence if Young K GAME remains inaccessible; B next test exact TMC venue→ticket role provenance and VIP upgrade only with new evidence, else rotate P0 Taipei/New Taipei. Do not mistake CI synthetic pass for formal acceptance.
 - **L7/L8/release:** #210 local REVIEW import merged/deployed, #211 UI provenance and #212 L7 receipt-owner guards Draft/unmerged; Owner 18-row REVIEW JSON historical SHA256 `35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603` with prior structural 18/18, current automation `LOCAL_ARTIFACT_NOT_MOUNTED`, no new independent 18-row audit. Android local candidate UAT pending; CKSMH5/TWTC39 USER_ATTESTED_PASS, L8 Core UI PASS preserved. Formal FIELD=0, Golden=0, published=0, `HARD_HOLD_NO_PUBLICATION`; no main/Golden/data/status/Production Writer/Publisher/Scheduler/Notifier write. Direct Pages HTTP runtime UNVERIFIED; historical Pages #41316070328 SUCCESS.
+
+
+### 2026-11-02 05:53 Asia/Taipei — A/B URL parser fail-closed topology + source index limits
+
+```text
+A / canonical TIXCRAFT_03 / P30-L9-CZ / Draft #215
+  HEAD 7fa75d55ae7b71b5be11e349129f9ff8e6ac7f67
+  DETAIL https://tixcraft.com/activity/detail/26_youngk
+    -> GAME https://tixcraft.com/activity/game/26_youngk
+  exact_url(untrusted URL): malformed IPv6 authority => ValueError
+    NEW: catch ValueError => False => HOLD_DETAIL_SOURCE or HOLD_DETAIL_GAME_EDGE
+    NEGATIVE: malformed detail_url / buy_tickets_href / game_url
+  CI #41354293451 SUCCESS; artifact #13101719453
+  source GET this cycle 0; accepted FIELD 0, Session 0
+B / P0 Taipei / TMC_VENUE_OFFICIAL / P30-VENUE-02BN / Draft #216
+  HEAD a739e7de3896ff8f064d392e3b1b7db81538ed07
+  LIST https://www.tmc.taipei/tw/blog/show
+    -> venue DETAIL https://www.tmc.taipei/tw/blog/show/5SOS2026
+    -> canonical TIXCRAFT_03 event https://tixcraft.com/activity/detail/26_5sos
+  exact_url malformed IPv6 authority => False / HOLD
+    NEGATIVE: venue_list, list_detail_href, venue_detail,
+              venue_ticket_href, ticket_detail
+  CI #41354310812 SUCCESS; artifact #13102896686
+  source GET this cycle 0; accepted FIELD 0, Session 0
+DISCOVERY_ONLY / NO FORMAL ADAPTER
+  P0 Taipei Dome https://www.taipeidome.com.tw/Web/dome/
+    indexed Nov calendar: booked venue != verified show/session
+    direct reader minimal shell; LIST/DETAIL/identity/role UNKNOWN
+  canonical FamiTicket #07 https://www.famiticket.com.tw/Home
+    indexed movie two screenings Nov01 12:00/15:00, doors 11:30/14:30
+    direct detail reader iframe-only; exact same-ID detail UNKNOWN
+  no duplicate source, no official CI GET, no production data write
+L7/L8
+  #210 merged/deployed local REVIEW-only importer
+  #211 UI receipt guard DRAFT; #212 exact source-owner receipt guard DRAFT
+  18-row historical structural 18/18; current LOCAL_ARTIFACT_NOT_MOUNTED
+  Android candidate UAT PENDING; CKSMH5/TWTC39 prior PASS preserved
+FORMAL FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+- **Engineering readback:** A exact-head job #124990932211 and B job #124990986345 all steps PASS, SHA artifacts GitHub digest A `sha256:e9b1afba35c66ef7cb1c6d29ee5aa48ae591b498af8c1f206094a8f6dd5f2e13`, B `sha256:425d1753e19040461533f7ac3644e5097c891f40d095e73742249013d23964e4`; independent ZIP CRC UNVERIFIED. Same 3-path isolated Draft scopes; no main write. Source quality A=0/B=0 this cycle, index discovery only; near 3 rounds verified source evidence A=1/3 B=2/3, offline-only streak A=2 B=1. Next rotate A to FamiTicket same-ID LIST/DETAIL and B to Taipei Dome event identity with bounded safe access; do not repeat Young K/TMC synthetic-only root causes.
