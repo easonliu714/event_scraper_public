@@ -4881,3 +4881,47 @@ FORMAL FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
 ```
 
 - **Engineering readback:** A exact-head job #124990932211 and B job #124990986345 all steps PASS, SHA artifacts GitHub digest A `sha256:e9b1afba35c66ef7cb1c6d29ee5aa48ae591b498af8c1f206094a8f6dd5f2e13`, B `sha256:425d1753e19040461533f7ac3644e5097c891f40d095e73742249013d23964e4`; independent ZIP CRC UNVERIFIED. Same 3-path isolated Draft scopes; no main write. Source quality A=0/B=0 this cycle, index discovery only; near 3 rounds verified source evidence A=1/3 B=2/3, offline-only streak A=2 B=1. Next rotate A to FamiTicket same-ID LIST/DETAIL and B to Taipei Dome event identity with bounded safe access; do not repeat Young K/TMC synthetic-only root causes.
+
+
+### 2026-11-02 07:00 Asia/Taipei — A/B source-bound evidence architecture delta (NO PUBLISH)
+
+```text
+A / canonical #07 FamiTicket / P30-L9-DA / isolated Draft #218
+  HEAD 05614cddb01c1a0a143e974c744cdaa384d321c4
+  LIST https://www.famiticket.com.tw/Home
+    -> exact official DETAIL /Home/Activity/Info/RgBh...ARQA9AA2
+  TITLE Ultra Taiwan 2026 超世代音樂節
+  EVENT_DATE 2026-11-14, venue 大佳河濱公園
+  ENTRY_CUTOFF 15:30 (EEGA) != SHOWTIME
+  LATE_ENTRY_UPGRADE_SURCHARGE NT$1000 != FACE_VALUE
+  HSR_DISCOUNT 65% != EVENT_TICKET_PRICE
+  Six source-bound REVIEW candidates; ticket Session/stock UNKNOWN
+  exact-head CI #41359957045 source/role/manifest steps PASS;
+  artifact #13105145148; full run readback pending at write
+  CI official GET=0; formal FIELD/Golden/published=0
+B / P0 Taipei / TaiNEX official venue / P30-VENUE-02BO / isolated Draft #217
+  HEAD d98b881dbc4ff2c34192717641b1cfd1a995f3f8
+  LIST https://www.tainex.com.tw/event
+    -> exact DETAIL https://www.tainex.com.tw/event/691
+  TITLE 2026臺灣國際食品暨設備展
+  EXHIBITION_PERIOD 2026-11-13..2026-11-16 != single SHOWTIME
+  VENUE 南港展覽館1館, floors 一樓展場/四樓展場
+  ORGANIZER 展昭; organizer website != verified ticket URL/Event ID
+  Six REVIEW receipts; ticket Session/price/inventory UNKNOWN
+  exact-head CI #41359847353 SUCCESS, all job steps PASS;
+  artifact #13104374300; CI official GET=0
+  formal FIELD/Golden/published=0
+Main: 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+Formal docs/data.json Git blob: 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+Formal docs/platform_status.json Git blob: cdeeb3b551e38f862c37759426a14b5129e1224d
+  19 platforms, reportDate 2026-10-28; status freshness HOLD
+Governance only in Draft #8; #210 merged/deployed local REVIEW importer
+L7 #212 / L8 #211 provenance guards Draft, NOT deployed
+Owner 18 rows prior structural 18/18; LOCAL_ARTIFACT_NOT_MOUNTED this run
+Android local candidate UAT pending; CKSMH5/TWTC39 prior PASS preserved
+Direct Pages runtime UNVERIFIED; historical Pages #41316070328 SUCCESS
+HARD_HOLD_NO_PUBLICATION; no main/Golden/data/status/Production write
+```
+
+- Source-first rotation achieved: near 3 rounds (04:53/05:53/07:00) new source-reader evidence A=1/3 B=2/3, offline-only streak A/B=0/0, formally accepted fields delta A/B=0/0. Both new Drafts use exact URL/title/role negatives and source-bound observed_at; never equate public REVIEW evidence with independent Golden acceptance. Artifact ZIP CRC independent readback UNVERIFIED.
+- Next A: #07 FamiTicket other same-ID detail or L7 #212 receipt-owner and #211 L8 local UI acceptance review, without re-requesting Owner 18-row file. Next B: TaiNEX event period vs ticket/organizer link independent provenance or rotate P0 Taipei/New Taipei nonduplicate venue. Existing ibon 39961 mismatch remains OPEN; #17 CKSMH/#16 TWTC Android PASS unchanged.
