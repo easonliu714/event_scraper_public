@@ -58,6 +58,6 @@ def inspect(x, observed_at):
     out["provenance"] = [
         {"source": "ZEPP_NEW_TAIPEI_VENUE", "source_url": DETAIL, "observed_at": observed_at,
          "role": "RID_163838_VENUE_DETAIL_AND_TICKET_HREF", "decision": "REVIEW"},
-        {"source": "TICKETPLUS_19_CANONICAL", "source_url": TICKET, "observed_at": observed_at,
+        {"source": "TICKETPLUS_EXTERNAL_UNVERIFIED", "source_url": TICKET, "observed_at": observed_at,
          "role": "PUBLIC_JS_APP_SHELL_NOT_EVENT_DETAIL", "decision": "HOLD_TICKETPLUS_JS_DETAIL_UNVERIFIED"}]
     return dict(out, decision="REVIEW_VENUE_HREF_HOLD_TICKETPLUS_JS_DETAIL_AND_SESSION")
