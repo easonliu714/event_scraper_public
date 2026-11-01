@@ -1,0 +1,65 @@
+name: EventRadar P30-L9-CP exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9co-kham-list-detail-link]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  exact-head:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9cp-era-venue-product-window'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD, three ADD-only files and immutable production feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=95c233f01433c702b1331ec23fce09ecf5553b87
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9cp_era_venue_product_window.py' 'tests/p30/test_l9cp_era_venue_product_window.py' '.github/workflows/eventradar_p30_l9cp.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          python - <<'PY'
+          import json,subprocess
+          data=json.loads(subprocess.check_output(['git','show','origin/main:docs/platform_status.json']))
+          assert len(data['platforms'])==19
+          assert data['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert data['production']['goldenAccepted']==0
+          PY
+      - name: Predecessor and source-role regression (offline)
+        run: |
+          python -m py_compile scripts/p30_l9cp_era_venue_product_window.py tests/p30/test_l9cp_era_venue_product_window.py
+          python -m unittest discover -s tests/p30 -p 'test_l9co_kham_list_detail_edge.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_l9cp_era_venue_product_window.py' -v
+      - name: Exact-head evidence SHA256 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('evidence')
+          a={'gate':'P30-L9-CP','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+             'officialGETinCI':0,'sourceObservationDate':'2026-11-01',
+             'sourceEvidence':'Official NTPC venue November bulletin links ERA 08 product P1FKLQFW with matching title; venue show Nov 1 14:30, ERA product header Oct 31 19:30 to Nov 1 23:59 is not a verified session. Ticket session and button href HOLD.','acceptedFields':0,'ticketSessionIdsVerified':0,
+             'goldenAccepted':0,'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True,ensure_ascii=False)+'\n',encoding='utf-8')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_p30_l9cp-source-evidence
+          path: evidence/
+          if-no-files-found: error
