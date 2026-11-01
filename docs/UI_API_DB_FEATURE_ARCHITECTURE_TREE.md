@@ -4374,3 +4374,20 @@ Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [status-only merge; frozen]
 - **Per-field provenance contract:** each candidate includes `field/value/source/source_url/observed_at/role/decision=REVIEW`; fail closed on cross-domain URL, mismatched activity/bulletin/Event ID, title mismatch, open/show/release/discount role swaps, past off-shelf event promotion, fabricated Session/inventory/checkout. All acceptance and publication values zero; HTTP/HTML official source observation is NOT live CI adapter extraction. Prior Android CKSMH5/TWTC39 and L8 UI PASS retained; ibon39961 mismatch OPEN, `HARD_HOLD_NO_PUBLICATION` unchanged.
 - **Independent evidence:** A artifact ZIP SHA256 `fe436bd4ce1f53db57b505ce0910c938516805ead872b146a4a910da83f9185e`; B `97ab8217646f8f23d4a21cc7c7e8c9930f31eda7a6b5bb59e44cadea7c2ee708`. Both downloaded with exact 3 files, ZIP CRC, SHA256SUMS, manifest audit SHA and exact headSHA PASS. Source reader A DETAIL re-read today; GAME was prior observation, current direct GAME read UNVERIFIED. B new official LIST→DETAIL→OPENTIX event link read today. No ticket Session ID or formal FIELD PASS.
 - **Near-three source quality:** A 3/3 (includes current DETAIL re-read; not 3 origin-CI GET), B 3/3; repeated root with no new hypothesis 0/0, consecutive offline-only 0/0, formal accepted FIELD 0/0. Next source-quality Gate A seek independent ticket Session ID on another canonical platform; B only if safe investigate public OPENTIX Session link, otherwise rotate next New Taipei source. Official PWA status-only #192 MERGED, deployed snapshot remains A #190/B #191; direct latest Pages HTTP/Android status-card UAT UNVERIFIED. No new main or status write without authorization.
+
+### 2026-11-01 15:04 Asia/Taipei — A distinct #03 tixCraft admission↔VIP upgrade source observation (supplement to CU)
+
+```text
+A canonical #03 tixCraft new SOURCE_QUALITY (not part of #204 CI)
+├─ standard event https://tixcraft.com/activity/detail/26_vashhsu
+│  ├─ 徐暐翔《愛火山的人》2026-11-08 18:00 Legacy Taipei
+│  ├─ general admission NT$1450; disability eligible NT$725
+│  └─ direct first-party href → VIP Upgrade 26_vashhsu_v
+└─ upgrade event https://tixcraft.com/activity/detail/26_vashhsu_v
+   ├─ same show/date/venue; direct first-party href → standard event
+   ├─ NT$600 [UPGRADE/ADD_ON, NOT ADMISSION]
+   ├─ requires existing same-show concert ticket
+   └─ distinct activity path != distinct performance or ticket Session ID
+```
+
+- The preceding CU same-ID `26_aftp` DETAIL re-read is not a new SOURCE_QUALITY increment by itself. A current-round new source evidence is this separately observed standard↔VIP upgrade two-way link; near-three A 3/3 counts distinct source signals, not repeated GET. Exact-head [#204](https://github.com/easonliu714/event_scraper_public/pull/204) CI 10/10 covers **three-show/release** only, not this VIP pair. Next A P30-L9-CV must test the ADD_ON-not-ADMISSION role or rotate to a new publicly verifiable ticket Session identity. FORMAL FIELD 0, Golden 0, publication 0, `HARD_HOLD_NO_PUBLICATION`.
