@@ -516,5 +516,61 @@
     "fields": "EVENT、SALE、ADMISSION、REGISTRATION、VOUCHER、PRICE、VENUE 分別核對，未核實保留 UNKNOWN",
     "android": "僅 CKSMH 5 與 TWTC 39 具原本逐平台用戶實機 PASS，其他未宣稱完整實機",
     "publication": "工程狀態頁可公開展示；活動卡片/Golden/Writer/即時庫存仍 LOCKED"
+  },
+  "latestEngineering": {
+    "snapshotAtTaipei": "2026-11-01 07:55",
+    "verifiedAtUTC": "2026-11-01T00:04:00Z",
+    "scope": "工程 Gate / 官方來源證據快照；不改動正式活動資料、不表示活動已可售",
+    "governanceDraftPR": 8,
+    "governanceHead": "2306c4aca4ece4b707aad57b3c689e462de91d87",
+    "sourceMainAtSnapshot": "fbf4ca02b91159f2423caf3d79fb0ca4bb747069",
+    "existing19PlatformBaselineDate": "2026-10-28",
+    "releaseState": "HARD_HOLD_NO_PUBLICATION",
+    "acceptedFieldsNew": 0,
+    "goldenNew": 0,
+    "publishedEventsNew": 0,
+    "hourlyWriter": {
+      "taskId": "6ae1e6147e548191881f20e730ab0f11",
+      "lastScheduledTaipei": "2026-11-01 07:55",
+      "lastRun": "completed",
+      "sourceEvidenceRecent3Rounds": "A 3/3、B 3/3",
+      "isSingleWriter": true
+    },
+    "lines": [
+      {
+        "id": "A",
+        "label": "售票平台（既有 19 來源）",
+        "gate": "P30-L9-CO",
+        "draftPR": 190,
+        "head": "95c233f01433c702b1331ec23fce09ecf5553b87",
+        "ciRun": 41255041223,
+        "tests": "42/42 PASS",
+        "artifact": 13062354505,
+        "source": "寬宏 #04",
+        "evidence": "會員合作通路活動清單 → 相同 PRODUCT_ID=P1FRRCZ9 詳情；類別清單不是寬宏一般活動總清單",
+        "decision": "REVIEW",
+        "blocker": "一般清單覆蓋率、實際購票 href、票券 Session ID 尚未獨立確認",
+        "acceptedFields": 0
+      },
+      {
+        "id": "B",
+        "label": "官方場館（臺北／新北優先）",
+        "gate": "P30-VENUE-02BB",
+        "draftPR": 191,
+        "head": "b04d99a8b2614963dc840d32c16d0fba89fd13e8",
+        "ciRun": 41254906585,
+        "tests": "46/46 PASS",
+        "artifact": 13062219649,
+        "source": "Zepp New Taipei",
+        "evidence": "場館 rid=163838 公開節目 → Ticket Plus 官方活動連結；已辨識演出／開賣／優惠等時間角色",
+        "decision": "REVIEW_WITH_HOLD",
+        "blocker": "售票網站為 JS 應用框架；票券 Event/Session ID、場次票價及庫存尚未確認",
+        "acceptedFields": 0
+      }
+    ],
+    "ownerDecision": {
+      "requiredNow": false,
+      "reason": "工程可持續進行；正式狀態發布須另經受控 PR／部署授權，活動發布 HOLD 未解除"
+    }
   }
 }
