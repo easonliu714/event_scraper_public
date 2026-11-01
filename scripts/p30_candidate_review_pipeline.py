@@ -93,9 +93,52 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
     # Allowlist only PWA fields and explicit candidate diagnostics. No supplied
     # arbitrary DOM/HTML, no inferred date, ticket status, price or availability.
     result = {k: raw[k] for k in ("title", "url", "platform", "type", "scraped_at")}
-    for k in ("date", "location", "price", "description", "region"):
+    # Every displayed optional field must carry independent, exact source
+    # provenance. A row-level URL is not evidence for arbitrary dates/prices.
+    # Missing or contradictory receipts remain visible only as UNKNOWN/HOLD.
+    field_roles = {
+        "date": {"EVENT_DATE", "VENUE_EVENT_DATE"},
+        "location": {"EVENT_VENUE"},
+        "price": {"EVENT_ADMISSION_PRICE"},
+        "description": {"EVENT_DESCRIPTION"},
+        "region": {"EVENT_REGION"},
+    }
+    field_evidence = m.get("field_evidence")
+    field_evidence = field_evidence if isinstance(field_evidence, dict) else {}
+    verified_fields = {}
+    field_holds = []
+    for k, allowed_roles in field_roles.items():
         v = raw.get(k)
-        result[k] = v.strip() if isinstance(v, str) and v.strip() else "未確認"
+        v = v.strip() if isinstance(v, str) else ""
+        receipt = field_evidence.get(k)
+        valid = False
+        if v and v != "未確認" and isinstance(receipt, dict):
+            stamp = receipt.get("observed_at")
+            try:
+                if not isinstance(stamp, str):
+                    raise ValueError("missing field observation")
+                observed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+                valid_stamp = observed.tzinfo is not None and observed.utcoffset() is not None
+            except (ValueError, TypeError, OverflowError):
+                valid_stamp = False
+            valid = (
+                valid_stamp
+                and receipt.get("value") == v
+                and receipt.get("source") in sources
+                and receipt.get("role") in allowed_roles
+                and receipt.get("decision") == "REVIEW"
+            )
+        if valid:
+            result[k] = v
+            verified_fields[k] = {
+                "value": v, "source": receipt["source"],
+                "observed_at": receipt["observed_at"],
+                "role": receipt["role"], "decision": "REVIEW",
+            }
+        else:
+            result[k] = "未確認"
+            if v and v != "未確認":
+                field_holds.append("FIELD_" + k.upper() + "_PROVENANCE_HOLD")
     result["img_url"] = None  # no remote tracking images in local review
     result["_candidate"] = {
         "scope": REVIEW_SCOPE,
@@ -105,7 +148,8 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
         "source_event_id": m["source_event_id"],
         "source_class": m.get("source_class", "UNKNOWN"),
         "sources": sources,
-        "hold_reasons": list(m["hold_reasons"]),
+        "field_evidence": verified_fields,
+        "hold_reasons": list(m["hold_reasons"]) + field_holds,
         # Input sessions have no independent ticket Session ID/role evidence
         # contract in this L7 review schema. Never forward arbitrary objects
         # as if they were source-validated showtimes or purchasable sessions.
