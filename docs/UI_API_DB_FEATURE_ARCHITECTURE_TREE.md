@@ -4144,3 +4144,25 @@ NEAR-3: A #170/#172/#174 and B #171/#173/#175 = 3/3 each
 
 - KHAM official `/application/UTK01/UTK0101_06.aspx?CATEGORY=205&TYPE=1` is publicly reachable but explicitly shows **「美安會員專區」**; classify `PUBLIC_PARTNER_CHANNEL_CATEGORY_LIST_NOT_GENERAL_INDEX`. Exact direct `PRODUCT_ID=P1FRRCZ9` detail hyperlink is REVIEW source evidence; **general KHAM list coverage remains UNKNOWN**. Never promote partner-list evidence to general-index coverage, purchase-button href, ticket Session ID, ticket-session price or Golden.
 - [A Draft #190](https://github.com/easonliu714/event_scraper_public/pull/190) final exact HEAD `95c233f01433c702b1331ec23fce09ecf5553b87` supersedes `9090134fcf774579a33912904bc42c724b6cb935`. [Exact-head CI #41255041223](https://github.com/easonliu714/event_scraper_public/actions/runs/41255041223) **42/42 PASS**, [artifact #13062354505](https://github.com/easonliu714/event_scraper_public/actions/runs/41255041223/artifacts/13062354505) ZIP SHA256 `255f0d37d8f9cacea5fe7924b431276792e1044e1b355f1046456cb9262202d8`, CRC/3-member SHA256 manifest/headSHA independently PASS. Earlier #190 CI/artifact historical. [B #191](https://github.com/easonliu714/event_scraper_public/pull/191) exact `b04d99a8b2614963dc840d32c16d0fba89fd13e8`, CI #41254906585 **46/46 PASS** unchanged. Formal accepted FIELD 0/0, Golden 0, publication 0, `HARD_HOLD_NO_PUBLICATION` unchanged.
+
+### 2026-11-01 08:35 Asia/Taipei — P30-PWA-STATUS PR #192 Owner-authorized status-only main Merge / Pages deployment
+
+```text
+Formal Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [PR #192 MERGED]
+├─ PWA docs/index.html [UNCHANGED; existing link to platform-status.html]
+├─ PWA docs/platform-status.html [STATUS-ONLY UI UPDATED, main blob 1abaec4d47fcba809430e24b8ff9312a08bc3de5]
+│  ├─ recent-engineering safe textContent-rendered A/B summary [DEPLOY JOB SUCCESS]
+│  │  ├─ A L9-CO #190 42/42, KHAM #04 official category list→detail REVIEW
+│  │  └─ B VENUE-02BB #191 46/46, Zepp→Ticket Plus JS-only detail HOLD
+│  └─ existing 19-platform filter / Android historical baselines retained
+├─ PWA docs/platform_status.json [STATUS-ONLY UPDATED, blob cdeeb3b551e38f862c37759426a14b5129e1224d]
+│  ├─ all 19 historical platform rows and original reportDate 2026-10-28 immutable
+│  └─ latestEngineering supplemental snapshot 2026-11-01 07:55 Taiwan
+├─ docs/data.json [FORMAL EVENT DATA FROZEN, blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+├─ scraper.py [FROZEN, blob 98eddeafb497718c51aa81c6a150e9a5e1e687a8]
+└─ GitHub Pages build / deploy #41257349599 [SUCCESS, exact main merged SHA]
+   └─ public URL direct HTTP and Android UI user attestation [UNVERIFIED]
+```
+
+- **Build and safety evidence:** owner explicitly authorized status-only Merge; [PR #192](https://github.com/easonliu714/event_scraper_public/pull/192) exact engineering HEAD `8cb15f0dbbda653764cc9dc820db9ca740b89d79` merged as `309481985c20ab3abd628b2e82dc6da29f07f920`. [CI #41256581033](https://github.com/easonliu714/event_scraper_public/actions/runs/41256581033) read-only exact-head **SUCCESS**; evidence Artifact #13063452249 GitHub digest `89cc6bf862ea0a06fcb8dbc5b3cdb7f661a78ebc793eebf96a7937b24e318179` (independent binary download NOT VERIFIED). Pages #41257349599 build/report/deploy jobs SUCCESS. Changes exactly status JSON, status HTML and two status-only CI workflows.
+- **UI/API/DB impact:** no API contract change, DB schema change, formal event feed change, Golden acceptance or hidden Writer activation. A/B snapshot is additive metadata with read-only rendering. Formal FIELD=0; Golden=0; publication=0; `HARD_HOLD_NO_PUBLICATION` preserved. CKSMH 5, TWTC 39 Android PASS and L8 UI PASS retained. Next is official Pages direct HTTP / Android UAT (UNKNOWN until observed), not a repetition of completed merge/CI gate.
