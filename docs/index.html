@@ -65,6 +65,8 @@
         .keyword-input { width: 100%; padding: 10px; border-radius: 8px; background: #121212; border: 1px solid #444; color: #fff; margin-bottom: 8px; }
         .tags-container { display: flex; flex-wrap: wrap; gap: 8px; }
         .tag { background: #444; padding: 4px 10px; border-radius: 16px; font-size: 0.85rem; display: flex; gap: 6px; }
+        /* Make the native hidden attribute win over layout display rules. */
+        [hidden] { display:none !important; }
     </style>
 </head>
 <body>
@@ -84,6 +86,12 @@
         </div>
     </div>
     <input type="text" id="search" class="search-box" placeholder="搜尋關鍵字..." oninput="resetPageAndRender()">
+    <!-- Isolated review: local file picker only; no candidate data is shipped as the formal event feed. -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 4px">
+      <button id="candidate-pick" type="button" onclick="document.getElementById('candidate-file-input').click()" style="background:#1e3a5f;color:#e5f1ff;border:1px solid #60a5fa;border-radius:8px;padding:8px 12px;cursor:pointer">匯入候選 JSON（本機預覽）</button>
+      <input id="candidate-file-input" type="file" accept=".json,application/json" onchange="loadCandidateReview(event)" hidden>
+      <span id="candidate-review-msg" role="status" style="font-size:0.78rem;color:#fbbf24"></span>
+    </div>
 </header>
 
 <div class="filter-section">
@@ -116,6 +124,15 @@
 </div>
 
 <div id="event-list"></div>
+<section id="candidate-review-list" aria-label="候選活動檢視（不發布）" hidden style="max-width:800px;margin:auto;padding:16px">
+  <div style="border:1px solid #f59e0b;border-radius:10px;padding:12px;margin-bottom:14px;color:#fde68a;background:#302819">
+    <strong>候選活動 REVIEW／非正式發布</strong>
+    <p style="font-size:0.85rem;color:#fef3c7;margin:6px 0">只讀取這次由您手動選取的本機 JSON。未取得 Golden／正式發布許可，不代表活動可售或即時有票。</p>
+    <button type="button" onclick="closeCandidateReview()" style="padding:8px 12px;border-radius:7px;background:#334155;color:white;border:0">返回正式活動清單</button>
+  </div>
+  <p id="candidate-review-count" style="color:#fcd34d"></p>
+  <div id="candidate-review-cards" aria-live="polite"></div>
+</section>
 
 <div class="pagination">
     <button class="page-btn" onclick="changePage(-1)" id="prev-btn">◀ 上一頁</button>
@@ -175,6 +192,9 @@
 </div>
 
 <script>
+    // Stage B: candidate file is never added to allEvents, localStorage, notification or docs/data.json.
+    let candidateReviewActive = false;
+    let candidateReviewRows = [];
     let allEvents = [];
     let filteredEvents = [];
     let currentPage = 1;
@@ -206,6 +226,121 @@
             setTimeout(() => { ptrEl.style.top = '-50px'; }, 500);
         }
     });
+
+    // Review-only: an explicit local-file gesture, strict provenance and fail-closed checks.
+    // The candidate dataset stays in memory and cannot trigger official activity notifications.
+    async function loadCandidateReview(event) {
+        const input = event.target;
+        const file = input.files && input.files[0];
+        input.value = '';
+        if (!file) return;
+        const msg = document.getElementById('candidate-review-msg');
+        try {
+            if (file.size > 2 * 1024 * 1024) throw new Error('候選檔案超過 2 MB');
+            const parsed = JSON.parse(await file.text());
+            if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 500)
+                throw new Error('必須是 1～500 筆活動的 JSON 陣列');
+            const items = parsed.map((row, i) => {
+                const meta = row && row._candidate;
+                if (!row || typeof row !== 'object' || !meta || meta.scope !== 'CANDIDATE_PREVIEW_ONLY'
+                    || !['REVIEW', 'REVIEW_WITH_HOLD'].includes(meta.decision)
+                    || meta.published !== false || meta.formal_field_pass !== false
+                    || meta.golden_accepted !== false || !Array.isArray(meta.hold_reasons)
+                    || !meta.hold_reasons.length
+                    || typeof row.title !== 'string' || row.title.length > 180 || !row.title.trim()
+                    || typeof row.platform !== 'string' || !row.platform
+                    || typeof row.url !== 'string' || !isCandidateOfficialUrl(row.url)) {
+                    throw new Error('第 ' + (i + 1) + ' 筆缺乏安全的 REVIEW 身分／官方 URL／未發布標記');
+                }
+                return {
+                    title: row.title, url: row.url, platform: row.platform,
+                    type: typeof row.type === 'string' ? row.type : '其他',
+                    date: typeof row.date === 'string' && row.date !== '詳內文' ? row.date : '未確認',
+                    location: typeof row.location === 'string' ? row.location : '未確認',
+                    price: typeof row.price === 'string' ? row.price : '未確認',
+                    description: typeof row.description === 'string' ? row.description : '',
+                    reasons: meta.hold_reasons.map(x => String(x)),
+                    decision: meta.decision
+                };
+            });
+            candidateReviewRows = items;
+            candidateReviewActive = true;
+            for (const sel of ['#event-list', '.pagination', '.filter-section', '.list-header', '#search'])
+                document.querySelector(sel).hidden = true;
+            document.getElementById('candidate-review-list').hidden = false;
+            document.getElementById('candidate-review-msg').textContent = '候選預覽已載入 ' + items.length + ' 筆（未發布）';
+            renderCandidateReview();
+        } catch (e) {
+            msg.textContent = '匯入拒絕：' + String(e.message || e);
+            // A rejected file does not modify existing formal records or active review state.
+        }
+    }
+
+    function isCandidateOfficialUrl(raw) {
+        try {
+            const u = new URL(raw);
+            return u.protocol === 'https:' && u.hostname && !u.username && !u.password;
+        } catch (_) { return false; }
+    }
+
+    function renderCandidateReview() {
+        const root = document.getElementById('candidate-review-cards');
+        root.replaceChildren();
+        document.getElementById('candidate-review-count').textContent =
+            '顯示 ' + candidateReviewRows.length + ' 筆候選（全部 REVIEW／不表示可售）';
+        candidateReviewRows.forEach((eventItem, i) => {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'card';
+            card.style.cssText = 'width:100%;text-align:left;color:#e5e7eb;cursor:pointer;margin-bottom:12px';
+            const body = document.createElement('div');
+            body.className = 'card-info';
+            for (const [value, css] of [
+                [eventItem.platform + '｜' + eventItem.decision, 'color:#fbbf24;font-size:0.8rem'],
+                [eventItem.title, 'font-weight:600;font-size:1.05rem'],
+                [eventItem.date + '｜' + eventItem.location, 'font-size:0.82rem;color:#a8b8c8']
+            ]) {
+                const el = document.createElement('div');
+                el.style.cssText = css;
+                el.textContent = value;
+                body.append(el);
+            }
+            card.append(body);
+            card.addEventListener('click', () => openCandidateDetail(i));
+            root.append(card);
+        });
+    }
+
+    function openCandidateDetail(i) {
+        if (!candidateReviewActive || !Number.isInteger(i)) return;
+        const e = candidateReviewRows[i];
+        if (!e) return;
+        // No readEvents/localStorage/notification changes. Only safe text nodes and HTTPS link.
+        document.getElementById('m-title').textContent = e.title;
+        document.getElementById('m-platform').textContent = e.platform + '｜REVIEW';
+        document.getElementById('m-type').textContent = e.type;
+        document.getElementById('m-date').textContent = e.date;
+        document.getElementById('m-location').textContent = e.location;
+        document.getElementById('m-price').textContent = e.price;
+        document.getElementById('m-desc').textContent =
+            (e.description || '官方摘要尚未確認') + '\n\n待驗：' + e.reasons.join('；');
+        const link = document.getElementById('m-link');
+        link.href = e.url; link.rel = 'noopener noreferrer';
+        const img = document.getElementById('m-img');
+        img.removeAttribute('src'); img.style.display = 'none';
+        document.getElementById('detail-modal').classList.add('open');
+    }
+
+    function closeCandidateReview() {
+        closeModal();
+        candidateReviewActive = false;
+        candidateReviewRows = [];
+        for (const sel of ['#event-list', '.pagination', '.filter-section', '.list-header', '#search'])
+            document.querySelector(sel).hidden = false;
+        document.getElementById('candidate-review-list').hidden = true;
+        document.getElementById('candidate-review-msg').textContent = '';
+        renderList(); renderPagination();
+    }
 
     async function init() {
         checkNotifyStatus();
@@ -276,6 +411,7 @@
     }
 
     function markAllRead() {
+        if (candidateReviewActive) return; // do not change stored formal read flags from review mode
         if(!confirm("確定要將所有活動設為已讀嗎？")) return;
         const currentUrls = allEvents.map(e => e.url);
         const uniqueReads = new Set([...readEvents, ...currentUrls]);
@@ -496,6 +632,8 @@
     function changePage(delta) { currentPage += delta; renderList(); renderPagination(); window.scrollTo(0, 0); }
 
     function openDetail(url) {
+        if (candidateReviewActive) return; // review records use a separate read-only detail handler
+
         const ev = allEvents.find(e => e.url === url);
         if(!ev) return;
         

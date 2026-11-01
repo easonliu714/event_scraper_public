@@ -1,0 +1,54 @@
+[
+  {
+    "title": "臺北場館活動預覽（範例）",
+    "url": "https://npac-ntch.org/programs",
+    "platform": "示範來源",
+    "type": "藝文活動",
+    "scraped_at": "2026-11-01T17:00:00+08:00",
+    "date": "未確認",
+    "location": "臺北市",
+    "price": "未確認",
+    "_candidate": {
+      "record_id": "FIXTURE-1",
+      "scope": "CANDIDATE_PREVIEW_ONLY",
+      "decision": "REVIEW",
+      "platform_id": "FIXTURE",
+      "source_event_id": "sample-1",
+      "sources": [
+        "https://npac-ntch.org/programs"
+      ],
+      "hold_reasons": [
+        "僅供 CI 測試；不是已驗證真實活動"
+      ],
+      "published": false,
+      "golden_accepted": false,
+      "formal_field_pass": false
+    }
+  },
+  {
+    "title": "新北場館活動預覽（範例）",
+    "url": "https://www.cloudgate.org.tw/cgt",
+    "platform": "示範來源",
+    "type": "藝文活動",
+    "scraped_at": "2026-11-01T17:00:00+08:00",
+    "date": "未確認",
+    "location": "新北市",
+    "price": "未確認",
+    "_candidate": {
+      "record_id": "FIXTURE-2",
+      "scope": "CANDIDATE_PREVIEW_ONLY",
+      "decision": "REVIEW",
+      "platform_id": "FIXTURE",
+      "source_event_id": "sample-2",
+      "sources": [
+        "https://www.cloudgate.org.tw/cgt"
+      ],
+      "hold_reasons": [
+        "僅供 CI 測試；不是已驗證真實活動"
+      ],
+      "published": false,
+      "golden_accepted": false,
+      "formal_field_pass": false
+    }
+  }
+]
