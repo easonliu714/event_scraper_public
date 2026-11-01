@@ -1,0 +1,68 @@
+name: EventRadar P30-VENUE-02BM exact-head source REVIEW NO PUBLISH
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  exact-head:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02bm-earendel-ibon-edge'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD, ADD-only and formal blob guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02bm_earendel_ibon_edge.py' 'tests/p30/test_venue02bm_earendel_ibon_edge.py' '.github/workflows/eventradar_p30_venue_02bm.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          python - <<'PY'
+          import json,subprocess
+          d=json.loads(subprocess.check_output(['git','show','origin/main:docs/platform_status.json']))
+          assert len(d['platforms'])==19
+          assert d['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['production']['goldenAccepted']==0
+          PY
+      - name: Source-bound venue/rid/redirect role regression
+        run: |
+          python -m py_compile scripts/p30_venue02bm_earendel_ibon_edge.py tests/p30/test_venue02bm_earendel_ibon_edge.py
+          python -m unittest discover -s tests/p30 -p 'test_venue02bm_earendel_ibon_edge.py' -v
+      - name: Evidence SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json,pathlib,subprocess
+          p=pathlib.Path('evidence')
+          a={'gate':'P30-VENUE-02BM','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+             'sourceObservationDate':'2026-11-02','officialGETinCI':0,
+             'venueList':'https://www.zepp.co.jp/hall/newtaipei/',
+             'venueDetail':'https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160667',
+             'redirect':'https://ticket.ibon.com.tw/ActivityInfo/Details/39946',
+             'sourceQuality':'Zepp LIST->rid 160667 DETAIL->ibontw.com shortlink->ticket.ibon.com.tw/39946; 11/14 19:00, VIP 3200=3180 admission+20 benefit, sale not show; ticket detail title unavailable',
+             'acceptedFields':0,'ticketSessionIdsVerified':0,'ticketDetailTitleVerified':False,
+             'goldenAccepted':0,'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,ensure_ascii=False,sort_keys=True)+'\n',encoding='utf-8')
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue-02bm-source-review
+          path: evidence/
+          if-no-files-found: error
