@@ -4295,3 +4295,41 @@ Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [unchanged]
 - **Evidence/provenance contract:** Each candidate includes `source`, `source_url`, `observed_at`, `role`, `decision=REVIEW`. A strict URL/ID/title guard rejects registration domain substitutions, sale/show swaps, fee/price conflation and guessed ticket sessions. B strict same-source list/detail ID guard and old/new date pairing prevent silent promotion of superseded Nov14 shows; refund date is never performance. Official [Cloud Gate notice](https://www.cloudgate.org.tw/cgt/theater-event/1680) explicitly revised Nov14 to Dec19. Ticket Session IDs, independently accepted FIELD, Golden, published events all **0**.
 - **CI and artifact:** A [#201](https://github.com/easonliu714/event_scraper_public/pull/201) [CI #41274720603](https://github.com/easonliu714/event_scraper_public/actions/runs/41274720603) 11/11 SUCCESS; artifact ZIP SHA256 `62b2174e5bf24dbbe917ccc4ea247c179433507af2ac70d851cd5a17ecfb7a6a`. B [#202](https://github.com/easonliu714/event_scraper_public/pull/202) [CI #41274723455](https://github.com/easonliu714/event_scraper_public/actions/runs/41274723455) 11/11 SUCCESS; artifact ZIP SHA256 `852bb128f1b9abbe1b7ff20e32b4aace03bf2361a6468a26c0010579a7fa1013`. Both independently downloaded, ZIP CRC/exact three members/SHA256SUMS/manifest/audit.headSHA and GitHub digest PASS, first true failure NONE.
 - **Quality / UI/PWA separation:** Near 3 A #197/#199/#201 and B #198/#200/#202 **3/3** source-bound observation rounds; no same-root no-new-hypothesis repeats **0/0**, offline-only consecutive **0/0**. A KKTIX 403 is a real explicit access blocker; B Cloud Gate postponement is new source-local date-role evidence. Formal FIELD increment **0/0**, ticket Session ID **0/0**, Golden **0**, publication **0**. Existing Owner-approved status-only #192 merged / Pages #41257349599 SUCCESS, but deployed additive snapshot still A #190/B #191 at 07:55, not #201/#202; public live Pages and latest Android status-card UAT UNVERIFIED. CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS, L8 UI PASS retained; ibon 39961 mismatch OPEN; `HARD_HOLD_NO_PUBLICATION` unchanged. Next A rotate to existing 19-platform first-party public session evidence, B continue distinct P0 New Taipei source or direct ticket edge, not repeated blocked GET. Toolkit local path UNKNOWN.
+
+### 2026-11-01 13:55 Asia/Taipei — A #03 tixCraft source role / B Zepp↔KKTIX multi-day bundle identity (NO PUBLISH)
+
+```text
+A / canonical platform #03 拓元/tixCraft / P30-L9-CU [SOURCE OBSERVATION ONLY]
+  DETAIL /activity/detail/26_aftp → GAME /activity/game/26_aftp [same activity ID]
+  11/06 19:30 + 11/07 19:30 + 11/08 19:30 = 3 SHOW rows
+  11/01 11:00 = RELEASE of scattered seats, NOT fourth SHOW or inventory proof
+  3850/3250/2950/2450/1950/1550/800 = general descriptive PRICE bands
+  400 = eligible accessible PRICE, not general price
+  Find tickets button != Session ID / inventory / checkout
+  source first-party public web-reader; official CI GET=0
+  branch creation SAFETY-BLOCKED; A new PR/HEAD/CI/Artifact NONE
+  prior A #201 HEAD 94d32ae098a6f445e89c648c09a7bd7208f141d0
+B / P0 New Taipei Zepp / P30-VENUE-02BH Draft #203
+  Zepp LIST → rid=160668 11/07 OPEN17:00 SHOW18:00
+            → rid=165132 11/08 OPEN16:00 SHOW17:00
+  both venue details → KKTIX #01 /events/takasetoya202611
+  KKTIX Event Dates = BUNDLE (11/07 18:00→11/08 17:00)
+                    + SHOW 11/07 18:00 + SHOW 11/08 17:00
+  BUNDLE is NOT third performance; ticket Event ID is NOT Session ID
+  VVIP single-day 5880 != VVIP two-day bundle 10800
+  general sale 09/23 20:00 != performance
+  scripts/p30_venue02bh_zepp_two_shows_bundle.py [ADD]
+  tests/p30/test_venue02bh_zepp_two_shows_bundle.py [ADD]
+  .github/workflows/eventradar_p30_venue_02bh.yml [ADD, read-only exact-head]
+  HEAD d65aef47826c564c55895aff4c84ec3f9aaa615f
+  CI #41278883610 SUCCESS 9/9; artifact #13071978877 CRC/SHA/head PASS
+B source/observed_at/role/decision per field; 6 REVIEW candidates, formal 0
+Cross-lane: 19 canonical platform IDs reused, Zepp venue != new ticket platform
+  main data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 FROZEN
+  main status blob cdeeb3b551e38f862c37759426a14b5129e1224d FROZEN
+  latestEngineering status A #190/B #191, current #203 not published
+  CKSMH5/TWTC39 Android USER_ATTESTED_PASS, L8 UI PASS retained
+  ibon39961 OPEN; HARD_HOLD_NO_PUBLICATION; no production changes
+```
+
+- B [Draft #203](https://github.com/easonliu714/event_scraper_public/pull/203) [CI #41278883610](https://github.com/easonliu714/event_scraper_public/actions/runs/41278883610) SUCCESS; artifact SHA256 `b37e8f31b6f6ebc05451bbf071d5d11924480303f784eb58295273d95f497a12` independently verified. A source quality advanced but engineering branch creation blocked; no fabricated A CI. Near-three A/B source rounds 3/3 each, repeated-root 0/0, formal FIELD 0/0, offline-only 0/0. Next A engineering branch safety resolution; B direct Session identity if publicly evidenced, else rotate P0 New Taipei source. All candidate fields REVIEW, no Golden/publication.
