@@ -81,7 +81,7 @@ jobs:
                     'a_pr':info['lines'][0]['draftPR'],'b_pr':info['lines'][1]['draftPR'],
                     'accepted_fields_new':info['acceptedFieldsNew'],'golden_new':info['goldenNew'],
                     'published_events_new':info['publishedEventsNew'],'release_state':info['releaseState']}
-          Path('evidence/status_snapshot_audit.json').write_text(json.dumps(evidence,sort_keys=True,indent=2)+'\\n')
+          Path('evidence/status_snapshot_audit.json').write_text(json.dumps(evidence,sort_keys=True,indent=2))
           PY
           (cd evidence && sha256sum status_snapshot_audit.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
