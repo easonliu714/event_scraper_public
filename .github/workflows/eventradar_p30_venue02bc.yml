@@ -1,0 +1,65 @@
+name: EventRadar P30-VENUE-02BC exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02bb-zepp-ticketplus-js-hold]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  exact-head:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02bc-ntpc-opentix-bulletin'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD, three ADD-only files and immutable production feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=b04d99a8b2614963dc840d32c16d0fba89fd13e8
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02bc_ntpc_opentix_bulletin.py' 'tests/p30/test_venue02bc_ntpc_opentix_bulletin.py' '.github/workflows/eventradar_p30_venue02bc.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          python - <<'PY'
+          import json,subprocess
+          data=json.loads(subprocess.check_output(['git','show','origin/main:docs/platform_status.json']))
+          assert len(data['platforms'])==19
+          assert data['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert data['production']['goldenAccepted']==0
+          PY
+      - name: Predecessor and source-role regression (offline)
+        run: |
+          python -m py_compile scripts/p30_venue02bc_ntpc_opentix_bulletin.py tests/p30/test_venue02bc_ntpc_opentix_bulletin.py
+          python -m unittest discover -s tests/p30 -p 'test_venue02bb_zepp_ticketplus_link.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02bc_ntpc_opentix_bulletin.py' -v
+      - name: Exact-head evidence SHA256 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('evidence')
+          a={'gate':'P30-VENUE-02BC','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+             'officialGETinCI':0,'sourceObservationDate':'2026-11-01',
+             'sourceEvidence':'Official New Taipei Art Center November bulletin sid 0Q152372523738311866 links OPENTIX event 2086734015886159873 for three Nov 7-8 shows; OPENTIX venue matches, ticket sessions HOLD. Separate Nov 10 Sunday-label conflict remains HOLD.','acceptedFields':0,'ticketSessionIdsVerified':0,
+             'goldenAccepted':0,'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True,ensure_ascii=False)+'\n',encoding='utf-8')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_p30_venue02bc-source-evidence
+          path: evidence/
+          if-no-files-found: error
