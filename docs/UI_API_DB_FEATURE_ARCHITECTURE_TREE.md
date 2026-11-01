@@ -4663,3 +4663,33 @@ CKSMH5/TWTC39 Android USER_ATTESTED_PASS retained
 ```
 
 - A [base concert](https://tixcraft.com/activity/detail/26_wte), [VIP add-on](https://tixcraft.com/activity/detail/26_wte_v); B [venue official bulletin](https://www.culture.ntpc.gov.tw/artcenter_chi/xmdoc/cont?sid=0Q152372523738311866&sq=&xsmsid=0G269629106251547168), [ticket Event](https://www.opentix.life/event/2086734015886159873). Source reader evidence only, not adapter GET/Golden PASS. A #208 and B #209 unchanged, both earlier exact-head CI SUCCESS; this round A/B code commits=0. Next isolated A/B date-role regressions and L8 Android UAT, no new Writer or publication.
+
+
+### 2026-11-02 00:51 Asia/Taipei — L8 source-owner isolation guard (A/B provenance regression)
+
+```text
+Source main: 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+A #03 tixCraft base 26_wte / VIP 26_wte_v
+  VIP add-on price receipt != base concert admission price receipt
+B NTPC bulletin SID 0Q152372523738311866 / OPENTIX Event 2086734015886159873
+  ticket Event receipt != venue bulletin date receipt != ticket Session
+L8 #211 Draft (NOT DEPLOYED) exact HEAD 18e64bd249e49668cdd7ba49c796809b7ccc89ce
+  candidateReviewField: exact value + receipt.source == row.url + allowed role
+  foreign event or mismatched role => FIELD_*_PROVENANCE_HOLD
+  CI 41328558987 QUEUED at append; no claimed PASS
+L7 normalize_record: cross-event receipt from sources[] still a known parity gap
+  NEXT separate safe L7 receipt-owner regression; no unverified promotion
+18 REVIEW rows prior structural 18/18; current runtime LOCAL_ARTIFACT_NOT_MOUNTED
+Android candidate import UAT pending; #210 merged/deployed, #211 Draft only
+Formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+Formal status blob cdeeb3b551e38f862c37759426a14b5129e1224d
+SOURCE_QUALITY this cycle A=0 B=0; prior cycle A=1 B=1
+FORMAL FIELD=0 Golden=0 published=0 HARD_HOLD_NO_PUBLICATION
+```
+
+- **Fresh authority:** Source main `9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb`; Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d`, status reportDate `2026-10-28`; latestEngineering snapshot 2026-11-01 07:55, now stale. Docs remain only on Governance Draft PR #8, not main.
+- **A (canonical #03 tixCraft) ENGINEERING:** existing [L9-CV Draft #206](https://github.com/easonliu714/event_scraper_public/pull/206) covers *different* 26_vashhsu base/add-on. 23:52 new source-reader evidence [26_wte base](https://tixcraft.com/activity/detail/26_wte) ↔ [26_wte_v VIP](https://tixcraft.com/activity/detail/26_wte_v) is not a ticket Session ID. This cycle added a distinct negative regression to existing [L8 Draft #211](https://github.com/easonliu714/event_scraper_public/pull/211): even if both URLs are listed, a VIP add-on receipt cannot certify the base concert's admission price, and VIP_ADDON_PRICE is not EVENT_ADMISSION_PRICE. A new official GET=0; formal accepted fields=0.
+- **B (NTPC Art Center / OPENTIX #05 reuse) ENGINEERING:** 23:52 source-reader bulletin SID `0Q152372523738311866` → OPENTIX Event `2086734015886159873`, multi-venue Event not ticket Session ID. Added L8 #211 negative regression: OPENTIX detail receipt cannot silently certify NTPC venue bulletin's date; bulletin publication role cannot be promoted to showtime. No new official GET; B formal accepted fields=0. No duplicate OPENTIX adapter.
+- **Cross-line actual fix:** L8 #211 exact HEAD `18e64bd249e49668cdd7ba49c796809b7ccc89ce` after sequential commits `3f2af7755bf54d35ada720989b176e81b0fc8e85` (UI) and `18e64bd249e49668cdd7ba49c796809b7ccc89ce` (tests). `candidateReviewField()` now demands `receipt.source === row.url` in addition to exact value, timezone-aware observation, allowlisted role, source list, HTTPS and REVIEW; until a separately verified cross-event identity/field edge is supported, foreign receipt stays `FIELD_*_PROVENANCE_HOLD`. Three-file PR scope unchanged. Exact-head CI `41328558987` was QUEUED at observation; **not yet PASS**. No merge or Pages deployment of #211.
+- **L7 remaining gap:** Python `normalize_record()` currently allows optional field receipt from another URL in `_candidate.sources` even when different from `row.url`; new UI guard is stricter. Next isolated L7 Gate must align source-owner contract with explicit cross-source identity evidence, tests and manifest, without silently treating multi-source listing as same-event proof. 18/18 Owner REVIEW JSON basic structure previously verified SHA256 `35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603`; **LOCAL_ARTIFACT_NOT_MOUNTED** here, new 18-row QC=0; do not request it again. Android L8 local-import list/detail/return UAT pending.
+- **Quality/acceptance:** this cycle A/B SOURCE_QUALITY new official HTTP/LIST/DETAIL/IDENTITY/FIELD=0/0 (prior 23:52 source-reader A/B each +1). Recent 3 rounds A/B official-reader evidence each 2/3; same-root-cause repeat 0; formally accepted field delta 0/0. This round is real UI regression hardening, not new official source proof. CKSMH5/TWTC39 Android USER_ATTESTED_PASS and L8 Core UI PASS retained; ibon39961 mismatch OPEN. Formal data/Golden/Publisher/Scheduler/Notifier untouched, `HARD_HOLD_NO_PUBLICATION`, Golden 0, published 0. Next A/B independently source-bound role tests or rotate to source with verifiable detail; prioritize L7 normalizer parity and Owner Android UAT.
