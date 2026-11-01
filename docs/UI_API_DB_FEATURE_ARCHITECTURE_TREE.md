@@ -4928,3 +4928,37 @@ HARD_HOLD_NO_PUBLICATION; no main/Golden/data/status/Production write
 
 
 **07:02 CI and status independent readback:** A #218 exact-head `05614cddb01c1a0a143e974c744cdaa384d321c4` CI #41359957045 SUCCESS, job #125008026233 all steps PASS, artifact #13105145148 SHA256 digest `d99e347df44da47ced7839c2acbb8daf20a523aeb7a3699a5808e1d3b93a21fa`. B #217 exact-head `d98b881dbc4ff2c34192717641b1cfd1a995f3f8` CI #41359847353 SUCCESS, job #125007710330 all steps PASS, artifact #13104374300. No independent ZIP CRC verification. Current formal status JSON contains `latestEngineering.snapshotAtTaipei=2026-11-01 07:55`, Gates A L9-CO/B VENUE-02BB; **status deployed snapshot is stale relative to engineering**, while formal reportDate stays 2026-10-28. Requires separately authorized status-only refresh, no automatic main/status publication. Official source-read candidates remain REVIEW and formal accepted=0.
+
+
+### 2026-11-02 07:53 Asia/Taipei — source-role topology A L9-DB / B VENUE-02BP
+
+```text
+Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb [FROZEN]
+A / canonical FAMITICKET_07 / Draft #219 / L9-DB
+  HEAD 5ba06e551aa0b7a2b437730689713c855fa1eeaa
+  Home LIST -> same official ITF DETAIL
+  title 2026 ITF 台灣國際旅展 / Nov 06-09 / venue 1館 1F+4F
+  "我要購票" button != verified ticket href / Session / inventory
+  CI #41364480507 SUCCESS, artifact #13107240313 SHA/CRC/manifest PASS
+B / P0 Taipei TaiNEX OFFICIAL VENUE / Draft #220 / VENUE-02BP
+  HEAD 7e3038335c8590c5f4d4cf6304c208fed9a0bf08
+  /event LIST -> exact /event/709 DETAIL title 旅展
+  Nov 06-09 / hall 1 floors 1F+4F / organizer 台灣觀光協會
+  organizer URL != verified ticket Event URL
+  CI #41364459755 SUCCESS, artifact #13106736649 SHA/CRC/manifest PASS
+CROSS-SOURCE EDGE [HOLD]
+  FamiTicket DETAIL title != TaiNEX generic venue DETAIL title
+  date+venue similarity != independently proven event identity
+  no fuzzy merge, no ticket Session ID, no accepted field, no Golden
+  source/observed_at/role/decision retained per REVIEW candidate
+L7/L8
+  #210 merged/deployed local-only REVIEW import
+  #211 UI receipt guard / #212 L7 source-owner guard remain DRAFT
+  Owner 18-row historical structure 18/18; runtime LOCAL_ARTIFACT_NOT_MOUNTED
+  Android 18-row UAT pending; CKSMH5/TWTC39 prior PASS retained
+  data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 FROZEN
+  status blob cdeeb3b551e38f862c37759426a14b5129e1224d FROZEN
+  direct Pages runtime UNVERIFIED, no new production deployment
+Near 3 rounds A source 2/3 B source 2/3; formal FIELD A=0 B=0
+HARD_HOLD_NO_PUBLICATION; CI official GET=0; no main write
+```
