@@ -45,6 +45,7 @@ footer{border-top:1px solid var(--line);margin:30px 0 0;padding:14px 0;color:var
 <header><nav><a href="./index.html" aria-label="返回活動雷達首頁">← 活動雷達</a><h1>19 平台工程進度／品質雷達</h1></nav></header>
 <main class="wrap">
 <div class="note"><strong>工程稽核版｜不是即時售票活動資料</strong><div>HTTP、清單、詳情、欄位、Android 與正式發布分別列出。數字是指定 Gate 的有界樣本，不能當成平台全部活動、即時有票或已過驗收。正式活動卡片資料檔 <code>data.json</code> 不因本頁變更。</div></div>
+<section id="recent-engineering" aria-label="最新雙線工程證據" hidden></section>
 <div class="summary" id="summary" aria-label="稽核摘要"></div>
 <p id="status" role="status">讀取 platform_status.json 中…</p>
 <div class="controls"><input id="search" type="search" placeholder="搜尋平台、困難點或 Gate" aria-label="搜尋平台"><select id="filter" aria-label="依抓取階段篩選"><option value="all">所有平台</option><option value="403">HTTP 403</option><option value="list">已抓到清單候選</option><option value="detail">抽樣詳情已對位</option><option value="android">有平台別 Android PASS</option><option value="overlay">有獨立專用 Gate</option></select></div>
@@ -65,6 +66,30 @@ function link(root,url,label){
  }catch{}
 }
 function metric(n,label){const e=el("div","metric");append(e,el("strong","",n),el("small","",label));return e;}
+// 顯示最新工程 Gate，但永遠不當成正式活動資料或 FIELD PASS。
+function drawRecentEngineering(d){
+ const info=d.latestEngineering;
+ if(!info)return;
+ if(info.releaseState!=="HARD_HOLD_NO_PUBLICATION"||
+    info.acceptedFieldsNew!==0||info.goldenNew!==0||info.publishedEventsNew!==0||
+    !Array.isArray(info.lines)||info.lines.length!==2)throw Error("最新工程快照安全檢查失敗");
+ const root=document.getElementById("recent-engineering");
+ root.hidden=false;
+ append(root,el("h2","","最新 A／B 雙線工程證據"),el("p","","截至 "+info.snapshotAtTaipei+"（台灣時間）；既有 19 平台的基本稽核仍為 "+info.existing19PlatformBaselineDate+"，不得將這份增量誤認為逐平台即時重抓。"));
+ const cards=el("div","summary");
+ for(const x of info.lines){
+  const c=el("article","metric");
+  append(c,el("strong","",x.id+" 線｜"+x.gate),el("small","",x.label+" · "+x.source));
+  append(c,el("p","",x.evidence),el("p","",x.decision+"｜"+x.blocker));
+  append(c,el("small","","CI "+x.tests+"｜新正式接受欄位 "+x.acceptedFields));
+  const p=el("p","links");link(p,"https://github.com/easonliu714/event_scraper_public/pull/"+x.draftPR,"工程 Draft PR #"+x.draftPR);
+  p.append(document.createTextNode(" · "));
+  link(p,"https://github.com/easonliu714/event_scraper_public/actions/runs/"+x.ciRun,"exact-head CI");
+  c.append(p);cards.append(c);
+ }
+ root.append(cards);
+ root.append(el("p","note","正式 FIELD、Golden、新活動發布皆為 0；HARD_HOLD_NO_PUBLICATION 維持。完整工程進度以治理 Draft PR #"+info.governanceDraftPR+" 為準。"));
+}
 function drawSummary(d){
  const root=document.getElementById("summary");root.replaceChildren(
  metric(d.baselineSummary.platformsChecked,"已稽核平台"),
@@ -125,7 +150,7 @@ document.getElementById("filter").addEventListener("change",render);
   if(d.kind!=="EVENTRADAR_PUBLIC_PLATFORM_ENGINEERING_STATUS_V1"||
      d.platforms?.length!==19||d.production?.eventFeedReleaseState!=="HARD_HOLD_NO_PUBLICATION")
    throw Error("狀態檔格式或正式發布保護檢查失敗");
-  rows=d.platforms;drawSummary(d);render();
+  rows=d.platforms;drawRecentEngineering(d);drawSummary(d);render();
  }catch(e){document.getElementById("status").textContent="讀取失敗："+String(e.message||e);
   document.getElementById("status").id="error";}
 })();
