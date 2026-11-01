@@ -78,6 +78,52 @@ class CandidateQualityTests(unittest.TestCase):
         self.assertEqual(report["previewRows"], 1)
         self.assertEqual(len(data), 1)
 
+    def test_review_timestamp_must_be_timezone_aware(self):
+        for stamp in ("2026-11-01T17:00:00", "not-a-date", None, 42):
+            e = example()
+            e["scraped_at"] = stamp
+            data, report = build_candidate_dataset([e])
+            self.assertEqual(data, [], repr(stamp))
+            self.assertIn("OBSERVATION_TIME_UNVERIFIED", report["rejected"][0]["reasons"])
+        e = example()
+        e["scraped_at"] = "2026-11-01T09:00:00Z"
+        self.assertEqual(build_candidate_dataset([e])[1]["previewRows"], 1)
+
+    def test_nested_review_flags_cannot_hide_top_level_publication(self):
+        for flag in ("published", "golden_accepted", "formal_field_pass"):
+            e = example()
+            e[flag] = True
+            data, report = build_candidate_dataset([e])
+            self.assertEqual(data, [])
+            self.assertIn("TOP_LEVEL_PUBLICATION_CLAIM_" + flag.upper(),
+                          report["rejected"][0]["reasons"])
+
+    def test_invalid_hold_reasons_and_type_fail_closed(self):
+        for bad in ([], [None], [" "], [object()]):
+            e = example()
+            e["_candidate"]["hold_reasons"] = bad
+            data, report = build_candidate_dataset([e])
+            self.assertEqual(data, [])
+            self.assertIn("MISSING_OR_INVALID_HOLD_REASON",
+                          report["rejected"][0]["reasons"])
+        e = example()
+        e["type"] = {"untrusted": "object"}
+        self.assertIn("TYPE_INVALID",
+                      build_candidate_dataset([e])[1]["rejected"][0]["reasons"])
+
+    def test_unverified_session_objects_are_quarantined_not_forwarded(self):
+        e = example()
+        e["_candidate"]["sessions"] = [
+            {"ticket_session_id": "fake", "price": "100", "inventory": "available"}
+        ]
+        rows, report = build_candidate_dataset([e])
+        self.assertEqual(report["previewRows"], 1)
+        self.assertEqual(rows[0]["_candidate"]["sessions"], [])
+        self.assertIn("UNVERIFIED_SESSIONS_QUARANTINED",
+                      rows[0]["_candidate"]["hold_reasons"])
+        self.assertIsNone(rows[0]["_candidate"]["ticket_session_id"])
+        self.assertIsNone(rows[0]["_candidate"]["inventory"])
+
     def test_duplicate_same_platform_event_id_rejected(self):
         first, second = example(), example("second", "1234")
         data, report = build_candidate_dataset([first, second])
