@@ -18,7 +18,13 @@ def inspect(row,observed_at):
     if not exact_url(row.get("buy_tickets_href"),GAME) or not exact_url(row.get("game_url"),GAME): return dict(result,decision="HOLD_DETAIL_GAME_EDGE")
     if row.get("detail_title")!=TITLE or row.get("game_title")!=TITLE: return dict(result,decision="HOLD_EVENT_IDENTITY")
     if row.get("venue")!="台北國際會議中心TICC": return dict(result,decision="HOLD_VENUE")
-    if tuple(tuple(x) for x in (row.get("game_rows") or ()))!=ROWS: return dict(result,decision="HOLD_GAME_ROW_STATUS")
+    # Source rows are untrusted: malformed shapes must HOLD, never crash or imply stock.
+    rows=row.get("game_rows")
+    if (not isinstance(rows,(list,tuple)) or len(rows)!=len(ROWS)
+            or any(not isinstance(x,(list,tuple)) or len(x)!=3
+                   or any(not isinstance(v,str) for v in x) for x in rows)):
+        return dict(result,decision="HOLD_GAME_ROW_SHAPE")
+    if tuple(tuple(x) for x in rows)!=ROWS: return dict(result,decision="HOLD_GAME_ROW_STATUS")
     if row.get("availability_scope")!="PUBLIC_DISPLAY_ONLY": return dict(result,decision="HOLD_DISPLAY_NOT_INVENTORY")
     if any(row.get(k) is not None for k in ("ticket_session_id","inventory_count","checkout_url","published_event")): return dict(result,decision="HOLD_UNVERIFIED_SESSION_OR_PUBLICATION")
     def f(name,value,role): return {"field":name,"value":value,"source":"TIXCRAFT_03","source_url":GAME,"observed_at":observed_at,"role":role,"decision":"REVIEW"}
