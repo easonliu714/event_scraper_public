@@ -4695,3 +4695,48 @@ FORMAL FIELD=0 Golden=0 published=0 HARD_HOLD_NO_PUBLICATION
 - **Quality/acceptance:** this cycle A/B SOURCE_QUALITY new official HTTP/LIST/DETAIL/IDENTITY/FIELD=0/0 (prior 23:52 source-reader A/B each +1). Recent 3 rounds (22:55, 23:52, 00:51) A/B official-reader evidence each 1/3; same-root-cause repeat 0; formally accepted field delta 0/0. This round is real UI regression hardening, not new official source proof. CKSMH5/TWTC39 Android USER_ATTESTED_PASS and L8 Core UI PASS retained; ibon39961 mismatch OPEN. Formal data/Golden/Publisher/Scheduler/Notifier untouched, `HARD_HOLD_NO_PUBLICATION`, Golden 0, published 0. Next A/B independently source-bound role tests or rotate to source with verifiable detail; prioritize L7 normalizer parity and Owner Android UAT.
 
 - **CI independent readback:** [L8 #211 exact-head run #41328558987](https://github.com/easonliu714/event_scraper_public/actions/runs/41328558987) **SUCCESS** on `18e64bd249e49668cdd7ba49c796809b7ccc89ce`; job `124913574795` all steps PASS (exact HEAD, immutable formal blobs, 3-file scope, existing Python L7 tests, JS A/B receipt-owner negatives, inline syntax, SHA manifest, upload). [Artifact #13092516467](https://github.com/easonliu714/event_scraper_public/actions/runs/41328558987/artifacts/13092516467) GitHub digest `sha256:d8c74a63265eb4465e08edcde8564dd87f36c54a50b0dd66d5274057974bcc76`; independent ZIP CRC/download UNVERIFIED. This confirms engineering test success only, not formal field acceptance or Android UAT.
+
+
+### 2026-11-02 01:51 Asia/Taipei — L7 Python/UI source-owner parity architecture (A+B)
+
+```text
+Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+  docs/index.html [#210 MERGED, PWA candidate file picker deployed]
+    candidateReviewField() [#211 DRAFT, exact HEAD 18e64bd..., CI 41328558987 SUCCESS]
+      receipt.source == row.url, value exact, role allowlisted,
+      observed_at timezone-aware, REVIEW, HTTPS, sources[] membership
+      foreign source / wrong role -> FIELD_*_PROVENANCE_HOLD
+      #211 NOT DEPLOYED, Android Owner UAT PENDING
+  scripts/p30_candidate_review_pipeline.py [#212 DRAFT ONLY]
+    normalize_record() [NEW L7 exact owner guard]
+      receipt.source == raw.url [NEW, no cross-event sources[] inference]
+      receipt.source in _candidate.sources
+      receipt.value == row[field], timezone-aware observed_at
+      field-specific role + decision REVIEW
+      valid -> REVIEW-only optional value + receipt
+      invalid -> 未確認 + FIELD_*_PROVENANCE_HOLD
+      no ticket Session ID, Golden, formal field or publication promotion
+    tests/p30/test_candidate_review_pipeline.py
+      A #03 tixCraft base 26_wte != VIP 26_wte_v field owner
+      B NTPC venue bulletin SID != OPENTIX Event 2086734015886159873
+      same exact row URL + allowed role -> REVIEW (not formal)
+      BULLETIN_PUBLISHED_AT != VENUE_EVENT_DATE
+    .github/workflows/eventradar_p30_l7_receipt_owner_parity.yml
+      checkout PR exact HEAD + frozen formal blobs + 3-file scope
+      Python regression + synthetic fixture + SHA256SUMS + artifact
+      #212 HEAD e6e4965527c0e95d5855461a3ac3172eb71875bc
+      CI 41333736490 SUCCESS, artifact 13094640202
+      digest sha256:69ebb1f67a2732abb8a79edcd7e907916af4e6626b693dde4f929dd556e87246
+      independent ZIP CRC UNVERIFIED
+  docs/data.json [FROZEN 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+  docs/platform_status.json [FROZEN cdeeb3b551e38f862c37759426a14b5129e1224d]
+  Pages #41316070328 [SUCCESS, direct runtime HTTP UNVERIFIED]
+  Owner 18-row REVIEW JSON [prior structural 18/18, this runtime NOT MOUNTED]
+  Android REVIEW import/list/detail/return [Owner UAT PENDING]
+  formal FIELD 0 / Golden 0 / published 0 / HARD_HOLD_NO_PUBLICATION
+```
+
+- **A ENGINEERING / SOURCE_QUALITY:** P30-L9-CX source evidence 23:52 (two official tixCraft URLs), #208 L9-CW source engineering CI previously SUCCESS; this round official GET=0, L7 #212 A negative regression PASS. VIP add-on is not ordinary admission or a Session ID; conflicting sale date remains HOLD.
+- **B ENGINEERING / SOURCE_QUALITY:** P30-VENUE-02BL source evidence 23:52 (NTPC official bulletin + OPENTIX nine-venue Event), #209 VENUE-02BK source engineering CI previously SUCCESS; this round official GET=0, L7 #212 B negative regression PASS. Venue bulletin and ticket Event remain separate identities, Session unknown; 11/10 weekday conflict HOLD.
+- **Near 3 rounds:** A/B new source-reader evidence each 1/3, consecutive source-absent rounds each 2; accepted fields A/B each 0. Next priority source-first, distinct low-frequency legal official LIST/DETAIL hypothesis, else rotate to next safe canonical platform or P0 Taipei/New Taipei venue. No repeated payload GET to satisfy KPI.
+- **Release boundary:** #211 UI fix and #212 Python L7 fix remain isolated Draft PRs; neither has Owner merge authorization. CKSMH5/TWTC39 Android USER_ATTESTED_PASS, L8 Core UI PASS retained; ibon39961 OPEN. Do not modify main/Golden/data/status/Production Writer/Publisher/Scheduler/Notifier. Governance remains in existing Draft #8 only.
