@@ -1,0 +1,66 @@
+name: EventRadar P30-VENUE-02BI exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-venue02bh-zepp-two-shows-bundle]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  exact-head:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02bi-xinzhuang-direct-opentix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD, ADD-only scope, frozen formal data
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=d65aef47826c564c55895aff4c84ec3f9aaa615f
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_venue02bi_xinzhuang_direct_opentix.py' 'tests/p30/test_venue02bi_xinzhuang_direct_opentix.py' '.github/workflows/eventradar_p30_venue_02bi.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          python - <<'PY'
+          import json,subprocess
+          d=json.loads(subprocess.check_output(['git','show','origin/main:docs/platform_status.json']))
+          assert len(d['platforms'])==19
+          assert d['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['production']['goldenAccepted']==0
+          PY
+      - name: Previous and new source-bound negative tests
+        run: |
+          python -m py_compile scripts/p30_venue02bi_xinzhuang_direct_opentix.py tests/p30/test_venue02bi_xinzhuang_direct_opentix.py
+          python -m unittest discover -s tests/p30 -p 'test_venue02bh_zepp_two_shows_bundle.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_venue02bi_xinzhuang_direct_opentix.py' -v
+      - name: Evidence manifest with exact HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('evidence')
+          a={'gate':'P30-VENUE-02BI','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+             'officialGETinCI':0,'sourceObservationDate':'2026-11-01',
+             'sourceEvidence':'Xinzhuang official hall LIST→same bulletin sid 0Q252550255605202263 DETAIL, 12/05 14:00 Da Capo price 400/500, direct OPENTIX Event 2089995501384269825 same title and venue, OPENTIX OPEN13:30 SHOW14:00. October 3 past event 2071939794940801025 is off-shelf, no future promotion. Event ID not ticket Session ID.',
+             'acceptedFields':0,'ticketSessionIdsVerified':0,'goldenAccepted':0,
+             'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True,ensure_ascii=False)+'\n',encoding='utf-8')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_p30_venue_02bi-source-evidence
+          path: evidence/
+          if-no-files-found: error
