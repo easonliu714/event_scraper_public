@@ -67,3 +67,26 @@ jobs:
           PY
           node --check /tmp/eventradar_platform_status.js
           echo PASS_JS_SYNTAX
+      - name: Produce sanitized immutable status-only evidence
+        run: |
+          mkdir -p evidence
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          info=json.loads(Path('docs/platform_status.json').read_text())['latestEngineering']
+          evidence={'head_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+                    'source_main_base':'fbf4ca02b91159f2423caf3d79fb0ca4bb747069',
+                    'formal_data_blob':subprocess.check_output(['git','rev-parse','HEAD:docs/data.json'],text=True).strip(),
+                    'status_snapshot_at':info['snapshotAtTaipei'],'governance_head':info['governanceHead'],
+                    'a_pr':info['lines'][0]['draftPR'],'b_pr':info['lines'][1]['draftPR'],
+                    'accepted_fields_new':info['acceptedFieldsNew'],'golden_new':info['goldenNew'],
+                    'published_events_new':info['publishedEventsNew'],'release_state':info['releaseState']}
+          Path('evidence/status_snapshot_audit.json').write_text(json.dumps(evidence,sort_keys=True,indent=2)+'\\n')
+          PY
+          (cd evidence && sha256sum status_snapshot_audit.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-public-duallane-status-evidence
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
