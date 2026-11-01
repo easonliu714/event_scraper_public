@@ -239,7 +239,7 @@
         const sources = Array.isArray(meta.sources) ? meta.sources : [];
         const timestamp = receipt && receipt.observed_at;
         const validTime = typeof timestamp === 'string'
-            && /(Z|[+-]\\d{2}:\\d{2})$/i.test(timestamp)
+            && /(Z|[+-]\d{2}:\d{2})$/i.test(timestamp)
             && !Number.isNaN(Date.parse(timestamp));
         const proven = receipt && typeof receipt === 'object'
             && validTime && receipt.value === value
