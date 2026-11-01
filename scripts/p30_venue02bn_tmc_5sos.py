@@ -12,6 +12,8 @@ VENUE_TITLE = "5 SECONDS OF SUMMER: EVERYONES A STAR！ WORLD TOUR"
 TICKET_TITLE = "5 SECONDS OF SUMMER: EVERYONE’S A STAR! WORLD TOUR"
 SHOW = "2026-11-25T20:00"
 VENUE = "臺北流行音樂中心 表演廳"
+VENUE_PUBLISHED = "2026-10-25"
+ACCESSIBLE_PRICES = (1990, 2490)
 
 def exact_url(value, expected):
     if not isinstance(value, str):
@@ -40,6 +42,13 @@ def inspect(row, observed_at):
         return dict(result, decision="HOLD_DIRECT_TICKET_LINK")
     if row.get("ticket_title") != TICKET_TITLE or row.get("ticket_show") != SHOW:
         return dict(result, decision="HOLD_TICKET_EVENT_PARITY")
+    # Source publication date is not the show; conditional concessions are not general prices.
+    if (row.get("venue_published_at") != VENUE_PUBLISHED or
+            row.get("venue_publication_role") != "ARTICLE_PUBLICATION_NOT_SHOW"):
+        return dict(result, decision="HOLD_PUBLICATION_NOT_SHOW")
+    if (row.get("accessible_prices") != ACCESSIBLE_PRICES or
+            row.get("accessible_price_role") != "DISABILITY_CONCESSION_NOT_GENERAL_MINIMUM"):
+        return dict(result, decision="HOLD_CONCESSION_NOT_GENERAL_PRICE")
     if (row.get("venue_min_general_price") != 3380 or
             row.get("venue_vip_seat_package") != 8680 or
             row.get("ticket_vip_standing_package") != 7380):
@@ -61,5 +70,7 @@ def inspect(row, observed_at):
         f("venue_ticket_href", TICKET_DETAIL, VENUE_DETAIL, "TMC_VENUE_OFFICIAL", "DIRECT_TICKET_EVENT_LINK"),
         f("vip_upgrade", "BENEFIT_ONLY", TICKET_DETAIL, "TIXCRAFT_03", "UPGRADE_NOT_ADMISSION"),
         f("service_fee", 200, TICKET_DETAIL, "TIXCRAFT_03", "ADDITIONAL_FEE_NOT_FACE_VALUE"),
+        f("venue_publication", VENUE_PUBLISHED, VENUE_DETAIL, "TMC_VENUE_OFFICIAL", "ARTICLE_PUBLICATION_NOT_SHOW"),
+        f("accessible_prices", list(ACCESSIBLE_PRICES), VENUE_DETAIL, "TMC_VENUE_OFFICIAL", "DISABILITY_CONCESSION_NOT_GENERAL_MINIMUM"),
     ]
     return dict(result, decision="REVIEW_DIRECT_TICKET_EVENT_HOLD_SESSION")
