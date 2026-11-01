@@ -4561,3 +4561,8 @@ CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS preserved
 #### 2026-11-01 21:57 Asia/Taipei — field receipt role type guard and CI lineage
 
 - Draft #210 earlier `d50c7f79220c2cb3b80096e6e84e505b45c9683b` exact-head CI #41313632239 SUCCESS (16 Python tests, artifact #13085977765 digest sha256:0f21e0956874a73abada27edd09f9a7eed207010802221140a4fe334ceb00d88). The new optional-field gate additionally requires `isinstance(receipt.role,str)` before allowlist set membership, so malformed list/dict metadata fails closed rather than raising TypeError. Added malformed-list-role regression in same existing tests file. Sequential commits `7ee310c317ada534d02fac515f0e1af67fead754` and `e69f61ebc469f01306c25111a81aa2a15d1e8380`; final exact-head CI PENDING at append. No changes to formal data, status, Golden, publisher or main. Real Owner 18 rows still 0/18; L8 Android candidate UAT UNVERIFIED.
+
+
+#### 2026-11-01 21:58 Asia/Taipei — final L7 exact-head CI PASS
+
+- Draft #210 final `e69f61ebc469f01306c25111a81aa2a15d1e8380` / [exact-head CI #41313723671](https://github.com/easonliu714/event_scraper_public/actions/runs/41313723671) SUCCESS, candidate-review job #124869282783 all steps PASS, artifact #13086303704 GitHub digest `sha256:bc77e12b564d7c3b790e1568eb3bd30d7016b070d97af52a8fe1a1e7adbcc8f7`; ZIP CRC independent UNVERIFIED. Source-bound field REVIEW receipt contract and malformed-role rejection covered; 18 actual Owner rows 0/18, L8 new Android UAT UNVERIFIED, no formal field/Golden/publication acceptance.
