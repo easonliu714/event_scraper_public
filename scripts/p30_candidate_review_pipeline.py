@@ -125,6 +125,7 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
                 valid_stamp
                 and receipt.get("value") == v
                 and receipt.get("source") in sources
+                and isinstance(receipt.get("role"), str)
                 and receipt.get("role") in allowed_roles
                 and receipt.get("decision") == "REVIEW"
             )
