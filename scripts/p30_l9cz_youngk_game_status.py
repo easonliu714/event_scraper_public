@@ -7,8 +7,13 @@ TITLE="Young K Solo Tour <YOUNGEST> in TAIPEI"
 ROWS=(("2026-11-28T19:00","GENERAL","NO_TICKETS_AVAILABLE"),("2026-11-29T18:00","GENERAL","NO_TICKETS_AVAILABLE"),("2026-11-29T18:00","MYVIDEO","SALE_ENDED_2026-08-30T11:00"),("2026-11-29T18:00","TAIWAN_MOBILE","SALE_ENDED_2026-08-30T11:00"))
 def exact_url(value,expected):
     if not isinstance(value,str): return False
-    a,b=urlsplit(value),urlsplit(expected)
-    return a.scheme==b.scheme=="https" and a.netloc==b.netloc and a.username is None and a.password is None and a.port is None and a.path==b.path and a.query==b.query and not a.fragment
+    # Untrusted URL parsing can raise ValueError for malformed IPv6 authorities.
+    # Fail closed rather than crash a source-review Gate.
+    try:
+        a,b=urlsplit(value),urlsplit(expected)
+        return a.scheme==b.scheme=="https" and a.netloc==b.netloc and a.username is None and a.password is None and a.port is None and a.path==b.path and a.query==b.query and not a.fragment
+    except ValueError:
+        return False
 def inspect(row,observed_at):
     result={"gate":"P30-L9-CZ","candidateFields":[],"acceptedFields":0,"ticketSessionIdsVerified":0,"inventoryVerified":False,"goldenAccepted":0,"published":False}
     try:
