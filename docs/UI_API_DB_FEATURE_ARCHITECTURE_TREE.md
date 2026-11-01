@@ -4333,3 +4333,44 @@ Cross-lane: 19 canonical platform IDs reused, Zepp venue != new ticket platform
 ```
 
 - B [Draft #203](https://github.com/easonliu714/event_scraper_public/pull/203) [CI #41278883610](https://github.com/easonliu714/event_scraper_public/actions/runs/41278883610) SUCCESS; artifact SHA256 `b37e8f31b6f6ebc05451bbf071d5d11924480303f784eb58295273d95f497a12` independently verified. A source quality advanced but engineering branch creation blocked; no fabricated A CI. Near-three A/B source rounds 3/3 each, repeated-root 0/0, formal FIELD 0/0, offline-only 0/0. Next A engineering branch safety resolution; B direct Session identity if publicly evidenced, else rotate P0 New Taipei source. All candidate fields REVIEW, no Golden/publication.
+
+---
+
+### 2026-11-01 15:01 Asia/Taipei — P30-L9-CU / P30-VENUE-02BI exact-head architecture (NO PUBLISH)
+
+```text
+Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [status-only merge; frozen]
+├─ A / canonical platform #03 tixCraft / P30-L9-CU / Draft #204
+│  ├─ DETAIL https://tixcraft.com/activity/detail/26_aftp
+│  ├─ same activity ID GAME https://tixcraft.com/activity/game/26_aftp
+│  ├─ 2026-11-06 / 07 / 08 19:30 [3 SHOW rows]
+│  ├─ 2026-11-01 11:00 [RELEASE, not SHOW #4 or inventory]
+│  ├─ descriptive prices 3850/3250/2950/2450/1950/1550/800
+│  ├─ accessible 400 [eligibility-specific, not general]
+│  ├─ current DETAIL source reader re-read; current GAME GET UNVERIFIED
+│  ├─ 5 REVIEW candidates, accepted FIELD 0, ticket Session ID 0
+│  └─ HEAD 5b478e793bd5668a23eaa88c29a32a04855a09f5
+│     CI #41283076891 SUCCESS 10/10; artifact #13073602699 CRC/SHA/head PASS
+├─ B / P0 New Taipei Xinzhuang Cultural Arts Center / VENUE-02BI / Draft #205
+│  ├─ LIST /xzcac_chi/xmdoc?XsmSId=0G286655201682579075
+│  ├─ DETAIL bulletin sid=0Q252550255605202263 [9 program items]
+│  ├─ Da Capo 2026-12-05 14:00 [SHOW], venue 400/500 [DESCRIPTIVE]
+│  ├─ direct href → canonical #05 OPENTIX Event 2089995501384269825
+│  │  ├─ exact title and venue [EVENT identity, not Session identity]
+│  │  ├─ OPEN 13:30 != SHOW 14:00
+│  │  └─ earlybird end 10/11 23:59 [DISCOUNT deadline, not current price]
+│  ├─ Oct03 historical direct OPENTIX Event 2071939794940801025 [OFF-SHELF]
+│  ├─ venue bulletin sid != ticket Event ID != ticket Session ID
+│  ├─ 7 REVIEW candidates, accepted FIELD 0, ticket Session ID 0
+│  └─ HEAD b2367c54e304fa6f85a444cd7f9e8acb212eed38
+│     CI #41283119555 SUCCESS 9/9; artifact #13073827085 CRC/SHA/head PASS
+├─ A/B exact-head CI official GET=0, first true failure NONE
+├─ main docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [FROZEN]
+├─ main docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d [FROZEN]
+└─ main latestEngineering A #190/B #191 07:55 [stale relative to Draft, no auto-release]
+```
+
+- **Strict code scope:** A adds only `scripts/p30_l9cu_tixcraft_three_show_release.py`, `tests/p30/test_l9cu_tixcraft_three_show_release.py`, `.github/workflows/eventradar_p30_l9_cu.yml`; B adds only `scripts/p30_venue02bi_xinzhuang_direct_opentix.py`, `tests/p30/test_venue02bi_xinzhuang_direct_opentix.py`, `.github/workflows/eventradar_p30_venue_02bi.yml`. No production scraper, API, DB, PWA, Golden, feed, scheduler, publisher or notifier edits. Branch base exact predecessor A #201 HEAD `94d32ae098a6f445e89c648c09a7bd7208f141d0`, B #203 HEAD `d65aef47826c564c55895aff4c84ec3f9aaa615f`.
+- **Per-field provenance contract:** each candidate includes `field/value/source/source_url/observed_at/role/decision=REVIEW`; fail closed on cross-domain URL, mismatched activity/bulletin/Event ID, title mismatch, open/show/release/discount role swaps, past off-shelf event promotion, fabricated Session/inventory/checkout. All acceptance and publication values zero; HTTP/HTML official source observation is NOT live CI adapter extraction. Prior Android CKSMH5/TWTC39 and L8 UI PASS retained; ibon39961 mismatch OPEN, `HARD_HOLD_NO_PUBLICATION` unchanged.
+- **Independent evidence:** A artifact ZIP SHA256 `fe436bd4ce1f53db57b505ce0910c938516805ead872b146a4a910da83f9185e`; B `97ab8217646f8f23d4a21cc7c7e8c9930f31eda7a6b5bb59e44cadea7c2ee708`. Both downloaded with exact 3 files, ZIP CRC, SHA256SUMS, manifest audit SHA and exact headSHA PASS. Source reader A DETAIL re-read today; GAME was prior observation, current direct GAME read UNVERIFIED. B new official LIST→DETAIL→OPENTIX event link read today. No ticket Session ID or formal FIELD PASS.
+- **Near-three source quality:** A 3/3 (includes current DETAIL re-read; not 3 origin-CI GET), B 3/3; repeated root with no new hypothesis 0/0, consecutive offline-only 0/0, formal accepted FIELD 0/0. Next source-quality Gate A seek independent ticket Session ID on another canonical platform; B only if safe investigate public OPENTIX Session link, otherwise rotate next New Taipei source. Official PWA status-only #192 MERGED, deployed snapshot remains A #190/B #191; direct latest Pages HTTP/Android status-card UAT UNVERIFIED. No new main or status write without authorization.
