@@ -53,11 +53,28 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
         reasons.append("INVALID_TITLE")
     if not isinstance(raw.get("platform"), str) or not raw["platform"].strip():
         reasons.append("PLATFORM_UNKNOWN")
-    if not isinstance(m.get("platform_id"), str) or not m["platform_id"]:
+    if not isinstance(raw.get("type"), str) or not raw["type"].strip():
+        reasons.append("TYPE_INVALID")
+    stamp = raw.get("scraped_at")
+    try:
+        # Freshness must be independently evaluated later; a naive or malformed
+        # timestamp cannot even serve as a REVIEW observation timestamp.
+        if not isinstance(stamp, str):
+            raise ValueError("not a string")
+        parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ValueError("timezone missing")
+    except (ValueError, TypeError, OverflowError):
+        reasons.append("OBSERVATION_TIME_UNVERIFIED")
+    # A nested REVIEW flag must not conceal a top-level publication claim.
+    for key in ("published", "golden_accepted", "formal_field_pass"):
+        if key in raw and raw[key] is not False:
+            reasons.append("TOP_LEVEL_PUBLICATION_CLAIM_" + key.upper())
+    if not isinstance(m.get("platform_id"), str) or not m["platform_id"].strip():
         reasons.append("CANONICAL_PLATFORM_ID_UNKNOWN")
-    if not isinstance(m.get("source_event_id"), str) or not m["source_event_id"]:
+    if not isinstance(m.get("source_event_id"), str) or not m["source_event_id"].strip():
         reasons.append("SOURCE_ID_UNVERIFIED")
-    if not isinstance(m.get("record_id"), str) or not m["record_id"]:
+    if not isinstance(m.get("record_id"), str) or not m["record_id"].strip():
         reasons.append("RECORD_ID_MISSING")
     sources = m.get("sources")
     if not isinstance(sources, list) or not sources or not all(_https(x) for x in sources):
@@ -67,8 +84,9 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
         # unless the exact linked detail URL is among the source receipts.
         # Venue index links and a different event ID cannot silently qualify it.
         reasons.append("DETAIL_URL_NOT_IN_SOURCE_EVIDENCE")
-    if not isinstance(m.get("hold_reasons"), list) or not m["hold_reasons"]:
-        reasons.append("MISSING_HOLD_REASON")
+    if (not isinstance(m.get("hold_reasons"), list) or not m["hold_reasons"]
+            or not all(isinstance(v, str) and v.strip() for v in m["hold_reasons"])):
+        reasons.append("MISSING_OR_INVALID_HOLD_REASON")
     if reasons:
         return None, reasons
 
@@ -88,13 +106,18 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
         "source_class": m.get("source_class", "UNKNOWN"),
         "sources": sources,
         "hold_reasons": list(m["hold_reasons"]),
-        "sessions": m.get("sessions", []),
+        # Input sessions have no independent ticket Session ID/role evidence
+        # contract in this L7 review schema. Never forward arbitrary objects
+        # as if they were source-validated showtimes or purchasable sessions.
+        "sessions": [],
         "formal_field_pass": False,
         "golden_accepted": False,
         "published": False,
         "ticket_session_id": None,
         "inventory": None,
     }
+    if m.get("sessions"):
+        result["_candidate"]["hold_reasons"].append("UNVERIFIED_SESSIONS_QUARANTINED")
     # Suspected title contaminated with date/location must be quarantined
     # instead of stripping an unverified substring and pretending certainty.
     if isinstance(title, str):
