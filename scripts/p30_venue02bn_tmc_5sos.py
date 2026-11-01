@@ -18,10 +18,15 @@ ACCESSIBLE_PRICES = (1990, 2490)
 def exact_url(value, expected):
     if not isinstance(value, str):
         return False
-    a, b = urlsplit(value), urlsplit(expected)
-    return (a.scheme == b.scheme == "https" and a.netloc == b.netloc
-            and a.username is None and a.password is None and a.port is None
-            and a.path == b.path and a.query == b.query and not a.fragment)
+    # A malformed IPv6 authority raises ValueError in urlsplit. Source evidence
+    # is untrusted: reject malformed links rather than aborting the Gate.
+    try:
+        a, b = urlsplit(value), urlsplit(expected)
+        return (a.scheme == b.scheme == "https" and a.netloc == b.netloc
+                and a.username is None and a.password is None and a.port is None
+                and a.path == b.path and a.query == b.query and not a.fragment)
+    except ValueError:
+        return False
 
 def inspect(row, observed_at):
     result = {"gate": "P30-VENUE-02BN", "candidateFields": [],
