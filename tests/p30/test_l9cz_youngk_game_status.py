@@ -39,6 +39,14 @@ class GameStatusGate(unittest.TestCase):
         rows=[list(x) for x in m.ROWS];rows[0][2]="IN_STOCK"
         self.assertEqual(self.check("game_rows",rows)["decision"],"HOLD_GAME_ROW_STATUS")
         self.assertEqual(self.check("availability_scope","INVENTORY_CONFIRMED")["decision"],"HOLD_DISPLAY_NOT_INVENTORY")
+    def test_malformed_public_game_rows_hold_without_exception(self):
+        good=fixture()["game_rows"]
+        for malformed in (None,0,"rows",{},[5],["2026-11-28"],[None],
+                          good[:-1],good+[["extra","GENERAL","NO_TICKETS_AVAILABLE"]],
+                          [None]+good[1:],[["2026-11-28T19:00","GENERAL"]]+good[1:],
+                          [[None,"GENERAL","NO_TICKETS_AVAILABLE"]]+good[1:]):
+            with self.subTest(value=repr(malformed)):
+                self.assertEqual(self.check("game_rows",malformed)["decision"],"HOLD_GAME_ROW_SHAPE")
     def test_no_session_stock_checkout_or_publication(self):
         for key,value in [("ticket_session_id","26_youngk"),("inventory_count",2),
                           ("checkout_url",m.GAME),("published_event",True)]:
