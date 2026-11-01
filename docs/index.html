@@ -245,6 +245,9 @@
             && validTime && receipt.value === value
             && typeof receipt.source === 'string'
             && sources.includes(row.url) && sources.includes(receipt.source)
+            // No cross-event receipt may prove a local REVIEW field without
+            // a separately verified same-event identity edge in this schema.
+            && receipt.source === row.url
             && isCandidateOfficialUrl(receipt.source)
             && typeof receipt.role === 'string'
             && allowedRoles.includes(receipt.role)
