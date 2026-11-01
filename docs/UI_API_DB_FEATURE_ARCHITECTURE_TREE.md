@@ -4432,3 +4432,52 @@ A canonical #03 tixCraft new SOURCE_QUALITY (not part of #204 CI)
 - **Phase B L8 existing-PWA import [ISOLATED ENGINEERING PASS, ANDROID UAT UNVERIFIED]:** docs/index.html gains opt-in local file input and separate candidate list (mobile card style) + safe textContent detail using existing modal. REVIEW state is kept only in volatile memory. Existing official allEvents/fetch(data.json), favorite storage, read tracking, notification workflow and production page are unchanged; review file is validated for REVIEW_ONLY, HTTPS link, explicit zero formal flags and HOLD reasons. Manual return to official list. No candidate JSON asset in public docs; unverified records remain private in the user's imported local file.
 - **PR/CI evidence:** [Draft #210](https://github.com/easonliu714/event_scraper_public/pull/210), head 1fd60203bdab940becebba1bf6ab6dc5b954cbbe, [exact-head CI #41295503191](https://github.com/easonliu714/event_scraper_public/actions/runs/41295503191) SUCCESS. Artifact #13079017095 GitHub sha256:d9f585d067e48a2bb5a0dbc2d1cca2c4b5d9209958884b3f45a8673f60fde787 (download CRC independently UNVERIFIED). Five changed paths exactly. Main remains 309481985c20ab3abd628b2e82dc6da29f07f920; formal data/status/scraper frozen; Android historical CKSMH5/TWTC39/prev UI PASS preserved, no activation of schedulers or Publisher. No Pages release for PR #210.
 - **Remaining:** local 18-record fixture contract run and reported per-field HOLD, Android local-import list/detail regressions after separately authorized UI-only deploy, actual source-freshness/Golden review, separate L9 production data publication authorization. Until then formal FIELD=0, Golden=0, publication=0, HARD_HOLD_NO_PUBLICATION.
+
+---
+
+
+### 2026-11-01 18:53 Asia/Taipei — L7 18-row audit-only intake and A/B source evidence boundaries
+
+```text
+SOURCE main 309481985c20ab3abd628b2e82dc6da29f07f920
+  docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [FROZEN]
+  docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d [FROZEN]
+  latestEngineering main snapshot 2026-11-01 07:55 (A #190/B #191) [STALE]
+STAGE A / Draft PR #210, updated HEAD 86d0d2f8c64e53b43a045fbab0b708461cf67381
+  scripts/p30_candidate_review_pipeline.py
+    --audit-only --expected-rows 18
+      -> input exact count check [FAIL-CLOSED]
+      -> normalize_record -> per-row provenance/rejection codes
+      -> per-platform input/rejected counts + rejection reason histogram
+      -> isolated quality_report.json + SHA256SUMS.txt [NO data.json]
+      -> zero accepted candidates permitted only in audit-only
+      -> stale data.json in audit-only target [REJECT]
+    normal review mode remains separate, preview-only, not production
+  tests/p30/test_candidate_review_pipeline.py
+    18 legacy-shaped synthetic contract test [NOT OWNER 18 REAL ROWS]
+    expected-count mismatch and stale preview fail-closed
+  exact-head CI on new HEAD [PENDING VERIFICATION when appended]
+  actual Owner 18-row JSON [NOT FOUND IN ACCESSIBLE FILES]
+  actual 18-row test 0/18; accepted/rejected UNKNOWN
+STAGE B / Draft PR #210
+  existing docs/index.html -> explicit local JSON import -> REVIEW cards/details
+  volatile-only; official allEvents/localStorage/notifications unaffected
+  new Android UAT UNVERIFIED; not merged/deployed to official PWA
+A / canonical 19-platform source #07 FamiTicket (PR #208)
+  voucher != screening Session; no ticket Session ID
+  supplemental #06 UDN ITF PRODUCT_ID=P1FSZGF7
+    exhibition/admission window != SALE tier windows != show Session
+    refund generic/event-specific cutoff conflict HOLD
+  this run new source evidence 0; new A PR/CI 0; NEXT P30-L9-CX
+B / P0 New Taipei Shulin (PR #209)
+  two workshop occurrences != verified ticket Session IDs
+  supplemental Fuzhong15 3 FILM SIDs @ same time
+    3 film IDs != 3 ticket Sessions; shared bundle UNKNOWN
+  this run new source evidence 0; new B PR/CI 0; NEXT P30-VENUE-02BL
+HARD_HOLD_NO_PUBLICATION
+  FORMAL FIELD 0 | Golden 0 | new publication 0
+  prior CKSMH 5 + TWTC 39 Android USER_ATTESTED_PASS preserved
+```
+
+Near-three prior completed A/B engineering rounds: A official evidence 2/3, B 3/3; repeated same-root 0/0; formally accepted field increments 0/0. This L7 audit-only engineering supplement is not another source round. The 18-row input is NOT the two-row synthetic CI fixture or 18 mobile screenshots. Owner-controlled separate UI-only merge/deploy and Android verification remain prerequisites for formal PWA candidate review; no formal event-feed publication or Golden unlock.
+
