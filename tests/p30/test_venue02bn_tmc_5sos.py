@@ -46,6 +46,15 @@ class TMC5SOSGate(unittest.TestCase):
             ("ticket_title","different","HOLD_TICKET_EVENT_PARITY"),
             ("ticket_show","2026-11-26T20:00","HOLD_TICKET_EVENT_PARITY")]:
             with self.subTest(key=key): self.assertEqual(self.check(key,value)["decision"],decision)
+    def test_malformed_source_authority_fail_closed(self):
+        # urlsplit must not raise for untrusted unmatched IPv6 brackets.
+        for key,decision in (("venue_list","HOLD_VENUE_LIST"),
+                             ("list_detail_href","HOLD_VENUE_DETAIL_IDENTITY"),
+                             ("venue_detail","HOLD_VENUE_DETAIL_IDENTITY"),
+                             ("venue_ticket_href","HOLD_DIRECT_TICKET_LINK"),
+                             ("ticket_detail","HOLD_DIRECT_TICKET_LINK")):
+            with self.subTest(key=key):
+                self.assertEqual(self.check(key,"https://[invalid")["decision"],decision)
     def test_publication_and_accessible_concession_roles(self):
         for key,value,decision in [
             ("venue_published_at","2026-11-25","HOLD_PUBLICATION_NOT_SHOW"),
