@@ -43,7 +43,7 @@ jobs:
           python - <<'PY'
           import hashlib,json,pathlib,subprocess
           p=pathlib.Path("evidence")
-          a={"gate":"P30-L9-CO","headSHA":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"officialGETinCI":0,"sourceObservationDate":"2026-11-01","sourceEvidence":"KHAM #04 official concert category list CATEGORY=205 TYPE=1 directly links same PRODUCT_ID P1FRRCZ9 detail, exact concert title. Detail-to-order button href remains unverified; no ticket session or publication.","acceptedFields":0,"ticketSessionIdsVerified":0,"goldenAccepted":0,"published":False,"releaseState":"HARD_HOLD_NO_PUBLICATION"}
+          a={"gate":"P30-L9-CO","headSHA":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"officialGETinCI":0,"sourceObservationDate":"2026-11-01","sourceEvidence":"KHAM #04 public partner-channel concert category (美安會員專區) LIST CATEGORY=205 TYPE=1 directly links same PRODUCT_ID P1FRRCZ9 detail, exact concert title. Detail-to-order button href remains unverified; no ticket session or publication.","acceptedFields":0,"ticketSessionIdsVerified":0,"goldenAccepted":0,"published":False,"releaseState":"HARD_HOLD_NO_PUBLICATION"}
           (p/"audit.json").write_text(json.dumps(a,sort_keys=True,ensure_ascii=False)+"\n",encoding="utf-8")
           (p/"manifest.json").write_text(json.dumps({"filesSHA256":{"audit.json":hashlib.sha256((p/"audit.json").read_bytes()).hexdigest()}},sort_keys=True)+"\n")
           PY
