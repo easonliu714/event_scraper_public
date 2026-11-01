@@ -4789,3 +4789,45 @@ L7/L8:
 ```
 
 - **Engineering architecture:** Separate 3-file ADD-only Draft branches from Source main; exact-head SHA, read-only CI, immutable formal blobs, six tests each with negative subcases, SHA256SUMS and artifacts. A [#213 CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41339515354) artifact #13097066174 digest `sha256:a1322155e14b9279735ac2ef4f65fd6802c26063855a55eb58da7123346ad2ba`; B [#214 CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41339576641) artifact #13096676565 digest `sha256:9cb27e1465302d96c7c956c6858bfcd7c6306f00001cd324125faa9a6a3f79a4`. CI official GET=0, independent artifact ZIP CRC UNVERIFIED. First-party source-reader REVIEW evidence is not adapter ingestion, Golden acceptance or production release. Near 3 rounds source-reader evidence A/B each 1/3, accepted fields 0/0; consecutive offline-only streak reset. No second Writer, no main writes.
+
+### 2026-11-02 03:56 Asia/Taipei — A L9-CZ / B VENUE-02BN source-role architecture
+
+```text
+Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb [FROZEN]
+  A canonical TIXCRAFT_03 / P30-L9-CZ
+    https://tixcraft.com/activity/detail/26_youngk
+      [Buy Tickets exact href]
+        -> https://tixcraft.com/activity/game/26_youngk
+           2026-11-28 19:00 GENERAL -> UI "No tickets available"
+           2026-11-29 18:00 GENERAL -> UI "No tickets available"
+           2026-11-29 18:00 MYVIDEO promotion -> sale ended 08/30 11:00
+           2026-11-29 18:00 TAIWAN_MOBILE promotion -> sale ended 08/30 11:00
+           displayed status != inventory; promo row != additional SHOW
+           no ticket Session ID, no checkout or Golden
+    isolated Draft #215 HEAD d852555de3c85dc95cc94d4d18567d55edb3309d
+    CI #41344218860 SUCCESS 5/5; artifact #13098920160
+  B P0 Taipei / TMC_VENUE_OFFICIAL / P30-VENUE-02BN
+    https://www.tmc.taipei/tw/blog/show
+      -> https://www.tmc.taipei/tw/blog/show/5SOS2026
+         venue SHOW 2026-11-25 20:00, TMC performance hall
+         venue admission from NTD3380; VIP seated package NTD8680
+         explicit ticket href -> https://tixcraft.com/activity/detail/26_5sos
+           canonical TIXCRAFT_03 event DETAIL (NOT ticket Session)
+           ticket SHOW 2026-11-25 20:00
+           VIP standing package NTD7380 INCLUDES admission
+           VIP UPGRADE excludes admission; NTD200 service fee additional
+         preserve field.source_url and observed_at separately per source
+         cross-source link != independent Session ID / stock proof
+    isolated Draft #216 HEAD 32203688acd49ecf3ef6bc3e4336edce9b59e6c5
+    CI #41344230634 SUCCESS 5/5; artifact #13098680985
+  governance Draft #8 [THIS BRANCH ONLY, NOT MAIN]
+  docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 FROZEN
+  docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d FROZEN
+  #210 PWA local REVIEW importer merged; #211 UI guard, #212 L7 guard DRAFT
+  Android 18-row candidate UAT PENDING; historical structural 18/18,
+    current runtime LOCAL_ARTIFACT_NOT_MOUNTED
+  FORMAL FIELD A=0/B=0; Golden=0; published=0; HARD_HOLD_NO_PUBLICATION
+```
+
+- **Exact-head readback:** A #215 CI #41344218860 job #124960466458 5/5 PASS, GitHub artifact digest `sha256:06d38a21249ad8738b42c93f767827519c74e699cb39bd1ec64091659fee40cc`; B #216 CI #41344230634 job #124960501029 5/5 PASS, digest `sha256:c5c16fae2fb3d8e871126326564218708aeb0212fd56bb634b9614184ab7cab8`. CI official GET=0, independent ZIP CRC UNVERIFIED. New first-party source-reader evidence A/B +1 each, near-three-round 2/3 each, accepted fields=0. Neither Draft PR merged or deployed.
+- **Authority and next:** Source main/Preview/ShowNews HEADs `9d8ddfab...`/`03e515d...`/`85fed3e...`. PWA direct HTTP UNVERIFIED, latest formal status snapshot stale (2026-11-01 07:55). A next inspect ticket GAME Session only via safe public evidence; B next verify exact source/field identity and VIP upgrade boundary; avoid same-root-cause repeated GET. No new canonical platform for TMC-to-tixCraft link. Existing CKSMH5/TWTC39 Android PASS retained; ibon39961 OPEN; no main/production/Golden/publication writes.
