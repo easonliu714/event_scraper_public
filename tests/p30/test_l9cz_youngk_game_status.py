@@ -33,6 +33,13 @@ class GameStatusGate(unittest.TestCase):
             ("game_title","other","HOLD_EVENT_IDENTITY"),
             ("venue","Zepp New Taipei","HOLD_VENUE")]:
             with self.subTest(key=key): self.assertEqual(self.check(key,value)["decision"],decision)
+    def test_malformed_url_authority_holds_without_exception(self):
+        # urlsplit raises ValueError for an unmatched IPv6 bracket; never crash.
+        for key,decision in (("detail_url","HOLD_DETAIL_SOURCE"),
+                             ("buy_tickets_href","HOLD_DETAIL_GAME_EDGE"),
+                             ("game_url","HOLD_DETAIL_GAME_EDGE")):
+            with self.subTest(key=key):
+                self.assertEqual(self.check(key,"https://[invalid")["decision"],decision)
     def test_promo_not_third_show_and_status_not_inventory(self):
         rows=[list(x) for x in m.ROWS];rows[2][0]="2026-11-30T18:00"
         self.assertEqual(self.check("game_rows",rows)["decision"],"HOLD_GAME_ROW_STATUS")
