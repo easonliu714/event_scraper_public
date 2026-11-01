@@ -4201,3 +4201,40 @@ Source main 309481985c20ab3abd628b2e82dc6da29f07f920 [unchanged]
 - **Source-level provenance:** A fields carry `source=OPENTIX_05/source_url/observed_at/role/decision=REVIEW` separately for event and each package; package ID cannot be substituted for event/session ID. B bulletin `sid` and ticket Event ID remain separate identity namespaces; four venue showtimes are not verified ticket sessions or automatically mapped to three OPENTIX venue choices. No fuzzy matching, guessed href, inventory or ticket Session IDs.
 - **Verification:** A #195 exact HEAD `b60097ad2f48dff4dd767f15f650c67ec42e3bc0`, CI #41263491543 40/40 SUCCESS, artifact ZIP SHA256 `3d75ffc28e7acb5f2cdd24acf715202329e3ece9dd54ecbf7098360b3ae7babd`. B #196 exact HEAD `4998fb3a9e96a1e981ec29283bd41231b03ab0cb`, CI #41263493123 38/38 SUCCESS, ZIP SHA256 `a666b8f45415b2c2a33deadf4b4e715e1dceb46d8f3aa94ef01b1337cf7aad9d`. Both independent ZIP CRC, three-member SHA256SUMS/manifest/audit.headSHA PASS; CI official GET 0; no true failure.
 - **Readiness / release:** A/B near-3 fresh official source evidence 3/3 each, same-root repeats 0/0, offline-only 0/0. Formal accepted FIELD 0/0, ticket Session IDs 0/0, Golden 0, published 0. PWA status-only #192 main merge and Pages deploy PASS but status snapshot remains A #190 / B #191, live Pages/Android UAT UNVERIFIED. CKSMH 5, TWTC 39 Android USER_ATTESTED_PASS and L8 UI PASS retained; ibon 39961 OPEN; `HARD_HOLD_NO_PUBLICATION` unchanged.
+
+
+### 2026-11-01 11:00 Asia/Taipei — P30-L9-CR / P30-VENUE-02BE source-bound dual-line architecture (NO PUBLISH)
+
+```text
+A / canonical ticket platform #18 iNDIEVOX — P30-L9-CR Draft #197
+  LIST https://www.indievox.com/activity
+    -> DETAIL /activity/detail/26_iv04215c4 [exact title/path ID]
+    -> GAME /activity/game/26_iv04215c4 [same title/path ID]
+  2026-11-08 19:30 = descriptive game-row showtime, NOT verified ticket Session ID
+  2026-10-29 = refund deadline, NOT performance; 30/10 NTD = pickup fees, NOT ticket price
+  GAME "Start ordering" != independently verified availability or checkout
+  scripts/p30_l9cr_indievox_game_refund.py + test + workflow [3 ADD-only]
+  PR HEAD b5429aa5d0e6a54da7d6baef6e6bec994a61828a
+  exact-head CI #41267466401 SUCCESS 45/45, Artifact #13067881420 CRC/SHA PASS
+B / P0 New Taipei Zepp venue — P30-VENUE-02BE Draft #198
+  Zepp LIST -> rid=166457 DETAIL -> direct KKTIX #01 organizer /events/jonyj
+  venue+ticket showtime 2026-11-06 20:00, source-local title spelling distinct
+  two 1F/2F KKTIX Event Dates category rows at same showtime != two performances
+  sale 07/27 19:00, VIP eligibility 11/01 23:59, queue 18:00, entry 18:30/19/19:30
+  680 NTD optional benefit add-on != independent ticket session; 3680=3000+680
+  scripts/p30_venue02be_zepp_jonyj_kktix.py + test + workflow [3 ADD-only]
+  PR HEAD 0829a5fa4a02ae94c96c87624fcd9cc9e7fed0fd
+  exact-head CI #41267469704 SUCCESS 47/47, Artifact #13067234060 CRC/SHA PASS
+Both: source/observed_at/role/decision provenance; all candidates REVIEW
+  verified ticket Session IDs 0/0; acceptedFields 0/0; Golden 0; published 0
+  CI official GET=0; public web-reader evidence != live adapter execution
+  main docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 FROZEN
+  main docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d
+  Owner-authorized status-only #192 MERGED / Pages #41257349599 SUCCESS
+  latestEngineering snapshot A #190/B #191, current #197/#198 NOT DEPLOYED
+  live Pages HTTP and Android status-card UAT UNVERIFIED
+  CKSMH #17 Android 5 / TWTC #16 Android 39 USER_ATTESTED_PASS retained
+  ibon 39961 mismatch OPEN; HARD_HOLD_NO_PUBLICATION unchanged
+```
+
+- **Quality window:** A #193/#195/#197 official source rounds 3/3; B #194/#196/#198 3/3; repeated same root without hypothesis 0/0, offline-only streak 0/0, formal FIELD increment 0/0. A source rotation OPENTIX #05 → iNDIEVOX #18; B NTPC Art Center → Zepp, KKTIX #01 reused rather than duplicated. No UI/API/DB schema or production writer change. Next A ticket-session identity only with safe first-party proof; next B floor-category registration link/session boundary only if public, else rotate New Taipei P0 source. Preserve Taipei→New Taipei→other north ordering.
