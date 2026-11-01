@@ -4590,3 +4590,48 @@ Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
 - Owner authorized only the PR #210 candidate-import UI Merge. [PR #210](https://github.com/easonliu714/event_scraper_public/pull/210) exact HEAD `e69f61ebc469f01306c25111a81aa2a15d1e8380` was merged to main as `9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb`. [CI #41313723671](https://github.com/easonliu714/event_scraper_public/actions/runs/41313723671) SUCCESS; Artifact #13086303704 GitHub SHA256 `bc77e12b564d7c3b790e1568eb3bd30d7016b070d97af52a8fe1a1e7adbcc8f7` metadata PASS; independently downloaded artifact content NOT VERIFIED in this interaction. Pages #41316070328 build/deploy/report-build-status SUCCESS. Main code and frozen data blobs independently read back. No new real event source, Golden, formal acceptance, or publication.
 - Original 18-row REVIEW JSON retained in current conversation filesystem, two ZIP copies consistent SHA256 `35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603`; structural check 18/18, source-level authenticity and real L7 pipeline independent acceptance remain HOLD. Do not repeatedly request Owner re-upload; Android user only needs to pick local file after download. Previous Android CKSMH 5 and TWTC 39 PASS preserved.
 - Owner UAT pending, no formal data replaced or authorization to lift `HARD_HOLD_NO_PUBLICATION`. Later L7 Golden and L9 data release require separate evidence and approval.
+
+
+### 2026-11-01 22:54 Asia/Taipei — L8 candidate local-import field receipt architecture / A+B cross-line guard
+
+```text
+FORMAL PWA (Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb)
+  docs/data.json [FROZEN blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4]
+  docs/platform_status.json [FROZEN blob cdeeb3b551e38f862c37759426a14b5129e1224d]
+  docs/index.html local file picker [DEPLOYED via #210; Android UAT PENDING]
+    BEFORE #211: direct row.date/location/price/description display
+      -> bypasses Python L7 normalize_record() field receipt contract
+      -> A #07 FamiTicket FILM_RELEASE could look like SHOW DATE
+      -> B Shulin NT$100/parent-child pair could look like per-person PRICE
+    AFTER proposed #211 [DRAFT ONLY / NOT DEPLOYED]:
+      candidateReviewField(row, meta, key, allowedRoles)
+      -> exact string value and _candidate.field_evidence[key].value
+      -> receipt.source in meta.sources + row.url in meta.sources
+      -> HTTPS safe receipt source
+      -> timezone-aware observed_at
+      -> field-specific role allowlist
+      -> decision REVIEW
+      -> valid: display REVIEW field
+      -> invalid: display 未確認 + FIELD_*_PROVENANCE_HOLD
+      -> never promote to formal FIELD/Golden/data/notification
+  Python L7 normalizer unchanged, existing 16 tests PASS
+  JS candidate field guard negative tests + inline node --check PASS
+  #211 exact HEAD a453407e48d154dbd2186ccf16c935d9454f0b11
+  exact-head CI #41318475099 SUCCESS, Artifact #13087958550
+  first CI #41318424890 FAILED timezone regex escape, root-cause fixed
+A source P30-L9-CW / #208 [CI #41291006508 SUCCESS]
+  FILM_RELEASE_NOT_SHOW, REFUND_NOT_SHOW, VOUCHER_NOT_SESSION
+  no new official GET this cycle; formal FIELD 0
+B venue P30-VENUE-02BK / #209 [CI #41291009914 SUCCESS]
+  TWO_WORKSHOP_OCCURRENCES, ONE_PARENT_CHILD_PAIR_NOT_PER_PERSON
+  ticket Event ID != ticket Session ID; no new official GET this cycle
+  formal FIELD 0
+Prior 18 REVIEW rows: 18/18 basic structure verified in prior conversation
+  SHA256 35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603
+  current automation LOCAL_ARTIFACT_NOT_MOUNTED, new independent QC 0/18
+PWA runtime direct HTTP UNVERIFIED; Pages #41316070328 deploy SUCCESS
+CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS preserved
+HARD_HOLD_NO_PUBLICATION | Golden 0 | Published 0
+```
+
+- Only isolated Draft #211 changed 3 files: `docs/index.html`, `tests/p30/test_candidate_review_ui_provenance.js`, `.github/workflows/eventradar_p30_l8_review_field_guard.yml`; exact-head CI [#41318475099](https://github.com/easonliu714/event_scraper_public/actions/runs/41318475099) all steps PASS, GitHub artifact SHA256 `a0a5cc75827e7c3174b56705a309847024baff6d044640918cd043504c434a99` (independent CRC UNVERIFIED). No A/B source adapter changes, no duplicated canonical IDs, no main write or merge authorization. Official HTTP/LIST/DETAIL new evidence this cycle A/B 0/0; previous 21:55 source observations A/B 1/1; recent 3 rounds 1/3 each; next prioritize owner Android UAT and field-provenance candidate QC while preserving both A/B source-quality queues. Toolkit path UNKNOWN.
