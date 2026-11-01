@@ -32,6 +32,7 @@ class Gate(unittest.TestCase):
         self.assertEqual(len(x["candidateFields"]), 2)
         self.assertEqual(x["candidateFields"][0]["value"], m.DETAIL)
         self.assertEqual(x["provenance"][1]["decision"], "HOLD_BUTTON_HREF_UNVERIFIED")
+        self.assertEqual(x["provenance"][0]["role"], "PUBLIC_PARTNER_CHANNEL_CATEGORY_LIST_NOT_GENERAL_INDEX")
     def test_observed_at(self):
         self.assertEqual(m.inspect(fixture(), "wrong")["decision"], "HOLD_OBSERVATION")
     def test_missing_object(self):
