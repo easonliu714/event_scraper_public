@@ -4635,3 +4635,31 @@ HARD_HOLD_NO_PUBLICATION | Golden 0 | Published 0
 ```
 
 - Only isolated Draft #211 changed 3 files: `docs/index.html`, `tests/p30/test_candidate_review_ui_provenance.js`, `.github/workflows/eventradar_p30_l8_review_field_guard.yml`; exact-head CI [#41318475099](https://github.com/easonliu714/event_scraper_public/actions/runs/41318475099) all steps PASS, GitHub artifact SHA256 `a0a5cc75827e7c3174b56705a309847024baff6d044640918cd043504c434a99` (independent CRC UNVERIFIED). No A/B source adapter changes, no duplicated canonical IDs, no main write or merge authorization. Official HTTP/LIST/DETAIL new evidence this cycle A/B 0/0; previous 21:55 source observations A/B 1/1; recent 3 rounds 1/3 each; next prioritize owner Android UAT and field-provenance candidate QC while preserving both A/B source-quality queues. Toolkit path UNKNOWN.
+
+
+### 2026-11-01 23:52 Asia/Taipei — A/B live source evidence and L8 provenance guard — field trust-boundary delta
+
+```text
+A canonical #03 tixCraft (existing platform; no duplicate source)
+  official /activity/detail/26_wte [base concert] <-> /activity/detail/26_wte_v [VIP add-on]
+  base 2026-11-24 19:30 TICC, NT$2300..6300; VIP add-on NT$4800/2900
+  add-on cannot independently admit; VIP 2025/05/25 sale vs 2026 base presale [HOLD]
+  2 source reader details, explicit same-event product edge REVIEW; Session ID UNKNOWN
+B New Taipei Art Center official (distinct venue, reuse OPENTIX #05)
+  November performance bulletin SID=0Q152372523738311866
+  屁屁偵探 11/07 14:30 + 11/08 10:30/14:30 -> direct OPENTIX Event 2086734015886159873
+  OPENTIX detail lists nine venues; Event ID != venue-scoped ticket Session ID
+  another bulletin row 11/10〔日〕 conflicts with actual Tuesday [DATE_ROLE_HOLD]
+  cross-source venue/event identity REVIEW; local Session ID UNKNOWN
+L8 #210 merged/deployed (main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb)
+  #211 optional-field provenance receipt guard exact-head CI 41318475099 SUCCESS
+  #211 Draft/unmerged/not deployed; deployed local REVIEW UI may display unproven fields
+  18/18 prior structural REVIEW; current runtime LOCAL_ARTIFACT_NOT_MOUNTED
+  Android candidate UAT PENDING; Pages CI SUCCESS, live HTTP UNVERIFIED
+Frozen docs/data.json 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+Frozen docs/platform_status.json cdeeb3b551e38f862c37759426a14b5129e1224d
+FORMAL FIELD=0 Golden=0 published=0 HARD_HOLD_NO_PUBLICATION
+CKSMH5/TWTC39 Android USER_ATTESTED_PASS retained
+```
+
+- A [base concert](https://tixcraft.com/activity/detail/26_wte), [VIP add-on](https://tixcraft.com/activity/detail/26_wte_v); B [venue official bulletin](https://www.culture.ntpc.gov.tw/artcenter_chi/xmdoc/cont?sid=0Q152372523738311866&sq=&xsmsid=0G269629106251547168), [ticket Event](https://www.opentix.life/event/2086734015886159873). Source reader evidence only, not adapter GET/Golden PASS. A #208 and B #209 unchanged, both earlier exact-head CI SUCCESS; this round A/B code commits=0. Next isolated A/B date-role regressions and L8 Android UAT, no new Writer or publication.
