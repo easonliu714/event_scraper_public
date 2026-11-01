@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""P30 L7 isolated candidate JSON builder. Never publishes to docs/data.json.
+
+Input must be provenance-tagged review records. All outputs are REVIEW-only.
+No network, login, scheduler, data feed mutation or notification is performed.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+from collections import Counter
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlparse
+
+REVIEW_SCOPE = "CANDIDATE_PREVIEW_ONLY"
+FORBIDDEN_OUTPUTS = {"docs/data.json", "docs/platform_status.json"}
+REQUIRED = ("title", "url", "platform", "type", "scraped_at", "_candidate")
+MAX_ROWS = 2000
+
+
+def _https(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        p = urlparse(value)
+        return p.scheme == "https" and bool(p.hostname) and not p.username and not p.password
+    except ValueError:
+        return False
+
+
+def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
+    """Validate provenance and classify a single original record; never invent fields."""
+    reasons: list[str] = []
+    if not isinstance(raw, dict):
+        return None, ["RECORD_NOT_OBJECT"]
+    for k in REQUIRED:
+        if k not in raw:
+            reasons.append("MISSING_" + k.upper())
+    m = raw.get("_candidate", {})
+    if not isinstance(m, dict):
+        return None, ["CANDIDATE_METADATA_INVALID"]
+    if m.get("scope") != REVIEW_SCOPE or m.get("decision") not in ("REVIEW", "REVIEW_WITH_HOLD"):
+        reasons.append("NOT_REVIEW_SCOPE")
+    for key in ("published", "golden_accepted", "formal_field_pass"):
+        if m.get(key) is not False:
+            reasons.append("NOT_EXPLICITLY_UNPUBLISHED_" + key.upper())
+    if not _https(raw.get("url")):
+        reasons.append("INVALID_OFFICIAL_URL")
+    title = raw.get("title")
+    if not isinstance(title, str) or not (3 <= len(title.strip()) <= 180):
+        reasons.append("INVALID_TITLE")
+    if not isinstance(raw.get("platform"), str) or not raw["platform"].strip():
+        reasons.append("PLATFORM_UNKNOWN")
+    if not isinstance(m.get("platform_id"), str) or not m["platform_id"]:
+        reasons.append("CANONICAL_PLATFORM_ID_UNKNOWN")
+    if not isinstance(m.get("source_event_id"), str) or not m["source_event_id"]:
+        reasons.append("SOURCE_ID_UNVERIFIED")
+    if not isinstance(m.get("record_id"), str) or not m["record_id"]:
+        reasons.append("RECORD_ID_MISSING")
+    sources = m.get("sources")
+    if not isinstance(sources, list) or not sources or not all(_https(x) for x in sources):
+        reasons.append("OFFICIAL_SOURCE_EVIDENCE_MISSING")
+    if not isinstance(m.get("hold_reasons"), list) or not m["hold_reasons"]:
+        reasons.append("MISSING_HOLD_REASON")
+    if reasons:
+        return None, reasons
+
+    # Allowlist only PWA fields and explicit candidate diagnostics. No supplied
+    # arbitrary DOM/HTML, no inferred date, ticket status, price or availability.
+    result = {k: raw[k] for k in ("title", "url", "platform", "type", "scraped_at")}
+    for k in ("date", "location", "price", "description", "region"):
+        v = raw.get(k)
+        result[k] = v.strip() if isinstance(v, str) and v.strip() else "未確認"
+    result["img_url"] = None  # no remote tracking images in local review
+    result["_candidate"] = {
+        "scope": REVIEW_SCOPE,
+        "decision": m["decision"],
+        "record_id": m["record_id"],
+        "platform_id": m["platform_id"],
+        "source_event_id": m["source_event_id"],
+        "source_class": m.get("source_class", "UNKNOWN"),
+        "sources": sources,
+        "hold_reasons": m["hold_reasons"],
+        "sessions": m.get("sessions", []),
+        "formal_field_pass": False,
+        "golden_accepted": False,
+        "published": False,
+        "ticket_session_id": None,
+        "inventory": None,
+    }
+    # Suspected title contaminated with date/location must be quarantined
+    # instead of stripping an unverified substring and pretending certainty.
+    if isinstance(title, str):
+        import re
+        if re.search(r"\d{4}-\d{2}-\d{2}", title) and len(title) > 75:
+            result["_candidate"]["hold_reasons"].append("TITLE_MIXED_WITH_DATE_REQUIRES_SOURCE_RECHECK")
+    return result, []
+
+
+def build_candidate_dataset(rows: object) -> tuple[list[dict], dict]:
+    if not isinstance(rows, list) or len(rows) > MAX_ROWS:
+        raise ValueError("INPUT_MUST_BE_BOUNDED_ARRAY")
+    accepted: list[dict] = []
+    rejected: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for index, raw in enumerate(rows):
+        row, problems = normalize_record(raw)
+        if problems:
+            rejected.append({"index": index, "reasons": problems})
+            continue
+        key = (row["_candidate"]["platform_id"], row["_candidate"]["source_event_id"])
+        if key in seen:
+            rejected.append({"index": index, "reasons": ["DUPLICATE_CANONICAL_ID"]})
+            continue
+        seen.add(key)
+        accepted.append(row)
+    report = {
+        "kind": "EVENTRADAR_ISOLATED_CANDIDATE_QUALITY_V1",
+        "scope": REVIEW_SCOPE,
+        "inputRows": len(rows),
+        "previewRows": len(accepted),
+        "rejectedRows": len(rejected),
+        "platformCounts": dict(sorted(Counter(x["platform"] for x in accepted).items())),
+        "rejected": rejected,
+        "formalFieldAccepted": 0,
+        "goldenAccepted": 0,
+        "published": 0,
+        "releaseState": "HARD_HOLD_NO_PUBLICATION",
+        "note": "PREVIEW only, not a live full-platform scrape or publication",
+    }
+    return accepted, report
+
+
+def write_isolated_outputs(rows: object, dest: Path, repo_root: Path) -> dict:
+    root = repo_root.resolve()
+    target = dest.resolve()
+    if target == root or target == (root / "docs").resolve():
+        raise ValueError("FORBIDDEN_PUBLIC_OUTPUT_DIR")
+    for forbidden in FORBIDDEN_OUTPUTS:
+        if target == (root / forbidden).resolve().parent:
+            raise ValueError("FORBIDDEN_PUBLICATION_PATH")
+    if target.is_relative_to((root / "docs").resolve()):
+        raise ValueError("NO_CANDIDATES_UNDER_PUBLIC_PAGES_DOCS")
+    candidates, report = build_candidate_dataset(rows)
+    if not candidates:
+        raise ValueError("EMPTY_REVIEW_CANDIDATES_NOT_PUBLISHED")
+    target.mkdir(parents=True, exist_ok=True)
+    data = json.dumps(candidates, ensure_ascii=False, indent=2) + "\n"
+    stats = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+    (target / "data.json").write_text(data, encoding="utf-8")
+    (target / "quality_report.json").write_text(stats, encoding="utf-8")
+    manifest = {}
+    for name in ("data.json", "quality_report.json"):
+        b = (target / name).read_bytes()
+        manifest[name] = hashlib.sha256(b).hexdigest()
+    (target / "SHA256SUMS.txt").write_text(
+        "".join(f"{manifest[k]}  {k}\n" for k in sorted(manifest)), encoding="utf-8")
+    return report
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description="Build non-published EventRadar candidate preview")
+    p.add_argument("--input", required=True, type=Path)
+    p.add_argument("--output-dir", required=True, type=Path)
+    p.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
+    args = p.parse_args()
+    data = json.loads(args.input.read_text(encoding="utf-8"))
+    result = write_isolated_outputs(data, args.output_dir, args.repo_root)
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()
