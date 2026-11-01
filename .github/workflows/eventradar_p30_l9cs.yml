@@ -1,0 +1,66 @@
+name: EventRadar P30-L9-CS exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [feat/eventradar-p30-l9cr-indievox-game-refund]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  exact-head:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9cs-indievox-bridge-dog-price-roles'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD, ADD-only changes, frozen event feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=b5429aa5d0e6a54da7d6baef6e6bec994a61828a
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' 'scripts/p30_l9cs_indievox_bridge_dog_roles.py' 'tests/p30/test_l9cs_indievox_bridge_dog_roles.py' '.github/workflows/eventradar_p30_l9cs.yml' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          python - <<'PY'
+          import json,subprocess
+          d=json.loads(subprocess.check_output(['git','show','origin/main:docs/platform_status.json']))
+          assert len(d['platforms'])==19
+          assert d['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['production']['goldenAccepted']==0
+          PY
+      - name: Predecessor and new source-bound role tests
+        run: |
+          python -m py_compile scripts/p30_l9cs_indievox_bridge_dog_roles.py tests/p30/test_l9cs_indievox_bridge_dog_roles.py
+          python -m unittest discover -s tests/p30 -p 'test_l9cr_indievox_game_refund.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_l9cs_indievox_bridge_dog_roles.py' -v
+      - name: Immutable source evidence SHA256 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          p=pathlib.Path('evidence')
+          a={'gate':'P30-L9-CS','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+             'officialGETinCI':0,'sourceObservationDate':'2026-11-01',
+             'sourceEvidence':"iNDIEVOX #18 public LIST -> Bridge Dog same path 26_iv0425761 DETAIL -> GAME 2026-11-12 19:30. Admission 19:00, presale 1250, door 1500, sale start 10/14, refund cutoff 11/02 separate source roles. Presale end exact time, inventory, ticket session ID, checkout unverified.",
+             'acceptedFields':0,'ticketSessionIdsVerified':0,
+             'goldenAccepted':0,'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(a,sort_keys=True,ensure_ascii=False)+'\n',encoding='utf-8')
+          (p/'manifest.json').write_text(json.dumps({'filesSHA256':{'audit.json':hashlib.sha256((p/'audit.json').read_bytes()).hexdigest()}},sort_keys=True)+'\n')
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar_p30_l9cs-source-evidence
+          path: evidence/
+          if-no-files-found: error
