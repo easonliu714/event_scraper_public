@@ -60,6 +60,24 @@ class CandidateQualityTests(unittest.TestCase):
             self.assertFalse(data, change)
             self.assertEqual(report["rejectedRows"], 1)
 
+    def test_candidate_detail_url_requires_exact_source_receipt(self):
+        # A listing URL or a different event detail must not authenticate
+        # a candidate ticket/detail URL, even on the same HTTPS host.
+        for bad_source in ("https://example.org/events",
+                           "https://example.org/events/other",
+                           "https://another.example.org/events/1234"):
+            e = example()
+            e["_candidate"]["sources"] = [bad_source]
+            data, report = build_candidate_dataset([e])
+            self.assertEqual(data, [])
+            self.assertIn("DETAIL_URL_NOT_IN_SOURCE_EVIDENCE",
+                          report["rejected"][0]["reasons"])
+        e = example()
+        e["_candidate"]["sources"] = ["https://example.org/events", e["url"]]
+        data, report = build_candidate_dataset([e])
+        self.assertEqual(report["previewRows"], 1)
+        self.assertEqual(len(data), 1)
+
     def test_duplicate_same_platform_event_id_rejected(self):
         first, second = example(), example("second", "1234")
         data, report = build_candidate_dataset([first, second])
