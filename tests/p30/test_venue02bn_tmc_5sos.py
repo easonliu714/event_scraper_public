@@ -11,6 +11,8 @@ def fixture():
             "venue_show":m.SHOW,"venue":m.VENUE,
             "venue_ticket_href":m.TICKET_DETAIL,"ticket_detail":m.TICKET_DETAIL,
             "ticket_title":m.TICKET_TITLE,"ticket_show":m.SHOW,
+            "venue_published_at":m.VENUE_PUBLISHED,"venue_publication_role":"ARTICLE_PUBLICATION_NOT_SHOW",
+            "accessible_prices":m.ACCESSIBLE_PRICES,"accessible_price_role":"DISABILITY_CONCESSION_NOT_GENERAL_MINIMUM",
             "venue_min_general_price":3380,"venue_vip_seat_package":8680,
             "ticket_vip_standing_package":7380,
             "vip_upgrade_role":"BENEFIT_ONLY_REQUIRES_VALID_CONCERT_TICKET",
@@ -29,7 +31,7 @@ class TMC5SOSGate(unittest.TestCase):
         self.assertEqual(r["acceptedFields"],0)
         self.assertEqual(r["ticketSessionIdsVerified"],0)
         self.assertFalse(r["published"])
-        self.assertEqual(len(r["candidateFields"]),5)
+        self.assertEqual(len(r["candidateFields"]),7)
         self.assertEqual({x["source"] for x in r["candidateFields"]},{"TMC_VENUE_OFFICIAL","TIXCRAFT_03"})
         self.assertTrue(all(x["decision"]=="REVIEW" and x["source_url"].startswith("https://") for x in r["candidateFields"]))
     def test_exact_official_list_detail_and_ticket(self):
@@ -44,6 +46,17 @@ class TMC5SOSGate(unittest.TestCase):
             ("ticket_title","different","HOLD_TICKET_EVENT_PARITY"),
             ("ticket_show","2026-11-26T20:00","HOLD_TICKET_EVENT_PARITY")]:
             with self.subTest(key=key): self.assertEqual(self.check(key,value)["decision"],decision)
+    def test_publication_and_accessible_concession_roles(self):
+        for key,value,decision in [
+            ("venue_published_at","2026-11-25","HOLD_PUBLICATION_NOT_SHOW"),
+            ("venue_publication_role","SHOW_DATE","HOLD_PUBLICATION_NOT_SHOW"),
+            ("accessible_prices",(3380,8680),"HOLD_CONCESSION_NOT_GENERAL_PRICE"),
+            ("accessible_price_role","GENERAL_ADMISSION","HOLD_CONCESSION_NOT_GENERAL_PRICE")]:
+            with self.subTest(key=key):
+                self.assertEqual(self.check(key,value)["decision"],decision)
+        r=self.check()
+        self.assertEqual(r["candidateFields"][-2]["role"],"ARTICLE_PUBLICATION_NOT_SHOW")
+        self.assertEqual(r["candidateFields"][-1]["role"],"DISABILITY_CONCESSION_NOT_GENERAL_MINIMUM")
     def test_vip_upgrade_is_not_admission(self):
         for key,value,decision in [
             ("venue_min_general_price",8680,"HOLD_PRICE_CATEGORY"),
