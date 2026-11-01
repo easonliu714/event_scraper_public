@@ -4740,3 +4740,52 @@ Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
 - **B ENGINEERING / SOURCE_QUALITY:** P30-VENUE-02BL source evidence 23:52 (NTPC official bulletin + OPENTIX nine-venue Event), #209 VENUE-02BK source engineering CI previously SUCCESS; this round official GET=0, L7 #212 B negative regression PASS. Venue bulletin and ticket Event remain separate identities, Session unknown; 11/10 weekday conflict HOLD.
 - **Near 3 rounds:** A/B new source-reader evidence each 1/3, consecutive source-absent rounds each 2; accepted fields A/B each 0. Next priority source-first, distinct low-frequency legal official LIST/DETAIL hypothesis, else rotate to next safe canonical platform or P0 Taipei/New Taipei venue. No repeated payload GET to satisfy KPI.
 - **Release boundary:** #211 UI fix and #212 Python L7 fix remain isolated Draft PRs; neither has Owner merge authorization. CKSMH5/TWTC39 Android USER_ATTESTED_PASS, L8 Core UI PASS retained; ibon39961 OPEN. Do not modify main/Golden/data/status/Production Writer/Publisher/Scheduler/Notifier. Governance remains in existing Draft #8 only.
+
+
+### 2026-11-02 03:00 Asia/Taipei — A L9-CY / B VENUE-02BM — source/field role topology and evidence isolation
+
+```text
+A canonical TIXCRAFT_03
+  first-party LIST https://tixcraft.com/activity
+    -> exact href/detail https://tixcraft.com/activity/detail/26_youngk
+       SHOW: 2026-11-28 19:00 (added) / 2026-11-29 18:00
+       VENUE: TICC
+       GENERAL_FACE_VALUE: NT$4880/3880/3380/2880
+       VIP_PACKAGE: NT$6880/5880
+       ADDITIONAL_SERVICE_FEE: NT$200 (NOT general admission price)
+       ORIGINAL_GENERAL_SALE: 2026-08-27 11:00
+       ADDED_SHOW_GENERAL_SALE: 2026-09-01 15:00
+       SALE != SHOW != ticket pickup != ticket Session
+  Draft #213 exact HEAD c934f8f508162c93325bf5cd0e041b0d57bf7525
+  CI #41339515354 SUCCESS 6/6; artifact #13097066174
+  candidate fields REVIEW; formal accepted 0, Session IDs 0
+
+B P0 New Taipei / ZEPP_NEW_TAIPEI_OFFICIAL (venue, distinct source)
+  LIST https://www.zepp.co.jp/hall/newtaipei/
+    -> exact rid=160667 DETAIL
+       https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160667
+       TITLE: Earendel THE SIGNAL, SHOW 2026-11-14 19:00
+       SALE: 2026-09-19 13:00 (NOT SHOW)
+       VIP_BUNDLE_TOTAL: NT$3200
+          ADMISSION_COMPONENT NT$3180 + BENEFIT_COMPONENT NT$20
+          BENEFIT_COMPONENT != standalone ticket
+       venue href https://ibontw.com/26_Earendel
+         -> observed redirect https://ticket.ibon.com.tw/ActivityInfo/Details/39946
+         ticket DETAIL content/title UNVERIFIED (image-only reader)
+         rid != ticket activity detail path != ticket Session ID
+  Reuse canonical ibon platform, no duplicate adapter; ibon 39961 mismatch OPEN
+  Draft #214 exact HEAD 8b91b068944230349daf8e7b3e4ab6e6d75ccf39
+  CI #41339576641 SUCCESS 6/6; artifact #13096676565
+  candidate fields REVIEW; formal accepted 0, Session IDs 0
+
+L7/L8:
+  #210 merged/deployed local REVIEW importer, Android UAT pending
+  #211 L8 receipt UI guard Draft; #212 L7 receipt-owner parity Draft
+  Owner 18-row REVIEW JSON historical 18/18 structure, current NOT MOUNTED
+  formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 FROZEN
+  formal status blob cdeeb3b551e38f862c37759426a14b5129e1224d FROZEN
+  Pages runtime HTTP UNVERIFIED; Golden=0, published=0
+  HARD_HOLD_NO_PUBLICATION; CKSMH5/TWTC39 Android PASS preserved
+```
+
+- **Engineering architecture:** Separate 3-file ADD-only Draft branches from Source main; exact-head SHA, read-only CI, immutable formal blobs, six tests each with negative subcases, SHA256SUMS and artifacts. A [#213 CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41339515354) artifact #13097066174 digest `sha256:a1322155e14b9279735ac2ef4f65fd6802c26063855a55eb58da7123346ad2ba`; B [#214 CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41339576641) artifact #13096676565 digest `sha256:9cb27e1465302d96c7c956c6858bfcd7c6306f00001cd324125faa9a6a3f79a4`. CI official GET=0, independent artifact ZIP CRC UNVERIFIED. First-party source-reader REVIEW evidence is not adapter ingestion, Golden acceptance or production release. Near 3 rounds source-reader evidence A/B each 1/3, accepted fields 0/0; consecutive offline-only streak reset. No second Writer, no main writes.
