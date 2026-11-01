@@ -4512,3 +4512,47 @@ Near-three prior completed A/B engineering rounds: A official evidence 2/3, B 3/
 - **B venue lane P30-VENUE-02BK:** [Draft #209](https://github.com/easonliu714/event_scraper_public/pull/209) HEAD `02d5064db3a03bc61efd1e0555d1465bce492d05`, prior CI #41291009914 SUCCESS. Independent code readback: NTPC Shulin bulletin SID and direct ACCUPASS #02 Event URL establish REVIEW event edge and two source-described workshop occurrences; neither the bulletin SID nor ACCUPASS Event ID establishes ticket Session ID. Pair-level NT$100 fee cannot be transformed into per-person price. This round new official GET/LIST/DETAIL/IDENTITY/FIELD=0, new B-specific PR=0. Next **P30-VENUE-02BL** rotate within New Taipei P0 to a new verifiable LIST→same-ID DETAIL/field hypothesis; no duplicate platform #17/#14/#13/#16.
 - **Anti-stall near-three completed hourly rounds:** A new official evidence **0/3**, B **0/3**; no same-payload repeat GET (0/0), no newly FORMAL accepted fields (0/0); both lines source-offline for **3 consecutive rounds** because Stage A priority. Trigger next-round source rotation with one bounded, legitimate evidence hypothesis per line; if no safe source exists record explicit HOLD and alternative, not another synthetic micro-PR. Stage A engineering is substantive but does not substitute A/B source quality.
 - **PWA/Android:** Status-only #192 already merged to Source main; `platform_status.json` retains reportDate 2026-10-28 and additive `latestEngineering` 2026-11-01 07:55 A #190/B #191, now stale versus #208/#209/#210. Pages runtime readback inaccessible/UNVERIFIED; no claim of updated live UI. #210 local import is Draft-only, not deployed; new Android UAT UNVERIFIED. Historical CKSMH 5/TWTC 39 USER_ATTESTED_PASS and L8 UI PASS preserved; ibon 39961 mismatch OPEN. **FORMAL FIELD 0, Golden 0, publication 0; HARD_HOLD_NO_PUBLICATION unchanged.**
+
+
+### 2026-11-01 21:55 Asia/Taipei — isolated L7 field receipt contract / dual-line live source boundary
+
+```text
+Stage A / Draft #210 HEAD d50c7f79220c2cb3b80096e6e84e505b45c9683b
+  normalize_record(raw)
+    title/url/platform/type/scraped_at/_candidate strict required review
+    date/location/price/description/region [NEW]
+      input raw field value
+      -> _candidate.field_evidence[field]
+      -> exact value + source URL in _candidate.sources
+      -> timezone-aware observed_at + role allowlist + decision REVIEW
+      -> DISPLAY REVIEW value + explicit field receipt
+      ELSE -> 未確認 + FIELD_<NAME>_PROVENANCE_HOLD
+    no independent ticket Session ID; sessions quarantined
+    no formal field promotion / Golden / publication
+  regression tests [NEW]
+    exact receipt positive
+    different source, SALE_END, naive timestamp, wrong value, PASS negative
+  exact-head CI #41313632239 PENDING at governance append
+  Owner actual 18 JSON rows NOT AVAILABLE -> 0/18 audited, real QC UNKNOWN
+A / P30-L9-CX [SOURCE REVIEW, no A code commit]
+  canonical platform #05 OPENTIX (reuse; not new adapter)
+  official LIST -> /event/2073011844495765504 -> same title H1
+  venue 恆春文化中心劇場館表演廳 (DETAIL field role)
+  2026/7/13..11/8 = bundle SALE, not SESSION date
+  showtime/price/inventory UNKNOWN; FORMAL FIELD 0
+  previous engineering Draft #208; next source-bound role Gate
+B / P30-VENUE-02BL [SOURCE REVIEW, no B code commit]
+  New Taipei Fuzhong15 official November LIST
+  film 尋秦記 -> SID 0Q289827308277719165 DETAIL
+  showtimes 2026-11-05 19:00 and 2026-12-16 19:00
+  updated 2026-10-16 != screening; 售 != ticket Session ID
+  same film SID != two ticket Session IDs; FORMAL FIELD 0
+  previous engineering Draft #209; next multi-showtime role Gate
+PWA status-only #192 MERGED; status reportDate baseline 2026-10-28
+  latestEngineering snapshot older than current A/B
+  live Pages runtime UNVERIFIED; #210 local import NOT DEPLOYED
+HARD_HOLD_NO_PUBLICATION | formal FIELD 0 | Golden 0 | published 0
+CKSMH 5 / TWTC 39 Android USER_ATTESTED_PASS preserved
+```
+
+- Source URLs: [OPENTIX LIST](https://www.opentix.life/), [same-ID DETAIL](https://www.opentix.life/event/2073011844495765504); [Fuzhong15 LIST](https://www.fuzhong15.ntpc.gov.tw/xcmovie?bdate=2026-11-01&edate=2026-11-30&xsmsid=0M361641875264878260), [same-SID DETAIL](https://www.fuzhong15.ntpc.gov.tw/xcmovie/cont?sid=0Q289827308277719165&xsmsid=0M361641875264878260). New A/B official evidence 1/1 source rounds, prior three source-offline rounds 0/3 each; formal accepted field delta 0/0. No second Writer, no main/formal data mutation.
