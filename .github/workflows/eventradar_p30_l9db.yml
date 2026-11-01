@@ -1,4 +1,4 @@
-name: EventRadar P30-L9-DA exact-head source REVIEW NO PUBLISH
+name: EventRadar P30-L9-DB exact-head source REVIEW NO PUBLISH
 on:
   pull_request:
     branches: [main]
@@ -50,7 +50,7 @@ jobs:
           mkdir -p evidence
           python - <<'PY'
           import json,pathlib,subprocess
-          audit={'gate':'P30-L9-DA','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+          audit={'gate':'P30-L9-DB','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
                  'sourceObservationDate':'2026-11-02','officialGETinCI':0,
                  'sourceQuality':'FamiTicket #07 official Home LIST -> exact ITF DETAIL; generic venue title differs; ticket Session/cross-source ID HOLD',
                  'acceptedFields':0,'ticketSessionIdsVerified':0,'goldenAccepted':0,
