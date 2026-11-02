@@ -368,5 +368,190 @@
     "golden_accepted_events": 0,
     "published_events": 0,
     "release_state": "HARD_HOLD_NO_PUBLICATION"
+  },
+  "role_rotation_indexed_receipt": {
+    "kind": "P30_L7_A_B_ROLE_ROTATION_REVIEW_V1",
+    "observation_method": "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION",
+    "observed_at": "2026-11-03T02:58:05+08:00",
+    "sources": {
+      "A_detail": "https://tixcraft.com/activity/detail/26_forever",
+      "B_list": "https://www.tmc.taipei/tw/blog/show",
+      "B_detail": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene"
+    },
+    "identity": {
+      "A_canonical_platform_id": "03",
+      "A_event_path": "26_forever",
+      "B_venue_detail_id": "2026SingTheScene",
+      "A_ticket_session_id": null,
+      "B_ticket_event_id": null,
+      "B_ticket_session_id": null,
+      "formal_eligible_min_price": null,
+      "formal_img_url": null,
+      "cross_event_identity_merge": false
+    },
+    "field_receipts": [
+      {
+        "line": "A",
+        "name": "ticket_showtimes",
+        "role": "TICKET_ANNOUNCED_SHOWTIMES",
+        "value": [
+          "2026-11-28T19:00:00+08:00",
+          "2026-11-29T19:00:00+08:00"
+        ],
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_standard_advertised_tiers",
+        "role": "TICKET_ADVERTISED_STANDARD_TIERS_NOT_STOCK",
+        "value": [
+          5880,
+          5280,
+          4880,
+          4280,
+          3680,
+          3280,
+          2680,
+          1680
+        ],
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_disability_restricted_tiers",
+        "role": "TICKET_RESTRICTED_DISABILITY_TIERS",
+        "value": [
+          2440,
+          1840
+        ],
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_ibon_pickup_fee",
+        "role": "TICKET_COLLECTION_FEE_NOT_ADMISSION",
+        "value": 30,
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REJECT_FOR_ADMISSION_PRICE",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_bank_transfer_fee",
+        "role": "CONDITIONAL_BANK_FEE_NOT_ADMISSION",
+        "value": 15,
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REJECT_FOR_ADMISSION_PRICE",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_showtime",
+        "role": "VENUE_ANNOUNCED_SHOWTIME",
+        "value": "2026-11-21T19:30:00+08:00",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_room",
+        "role": "VENUE_ROOM",
+        "value": "臺北流行音樂中心 Legacy TERA",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_standard_presale_tiers",
+        "role": "VENUE_ADVERTISED_STANDARD_PRESELL_NOT_STOCK",
+        "value": [
+          1600,
+          1200,
+          800
+        ],
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_accessibility_restricted_tiers",
+        "role": "VENUE_RESTRICTED_ACCESSIBILITY_TIERS",
+        "value": [
+          800,
+          600,
+          400
+        ],
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_cassette_bundle_tiers",
+        "role": "VENUE_CONDITIONAL_MERCH_BUNDLE_TIERS",
+        "value": [
+          1799,
+          1399,
+          999
+        ],
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REJECT_FOR_BASE_ADMISSION",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_ticket_platform_claim",
+        "role": "VENUE_CLAIMED_TICKET_PLATFORM_NOT_EVENT_ID",
+        "value": "Klook",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_event_poster",
+        "role": "VENUE_EVENT_POSTER_LINK_REVIEW_ONLY",
+        "value": "https://www.tmc.taipei/files/20260916122654324.png",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_seating_chart",
+        "role": "SEAT_MAP_NOT_EVENT_POSTER",
+        "value": "https://www.tmc.taipei/files/20261015113836233.jpg",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T02:58:05+08:00",
+        "decision": "REJECT_FOR_EVENT_POSTER",
+        "formal_accepted": false
+      }
+    ],
+    "native_official_get": 0,
+    "formal_accepted_fields": 0,
+    "golden_accepted_events": 0,
+    "published_events": 0,
+    "release_state": "HARD_HOLD_NO_PUBLICATION"
   }
 }
