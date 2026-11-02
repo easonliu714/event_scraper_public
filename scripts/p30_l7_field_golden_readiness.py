@@ -158,7 +158,7 @@ def audit_l7_candidate_parity(source_contract, candidate):
         or meta["field_evidence"].get("location") != {
             "value": venue_receipt["value"],
             "source": TICKET,
-            "observed_at": meta["field_evidence"].get("location", {}).get("observed_at"),
+            "observed_at": venue_receipt["observed_at"],
             "role": "EVENT_VENUE",
             "decision": "REVIEW",
         }):
@@ -174,6 +174,9 @@ def audit_l7_candidate_parity(source_contract, candidate):
         reasons.append("IMAGE_SESSION_OR_INVENTORY_NOT_INDEPENDENTLY_ACCEPTED")
     if isinstance(candidate, dict) and candidate.get("img_url"):
         reasons.append("UNVERIFIED_IMAGE_IN_RAW_CANDIDATE")
+    if isinstance(candidate, dict) and any(candidate.get(k) not in (None, "", "未確認")
+                                           for k in ("date", "price", "description", "region")):
+        reasons.append("UNVERIFIED_RAW_OPTIONAL_FIELD")
     if (meta["formal_field_pass"] is not False
         or meta["golden_accepted"] is not False
         or meta["published"] is not False):
