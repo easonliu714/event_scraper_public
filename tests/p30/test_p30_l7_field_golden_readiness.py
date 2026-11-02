@@ -386,6 +386,15 @@ class Readiness(unittest.TestCase):
         self.assertEqual(result["formal_accepted"],0)
         self.assertEqual(result["A_conflict_hold"],1)
         self.assertEqual(result["B_reject_general_price"],3)
+        self.assertEqual(result["A_explicit_start_conflict_hold"],1)
+        self.assertEqual(result["B_registration_href_403_hold"],3)
+        # Three option-specific public hrefs are exact, but GET 403 means
+        # no registration Session, stock, checkout, or Golden acceptance.
+        self.assertEqual([r["value"] for r in e["field_receipts"]
+            if r["name"].startswith("b_kktix_") and r["name"].endswith("_registration")],
+            ["https://kktix.com/events/takasetoya202611-1/registrations/new",
+             "https://kktix.com/events/takasetoya202611-2/registrations/new",
+             "https://kktix.com/events/takasetoya202611-3/registrations/new"])
         self.assertEqual(e["identity"]["A_event_id"],e["identity"]["A_game_event_id"])
         self.assertIsNone(e["identity"]["B_ticket_session_id"])
         self.assertIsNone(e["identity"]["formal_eligible_checkout_min"])
@@ -419,6 +428,12 @@ class Readiness(unittest.TestCase):
         e=self._rotated_source_fixture()
         for name,key,bad in (
             ("a_game_show","source",m.MYCELIUM_DETAIL),
+            ("a_explicit_start_time_conflict","decision","REVIEW"),
+            ("a_explicit_start_time_conflict","role","FORMAL_SHOWTIME"),
+            ("b_kktix_two_day_registration","decision","REVIEW"),
+            ("b_kktix_nov07_registration","value","https://kktix.com/events/takasetoya202611-3/registrations/new"),
+            ("b_kktix_nov08_registration","source",m.ZEPP_TAKASE_DETAIL),
+            ("b_kktix_nov08_registration","formal_accepted",True),
             ("a_body_show","decision","REVIEW"),
             ("a_header_show","value","2026-11-13T19:00:00+08:00"),
             ("a_single_presale","value",350),
