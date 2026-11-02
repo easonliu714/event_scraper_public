@@ -403,6 +403,70 @@ def validate_ticket_bridge_receipt(evidence):
             "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
 
+
+# 2026-11-03 04:58 source re-observation: separate ticket payment reconciliation
+# from sale/session/stock, and Klook entrance/presale/2-person bundle from show
+# and single-ticket price. Venue's actual shortlink is not a verified redirect.
+TMC_KLOOK_SHORTLINK = "https://s.klook.com/c/mXkdqlAMyQ"
+TIMELINE_PACKAGE_FIELDS = {
+    "ticket_failed_payment_window": ("A", TIX_FOREVER, "FAILED_PAYMENT_RECONCILIATION_NOT_SESSION", ["2026-10-04T14:00:00+08:00","2026-10-04T14:30:00+08:00"], "REJECT_FOR_TICKET_SESSION"),
+    "ticket_oct4_release_notice": ("A", TIX_FOREVER, "ACCOUNT_RECONCILIATION_RELEASE_NOT_CURRENT_STOCK", "2026-10-04T17:00:00+08:00", "REJECT_FOR_STOCK"),
+    "venue_klook_shortlink": ("B", TMC_SCENE, "VENUE_TICKET_SHORTLINK_FINAL_EVENT_DESTINATION_UNVERIFIED", TMC_KLOOK_SHORTLINK, "HOLD_FOR_FINAL_DESTINATION"),
+    "klook_entrance_time": ("B", KLOOK_SCENE, "DOORS_OPEN_NOT_SHOWTIME", "2026-11-21T18:30:00+08:00", "REVIEW"),
+    "klook_presale_start": ("B", KLOOK_SCENE, "TICKET_PRESELL_START_NOT_SHOWTIME", "2026-09-09T18:00:00+08:00", "REVIEW"),
+    "klook_presale_end": ("B", KLOOK_SCENE, "TICKET_PRESELL_END_NOT_SHOWTIME", "2026-11-20T23:59:00+08:00", "REVIEW"),
+    "klook_two_person_bundle_total": ("B", KLOOK_SCENE, "TWO_TICKET_PACKAGE_TOTAL_NOT_SINGLE_ADMISSION", [3200,2400], "REJECT_FOR_SINGLE_ADMISSION"),
+    "klook_two_person_bundle_quantity": ("B", KLOOK_SCENE, "TWO_TICKETS_PER_PACKAGE_NOT_ONE", 2, "REVIEW"),
+    "klook_accessibility_cassette_bundle": ("B", KLOOK_SCENE, "ACCESSIBILITY_PLUS_MERCH_NOT_GENERAL_ADMISSION", [999,799,599], "REJECT_FOR_GENERAL_PRICE"),
+}
+
+def validate_timeline_package_receipt(evidence):
+    """Require exact A/B source ownership; never promote sale/doors/package to Golden."""
+    if not isinstance(evidence, dict) or evidence.get("kind") != "P30_L7_A_B_TIMELINE_PACKAGE_REVIEW_V1":
+        raise ValueError("TIMELINE_PACKAGE_KIND_HOLD")
+    if (evidence.get("observation_method") != "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION"
+        or evidence.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+        or any(type(evidence.get(k)) is not int or evidence[k] != 0 for k in
+               ("native_official_get", "formal_accepted_fields", "golden_accepted_events", "published_events"))):
+        raise ValueError("TIMELINE_PACKAGE_RELEASE_HOLD")
+    if evidence.get("sources") != {"A_ticket_detail":TIX_FOREVER,
+                                   "B_venue_detail":TMC_SCENE,
+                                   "B_ticket_detail":KLOOK_SCENE}:
+        raise ValueError("TIMELINE_PACKAGE_SOURCES_HOLD")
+    if evidence.get("identity") != {
+        "A_event_path":"26_forever", "A_ticket_session_id":None,
+        "B_venue_detail_id":"2026SingTheScene", "B_ticket_event_id":"102001087",
+        "B_ticket_session_id":None, "B_shortlink_final_destination_verified":False,
+        "B_checkout_eligible_single_ticket_min":None, "formal_img_url":None,
+        "cross_event_identity_merge":False}:
+        raise ValueError("TIMELINE_PACKAGE_IDENTITY_HOLD")
+    rows=evidence.get("field_receipts")
+    if not isinstance(rows,list) or len(rows)!=len(TIMELINE_PACKAGE_FIELDS):
+        raise ValueError("TIMELINE_PACKAGE_COUNT_HOLD")
+    seen=set()
+    for row in rows:
+        if not isinstance(row,dict) or row.get("name") not in TIMELINE_PACKAGE_FIELDS:
+            raise ValueError("TIMELINE_PACKAGE_UNKNOWN_FIELD_HOLD")
+        name=row["name"]
+        if name in seen: raise ValueError("TIMELINE_PACKAGE_DUPLICATE_FIELD_HOLD")
+        seen.add(name)
+        line,source,role,value,decision=TIMELINE_PACKAGE_FIELDS[name]
+        if (row.get("line")!=line or not exact_source_url(row.get("source"),source)
+            or row.get("role")!=role or type(row.get("value")) is not type(value)
+            or row.get("value")!=value or row.get("decision")!=decision
+            or row.get("formal_accepted") is not False):
+            raise ValueError("TIMELINE_PACKAGE_ROLE_VALUE_HOLD")
+        try:
+            stamp=datetime.fromisoformat(row["observed_at"].replace("Z","+00:00"))
+            if stamp.utcoffset() is None: raise ValueError()
+        except (ValueError,TypeError,KeyError,AttributeError):
+            raise ValueError("TIMELINE_PACKAGE_TIMESTAMP_HOLD")
+    if seen!=set(TIMELINE_PACKAGE_FIELDS): raise ValueError("TIMELINE_PACKAGE_MISSING_FIELD_HOLD")
+    return {"A_rejected_session_or_stock":2,"B_review":4,"B_shortlink_hold":1,
+            "B_rejected_general_price":2,"native_get":0,"formal_accepted":0,
+            "golden":0,"published":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
