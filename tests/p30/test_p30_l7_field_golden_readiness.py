@@ -12,14 +12,23 @@ def mutate(line,name,key,value):
     return d
 class Readiness(unittest.TestCase):
     def test_a_b_review_ready_but_formal_zero(self):
-        self.assertEqual(m.validate(data),{"A_review_ready":3,"B_review_ready":4,
+        self.assertEqual(m.validate(data),{"A_review_ready":4,"B_review_ready":5,
             "formal_accepted":0,"golden":0,"published":0,"native_get":0,
             "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"})
     def test_unverified_price_age_and_images_must_not_promote(self):
-        for line,name in (("A","age_min"),("A","admission_price"),("A","img_url"),
-                          ("B","age_min"),("B","advertised_price_range"),("B","img_url")):
+        for line,name in (("A","age_min"),("A","admission_price"),
+                          ("B","age_min"),("B","advertised_price_range")):
             with self.subTest(line=line,name=name):
                 with self.assertRaises(ValueError):m.validate(mutate(line,name,"decision",m.READY))
+    def test_official_same_event_image_links_review_only(self):
+        for line,name,expected in (("A","img_url",m.TICKET_IMAGE),("B","img_url",m.VENUE_IMAGE)):
+            receipt=next(f for f in data["field_receipts"] if (f["line"],f["name"])==(line,name))
+            self.assertEqual(receipt["value"],expected)
+            self.assertFalse(receipt["formal_accepted"])
+            for invalid in (expected+"?size=small",expected.replace("https://","http://"),"https://example.org/fake.jpg",expected.rsplit(".",1)[0]+".png"):
+                with self.subTest(line=line,invalid=invalid):
+                    with self.assertRaises(ValueError):m.validate(mutate(line,name,"value",invalid))
+            with self.assertRaises(ValueError):m.validate(mutate(line,name,"formal_accepted",True))
     def test_false_golden_and_native_claims_rejected(self):
         for k,v in (("formal_accepted_fields",1),("golden_accepted_events",1),
                     ("published_events",1),("native_official_get_this_gate",1),
