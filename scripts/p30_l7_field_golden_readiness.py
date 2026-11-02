@@ -335,6 +335,74 @@ def validate_role_rotation_receipt(evidence):
             "golden":0,"published":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
 
+
+# 2026-11-03 03:54 independent ticket/venue cross-source identity evidence.
+# This is indexed public evidence, not native GET, ticket Session, checkout or Golden.
+KLOOK_SCENE = "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/"
+TICKET_BRIDGE_FIELDS = {
+    "ticket_initial_general_sale": ("A", TIX_FOREVER, "TICKET_GENERAL_SALE_START_NOT_SHOW", "2026-10-04T14:00:00+08:00", "REVIEW"),
+    "ticket_partial_release": ("A", TIX_FOREVER, "TICKET_PARTIAL_RELEASE_NOTICE_NOT_SHOW", "2026-10-13T18:00:00+08:00", "REVIEW"),
+    "ticket_partial_release_not_inventory": ("A", TIX_FOREVER, "RELEASE_NOTICE_NOT_CURRENT_INVENTORY", True, "REJECT_FOR_STOCK"),
+    "klook_ticket_event_url": ("B", KLOOK_SCENE, "INDEPENDENT_SAME_EVENT_TICKET_DETAIL_URL_NOT_SESSION", KLOOK_SCENE, "REVIEW"),
+    "klook_event_title": ("B", KLOOK_SCENE, "TICKET_EVENT_TITLE_SAME_EVENT_REVIEW", "2026〖唱 我們的歌〗金曲再現 演唱會｜我的電影K歌時代", "REVIEW"),
+    "klook_showtime": ("B", KLOOK_SCENE, "TICKET_ANNOUNCED_SHOWTIME_NOT_SESSION", "2026-11-21T19:30:00+08:00", "REVIEW"),
+    "klook_venue": ("B", KLOOK_SCENE, "TICKET_EVENT_VENUE", "Legacy TERA", "REVIEW"),
+    "klook_standard_tiers": ("B", KLOOK_SCENE, "TICKET_ADVERTISED_STANDARD_TIERS_NOT_STOCK", [1600,1200,800], "REVIEW"),
+    "klook_accessibility_tiers": ("B", KLOOK_SCENE, "TICKET_RESTRICTED_ACCESSIBILITY_TIERS", [800,600,400], "REVIEW"),
+    "klook_bundle_tiers": ("B", KLOOK_SCENE, "TICKET_BUNDLE_TIERS_NOT_BASE_ADMISSION", [1799,1399,999], "REJECT_FOR_BASE_ADMISSION"),
+    "klook_display_range": ("B", KLOOK_SCENE, "MIXED_PACKAGE_RANGE_NOT_ELIGIBLE_CHECKOUT_MIN", [800,1799], "REJECT_FOR_ELIGIBLE_MIN"),
+}
+
+def validate_ticket_bridge_receipt(evidence):
+    """Require exact independent ticket Event identity, role and source ownership."""
+    if not isinstance(evidence, dict) or evidence.get("kind") != "P30_L7_A_B_INDEPENDENT_TICKET_BRIDGE_V1":
+        raise ValueError("BRIDGE_KIND_HOLD")
+    if (evidence.get("observation_method") != "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION"
+        or evidence.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+        or any(type(evidence.get(k)) is not int or evidence[k] != 0 for k in
+               ("native_official_get", "formal_accepted_fields", "golden_accepted_events", "published_events"))):
+        raise ValueError("BRIDGE_RELEASE_HOLD")
+    if evidence.get("sources") != {"A_ticket_detail":TIX_FOREVER,
+                                    "B_venue_detail":TMC_SCENE,
+                                    "B_ticket_detail":KLOOK_SCENE}:
+        raise ValueError("BRIDGE_SOURCE_ALLOWLIST_HOLD")
+    if evidence.get("identity") != {
+        "A_event_path":"26_forever", "A_ticket_session_id":None,
+        "B_venue_detail_id":"2026SingTheScene", "B_ticket_event_id":"102001087",
+        "B_ticket_session_id":None, "B_venue_direct_href_verified":False,
+        "B_same_event_evidence":"INDEPENDENT_TITLE_SHOWTIME_VENUE_ORGANIZER_PARITY_REVIEW",
+        "formal_eligible_min_price":None, "formal_img_url":None,
+        "cross_event_identity_merge":False}:
+        raise ValueError("BRIDGE_IDENTITY_OR_SESSION_HOLD")
+    rows=evidence.get("field_receipts")
+    if not isinstance(rows,list) or len(rows)!=len(TICKET_BRIDGE_FIELDS):
+        raise ValueError("BRIDGE_COUNT_HOLD")
+    seen=set()
+    for row in rows:
+        if not isinstance(row,dict) or row.get("name") not in TICKET_BRIDGE_FIELDS:
+            raise ValueError("BRIDGE_UNKNOWN_FIELD_HOLD")
+        name=row["name"]
+        if name in seen: raise ValueError("BRIDGE_DUPLICATE_FIELD_HOLD")
+        seen.add(name)
+        line,source,role,value,decision=TICKET_BRIDGE_FIELDS[name]
+        if (row.get("line")!=line or not exact_source_url(row.get("source"),source)
+            or row.get("role")!=role or type(row.get("value")) is not type(value)
+            or row.get("value")!=value or row.get("decision")!=decision
+            or row.get("formal_accepted") is not False):
+            raise ValueError("BRIDGE_SOURCE_ROLE_VALUE_HOLD")
+        try:
+            dt=datetime.fromisoformat(row["observed_at"].replace("Z","+00:00"))
+            if dt.utcoffset() is None: raise ValueError()
+        except (ValueError,TypeError,KeyError,AttributeError):
+            raise ValueError("BRIDGE_TIMESTAMP_HOLD")
+    if seen!=set(TICKET_BRIDGE_FIELDS):
+        raise ValueError("BRIDGE_MISSING_FIELD_HOLD")
+    return {"A_review":2,"A_reject_stock":1,"B_review":6,"B_reject_price":2,
+            "B_ticket_event_id_review":"102001087","B_ticket_session_id":None,
+            "native_get":0,"formal_accepted":0,"golden":0,"published":0,
+            "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))

@@ -553,5 +553,159 @@
     "golden_accepted_events": 0,
     "published_events": 0,
     "release_state": "HARD_HOLD_NO_PUBLICATION"
+  },
+  "ticket_bridge_indexed_receipt": {
+    "kind": "P30_L7_A_B_INDEPENDENT_TICKET_BRIDGE_V1",
+    "observation_method": "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION",
+    "observed_at": "2026-11-03T03:54:00+08:00",
+    "sources": {
+      "A_ticket_detail": "https://tixcraft.com/activity/detail/26_forever",
+      "B_venue_detail": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+      "B_ticket_detail": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/"
+    },
+    "identity": {
+      "A_event_path": "26_forever",
+      "A_ticket_session_id": null,
+      "B_venue_detail_id": "2026SingTheScene",
+      "B_ticket_event_id": "102001087",
+      "B_ticket_session_id": null,
+      "B_venue_direct_href_verified": false,
+      "B_same_event_evidence": "INDEPENDENT_TITLE_SHOWTIME_VENUE_ORGANIZER_PARITY_REVIEW",
+      "formal_eligible_min_price": null,
+      "formal_img_url": null,
+      "cross_event_identity_merge": false
+    },
+    "field_receipts": [
+      {
+        "line": "A",
+        "name": "ticket_initial_general_sale",
+        "role": "TICKET_GENERAL_SALE_START_NOT_SHOW",
+        "value": "2026-10-04T14:00:00+08:00",
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_partial_release",
+        "role": "TICKET_PARTIAL_RELEASE_NOTICE_NOT_SHOW",
+        "value": "2026-10-13T18:00:00+08:00",
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_partial_release_not_inventory",
+        "role": "RELEASE_NOTICE_NOT_CURRENT_INVENTORY",
+        "value": true,
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REJECT_FOR_STOCK",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_ticket_event_url",
+        "role": "INDEPENDENT_SAME_EVENT_TICKET_DETAIL_URL_NOT_SESSION",
+        "value": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_event_title",
+        "role": "TICKET_EVENT_TITLE_SAME_EVENT_REVIEW",
+        "value": "2026〖唱 我們的歌〗金曲再現 演唱會｜我的電影K歌時代",
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_showtime",
+        "role": "TICKET_ANNOUNCED_SHOWTIME_NOT_SESSION",
+        "value": "2026-11-21T19:30:00+08:00",
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_venue",
+        "role": "TICKET_EVENT_VENUE",
+        "value": "Legacy TERA",
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_standard_tiers",
+        "role": "TICKET_ADVERTISED_STANDARD_TIERS_NOT_STOCK",
+        "value": [
+          1600,
+          1200,
+          800
+        ],
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_accessibility_tiers",
+        "role": "TICKET_RESTRICTED_ACCESSIBILITY_TIERS",
+        "value": [
+          800,
+          600,
+          400
+        ],
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_bundle_tiers",
+        "role": "TICKET_BUNDLE_TIERS_NOT_BASE_ADMISSION",
+        "value": [
+          1799,
+          1399,
+          999
+        ],
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REJECT_FOR_BASE_ADMISSION",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_display_range",
+        "role": "MIXED_PACKAGE_RANGE_NOT_ELIGIBLE_CHECKOUT_MIN",
+        "value": [
+          800,
+          1799
+        ],
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T03:54:00+08:00",
+        "decision": "REJECT_FOR_ELIGIBLE_MIN",
+        "formal_accepted": false
+      }
+    ],
+    "native_official_get": 0,
+    "formal_accepted_fields": 0,
+    "golden_accepted_events": 0,
+    "published_events": 0,
+    "release_state": "HARD_HOLD_NO_PUBLICATION"
   }
 }

@@ -260,4 +260,65 @@ class Readiness(unittest.TestCase):
         with self.assertRaises(ValueError):m.validate_role_rotation_receipt(changed)
 
 
+
+    def test_independent_klook_tmc_event_edge_and_tixcraft_sale_roles(self):
+        # Independent indexed official pages: A ticket sale is not SHOW/stock;
+        # B ticket Event path matches venue title/show/room, not a Session.
+        e=data["ticket_bridge_indexed_receipt"]
+        self.assertEqual(m.validate_ticket_bridge_receipt(e),{
+            "A_review":2,"A_reject_stock":1,"B_review":6,"B_reject_price":2,
+            "B_ticket_event_id_review":"102001087","B_ticket_session_id":None,
+            "native_get":0,"formal_accepted":0,"golden":0,"published":0,
+            "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"})
+        rows={x["name"]:x for x in e["field_receipts"]}
+        self.assertEqual(rows["klook_ticket_event_url"]["value"],m.KLOOK_SCENE)
+        self.assertEqual(rows["klook_showtime"]["value"],rows["venue_showtime"]["value"] if "venue_showtime" in rows else "2026-11-21T19:30:00+08:00")
+        self.assertEqual(rows["klook_standard_tiers"]["value"],[1600,1200,800])
+        self.assertEqual(rows["klook_accessibility_tiers"]["value"],[800,600,400])
+        self.assertEqual(rows["klook_display_range"]["decision"],"REJECT_FOR_ELIGIBLE_MIN")
+        self.assertFalse(e["identity"]["B_venue_direct_href_verified"])
+        self.assertIsNone(e["identity"]["B_ticket_session_id"])
+
+    def test_independent_ticket_bridge_negative_parity_and_release_guards(self):
+        e=data["ticket_bridge_indexed_receipt"]
+        for name,key,bad in (
+            ("ticket_initial_general_sale","value","2026-11-28T19:00:00+08:00"),
+            ("ticket_partial_release","role","TICKET_ANNOUNCED_SHOW"),
+            ("ticket_partial_release_not_inventory","decision","REVIEW"),
+            ("klook_ticket_event_url","value","https://www.klook.com/zh-TW/event-detail/999-other/"),
+            ("klook_event_title","value","another event"),
+            ("klook_showtime","value","2026-11-28T19:00:00+08:00"),
+            ("klook_venue","value","臺北大巨蛋"),
+            ("klook_standard_tiers","value",[400]),
+            ("klook_accessibility_tiers","role","GENERAL_ADMISSION"),
+            ("klook_bundle_tiers","decision","REVIEW"),
+            ("klook_display_range","decision","REVIEW"),
+            ("klook_ticket_event_url","source",m.TMC_SCENE),
+            ("klook_ticket_event_url","formal_accepted",True),
+            ("klook_showtime","observed_at","2026-11-03T03:54:00"),
+        ):
+            d=copy.deepcopy(e)
+            next(x for x in d["field_receipts"] if x["name"]==name)[key]=bad
+            with self.subTest(name=name,key=key):
+                with self.assertRaises(ValueError):m.validate_ticket_bridge_receipt(d)
+        for key,bad in (
+            ("B_ticket_event_id","999"),("B_ticket_session_id","invented"),
+            ("B_venue_direct_href_verified",True),
+            ("A_ticket_session_id","invented"),
+            ("formal_eligible_min_price",800),("formal_img_url",m.TMC_SCENE_POSTER),
+            ("cross_event_identity_merge",True),
+        ):
+            d=copy.deepcopy(e);d["identity"][key]=bad
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError):m.validate_ticket_bridge_receipt(d)
+        for key in ("native_official_get","formal_accepted_fields","golden_accepted_events","published_events"):
+            d=copy.deepcopy(e);d[key]=1
+            with self.subTest(release=key):
+                with self.assertRaises(ValueError):m.validate_ticket_bridge_receipt(d)
+        d=copy.deepcopy(e);d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
+        with self.assertRaises(ValueError):m.validate_ticket_bridge_receipt(d)
+        d=copy.deepcopy(e);d["sources"]["B_ticket_detail"]=m.TIX_FOREVER
+        with self.assertRaises(ValueError):m.validate_ticket_bridge_receipt(d)
+
+
 if __name__=="__main__":unittest.main()
