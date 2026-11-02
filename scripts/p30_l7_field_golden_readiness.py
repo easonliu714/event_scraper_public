@@ -266,6 +266,75 @@ def validate_tmc_kham_receipt(evidence):
             "published":0,"native_get":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
 
+
+# 2026-11-03 A/B source rotation: distinguish advertised admission from restricted
+# categories, transaction fees, bundles and image roles. Indexed-reader REVIEW
+# evidence only; no ticket checkout, inventory, native GET or Golden promotion.
+TIX_FOREVER = "https://tixcraft.com/activity/detail/26_forever"
+TMC_SCENE = "https://www.tmc.taipei/tw/blog/show/2026SingTheScene"
+TMC_SCENE_POSTER = "https://www.tmc.taipei/files/20260916122654324.png"
+TMC_SCENE_SEAT_MAP = "https://www.tmc.taipei/files/20261015113836233.jpg"
+ROTATION_FIELDS = {
+    "ticket_showtimes": ("A", TIX_FOREVER, "TICKET_ANNOUNCED_SHOWTIMES", ["2026-11-28T19:00:00+08:00", "2026-11-29T19:00:00+08:00"], "REVIEW"),
+    "ticket_standard_advertised_tiers": ("A", TIX_FOREVER, "TICKET_ADVERTISED_STANDARD_TIERS_NOT_STOCK", [5880,5280,4880,4280,3680,3280,2680,1680], "REVIEW"),
+    "ticket_disability_restricted_tiers": ("A", TIX_FOREVER, "TICKET_RESTRICTED_DISABILITY_TIERS", [2440,1840], "REVIEW"),
+    "ticket_ibon_pickup_fee": ("A", TIX_FOREVER, "TICKET_COLLECTION_FEE_NOT_ADMISSION", 30, "REJECT_FOR_ADMISSION_PRICE"),
+    "ticket_bank_transfer_fee": ("A", TIX_FOREVER, "CONDITIONAL_BANK_FEE_NOT_ADMISSION", 15, "REJECT_FOR_ADMISSION_PRICE"),
+    "venue_showtime": ("B", TMC_SCENE, "VENUE_ANNOUNCED_SHOWTIME", "2026-11-21T19:30:00+08:00", "REVIEW"),
+    "venue_room": ("B", TMC_SCENE, "VENUE_ROOM", "臺北流行音樂中心 Legacy TERA", "REVIEW"),
+    "venue_standard_presale_tiers": ("B", TMC_SCENE, "VENUE_ADVERTISED_STANDARD_PRESELL_NOT_STOCK", [1600,1200,800], "REVIEW"),
+    "venue_accessibility_restricted_tiers": ("B", TMC_SCENE, "VENUE_RESTRICTED_ACCESSIBILITY_TIERS", [800,600,400], "REVIEW"),
+    "venue_cassette_bundle_tiers": ("B", TMC_SCENE, "VENUE_CONDITIONAL_MERCH_BUNDLE_TIERS", [1799,1399,999], "REJECT_FOR_BASE_ADMISSION"),
+    "venue_ticket_platform_claim": ("B", TMC_SCENE, "VENUE_CLAIMED_TICKET_PLATFORM_NOT_EVENT_ID", "Klook", "REVIEW"),
+    "venue_event_poster": ("B", TMC_SCENE, "VENUE_EVENT_POSTER_LINK_REVIEW_ONLY", TMC_SCENE_POSTER, "REVIEW"),
+    "venue_seating_chart": ("B", TMC_SCENE, "SEAT_MAP_NOT_EVENT_POSTER", TMC_SCENE_SEAT_MAP, "REJECT_FOR_EVENT_POSTER"),
+}
+
+def validate_role_rotation_receipt(evidence):
+    """Fail closed on identity, source, role, value, image and release claims."""
+    if not isinstance(evidence, dict) or evidence.get("kind") != "P30_L7_A_B_ROLE_ROTATION_REVIEW_V1":
+        raise ValueError("ROTATION_KIND_HOLD")
+    if (evidence.get("observation_method") != "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION"
+        or evidence.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+        or any(type(evidence.get(k)) is not int or evidence[k] != 0 for k in
+               ("native_official_get", "formal_accepted_fields", "golden_accepted_events", "published_events"))):
+        raise ValueError("ROTATION_RELEASE_HOLD")
+    if evidence.get("sources") != {"A_detail":TIX_FOREVER,"B_list":TMC_LIST,"B_detail":TMC_SCENE}:
+        raise ValueError("ROTATION_SOURCES_HOLD")
+    identity=evidence.get("identity")
+    if identity != {"A_canonical_platform_id":"03","A_event_path":"26_forever",
+                    "B_venue_detail_id":"2026SingTheScene","A_ticket_session_id":None,
+                    "B_ticket_event_id":None,"B_ticket_session_id":None,
+                    "formal_eligible_min_price":None,"formal_img_url":None,
+                    "cross_event_identity_merge":False}:
+        raise ValueError("ROTATION_IDENTITY_HOLD")
+    receipts=evidence.get("field_receipts")
+    if not isinstance(receipts,list) or len(receipts)!=len(ROTATION_FIELDS):
+        raise ValueError("ROTATION_COUNT_HOLD")
+    seen=set()
+    for row in receipts:
+        if not isinstance(row,dict) or row.get("name") not in ROTATION_FIELDS:
+            raise ValueError("ROTATION_UNKNOWN_FIELD_HOLD")
+        name=row["name"]
+        if name in seen: raise ValueError("ROTATION_DUPLICATE_FIELD_HOLD")
+        seen.add(name)
+        line,source,role,value,decision=ROTATION_FIELDS[name]
+        if (row.get("line")!=line or not exact_source_url(row.get("source"),source)
+            or row.get("role")!=role or type(row.get("value")) is not type(value)
+            or row.get("value")!=value or row.get("decision")!=decision
+            or row.get("formal_accepted") is not False):
+            raise ValueError("ROTATION_ROLE_VALUE_PROVENANCE_HOLD")
+        try:
+            stamp=datetime.fromisoformat(row["observed_at"].replace("Z","+00:00"))
+            if stamp.utcoffset() is None: raise ValueError()
+        except (ValueError,TypeError,KeyError,AttributeError):
+            raise ValueError("ROTATION_TIMESTAMP_HOLD")
+    if seen!=set(ROTATION_FIELDS): raise ValueError("ROTATION_MISSING_FIELD_HOLD")
+    return {"A_review":3,"A_rejected_as_admission":2,"B_review":6,
+            "B_rejected_as_base_or_poster":2,"native_get":0,"formal_accepted":0,
+            "golden":0,"published":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
