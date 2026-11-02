@@ -198,4 +198,66 @@ class Readiness(unittest.TestCase):
         with self.assertRaises(ValueError):m.validate_tmc_kham_receipt(changed)
 
 
+
+    def test_rotated_price_image_role_gate(self):
+        # A canonical tixCraft #03 and B P0 TMC are different events; no
+        # cross-event identity, no formal tier/asset, no synthetic Golden.
+        receipt=data["role_rotation_indexed_receipt"]
+        self.assertEqual(m.validate_role_rotation_receipt(receipt),{
+            "A_review":3,"A_rejected_as_admission":2,"B_review":6,
+            "B_rejected_as_base_or_poster":2,"native_get":0,"formal_accepted":0,
+            "golden":0,"published":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"})
+        rows={r["name"]:r for r in receipt["field_receipts"]}
+        self.assertEqual(rows["ticket_standard_advertised_tiers"]["value"][-1],1680)
+        self.assertEqual(rows["venue_standard_presale_tiers"]["value"][-1],800)
+        self.assertEqual(rows["venue_accessibility_restricted_tiers"]["value"][-1],400)
+        self.assertEqual(rows["venue_event_poster"]["value"],m.TMC_SCENE_POSTER)
+        self.assertEqual(rows["venue_seating_chart"]["value"],m.TMC_SCENE_SEAT_MAP)
+        self.assertEqual(rows["ticket_ibon_pickup_fee"]["decision"],"REJECT_FOR_ADMISSION_PRICE")
+        self.assertEqual(rows["venue_cassette_bundle_tiers"]["decision"],"REJECT_FOR_BASE_ADMISSION")
+        self.assertIsNone(receipt["identity"]["formal_eligible_min_price"])
+        self.assertIsNone(receipt["identity"]["formal_img_url"])
+
+    def test_rotated_source_role_negative_matrix(self):
+        receipt=data["role_rotation_indexed_receipt"]
+        for name,key,bad in (
+            ("ticket_standard_advertised_tiers","value",[30]),
+            ("ticket_disability_restricted_tiers","role","GENERAL_ADMISSION"),
+            ("ticket_ibon_pickup_fee","decision","REVIEW"),
+            ("ticket_bank_transfer_fee","value",1680),
+            ("ticket_showtimes","value",["2026-11-21T19:30:00+08:00"]),
+            ("venue_standard_presale_tiers","value",[400]),
+            ("venue_accessibility_restricted_tiers","role","GENERAL_ADMISSION"),
+            ("venue_cassette_bundle_tiers","decision","REVIEW"),
+            ("venue_ticket_platform_claim","role","TICKET_EVENT_ID"),
+            ("venue_event_poster","value",m.TMC_SCENE_SEAT_MAP),
+            ("venue_event_poster","source",m.TIX_FOREVER),
+            ("venue_seating_chart","decision","REVIEW"),
+            ("venue_seating_chart","role","EVENT_POSTER"),
+            ("venue_room","observed_at","2026-11-03T02:58:05"),
+            ("venue_showtime","formal_accepted",True),
+        ):
+            changed=copy.deepcopy(receipt)
+            next(r for r in changed["field_receipts"] if r["name"]==name)[key]=bad
+            with self.subTest(name=name,key=key):
+                with self.assertRaises(ValueError):m.validate_role_rotation_receipt(changed)
+        for key,bad in (
+            ("A_ticket_session_id","invented"),("B_ticket_event_id","invented"),
+            ("B_ticket_session_id","invented"),("formal_eligible_min_price",400),
+            ("formal_img_url",m.TMC_SCENE_POSTER),("cross_event_identity_merge",True),
+        ):
+            changed=copy.deepcopy(receipt);changed["identity"][key]=bad
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError):m.validate_role_rotation_receipt(changed)
+        for key in ("native_official_get","formal_accepted_fields","golden_accepted_events","published_events"):
+            changed=copy.deepcopy(receipt);changed[key]=1
+            with self.subTest(release=key):
+                with self.assertRaises(ValueError):m.validate_role_rotation_receipt(changed)
+        changed=copy.deepcopy(receipt)
+        changed["field_receipts"].append(copy.deepcopy(changed["field_receipts"][0]))
+        with self.assertRaises(ValueError):m.validate_role_rotation_receipt(changed)
+        changed=copy.deepcopy(receipt);changed["sources"]["B_detail"]=m.TMC_DETAIL
+        with self.assertRaises(ValueError):m.validate_role_rotation_receipt(changed)
+
+
 if __name__=="__main__":unittest.main()
