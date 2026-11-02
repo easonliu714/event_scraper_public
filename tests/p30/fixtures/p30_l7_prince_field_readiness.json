@@ -226,5 +226,125 @@
   "golden_accepted_events": 0,
   "published_events": 0,
   "release_state": "HARD_HOLD_NO_PUBLICATION",
-  "next_gate": "Native official source and image ownership parity receipts; eligible admission tier/session; actual 5-row JSON only if mounted"
+  "next_gate": "Native official source and image ownership parity receipts; eligible admission tier/session; actual 5-row JSON only if mounted",
+  "tmc_kham_indexed_receipt": {
+    "kind": "P30_L7_TMC_KHAM_REVIEW_EDGE_V1",
+    "observation_method": "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION",
+    "sources": {
+      "B_list": "https://www.tmc.taipei/tw/blog/show",
+      "B_detail": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+      "A_ticket": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"
+    },
+    "identity": {
+      "venue_detail_id": "2026SungNien-Yu",
+      "ticket_product_id": "P1DF32E2",
+      "ticket_session_id": null,
+      "eligible_general_price": null,
+      "image_url": null
+    },
+    "field_receipts": [
+      {
+        "line": "A",
+        "name": "ticket_title",
+        "role": "TICKET_EVENT_TITLE",
+        "value": "2026 小宇 宋念宇《不，完美的人》演唱會",
+        "source": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_sale_open",
+        "role": "TICKET_SALE_OPEN",
+        "value": "2026-08-22T12:00:00+08:00",
+        "source": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_age_recommendation",
+        "role": "AGE_RECOMMENDATION_NOT_RESTRICTION",
+        "value": 6,
+        "source": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_one_person_one_ticket",
+        "role": "ADMISSION_RULE",
+        "value": true,
+        "source": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_title",
+        "role": "VENUE_EVENT_TITLE",
+        "value": "小宇 宋念宇 《不，完美的人》 演唱會",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_showtime",
+        "role": "VENUE_ANNOUNCED_SHOWTIME",
+        "value": "2026-11-07T19:30:00+08:00",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_room",
+        "role": "VENUE_ROOM",
+        "value": "臺北流行音樂中心 表演廳",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_advertised_prices",
+        "role": "VENUE_ADVERTISED_PRICE_TIERS_NOT_TICKET_ELIGIBILITY",
+        "value": [
+          4280,
+          3880,
+          3480,
+          2880,
+          2480,
+          1880
+        ],
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_direct_ticket_url",
+        "role": "VENUE_TO_TICKET_PRODUCT_EDGE",
+        "value": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "observed_at": "2026-11-03T00:52:01+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false
+      }
+    ],
+    "native_official_get": 0,
+    "formal_accepted_fields": 0,
+    "golden_accepted_events": 0,
+    "published_events": 0,
+    "release_state": "HARD_HOLD_NO_PUBLICATION"
+  }
 }
