@@ -34,6 +34,13 @@ def inspect(row, observed_at):
         out["decision"]="HOLD_THREE_SOURCE_TITLE_PARITY";return out
     if row.get("venue_room")!="藍盒子" or row.get("ticket_venue")!="臺北表演藝術中心 藍盒子":
         out["decision"]="HOLD_VENUE_ROOM_PARITY";return out
+    # Official TPAC LIST advertises 11/04–11/14, but its exact DETAIL and OPENTIX
+    # both advertise 11/05–11/15. Never use the index range as a show date.
+    # Exact source-bound observations are required; omission is fail-closed.
+    if row.get("list_advertised_range")!=["2026-11-04","2026-11-14"]:
+        out["decision"]="HOLD_LIST_DATE_RANGE_UNVERIFIED";return out
+    if row.get("detail_advertised_range")!=["2026-11-05","2026-11-15"] or row.get("ticket_advertised_range")!=["2026-11-05","2026-11-15"]:
+        out["decision"]="HOLD_DETAIL_TICKET_DATE_RANGE_PARITY";return out
     if row.get("show_times")!=list(SHOWS) or len(set(row["show_times"]))!=12:
         out["decision"]="HOLD_TWELVE_VENUE_SHOWS";return out
     if row.get("venue_advertised_price_range")!=[1200,2200]:
@@ -45,7 +52,10 @@ def inspect(row, observed_at):
     for key in ("ticket_session_ids","checkout_url","stock","inventory","formal_age_min","ticket_prices_verified","golden_accepted"):
         if key in row and row[key] is not None:
             out["decision"]="HOLD_UNVERIFIED_SESSION_OR_CONFLICT_OVERRIDE";return out
-    fields=(("venue_detail_url",LIST,"VENUE_LIST_TO_EXACT_DETAIL"),
+    fields=(("list_advertised_range",LIST,"INDEX_RANGE_CONFLICT_NOT_SHOW_DATES"),
+            ("detail_advertised_range",DETAIL,"DETAIL_DATE_RANGE_12_SHOWS_AUTHORITY"),
+            ("ticket_advertised_range",TICKET,"TICKET_EVENT_RANGE_NOT_SESSION_ID"),
+            ("venue_detail_url",LIST,"VENUE_LIST_TO_EXACT_DETAIL"),
             ("direct_ticket_url",DETAIL,"VENUE_DIRECT_OPENTIX_EVENT_URL_NOT_SESSION_ID"),
             ("show_times",DETAIL,"TWELVE_VENUE_SHOW_TIMES_NOT_TICKET_SESSION_IDS"),
             ("venue_advertised_price_range",DETAIL,"VENUE_ADVERTISED_RANGE_NOT_CHECKOUT_PRICE"),
@@ -54,6 +64,7 @@ def inspect(row, observed_at):
             ("ticket_notice_city",TICKET,"CHIAYI_NOTICE_NOT_TAIPEI_SHOW_CHANGE"))
     out["candidateFields"]=[{"field":field,"value":row[field],"source":source,
          "observed_at":observed_at,"role":role,"decision":"REVIEW"} for field,source,role in fields]
+    out["listDetailRangeConflict"]=True
     out["ticketEventIdsVerified"]=1
     out["decision"]="REVIEW_EXACT_TICKET_EVENT_EDGE_AGE_CONFLICT_SESSION_HOLD"
     return out
