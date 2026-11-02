@@ -18,7 +18,7 @@ const ctx={
 };
 vm.runInNewContext(helpers[0]+';this.api={formalCardPriceSummary,formalEventDetailEvidence};',ctx);
 const {formalCardPriceSummary:summary,formalEventDetailEvidence:detail}=ctx.api;
-function e(price){return {url:'https://official.example/event/1',price};}
+function e(price){const url='https://official.example/event/1';return {url,price,formal_field_pass:true,golden_accepted:true,_formal_field_evidence:{price:{source:url,value:price,role:'EVENT_ADMISSION_PRICE',decision:'GOLDEN_ACCEPTED',accepted:true,observed_at:'2026-11-02T12:30:00+08:00'}}};}
 assert.equal(summary(e('NT$2880')),'NT$2,880（詳官方）');
 assert.equal(summary(e('NT$2,880')),'NT$2,880（詳官方）');
 assert.equal(summary(e('新台幣 150 元')),'NT$150（詳官方）');
@@ -33,6 +33,20 @@ for(const p of [
 }
 assert.equal(summary({...e('NT$2880'),_candidate:{scope:'CANDIDATE_PREVIEW_ONLY'}}),'票價詳官方資訊');
 assert.equal(summary(null),'票價詳官方資訊');
+// Independent overlap audit #226 vs #227: never certify plain legacy price text.
+assert.equal(summary({url:'https://official.example/event/1',price:'NT$2880'}),'票價詳官方資訊');
+const good=e('NT$2880');
+for (const broken of [
+  {...good,golden_accepted:false},
+  {...good,formal_field_pass:false},
+  {...good,_formal_field_evidence:null},
+  {...good,_formal_field_evidence:{price:{...good._formal_field_evidence.price,accepted:false}}},
+  {...good,_formal_field_evidence:{price:{...good._formal_field_evidence.price,decision:'REVIEW'}}},
+  {...good,_formal_field_evidence:{price:{...good._formal_field_evidence.price,role:'VENUE_ADVERTISED_PRICE'}}},
+  {...good,_formal_field_evidence:{price:{...good._formal_field_evidence.price,source:'https://official.example/event/2'}}},
+  {...good,_formal_field_evidence:{price:{...good._formal_field_evidence.price,value:'NT$100'}}},
+  {...good,_formal_field_evidence:{price:{...good._formal_field_evidence.price,observed_at:'2026-11-02T12:30:00'}}}
+]) assert.equal(summary(broken),'票價詳官方資訊');
 const stamp='2026-11-02T12:30:00+08:00';
 const base={...e('NT$2,880'),formal_field_pass:true,golden_accepted:true,detail_evidence:[
   {source:'https://official.example/event/1',role:'SALE_START',label:'開賣時間',value:'10:00',decision:'GOLDEN_ACCEPTED',observed_at:stamp},
