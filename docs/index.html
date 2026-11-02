@@ -706,14 +706,24 @@
     // A price amount is shown only for a single unqualified general admission
     // amount (not sale date, VIP add-on, discounted membership, service charge).
     function formalCardPriceSummary(ev) {
-        if (!ev || typeof ev.price !== 'string' || ev._candidate) return '票價詳官方資訊';
+        // P30-L8 reconciliation: plain legacy price text is NOT admission proof.
+        // A receipt is an opt-in display gate, not an independent Golden audit.
+        if (!ev || ev._candidate || ev.formal_field_pass !== true
+            || ev.golden_accepted !== true || !isCandidateOfficialUrl(ev.url)
+            || typeof ev.price !== 'string') return '票價詳官方資訊';
+        const receipt = ev._formal_field_evidence && ev._formal_field_evidence.price;
+        if (!receipt || receipt.accepted !== true || receipt.decision !== 'GOLDEN_ACCEPTED'
+            || receipt.role !== 'EVENT_ADMISSION_PRICE' || receipt.source !== ev.url
+            || receipt.value !== ev.price || typeof receipt.observed_at !== 'string'
+            || !/(Z|[+-]\\d{2}:\\d{2})$/i.test(receipt.observed_at)
+            || Number.isNaN(Date.parse(receipt.observed_at)))
+            return '票價詳官方資訊';
         const p = ev.price.trim();
         if (p === '免費' || p === '免門票') return '免費（詳官方）';
         const noClaim = /VIP|升級|加價|手續費|服務費|會員|優惠|限|資格|預售|早鳥|票況|售罄|缺票|套票|換票|折抵|登記|捐款/u;
         if (noClaim.test(p)) return '票價詳官方資訊';
-        // Legacy formal data: only one explicit amount is displayable.
-        // Do not guess a minimum from a list of unlabeled numbers.
-        const single = /^(?:NT\$|新臺幣|新台幣)\s*(\d{1,3}(?:,\d{3})+|\d{1,7})\s*(?:元)?$/u.exec(p);
+        // Never infer a minimum from unlabeled amounts or conditional tickets.
+        const single = /^(?:NT\\$|新臺幣|新台幣)\\s*(\\d{1,3}(?:,\\d{3})+|\\d{1,7})\\s*(?:元)?$/u.exec(p);
         if (!single) return '票價詳官方資訊';
         const n = Number(single[1].replace(/,/g, ''));
         return Number.isSafeInteger(n) && n > 0 && n < 1000000
