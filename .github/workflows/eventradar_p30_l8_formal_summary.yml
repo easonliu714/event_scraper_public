@@ -1,0 +1,62 @@
+name: EventRadar L8 formal card summary exact-head NO PUBLISH
+on:
+  pull_request:
+    paths:
+      - 'docs/index.html'
+      - 'tests/p30/test_formal_summary_fail_closed.js'
+      - '.github/workflows/eventradar_p30_l8_formal_summary.yml'
+permissions:
+  contents: read
+jobs:
+  formal-card-summary:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-l8-formal-summary-safe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact-head scope and immutable data
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          base=de295950e6aad601f2df148d161e016e08535845
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l8_formal_summary.yml' 'docs/index.html' 'tests/p30/test_formal_summary_fail_closed.js' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+      - name: Prior provenance regression and formal summary negatives
+        run: |
+          python -m unittest discover -s tests/p30 -p test_candidate_review_pipeline.py -v
+          node tests/p30/test_candidate_review_ui_provenance.js
+          node tests/p30/test_candidate_source_summary.js
+          node tests/p30/test_formal_summary_fail_closed.js
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          b=re.findall(r'<script>(.*?)</script>',Path('docs/index.html').read_text(),re.S)
+          assert len(b)==1
+          Path('/tmp/formal_summary.js').write_text(b[0])
+          PY
+          node --check /tmp/formal_summary.js
+      - name: Immutable SHA evidence
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          printf 'head=%s\nrelease=HARD_HOLD_NO_PUBLICATION\nformal_fields=0\ngolden=0\npublished=0\n' "$HEAD_SHA" > evidence/receipt.txt
+          sha256sum docs/index.html tests/p30/test_formal_summary_fail_closed.js > evidence/source.sha256
+          (cd evidence && sha256sum receipt.txt source.sha256 > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-l8-formal-summary
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
