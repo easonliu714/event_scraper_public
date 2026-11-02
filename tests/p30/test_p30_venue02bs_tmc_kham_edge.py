@@ -6,18 +6,27 @@ p=pathlib.Path(__file__).resolve().parents[2]/"scripts/p30_venue02bs_tmc_kham_ed
 spec=importlib.util.spec_from_file_location("venue02bs",p)
 m=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
-NOW="2026-11-02T05:55:00Z"
+NOW="2026-11-02T06:55:00Z"
 def sample():
     return dict(list_url=m.LIST,list_detail_href=m.DETAIL,detail_url=m.DETAIL,
                 ticket_href=m.TICKET,list_title=m.TITLE,detail_title=m.TITLE,
                 list_date="2026-11-07",show="2026-11-07T19:30+08:00",
                 venue="臺北流行音樂中心 表演廳",
-                prices=[4280,3880,3480,2880,2480,1880],published_at="2026-08-11")
+                prices=[4280,3880,3480,2880,2480,1880],published_at="2026-08-11",
+                ticket_session_list_url=m.TICKET_SESSION_LIST,
+                ticket_session_list_title="2026 小宇 宋念宇《不，完美的人》演唱會",
+                ticket_standard_row={"show":"2026-11-07T19:30+08:00",
+                                     "venue":"臺北流行音樂中心 表演廳","label":"",
+                                     "displayed_prices":[1880,2480,2880,3480,3880,4280],
+                                     "struck_through":True},
+                ticket_wheelchair_row={"show":"2026-11-07T19:30+08:00",
+                                       "venue":"臺北流行音樂中心 表演廳","label":"輪椅席",
+                                       "displayed_prices":[3480,4280],"struck_through":False})
 class StrictVenueEvidence(unittest.TestCase):
     def test_review_receipts_not_accepted(self):
         r=m.inspect(sample(),NOW)
         self.assertEqual(r["decision"],"REVIEW_EXACT_LIST_DETAIL_HOLD_TICKET_SESSION")
-        self.assertEqual(len(r["candidateFields"]),6)
+        self.assertEqual(len(r["candidateFields"]),9)
         self.assertEqual({f["decision"] for f in r["candidateFields"]},{"REVIEW"})
         self.assertEqual(r["acceptedFields"],0)
         self.assertEqual(r["goldenAccepted"],0)
@@ -41,6 +50,19 @@ class StrictVenueEvidence(unittest.TestCase):
             with self.subTest(field=field):
                 x=sample();x[field]=value
                 self.assertEqual(m.inspect(x,NOW)["candidateFields"],[])
+    def test_ticket_selection_row_separation(self):
+        for field,value in [
+            ("ticket_session_list_url",m.TICKET_SESSION_LIST+"#cart"),
+            ("ticket_session_list_title","similar unrelated event"),
+            ("ticket_standard_row",{"show":"2026-11-07T19:30+08:00","venue":"臺北流行音樂中心 表演廳","label":"","displayed_prices":[1880,2480,2880,3480,3880,4280],"struck_through":False}),
+            ("ticket_wheelchair_row",{"show":"2026-11-07T19:30+08:00","venue":"臺北流行音樂中心 表演廳","label":"輪椅席","displayed_prices":[1880,4280],"struck_through":False}),
+        ]:
+            with self.subTest(field=field):
+                x=sample();x[field]=value
+                self.assertEqual(m.inspect(x,NOW)["candidateFields"],[])
+        x=sample();x["inventory"]="AVAILABLE"
+        self.assertEqual(m.inspect(x,NOW)["decision"],"HOLD_UNVERIFIED_CLAIM")
+
     def test_no_unverified_session_or_inventory(self):
         for field,value in [("ticket_session_id",0),("ticket_session_id",False),
                             ("checkout_url",m.TICKET),("inventory",0),
