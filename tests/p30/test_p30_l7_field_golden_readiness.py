@@ -480,4 +480,81 @@ class Readiness(unittest.TestCase):
         d=copy.deepcopy(e);d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
         with self.assertRaises(ValueError):m.validate_rotated_event_receipt(d)
 
+
+    @staticmethod
+    def _dome_fixture():
+        # Independent indexed reader; this fixture is NOT a live source GET.
+        e={"kind":"P30_L7_DOME_CROSSCHECK_V1",
+           "scope":"ISOLATED_EVIDENCE_ONLY",
+           "observation_method":"PUBLIC_INDEXED_TEXT_READER_REOBSERVATION",
+           "release_state":"HARD_HOLD_NO_PUBLICATION",
+           "native_official_get":0,"formal_accepted_fields":0,
+           "golden_accepted_events":0,"published_events":0,
+           "sources":{"A":m.DOME_TICKET,"B":m.DOME_CALENDAR},
+           "identity":{"A_platform_id":"03","A_ticket_event_id":"26_forever",
+                       "B_venue_source":"TAIPEI_DOME_OFFICIAL_NOT_FORMAL_19",
+                       "B_calendar_event_id":None,"B_direct_ticket_href":None,
+                       "B_calendar_show_time":None,"ticket_session_id":None,
+                       "formal_eligible_min":None,"formal_img_url":None,
+                       "cross_source_identity":"TITLE_DATES_VENUE_REVIEW_NO_DIRECT_ID_EDGE",
+                       "cross_event_merge":False}}
+        e["field_receipts"]=[{"name":name,"line":line,"source":source,
+            "role":role,"value":copy.deepcopy(value),"decision":decision,
+            "reason":"Exact official source text, independently indexed; no Golden promotion",
+            "observed_at":"2026-11-03T07:55:00+08:00","formal_accepted":False}
+            for name,(line,source,role,value,decision) in m.DOME_FIELDS.items()]
+        return e
+
+    def test_dome_ticket_calendar_independent_roles(self):
+        e=self._dome_fixture()
+        result=m.validate_dome_crosscheck(e)
+        self.assertEqual((result["A_review"],result["B_review"]), (5,2))
+        self.assertEqual((result["formal_accepted"],result["golden"],result["published"]), (0,0,0))
+        self.assertEqual(e["identity"]["B_calendar_event_id"],None)
+        self.assertEqual(next(x for x in e["field_receipts"] if x["name"]=="b_dates")["value"],
+                         ["2026-11-28","2026-11-29"])
+
+    def test_dome_calendar_fail_closed_negative_cases(self):
+        e=self._dome_fixture()
+        for name,key,bad in (
+            ("a_shows","value",["2026-11-28","2026-11-29"]),
+            ("a_general_prices","value",[1840]),
+            ("a_accessibility","decision","REVIEW"),
+            ("a_ibon_fee","role","GENERAL_ADMISSION"),
+            ("a_age_advisory","role","AGE_MINIMUM"),
+            ("a_child_companion","value",7),
+            ("a_session","value","invented"),
+            ("b_dates","value",["2026-11-12","2026-11-13"]),
+            ("b_other_event","decision","REVIEW"),
+            ("b_shuttle","role","TICKET_SESSION"),
+            ("b_ticket_href","value",m.DOME_TICKET),
+            ("b_show_time","value","2026-11-28T19:00:00+08:00"),
+            ("b_img_url","value","https://example.com/poster.jpg"),
+            ("b_calendar_title","source",m.DOME_TICKET),
+            ("b_calendar_title","formal_accepted",True),
+            ("b_dates","observed_at","2026-11-03T07:55:00"),
+        ):
+            d=copy.deepcopy(e)
+            next(x for x in d["field_receipts"] if x["name"]==name)[key]=bad
+            with self.subTest(name=name,key=key):
+                with self.assertRaises(ValueError):m.validate_dome_crosscheck(d)
+        for key,bad in (
+            ("B_calendar_event_id","26_forever"),
+            ("B_direct_ticket_href",m.DOME_TICKET),
+            ("B_calendar_show_time","2026-11-28T19:00:00+08:00"),
+            ("ticket_session_id","fabricated"),
+            ("formal_eligible_min",1680),
+            ("formal_img_url","https://example.com/hero.jpg"),
+            ("cross_event_merge",True),
+        ):
+            d=copy.deepcopy(e);d["identity"][key]=bad
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError):m.validate_dome_crosscheck(d)
+        for key in ("native_official_get","formal_accepted_fields",
+                    "golden_accepted_events","published_events"):
+            d=copy.deepcopy(e);d[key]=1
+            with self.assertRaises(ValueError):m.validate_dome_crosscheck(d)
+        d=copy.deepcopy(e);d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
+        with self.assertRaises(ValueError):m.validate_dome_crosscheck(d)
+
 if __name__=="__main__":unittest.main()
