@@ -5023,3 +5023,49 @@ FROZEN
 - **B / P30-VENUE-02BP ENGINEERING +1:** [Draft #220](https://github.com/easonliu714/event_scraper_public/pull/220) prior `aed382713a1e4a265659b1975c6cde42f3a6c6ba` → exact HEAD `6350c0f0bddf98f0c52511520d69c5decb244133`. `scripts/p30_venue02bp_tainex_itf.py::inspect` rejects false-as-missing ticket claims and now **requires a separate timezone-aware `organizer_visit.observed_at`**; five organizer-only REVIEW receipts use that timestamp instead of incorrectly inheriting the TaiNEX observation. Missing/naive organizer timestamp => `HOLD_ORGANIZER_OBSERVATION`, zero candidate fields. New negative subcases in `tests/p30/test_venue02bp_tainex_itf.py`. [Exact-head CI #41374978474](https://github.com/easonliu714/event_scraper_public/actions/runs/41374978474) SUCCESS, 5 unittest methods incl. subcases, job steps PASS; [artifact #13110243845](https://github.com/easonliu714/event_scraper_public/actions/runs/41374978474/artifacts/13110243845) digest `sha256:20b671189bb501cdf7ea3720a92c46ef6610edb1b8a70ea7b87c134beea8eacc`. New official source GET **0 this cycle**; prior organizer visitor-information evidence REVIEW; TaiNEX /event/709 ↔ FamiTicket ITF cross-source Event ID remains HOLD.
 - **Near 3 rounds (07:53/08:58/09:55):** new source-reader evidence A **1/3**, B **2/3**; consecutive offline-only A **2**, B **1**; repeated identical payload GET 0; formal accepted FIELD A/B **0/0**, Golden 0, published 0. Next A **prioritize distinct low-frequency first-party source-bound LIST→same-ID DETAIL** or meaningful L7 #212 field receipt guard, rather than a third offline-only type micro-gate. Next B prioritize distinct P0 Taipei/New Taipei venue official evidence/identity or L7/L8 integration, avoid another synthetic-only TaiNEX guard.
 - **L7/L8/release:** #210 merged/deployed local-only REVIEW importer; #211 UI and #212 receipt-owner guard still Draft/unmerged. Owner 18-row JSON historical SHA256 `35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603`, prior structural 18/18, **this runtime LOCAL_ARTIFACT_NOT_MOUNTED**, fresh 18-row QC not run. Android local 18-row list/detail/return UAT pending; CKSMH5/TWTC39 historical USER_ATTESTED_PASS retained. Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` frozen; `docs/platform_status.json` blob `cdeeb3b551e38f862c37759426a14b5129e1224d` frozen, 19 platforms, reportDate 2026-10-28, latestEngineering 2026-11-01 07:55 stale. Historical Pages #41316070328 SUCCESS, direct live PWA readback UNVERIFIED. Artifact digest read back; independent ZIP CRC UNVERIFIED. Toolkit path UNKNOWN, no path assumed. `HARD_HOLD_NO_PUBLICATION` maintained; no main/status/data/Golden/Production Writer/Publisher/Scheduler/Notifier write or merge.
+
+
+
+### 2026-11-02 10:59 Asia/Taipei — A/B source-first architecture edges (NO PUBLISH)
+
+```text
+Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb [FROZEN]
+A P30-L9-DC / canonical FamiTicket #07 / Draft #221
+  Home LIST -> exact TECA DETAIL
+  exhibition period Nov19-22; opening 10:00-18:00 != SHOW
+  venue Taipei Grand Hotel
+  presale 1-day 150 / standard 1-day 250
+  presale 2-day 250 / standard 2-day 500
+  four price categories != generic admission price / ticket Session
+  purchase button != independently verified checkout URL
+  9 REVIEW receipts; accepted FIELD 0, Session 0
+  HEAD 1f448e49a93d2f4446bffe347e62be739cf34930
+  CI #41380595261 SUCCESS 4/4; artifact #13113486543 digest verified
+B P30-VENUE-02BQ / P0 Taipei Music Center / Draft #222
+  TMC LIST -> same-source DianaKrall2026 DETAIL
+  Nov28 19:30 and Nov29 16:00 = two venue-announced shows
+  Sep17 12:00 = SALE; Sep09 = BULLETIN PUBLICATION
+  eight advertised price bands 2580..5980; inventory UNKNOWN
+  MNA ticket link -> MNA 2 dates plus distinct membership offer
+  venue-advertised platform != independently verified ticket Event/Session ID
+  8 REVIEW receipts; accepted FIELD 0, Session 0
+  HEAD b8fd49252b095a824212b4a3d221c8344e11e6fb
+  CI #41380599888 SUCCESS 4/4; artifact #13113381907 digest verified
+CROSS-SOURCE
+  venue show occurrences != verified ticket Session IDs
+  no fuzzy merge; no unverified price/date field promotion
+L7/L8
+  #210 merged/deployed local-only REVIEW import
+  #211 UI field guard / #212 L7 exact-source receipt guard DRAFT
+  historical 18-row structure 18/18; runtime LOCAL_ARTIFACT_NOT_MOUNTED
+  Android candidate UAT PENDING; CKSMH5/TWTC39 historical PASS retained
+FORMAL
+  docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 FROZEN
+  docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d FROZEN
+  status latestEngineering 2026-11-01 07:55 STALE
+  formal FIELD 0 / Golden 0 / Published 0 / CI official GET 0
+  HARD_HOLD_NO_PUBLICATION; no main or production write
+```
+
+- Official source-reader evidence 2026-11-02: [FamiTicket TECA](https://www.famiticket.com.tw/Home/Activity/Info/MABvAE4ALwBxAEkAcQB3ADkAawB0AHUASgBlAGwAZwA3AGkAOQBsAEwATwBsAHIAOQBpADIANQBuAEkAcQBmAHYAZwBOADAAegBlAE0AQQBtAEwAZwA9AA2), [TMC Diana Krall](https://www.tmc.taipei/tw/blog/show/DianaKrall2026). These are public source-reader observations, not native CI GET. A 1/3 and B 2/3 new official source-reader rounds over 08:58/09:55/10:59; offline-only streak 0/0; accepted fields 0/0. CI SHA256SUMS internal PASS; independent artifact ZIP CRC UNVERIFIED.
+- NEXT A: investigate another safe same-ID canonical source or L7 #212 source-owner provenance; B: independently verify MNA Event/Session only with explicit source link, else rotate P0 Taipei/New Taipei. No redundant GET, no new platform duplicate, no automatic Golden or publication.
