@@ -31,7 +31,7 @@ def inspect(obs, observed_at):
     if obs.get("standard_presale")!="2026-05-25" or obs.get("vip_sale_claim")!="2025-05-25":
         out["decision"]="HOLD_SALE_EVIDENCE";return out
     for k in ("checkout_url","ticket_session_id","inventory","published_event","golden_accepted"):
-        if k in obs and obs[k] not in (None,False,""):
+        if k in obs and not (obs[k] is None or obs[k] is False or (isinstance(obs[k],str) and obs[k]=="")):
             out["decision"]="HOLD_UNVERIFIED_CLAIM";return out
     facts=[("show","2026-11-24T19:30+08:00","SHOW"),("venue","TICC","VENUE"),
            ("general_price_min",2300,"GENERAL_PRICE_RANGE"),("general_price_max",6300,"GENERAL_PRICE_RANGE"),
