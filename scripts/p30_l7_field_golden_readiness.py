@@ -8,22 +8,26 @@ from urllib.parse import urlsplit
 TICKET = "https://www.opentix.life/event/2072516129034670080"
 VENUE = "https://tpac.org.taipei/program/2088"
 LIST = "https://tpac.org.taipei/program"
+TICKET_IMAGE = "https://s3.resource.opentix.life/upload/program/1783488303546FNFfEObGMQ.jpeg"
+VENUE_IMAGE = "https://backstage.tpac-taipei.org/storage/uploads/program/images/f5182a1f85017d7b56d4643927ed8484.jpg"
 READY = "READY_FOR_INDEPENDENT_GOLDEN_REVIEW"
 HOLD = "HOLD"
 READY_FIELDS = {
     ("A", "title"): ("EVENT_TITLE", TICKET),
     ("A", "ticket_event_url"): ("EVENT_URL", TICKET),
     ("A", "venue"): ("EVENT_VENUE", TICKET),
+    ("A", "img_url"): ("OFFICIAL_IMAGE_URL", TICKET),
     ("B", "title"): ("EVENT_TITLE", VENUE),
     ("B", "venue_room"): ("VENUE_ROOM", VENUE),
     ("B", "showtimes"): ("VENUE_ANNOUNCED_SHOWTIME", VENUE),
     ("B", "direct_ticket_event_url"): ("VENUE_TO_TICKET_EVENT_EDGE", VENUE),
+    ("B", "img_url"): ("OFFICIAL_IMAGE_URL", VENUE),
 }
 HOLD_FIELDS = {
     ("A", "age_min"), ("A", "sale_markers"), ("A", "ticket_session_id"),
-    ("A", "admission_price"), ("A", "img_url"),
+    ("A", "admission_price"),
     ("B", "index_advertised_range"), ("B", "age_min"),
-    ("B", "advertised_price_range"), ("B", "img_url"),
+    ("B", "advertised_price_range"),
 }
 def exact_https(value, expected):
     if not isinstance(value, str): return False
@@ -99,8 +103,9 @@ def validate(data):
         raise ValueError("AGE_CONFLICT_NOT_PRESERVED")
     if by["A","ticket_session_id"] is not None or by["A","admission_price"] is not None:
         raise ValueError("UNVERIFIED_TICKET_FIELDS")
-    if by["A","img_url"] is not None or by["B","img_url"] is not None:
-        raise ValueError("UNVERIFIED_IMAGE_URL")
+    # Indexed same-event source-page image links are REVIEW-only; never infer Golden or download assets.
+    if not exact_https(by["A","img_url"], TICKET_IMAGE) or not exact_https(by["B","img_url"], VENUE_IMAGE):
+        raise ValueError("SOURCE_EVENT_IMAGE_URL_HOLD")
     if by["B","advertised_price_range"] != [1200,2200]:
         raise ValueError("VENUE_ADVERTISED_PRICE_CHANGED")
     if by["B","index_advertised_range"] != ["2026-11-04","2026-11-14"]:
@@ -121,7 +126,7 @@ def validate(data):
             if dt.utcoffset().total_seconds()!=28800: raise ValueError()
         except (ValueError,TypeError,AttributeError):
             raise ValueError("VENUE_SHOW_TIMEZONE_HOLD")
-    return {"A_review_ready":3,"B_review_ready":4,"formal_accepted":0,
+    return {"A_review_ready":4,"B_review_ready":5,"formal_accepted":0,
             "golden":0,"published":0,"native_get":0,
             "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
