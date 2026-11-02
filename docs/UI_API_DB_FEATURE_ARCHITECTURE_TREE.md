@@ -5231,3 +5231,34 @@ TMC LIST https://www.tmc.taipei/tw/blog/show
 - **B provenance graph:** Official [TICC LIST](https://www.ticc.com.tw/wSite/sp?BaseDSD=7&CtUnit=152&ctNode=385&mp=2&nowpage=7&s_datetype=1&s_enddate=2026-11-01&s_keywords=&s_order=1&s_roomId=0&s_startdate=2026-10-03&xdUrl=%2FwSite%2Fap%2Flp_Activity_3.jsp) → exact venue [bId=7416](https://www.ticc.com.tw/wSite/sp?bId=7416&ctNode=385&mp=2&xdUrl=%2FwSite%2Fap%2Fcp_Activity.jsp) generic '寬宏演唱會' 2026-11-14 大會堂, organizer 寬宏; **not** KHAM PRODUCT_ID or a named performer. Separate [bId=8229](https://www.ticc.com.tw/wSite/sp?bId=8229&ctNode=385&mp=2&xdUrl=%2FwSite%2Fap%2Fcp_Activity.jsp) TOPBS 2026年會 11/14–15 across rooms 101/102/105/106; 11/13 setup/flag day **not** event start. bId is venue detail identity only; no verified ticket URL, price, Session ID, show clock time. Eight provenance-bound REVIEW fields, accepted 0. [Draft #231](https://github.com/easonliu714/event_scraper_public/pull/231) HEAD `db896d4383481bc61df06b26a621f17060c79129`, [exact-head CI #41410912028](https://github.com/easonliu714/event_scraper_public/actions/runs/41410912028) SUCCESS, five unittest methods, all job steps PASS, artifact #13124899290 digest `sha256:a4ec6b609cf56504bfea94d7a5747add31c4afa5cb89dc3b5973930d53aec8a6`.
 - **Evidence quality:** Both official source-reader navigations on 2026-11-02; native CI official GET=0; reader cache freshness may be uncertain. Each branch changes exactly 3 ADD-only paths (inspector, test, read-only workflow), exact-head and formal blob guards PASS; independent ZIP CRC UNVERIFIED. Recent 3 cycles 13:55/15:00/16:05: A/B official reader evidence 3/3 each, repeated KHAM session/inventory blocker 2 earlier rounds then source rotation, formal field delta 0. Next A exact tixCraft show/session proof without login; next B named TICC venue event direct ticket URL or rotate another P0 source; do not repeat synthetic micro-Gates.
 - **Frozen release/PWA:** Source main data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d`, 19 platform rows, reportDate 2026-10-28 / latestEngineering 2026-11-01 07:55 stale. #210 local REVIEW import merged, Pages run #41316070328 SUCCESS; direct Pages runtime readback UNVERIFIED. Historical Owner 18-row candidate JSON SHA256 `35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603`, prior 18/18 structural; this runtime `LOCAL_ARTIFACT_NOT_MOUNTED`, fresh QC 0. Owner offline 5-card L8 Android USER_ATTESTED_PASS, CKSMH5/TWTC39 Android PASS retained; #211/#212/#225/#226/#227 remain Draft and not formal Pages deployed. Formal FIELD 0, Golden 0, published 0. **HARD_HOLD_NO_PUBLICATION**; no main, data/status, production Publisher/Scheduler/Notifier or unauthorized merge. Toolkit path UNKNOWN.
+
+---
+
+### 2026-11-02 17:17 Asia/Taipei — P30-L9-DG / P30-VENUE-02BU source identity and field provenance (REVIEW ONLY)
+
+```text
+A canonical ticket platform #03 tixCraft [Draft #232 HEAD fe673ad6ef4935926aab0185fb4b6f37ab45716a]
+  /activity/detail/26_forever  (exact same event, NOT separate shuttle product)
+    └── official "立即購票" → /activity/game/26_forever
+          ├── 2026-11-28 19:00 Richart priority  [button only, NOT session URL]
+          ├── 2026-11-28 19:00 general           [button only, NOT session URL]
+          ├── 2026-11-29 19:00 Richart priority  [button only, NOT session URL]
+          └── 2026-11-29 19:00 general           [button only, NOT session URL]
+  /activity/detail/26_busffdome remains distinct TRANSPORT product
+  REVIEW receipt fields=3; ticket Session ID=0; checkout URL=UNKNOWN; inventory=UNKNOWN
+B TPAC official venue [Draft #233 HEAD 65f1bb30e0ef0f754ba59c691a9f171d6d60f059]
+  /program LIST → /program/2088 "C MUSICAL 音樂劇《小王子》"
+    ├── 12 SHOW times 2026-11-05..2026-11-15 (11/07 and 11/14 have two shows)
+    ├── venue 藍盒子; advertised NT$1200–2200 (NOT checkout price)
+    ├── TPAC recommended age 6+  ↔  OPENTIX recommended age 7+ [CONFLICT HOLD]
+    └── explicit "購票去" → canonical OPENTIX #05
+          /event/2072516129034670080  [ticket EVENT identity URL verified]
+          ├── exact title and venue match
+          ├── ticket Session IDs and live inventory UNKNOWN
+          └── change notice 嘉義 11/01 cast ONLY, not Taipei schedule
+  REVIEW receipt fields=7; ticket Event ID evidence=1; ticket Session IDs=0
+```
+
+**Engineering exact-head readback:** A [CI #41419673679](https://github.com/easonliu714/event_scraper_public/actions/runs/41419673679) SUCCESS all steps; artifact #13129766119 digest `sha256:924ef0dce349e3ab57792c84334f1fccb2cfdd8d7614d89a266e0f022e667de6`. B [CI #41419680976](https://github.com/easonliu714/event_scraper_public/actions/runs/41419680976) SUCCESS all steps; artifact #13130260160 digest `sha256:3c21c82cc92d42a29477c7fc834273c7e7a3bcb2bbaa1d6ba172e06f2dc751d6`. Each branch adds exactly 3 files: isolated strict Python inspector, 5 unittest methods with negatives, read-only exact-head workflow and SHA manifest. No CI official GET; public source-reader official observations separately evidenced, indexed freshness potentially cached. Independent ZIP CRC UNVERIFIED. No duplicate canonical platform ID.
+
+**Architecture release boundary:** Source main `9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb`; Preview `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Main formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d` unchanged, 19 platform IDs, reportDate 2026-10-28 and latestEngineering 2026-11-01 07:55 stale. Local REVIEW import #210 merged and historically Pages deployed; direct live Pages readback UNVERIFIED. Owner 18-row JSON historical 18/18 structural, this runtime `LOCAL_ARTIFACT_NOT_MOUNTED` (fresh QC=0). L8 #211/#212/#225/#226/#227 Draft/unmerged; Owner historical offline 5-card UAT and CKSMH5/TWTC39 Android PASS preserved. Recent 3 A/B rounds official reader evidence 3/3 each, formal field delta 0/0; exact new cross-source identity is **not** formal Golden. **HARD_HOLD_NO_PUBLICATION**, accepted FIELD=0, Golden=0, published=0. Next A: public per-row session URL if safe, else source rotation; next B: independent TPAC/OPENTIX session parity and age conflict resolution, else P0 venue rotation. Toolkit path UNKNOWN; no local Toolkit action.
