@@ -65,7 +65,12 @@ def inspect(obs, observed_at):
         value = obs.get(key)
         # Numeric 0 (e.g. free admission or zero inventory) is a FIELD CLAIM,
         # not missing metadata; Python's 0 == False must never hide it.
-        if not (value is None or value is False or (isinstance(value, str) and value == "")):
+        # False is valid only for explicit boolean status flags; for price,
+        # inventory, URL and ticket IDs it is a malformed field claim.
+        is_flag = key in ("cross_source_verified", "published_event")
+        missing = (value is None or (is_flag and value is False)
+                   or (isinstance(value, str) and value == ""))
+        if not missing:
             out["decision"] = "HOLD_UNVERIFIED_TICKET_OR_CROSS_SOURCE"; return out
     # The venue article has a generic title; matching dates/venue do not prove
     # an independently validated event ID, ticket session or cross-source merge.
