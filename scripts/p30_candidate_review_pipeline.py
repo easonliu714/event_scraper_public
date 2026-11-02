@@ -124,6 +124,13 @@ def normalize_record(raw: object) -> tuple[dict | None, list[str]]:
             valid = (
                 valid_stamp
                 and receipt.get("value") == v
+                # A sources[] membership proves only that the URL was listed,
+                # not that two distinct event/product URLs share field ownership.
+                # Until a separately verified cross-source identity edge exists,
+                # an optional REVIEW field must be certified by this exact row URL.
+                # A tixCraft VIP add-on price must not become base admission;
+                # an OPENTIX multi-venue Event date must not become venue showtime.
+                and receipt.get("source") == raw["url"]
                 and receipt.get("source") in sources
                 and isinstance(receipt.get("role"), str)
                 and receipt.get("role") in allowed_roles

@@ -173,6 +173,67 @@ class CandidateQualityTests(unittest.TestCase):
         self.assertIn("TITLE_MIXED_WITH_DATE_REQUIRES_SOURCE_RECHECK",
                       data[0]["_candidate"]["hold_reasons"])
 
+    def test_cross_source_receipts_do_not_prove_candidate_fields(self):
+        # A-line: a source-listed VIP add-on is a distinct product, not a
+        # source-owned admission price for the base concert.
+        base = example(source="26_wte", platform="tixCraft")
+        base["url"] = "https://tixcraft.com/activity/detail/26_wte"
+        addon = "https://tixcraft.com/activity/detail/26_wte_v"
+        base["_candidate"]["sources"] = [base["url"], addon]
+        base["price"] = "NT$4,800"
+        base["_candidate"]["field_evidence"] = {
+            "price": {
+                "value": base["price"], "source": addon,
+                "role": "EVENT_ADMISSION_PRICE",
+                "observed_at": "2026-11-01T23:52:00+08:00",
+                "decision": "REVIEW",
+            }
+        }
+        rows, report = build_candidate_dataset([base])
+        self.assertEqual(report["previewRows"], 1)
+        self.assertEqual(rows[0]["price"], "未確認")
+        self.assertNotIn("price", rows[0]["_candidate"]["field_evidence"])
+        self.assertIn("FIELD_PRICE_PROVENANCE_HOLD",
+                      rows[0]["_candidate"]["hold_reasons"])
+
+        # B-line: an OPENTIX multi-venue Event URL in sources[] is not a
+        # verified New Taipei Art Center performance Session/date receipt.
+        venue = example(source="0Q152372523738311866",
+                        platform="新北市藝文中心")
+        venue["url"] = ("https://www.culture.ntpc.gov.tw/artcenter_chi/"
+                        "xmdoc/cont?sid=0Q152372523738311866")
+        ticket = "https://www.opentix.life/event/2086734015886159873"
+        venue["_candidate"]["sources"] = [venue["url"], ticket]
+        venue["date"] = "2026-11-07 14:30"
+        venue["_candidate"]["field_evidence"] = {
+            "date": {
+                "value": venue["date"], "source": ticket,
+                "role": "VENUE_EVENT_DATE",
+                "observed_at": "2026-11-01T23:52:00+08:00",
+                "decision": "REVIEW",
+            }
+        }
+        rows, report = build_candidate_dataset([venue])
+        self.assertEqual(report["previewRows"], 1)
+        self.assertEqual(rows[0]["date"], "未確認")
+        self.assertIn("FIELD_DATE_PROVENANCE_HOLD",
+                      rows[0]["_candidate"]["hold_reasons"])
+        self.assertEqual(report["formalFieldAccepted"], 0)
+        self.assertEqual(report["goldenAccepted"], 0)
+
+        # Exact same-row URL can support a REVIEW value only with an
+        # allowed semantic role; sale/publication timestamps stay HOLD.
+        venue["_candidate"]["field_evidence"]["date"]["source"] = venue["url"]
+        rows, _ = build_candidate_dataset([venue])
+        self.assertEqual(rows[0]["date"], venue["date"])
+        self.assertEqual(rows[0]["_candidate"]["field_evidence"]["date"]["decision"],
+                         "REVIEW")
+        venue["_candidate"]["field_evidence"]["date"]["role"] = "BULLETIN_PUBLISHED_AT"
+        rows, _ = build_candidate_dataset([venue])
+        self.assertEqual(rows[0]["date"], "未確認")
+        self.assertIn("FIELD_DATE_PROVENANCE_HOLD",
+                      rows[0]["_candidate"]["hold_reasons"])
+
     def test_output_frozen_public_pages_and_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
