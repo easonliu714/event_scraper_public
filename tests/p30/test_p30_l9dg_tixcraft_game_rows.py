@@ -5,13 +5,14 @@ s=importlib.util.spec_from_file_location("l9dg",p); m=importlib.util.module_from
 NOW="2026-11-02T09:16:00Z"
 def sample():
     return {"detail_url":m.DETAIL,"game_url":m.GAME,"detail_title":m.TITLE,"game_title":m.TITLE,
+      "purchase_requires_membership":True,"purchase_requires_phone_verification":True,
       "rows":[{"show":show,"priority":priority,"venue":"臺北大巨蛋","button":"Find tickets"}
       for show in m.SHOWS for priority in (True,False)]}
 class Gate(unittest.TestCase):
     def test_exact_four_row_source_receipts(self):
         x=m.inspect(sample(),NOW)
         self.assertEqual(x["decision"],"REVIEW_GAME_FOUR_ROWS_NO_SESSION_ID_OR_STOCK")
-        self.assertEqual(len(x["candidateFields"]),3)
+        self.assertEqual(len(x["candidateFields"]),5)
         self.assertEqual({f["source"] for f in x["candidateFields"]},{m.GAME,m.DETAIL})
         self.assertEqual({f["decision"] for f in x["candidateFields"]},{"REVIEW"})
         self.assertEqual((x["acceptedFields"],x["ticketSessionIdsVerified"],x["goldenAccepted"],x["published"]),(0,0,0,False))
@@ -21,6 +22,14 @@ class Gate(unittest.TestCase):
                           ("detail_title","F✦FOREVER"),("game_title","F✦FOREVER")):
             with self.subTest(key=key):
                 a=sample();a[key]=value;self.assertEqual(m.inspect(a,NOW)["candidateFields"],[])
+    def test_official_checkout_access_boundary(self):
+        for key in ("purchase_requires_membership","purchase_requires_phone_verification"):
+            for value in (False,None,"true"):
+                with self.subTest(key=key,value=value):
+                    row=sample();row[key]=value
+                    x=m.inspect(row,NOW)
+                    self.assertEqual(x["decision"],"HOLD_CHECKOUT_ACCESS_REQUIREMENTS_UNVERIFIED")
+                    self.assertEqual((x["candidateFields"],x["ticketSessionIdsVerified"]),([],0))
     def test_four_distinct_row_roles(self):
         for mutate in ("drop","swap","bool","date","venue","button","extra"):
             a=sample()
