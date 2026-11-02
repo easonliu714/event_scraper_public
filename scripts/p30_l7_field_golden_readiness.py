@@ -195,16 +195,20 @@ def audit_l7_candidate_parity(source_contract, candidate):
 TMC_LIST = "https://www.tmc.taipei/tw/blog/show"
 TMC_DETAIL = "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu"
 KHAM_DETAIL = "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"
+TMC_KHAM_TICKET_POSTER = "https://imgs2.utiki.com.tw/Data/KHAM/Images/UTK2401/P1DF32E2_Large.JPG?v=202610231202"
+TMC_KHAM_VENUE_SEAT_MAP = "https://www.tmc.taipei/files/20261015113742345.jpg"
 TMC_KHAM_FIELDS = {
     "ticket_title": ("A", KHAM_DETAIL, "TICKET_EVENT_TITLE", "2026 小宇 宋念宇《不，完美的人》演唱會"),
     "ticket_sale_open": ("A", KHAM_DETAIL, "TICKET_SALE_OPEN", "2026-08-22T12:00:00+08:00"),
     "ticket_age_recommendation": ("A", KHAM_DETAIL, "AGE_RECOMMENDATION_NOT_RESTRICTION", 6),
     "ticket_one_person_one_ticket": ("A", KHAM_DETAIL, "ADMISSION_RULE", True),
+    "ticket_product_poster": ("A", KHAM_DETAIL, "TICKET_PRODUCT_LINKED_POSTER_REVIEW_ONLY", TMC_KHAM_TICKET_POSTER),
     "venue_title": ("B", TMC_DETAIL, "VENUE_EVENT_TITLE", "小宇 宋念宇 《不，完美的人》 演唱會"),
     "venue_showtime": ("B", TMC_DETAIL, "VENUE_ANNOUNCED_SHOWTIME", "2026-11-07T19:30:00+08:00"),
     "venue_room": ("B", TMC_DETAIL, "VENUE_ROOM", "臺北流行音樂中心 表演廳"),
     "venue_advertised_prices": ("B", TMC_DETAIL, "VENUE_ADVERTISED_PRICE_TIERS_NOT_TICKET_ELIGIBILITY", [4280,3880,3480,2880,2480,1880]),
     "venue_direct_ticket_url": ("B", TMC_DETAIL, "VENUE_TO_TICKET_PRODUCT_EDGE", KHAM_DETAIL),
+    "venue_seat_map_not_poster": ("B", TMC_DETAIL, "SEAT_MAP_REJECT_AS_EVENT_POSTER", TMC_KHAM_VENUE_SEAT_MAP),
 }
 
 def exact_source_url(value, expected):
@@ -248,7 +252,8 @@ def validate_tmc_kham_receipt(evidence):
         line,source,role,value=TMC_KHAM_FIELDS[name]
         if (f.get("line")!=line or not exact_source_url(f.get("source"),source)
             or f.get("role")!=role or type(f.get("value")) is not type(value)
-            or f.get("value")!=value or f.get("decision")!="REVIEW"
+            or f.get("value")!=value
+            or f.get("decision")!=("REJECT_FOR_EVENT_POSTER" if name=="venue_seat_map_not_poster" else "REVIEW")
             or f.get("formal_accepted") is not False):
             raise ValueError("TMC_KHAM_FIELD_OWNER_ROLE_VALUE_HOLD")
         try:
@@ -257,7 +262,7 @@ def validate_tmc_kham_receipt(evidence):
         except (ValueError,TypeError,KeyError,AttributeError):
             raise ValueError("TMC_KHAM_TIMESTAMP_HOLD")
     if seen!=set(TMC_KHAM_FIELDS): raise ValueError("TMC_KHAM_MISSING_FIELD")
-    return {"A_review":4,"B_review":5,"formal_accepted":0,"golden":0,
+    return {"A_review":5,"B_review":5,"B_rejected_as_poster":1,"formal_accepted":0,"golden":0,
             "published":0,"native_get":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
 
