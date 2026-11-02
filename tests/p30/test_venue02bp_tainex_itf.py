@@ -16,6 +16,7 @@ class TaiNEXITF(unittest.TestCase):
         self.assertEqual({x["source"] for x in r["candidateFields"]},{m.DETAIL})
         self.assertFalse(r["crossSourceIdentityVerified"])
         self.assertEqual(r["acceptedFields"],0)
+        self.assertTrue(all(z["observed_at"]=="2026-11-02T08:58:00+08:00" for z in r["candidateFields"] if z["source"]==m.ORGANIZER_VISIT))
         self.assertEqual(r["ticketSessionIdsVerified"],0)
         self.assertFalse(r["published"])
     def test_identity_and_role_guards(self):
@@ -37,13 +38,15 @@ class TaiNEXITF(unittest.TestCase):
                           ("ticket_href",m.TICKET_DETAIL),("showtime","2026-11-06T10:00"),
                           ("admission_price",100),("inventory",10),
                           ("cross_source_verified",True),("published_event",True),
-                          ("admission_price",0),("inventory",0),("published_event",0)]:
+                          ("admission_price",0),("inventory",0),("published_event",0),
+                          ("admission_price",False),("inventory",False),
+                          ("ticket_href",False),("ticket_session_id",False)]:
             with self.subTest(key=key):
                 x=sample();x[key]=value
                 self.assertEqual(m.inspect(x,STAMP)["decision"],"HOLD_UNVERIFIED_TICKET_OR_CROSS_SOURCE")
     def test_independent_organizer_roles_review_only(self):
         x=sample()
-        x["organizer_visit"]=dict(url=m.ORGANIZER_VISIT,date_start="2026-11-06",
+        x["organizer_visit"]=dict(url=m.ORGANIZER_VISIT,observed_at="2026-11-02T08:58:00+08:00",date_start="2026-11-06",
             date_end="2026-11-09",day1_hours="12:00-18:00",
             later_hours="10:00-18:00",general_admission=200,
             presale=180,early_bird=150,online_ticket_url=None)
@@ -58,6 +61,7 @@ class TaiNEXITF(unittest.TestCase):
             ("general_admission",0,"HOLD_ORGANIZER_DETAIL_ROLES"),
             ("general_admission",True,"HOLD_ORGANIZER_DETAIL_ROLES"),
             ("day1_hours","10:00-18:00","HOLD_ORGANIZER_DETAIL_ROLES"),
+            ("observed_at","2026-11-02T08:58:00","HOLD_ORGANIZER_OBSERVATION"),
             ("online_ticket_url","https://checkout.example/","HOLD_ORGANIZER_UNVERIFIED_TICKET_URL"),
         ]:
             with self.subTest(key=key,value=value):
