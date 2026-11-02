@@ -7,7 +7,7 @@ PATH = pathlib.Path(__file__).resolve().parents[2] / "scripts/p30_l9de_kham_tmc_
 spec = importlib.util.spec_from_file_location("l9de", PATH)
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
-NOW = "2026-11-02T05:55:00Z"
+NOW = "2026-11-02T06:55:00Z"
 
 def sample():
     return dict(kham_detail_url=m.KHAM, venue_detail_url=m.TMC,
@@ -15,14 +15,24 @@ def sample():
                 tmc_title=m.TMC_TITLE, kham_sale_start="2026-08-22T12:00:00+08:00",
                 venue_show="2026-11-07T19:30:00+08:00",
                 venue_name="臺北流行音樂中心 表演廳",
-                venue_price_bands=[4280,3880,3480,2880,2480,1880])
+                venue_price_bands=[4280,3880,3480,2880,2480,1880],
+                kham_session_list_url=m.KHAM_SESSION_LIST,
+                session_list_title=m.KHAM_TITLE,
+                standard_row={"show":"2026-11-07T19:30:00+08:00",
+                              "venue":"臺北流行音樂中心 表演廳","label":"",
+                              "displayed_prices":[1880,2480,2880,3480,3880,4280],
+                              "struck_through":True},
+                wheelchair_row={"show":"2026-11-07T19:30:00+08:00",
+                                "venue":"臺北流行音樂中心 表演廳","label":"輪椅席",
+                                "displayed_prices":[3480,4280],"struck_through":False})
 
 class SourceRoles(unittest.TestCase):
     def test_review_has_exact_source_provenance(self):
         r = m.inspect(sample(), NOW)
         self.assertEqual(r["canonicalPlatformId"], "04")
         self.assertEqual(r["decision"], "REVIEW_DIRECT_PRODUCT_LINK_HOLD_SESSION_AND_PRICE_AUTHORITY")
-        self.assertEqual(len(r["candidateFields"]), 6)
+        self.assertEqual(len(r["candidateFields"]), 9)
+        self.assertEqual({f["role"] for f in r["candidateFields"] if "KHAM_" in f["role"]}, {"KHAM_STANDARD_PRICE_STRUCK_NOT_STOCK_PROOF","KHAM_WHEELCHAIR_SEPARATE_ROW_NOT_GENERAL_PRICE"})
         self.assertEqual({x["decision"] for x in r["candidateFields"]}, {"REVIEW"})
         self.assertEqual({x["source"] for x in r["candidateFields"]}, {m.KHAM, m.TMC})
         self.assertEqual(r["acceptedFields"], 0)
@@ -57,6 +67,22 @@ class SourceRoles(unittest.TestCase):
             with self.subTest(field=field):
                 x=sample();x[field]=value
                 self.assertEqual(m.inspect(x,NOW)["candidateFields"],[])
+
+    def test_session_list_row_identity_and_price_status_fail_closed(self):
+        for field,value in [
+            ("kham_session_list_url",m.KHAM_SESSION_LIST.replace("_00.aspx","_.aspx")),
+            ("session_list_title","other event"),
+            ("standard_row",{"show":"2026-11-07T19:30:00+08:00","venue":"臺北流行音樂中心 表演廳","label":"","displayed_prices":[1880,2480,2880,3480,3880,4280],"struck_through":False}),
+            ("wheelchair_row",{"show":"2026-11-07T19:30:00+08:00","venue":"臺北流行音樂中心 表演廳","label":"輪椅席","displayed_prices":[1880,3480],"struck_through":False}),
+        ]:
+            with self.subTest(field=field):
+                x=sample();x[field]=value
+                r=m.inspect(x,NOW)
+                self.assertEqual(r["candidateFields"],[])
+                self.assertTrue(r["decision"].startswith("HOLD_KHAM_"))
+        x=sample()
+        x["inventory"]="SOLD_OUT"
+        self.assertEqual(m.inspect(x,NOW)["decision"],"HOLD_UNVERIFIED_INVENTORY")
 
     def test_unverified_checkout_session_inventory_never_promoted(self):
         for field,value in [("checkout_url","https://kham.com.tw/buy"),
