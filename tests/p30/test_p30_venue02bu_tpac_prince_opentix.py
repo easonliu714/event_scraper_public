@@ -12,12 +12,13 @@ def sample():
             "ticket_advertised_range":["2026-11-05","2026-11-15"],
             "show_times":list(m.SHOWS),"venue_advertised_price_range":[1200,2200],
             "venue_age_min":6,"ticket_age_min":7,"ticket_notice_city":"嘉義市",
-            "ticket_notice_date":"2026-11-01"}
+            "ticket_notice_date":"2026-11-01",
+            "ticket_reader_heading":"選擇場次","ticket_reader_session_rows_exposed":False}
 class Gate(unittest.TestCase):
-    def test_ten_source_bound_receipts_and_one_event_edge(self):
+    def test_twelve_source_bound_receipts_and_one_event_edge(self):
         x=m.inspect(sample(),NOW)
         self.assertEqual(x["decision"],"REVIEW_EXACT_TICKET_EVENT_EDGE_AGE_CONFLICT_SESSION_HOLD")
-        self.assertEqual(len(x["candidateFields"]),10)
+        self.assertEqual(len(x["candidateFields"]),12)
         self.assertTrue(x["listDetailRangeConflict"])
         self.assertEqual({f["source"] for f in x["candidateFields"]},{m.LIST,m.DETAIL,m.TICKET})
         self.assertEqual({f["decision"] for f in x["candidateFields"]},{"REVIEW"})
@@ -45,7 +46,9 @@ class Gate(unittest.TestCase):
                           ("show_times",list(m.SHOWS[:-1])+[m.SHOWS[0]]),
                           ("venue_advertised_price_range",[1000,2200]),
                           ("venue_age_min",7),("ticket_age_min",6),
-                          ("ticket_notice_city","臺北市"),("ticket_notice_date","2026-11-05")):
+                          ("ticket_notice_city","臺北市"),("ticket_notice_date","2026-11-05"),
+                          ("ticket_reader_heading","購票去"),("ticket_reader_session_rows_exposed",True),
+                          ("ticket_reader_session_rows_exposed",None)):
             with self.subTest(key=key):
                 a=sample();a[key]=value;self.assertEqual(m.inspect(a,NOW)["candidateFields"],[])
     def test_unverified_ticket_session_and_conflict_override(self):
