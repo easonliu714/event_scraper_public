@@ -5694,3 +5694,40 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing isolated Draft #236]
 ```
 
 **Source evidence:** [A iNDIEVOX detail](https://www.indievox.com/activity/detail/26_iv04256e8), [A same-ID GAME](https://www.indievox.com/activity/game/26_iv04256e8), [B Zepp rid](https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668), [B direct KKTIX Event](https://freeplanetml.kktix.cc/events/takasetoya202611). Images remain review-only. **NEXT A** resolve official 19:00/19:30 source conflict or rotate; **NEXT B** obtain lawful independent Session/eligible checkout evidence or rotate P0. Main f2859b7c72d6e280b850cb253730989f22b01d46, formal data/status frozen; Owner five-row artifact LOCAL_ARTIFACT_NOT_MOUNTED. No status-only merge without separate authorization; no new Writer/PR.
+
+---
+
+### P30-L7-A-B-OPTION-ROUTE-403-20261103T0700 — strict source/role architecture
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; same Draft #236]
+├── A existing canonical #18 iNDIEVOX 26_iv04256e8 [INDEXED_REVIEW]
+│   ├── Same-ID detail HEADER 2026-11-13 19:30 and GAME 19:30
+│   ├── Detail body explicit 開演時間 19:00 and earlier event poster 19:00
+│   ├── SHOWTIME_HOLD_CONFLICT +1 explicit official body-role receipt
+│   └── No chosen SHOW, checkout Session, live stock or Golden min
+├── B existing P0 Zepp New Taipei rid=160668 → KKTIX event takasetoya202611
+│   ├── Exact ticket event URL from venue DETAIL [REVIEW]
+│   ├── KKTIX FC two-day pass option → /events/takasetoya202611-1/registrations/new
+│   ├── KKTIX Nov07 single-day option → /events/takasetoya202611-2/registrations/new
+│   ├── KKTIX Nov08 single-day option → /events/takasetoya202611-3/registrations/new
+│   ├── Three public reader GET responses HTTP403 [3 HOLD_403]
+│   └── These are registration hrefs, NOT verified checkout Session IDs or stock
+├── validate_rotated_event_receipt [original same-event/role/price/image guard]
+│   ├── +4 new strict receipts: A explicit time conflict; B 3 exact option 403 URLs
+│   ├── Positive and negative tests reject swapped options, fake session, fake promotion
+│   ├── All formal_accepted=false, native GET=0, Golden=0, published=0
+│   └── No production data, 19-platform, index, scraper or workflow mutation
+├── Draft #236 exact HEAD f0c827b62850a6cd07df053a7dbc4a93f92bc7f4
+│   ├── Exact-head CI #41542036999 SUCCESS; all job steps PASS
+│   ├── Artifact #13186942509 sha256:d194d973b6c6ff2c55125a97cc2e46327029851e317db2943e8a211e2900ded2
+│   └── Same 4 ADD-only PR paths; immutable formal blobs verified
+├── Last 3 rounds A/B indexed reader 3/3, successful native GET 0/3
+├── A/B current same-source root streak 2; formal FIELD delta 0/3
+├── Status Draft #53 OPEN, diverged and HOLD_NO_MERGE; no duplicate status writer
+├── L8 formal PWA Android 5/5 USER_ATTESTED_PASS [CLOSED]
+└── FORMAL_FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+**Next:** A rotate a legally accessible canonical ticket source or obtain an independent same-ID official time correction; B rotate next nonduplicated P0 Taipei/New Taipei venue or obtain public non-registration Session evidence. No retry/bypass of KKTIX 403. Sources: [A detail](https://www.indievox.com/activity/detail/26_iv04256e8), [A GAME](https://www.indievox.com/activity/game/26_iv04256e8), [B venue](https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668), [B ticket event](https://freeplanetml.kktix.cc/events/takasetoya202611), [exact-head CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41542036999). Original five-row local artifact LOCAL_ARTIFACT_NOT_MOUNTED. Formal status reportDate 2026-10-28 / snapshot 2026-11-01 07:55 stale, runtime UNVERIFIED; status-only release requires separate Owner authorization.
+
