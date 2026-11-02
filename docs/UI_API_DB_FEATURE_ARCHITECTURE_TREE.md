@@ -5469,3 +5469,20 @@ FORMAL_FIELD 0 / GOLDEN 0 / PUBLICATION 0 / NATIVE_GET 0
 ```
 
 Previous bridge HEAD `c3bd8255...` is superseded (historical PASS only). No main/status/data/Golden/production modifications, and no change to Owner L8 formal Android 5/5 CLOSED. `HARD_HOLD_NO_PUBLICATION` persists.
+
+#### P30-L7-KHAM-TMC-SOURCE-EDGE-AND-PARITY-GUARD — incremental A/B evidence architecture (2026-11-03 00:00 Asia/Taipei)
+
+A canonical ticket source KHAM #04 (do not create a second KHAM platform):
+- Official [TMC LIST](https://www.tmc.taipei/tw/blog/show) → exact [TMC DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu) → direct [KHAM PRODUCT_ID=P1DF32E2](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2).
+- Independent indexed KHAM page title matches TMC same-event title **小宇 宋念宇《不，完美的人》**. KHAM 2026-08-22 12:00 is SALE time, never 2026-11-07 performance time.
+- A REVIEW: exact product ID, official ticket detail URL, ticket page title, sale-role label. A HOLD: ticket Session ID, checkout URL, eligible general price, stock, image ownership (no independently matched image URL).
+- Cross-source TMC→KHAM edge is an event-identity REVIEW receipt, not a license to copy TMC venue price into KHAM formal price.
+
+B canonical P0 venue source TMC (no new 20th platform/duplicate adapter):
+- TMC index → exact /2026SungNien-Yu detail: performance 2026-11-07 19:30, TMC 表演廳; advertised six prices 4280/3880/3480/2880/2480/1880 TWD. B REVIEW only: venue event title, performance datetime, venue room, advertised price role. B HOLD: KHAM ticket tier eligibility/Session/inventory; official img_url ownership still UNKNOWN.
+- Public indexed reader only, not native HTTPS GET or CI source GET. No independent formal FIELD PASS.
+
+Existing [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) now exact HEAD 5d433dc6ea510cb25fef3b267e51fcdb9b029f2e; [CI #41477151376](https://github.com/easonliu714/event_scraper_public/actions/runs/41477151376) SUCCESS; Artifact #13156419525 SHA256 c78e1d7399b287aa5b16a016fa5a7730a932913dcc27b46b1f7dfd55d960f7c5. Its existing audit_l7_candidate_parity contract adds a strict single-source exact-event allowlist check: additional, reordered or duplicate sources => UNVERIFIED_EXTRA_OR_DUPLICATE_SOURCE HOLD. Synthetic regression only, no new native GET, no Owner five-row JSON re-validation.
+
+Status-only existing Draft #53 remains OPEN and unmerged. Root cause of old CI FAIL: overwriting immutable ibon baseline stages.fields instead of preserving it and attaching L9-N in separate evidence. Current main reportDate 2026-10-28 / snapshot 2026-11-01 07:55; retain 19 platform IDs and formal data blob. No status writer duplication or merge. Formal FIELD/GOLDEN/PUBLISHED remain 0; HARD_HOLD_NO_PUBLICATION and L8 formal Android USER_ATTESTED_PASS 5/5 CLOSED unchanged.
+
