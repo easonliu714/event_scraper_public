@@ -60,7 +60,11 @@ def inspect(obs, observed_at):
                 "admission_price","inventory","cross_source_verified","published_event"):
         value = obs.get(key)
         # Numeric zero is a field claim, never equivalent to absent/False.
-        if not (value is None or value is False or (isinstance(value,str) and value=="")):
+        # Boolean False is not an absent price, inventory, URL or ticket ID.
+        is_flag = key in ("cross_source_verified", "published_event")
+        missing = (value is None or (is_flag and value is False)
+                   or (isinstance(value,str) and value==""))
+        if not missing:
             out["decision"]="HOLD_UNVERIFIED_TICKET_OR_CROSS_SOURCE";return out
     out["candidateFields"]=[
         {"field":"venue_title","value":TITLE,"role":"VENUE_GENERIC_EXHIBITION_TITLE"},
@@ -85,6 +89,17 @@ def inspect(obs, observed_at):
         }
         if any(type(extra.get(k)) is not type(v) or extra.get(k)!=v for k,v in expected.items()):
             out["decision"]="HOLD_ORGANIZER_DETAIL_ROLES";out["candidateFields"]=[];return out
+        # Organizer provenance must carry its own observation time; using
+        # the TaiNEX observation timestamp would misattribute third-party data.
+        organizer_stamp = extra.get("observed_at")
+        try:
+            if not isinstance(organizer_stamp,str):
+                raise ValueError("organizer observation missing")
+            organizer_time = datetime.fromisoformat(organizer_stamp.replace("Z","+00:00"))
+            if organizer_time.tzinfo is None or organizer_time.utcoffset() is None:
+                raise ValueError("organizer timezone missing")
+        except (ValueError,TypeError,OverflowError):
+            out["decision"]="HOLD_ORGANIZER_OBSERVATION";out["candidateFields"]=[];return out
         if extra.get("online_ticket_url") not in (None,""):
             out["decision"]="HOLD_ORGANIZER_UNVERIFIED_TICKET_URL";out["candidateFields"]=[];return out
         out["candidateFields"].extend([
@@ -95,5 +110,5 @@ def inspect(obs, observed_at):
             {"field":"organizer_early_bird","value":150,"role":"ORGANIZER_EARLY_BIRD_NOT_TICKET_SESSION"},
         ])
         for row in out["candidateFields"][-5:]:
-            row.update(source=ORGANIZER_VISIT,observed_at=observed_at,decision="REVIEW")
+            row.update(source=ORGANIZER_VISIT,observed_at=organizer_stamp,decision="REVIEW")
     return out
