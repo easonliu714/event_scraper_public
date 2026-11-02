@@ -378,4 +378,91 @@ class Readiness(unittest.TestCase):
         with self.assertRaises(ValueError):m.validate_timeline_package_receipt(d)
 
 
+
+    def test_rotated_a_indievox_b_zepp_kktix_same_event_receipts(self):
+        # Independent indexed source pages, not a native GET or Golden acceptance.
+        e=self._rotated_source_fixture()
+        result=m.validate_rotated_event_receipt(e)
+        self.assertEqual(result["formal_accepted"],0)
+        self.assertEqual(result["A_conflict_hold"],1)
+        self.assertEqual(result["B_reject_general_price"],3)
+        self.assertEqual(e["identity"]["A_event_id"],e["identity"]["A_game_event_id"])
+        self.assertIsNone(e["identity"]["B_ticket_session_id"])
+        self.assertIsNone(e["identity"]["formal_eligible_checkout_min"])
+
+    @staticmethod
+    def _rotated_source_fixture():
+        e={"kind":"P30_L7_A_B_SOURCE_ROTATION_V1",
+           "observation_method":"PUBLIC_INDEXED_TEXT_READER_REOBSERVATION",
+           "release_state":"HARD_HOLD_NO_PUBLICATION",
+           "native_official_get":0,"formal_accepted_fields":0,
+           "golden_accepted_events":0,"published_events":0,
+           "sources":{"A_detail":m.MYCELIUM_DETAIL,"A_game":m.MYCELIUM_GAME,
+                      "B_venue_list":m.ZEPP_TAKASE_LIST,
+                      "B_venue_detail":m.ZEPP_TAKASE_DETAIL,
+                      "B_ticket_detail":m.KKTIX_TAKASE},
+           "identity":{"A_event_id":"26_iv04256e8","A_game_event_id":"26_iv04256e8",
+                       "A_header_game_time_conflict_with_body_poster":True,
+                       "A_ticket_session_id":None,"B_venue_rid":"160668",
+                       "B_ticket_event_url":m.KKTIX_TAKASE,
+                       "B_ticket_session_id":None,
+                       "B_fanclub_two_day_is_single_day":False,
+                       "formal_eligible_checkout_min":None,"formal_img_url":None,
+                       "cross_event_identity_merge":False}}
+        e["field_receipts"]=[{"name":name,"line":line,"source":source,"role":role,
+             "value":copy.deepcopy(value),"decision":decision,
+             "observed_at":"2026-11-03T05:55:00+08:00","formal_accepted":False}
+             for name,(line,source,role,value,decision) in m.ROTATED_EVENT_FIELDS.items()]
+        return e
+
+    def test_rotated_source_negative_cross_event_role_time_price_and_image(self):
+        e=self._rotated_source_fixture()
+        for name,key,bad in (
+            ("a_game_show","source",m.MYCELIUM_DETAIL),
+            ("a_body_show","decision","REVIEW"),
+            ("a_header_show","value","2026-11-13T19:00:00+08:00"),
+            ("a_single_presale","value",350),
+            ("a_two_person_total","decision","REVIEW"),
+            ("a_accessibility","role","GENERAL_ADMISSION"),
+            ("a_event_poster","value",m.ZEPP_TAKASE_POSTER),
+            ("b_direct_ticket_event","value","https://freeplanetml.kktix.cc/events/other"),
+            ("b_ticket_options","value",["NOV_07_SINGLE_DAY"]),
+            ("b_kktix_showtimes","source",m.ZEPP_TAKASE_DETAIL),
+            ("b_general_single","value",900),
+            ("b_fanclub_two_day","decision","REVIEW"),
+            ("b_accessibility","decision","REVIEW"),
+            ("b_pickup_fee","role","GENERAL_ADMISSION"),
+            ("b_venue_poster","value",m.KKTIX_TAKASE_POSTER),
+            ("b_ticket_poster","value",m.ZEPP_TAKASE_POSTER),
+            ("b_ticket_session","value","invented"),
+            ("b_current_stock","value",0),
+            ("b_general_single","formal_accepted",True),
+            ("a_event_title","observed_at","2026-11-03T05:55:00"),
+        ):
+            d=copy.deepcopy(e)
+            next(x for x in d["field_receipts"] if x["name"]==name)[key]=bad
+            with self.subTest(name=name,key=key):
+                with self.assertRaises(ValueError):m.validate_rotated_event_receipt(d)
+        for key,bad in (
+            ("A_game_event_id","different"),
+            ("A_header_game_time_conflict_with_body_poster",False),
+            ("B_venue_rid","166457"),
+            ("B_ticket_event_url","https://other.kktix.cc/events/other"),
+            ("B_fanclub_two_day_is_single_day",True),
+            ("B_ticket_session_id","invented"),
+            ("formal_eligible_checkout_min",900),
+            ("formal_img_url",m.ZEPP_TAKASE_POSTER),
+            ("cross_event_identity_merge",True),
+        ):
+            d=copy.deepcopy(e);d["identity"][key]=bad
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError):m.validate_rotated_event_receipt(d)
+        for key in ("native_official_get","formal_accepted_fields",
+                    "golden_accepted_events","published_events"):
+            d=copy.deepcopy(e);d[key]=1
+            with self.subTest(release=key):
+                with self.assertRaises(ValueError):m.validate_rotated_event_receipt(d)
+        d=copy.deepcopy(e);d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
+        with self.assertRaises(ValueError):m.validate_rotated_event_receipt(d)
+
 if __name__=="__main__":unittest.main()
