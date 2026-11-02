@@ -69,4 +69,55 @@ class Readiness(unittest.TestCase):
     def test_no_extra_untrusted_field_or_duplicate(self):
         d=copy.deepcopy(data);d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
         with self.assertRaises(ValueError):m.validate(d)
+
+    def test_existing_l7_candidate_pipeline_bridge(self):
+        # This is a synthetic integration regression, NOT the Owner's 5-row JSON
+        # and NOT a new native GET or formally accepted event field.
+        from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+        raw = {
+            "title": m.TICKET and data["identity"]["title"],
+            "url": m.TICKET, "platform": "OPENTIX", "type": "UNKNOWN",
+            "scraped_at": "2026-11-02T20:55:00+08:00",
+            "location": "臺北表演藝術中心 藍盒子",
+            "_candidate": {
+                "scope": "CANDIDATE_PREVIEW_ONLY", "decision": "REVIEW_WITH_HOLD",
+                "published": False, "golden_accepted": False, "formal_field_pass": False,
+                "platform_id": "05", "source_event_id": "2072516129034670080",
+                "record_id": "SYNTHETIC_BRIDGE_TEST_ONLY", "sources": [m.TICKET],
+                "hold_reasons": ["AGE_DATE_SESSION_PRICE_CONFLICT_HOLD"],
+                "field_evidence": {"location": {
+                    "value": "臺北表演藝術中心 藍盒子", "source": m.TICKET,
+                    "observed_at": "2026-11-02T20:55:00+08:00",
+                    "role": "EVENT_VENUE", "decision": "REVIEW"
+                }}
+            }
+        }
+        preview, report = build_candidate_dataset([raw])
+        self.assertEqual((len(preview), report["formalFieldAccepted"],
+                          report["goldenAccepted"], report["published"]), (1, 0, 0, 0))
+        self.assertEqual(preview[0]["price"], "未確認")
+        self.assertEqual(preview[0]["date"], "未確認")
+        self.assertIsNone(preview[0]["img_url"])
+        self.assertEqual(preview[0]["_candidate"]["sessions"], [])
+        self.assertEqual(m.audit_l7_candidate_parity(data, raw)["decision"], "REVIEW_PARITY_ONLY")
+        for key, value in (("title", "另一個節目"), ("url", "https://www.opentix.life/event/999"),
+                           ("location", "另一個場館"), ("img_url", m.TICKET_IMAGE)):
+            changed = copy.deepcopy(raw); changed[key] = value
+            with self.subTest(field=key):
+                self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
+        for key, value in (("source_event_id", "999"), ("platform_id", "17"),
+                           ("published", True)):
+            changed = copy.deepcopy(raw); changed["_candidate"][key] = value
+            with self.subTest(meta=key):
+                self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
+        changed = copy.deepcopy(raw)
+        changed["_candidate"]["field_evidence"]["location"]["source"] = m.VENUE
+        self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
+        changed = copy.deepcopy(raw)
+        changed["_candidate"]["field_evidence"]["price"] = {
+            "value": "1200", "source": m.TICKET, "observed_at": "2026-11-02T20:55:00+08:00",
+            "role": "EVENT_ADMISSION_PRICE", "decision": "REVIEW"}
+        changed["price"] = "1200"
+        self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
+
 if __name__=="__main__":unittest.main()
