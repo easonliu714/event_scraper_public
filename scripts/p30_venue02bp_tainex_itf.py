@@ -13,6 +13,7 @@ TITLE = "旅展"
 TICKET_TITLE = "2026 ITF 台灣國際旅展"
 ORGANIZER = "財團法人台灣觀光協會"
 ORGANIZER_SITE = "www.taiwanitf.org.tw/"
+ORGANIZER_VISIT = "https://www.taiwanitf.org.tw/Information3"
 PERIOD = ("2026-11-06", "2026-11-09")
 FLOORS = ("一樓展場", "四樓展場")
 def exact_url(value, expected):
@@ -57,7 +58,9 @@ def inspect(obs, observed_at):
         out["decision"]="HOLD_ORGANIZER_ROLE";return out
     for key in ("ticket_event_id","ticket_session_id","ticket_href","showtime",
                 "admission_price","inventory","cross_source_verified","published_event"):
-        if obs.get(key) not in (None,"",False):
+        value = obs.get(key)
+        # Numeric zero is a field claim, never equivalent to absent/False.
+        if not (value is None or value is False or (isinstance(value,str) and value=="")):
             out["decision"]="HOLD_UNVERIFIED_TICKET_OR_CROSS_SOURCE";return out
     out["candidateFields"]=[
         {"field":"venue_title","value":TITLE,"role":"VENUE_GENERIC_EXHIBITION_TITLE"},
@@ -69,4 +72,28 @@ def inspect(obs, observed_at):
     ]
     for row in out["candidateFields"]:
         row.update(source=DETAIL,observed_at=observed_at,decision="REVIEW")
+    # Independently observed organizer information is a THIRD source, not
+    # proof that TaiNEX /event/709 equals FamiTicket's ticket Event ID.
+    extra = obs.get("organizer_visit")
+    if extra is not None:
+        if not isinstance(extra,dict) or not exact_url(extra.get("url"),ORGANIZER_VISIT):
+            out["decision"]="HOLD_ORGANIZER_DETAIL_SOURCE";out["candidateFields"]=[];return out
+        expected = {
+            "date_start":"2026-11-06","date_end":"2026-11-09",
+            "day1_hours":"12:00-18:00","later_hours":"10:00-18:00",
+            "general_admission":200,"presale":180,"early_bird":150,
+        }
+        if any(type(extra.get(k)) is not type(v) or extra.get(k)!=v for k,v in expected.items()):
+            out["decision"]="HOLD_ORGANIZER_DETAIL_ROLES";out["candidateFields"]=[];return out
+        if extra.get("online_ticket_url") not in (None,""):
+            out["decision"]="HOLD_ORGANIZER_UNVERIFIED_TICKET_URL";out["candidateFields"]=[];return out
+        out["candidateFields"].extend([
+            {"field":"organizer_day1_hours","value":expected["day1_hours"],"role":"EXHIBITION_OPEN_HOURS_NOT_SHOWTIME"},
+            {"field":"organizer_later_hours","value":expected["later_hours"],"role":"EXHIBITION_OPEN_HOURS_NOT_SHOWTIME"},
+            {"field":"organizer_general_admission","value":200,"role":"ORGANIZER_ONSITE_GENERAL_ADMISSION"},
+            {"field":"organizer_presale","value":180,"role":"ORGANIZER_PRESALE_NOT_TICKET_SESSION"},
+            {"field":"organizer_early_bird","value":150,"role":"ORGANIZER_EARLY_BIRD_NOT_TICKET_SESSION"},
+        ])
+        for row in out["candidateFields"][-5:]:
+            row.update(source=ORGANIZER_VISIT,observed_at=observed_at,decision="REVIEW")
     return out
