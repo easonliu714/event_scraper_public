@@ -137,7 +137,7 @@ class Readiness(unittest.TestCase):
     def test_tmc_kham_source_edge_is_review_not_formal(self):
         receipt=data["tmc_kham_indexed_receipt"]
         self.assertEqual(m.validate_tmc_kham_receipt(receipt),{
-            "A_review":4,"B_review":5,"formal_accepted":0,"golden":0,
+            "A_review":5,"B_review":5,"B_rejected_as_poster":1,"formal_accepted":0,"golden":0,
             "published":0,"native_get":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"})
         # Source role and value cannot be borrowed across venue and ticket.
         for name,key,bad in (
@@ -165,6 +165,36 @@ class Readiness(unittest.TestCase):
             with self.subTest(release=key):
                 with self.assertRaises(ValueError): m.validate_tmc_kham_receipt(changed)
         changed=copy.deepcopy(receipt);changed["field_receipts"].append(copy.deepcopy(changed["field_receipts"][0]))
+        with self.assertRaises(ValueError):m.validate_tmc_kham_receipt(changed)
+
+
+    def test_kham_tmc_image_provenance_and_seat_map_rejection(self):
+        # Official product poster is a source-bound REVIEW image; TMC's
+        # seating diagram must never be promoted to a generic event poster.
+        receipt=data["tmc_kham_indexed_receipt"]
+        rows={f["name"]:f for f in receipt["field_receipts"]}
+        self.assertEqual(rows["ticket_product_poster"]["value"],m.TMC_KHAM_TICKET_POSTER)
+        self.assertEqual(rows["ticket_product_poster"]["decision"],"REVIEW")
+        self.assertEqual(rows["venue_seat_map_not_poster"]["value"],m.TMC_KHAM_VENUE_SEAT_MAP)
+        self.assertEqual(rows["venue_seat_map_not_poster"]["decision"],"REJECT_FOR_EVENT_POSTER")
+        self.assertIsNone(receipt["identity"]["image_url"])
+        for name,key,bad in (
+            ("ticket_product_poster","value","https://imgs2.utiki.com.tw/Data/KHAM/Images/UTK2401/OTHER_Large.JPG?v=202610231202"),
+            ("ticket_product_poster","value",m.TMC_KHAM_TICKET_POSTER.split("?")[0]),
+            ("ticket_product_poster","source",m.TMC_DETAIL),
+            ("ticket_product_poster","role","GOLDEN_OFFICIAL_IMAGE"),
+            ("ticket_product_poster","formal_accepted",True),
+            ("venue_seat_map_not_poster","value",m.TMC_KHAM_TICKET_POSTER),
+            ("venue_seat_map_not_poster","decision","REVIEW"),
+            ("venue_seat_map_not_poster","role","EVENT_POSTER"),
+            ("venue_seat_map_not_poster","formal_accepted",True),
+        ):
+            changed=copy.deepcopy(receipt)
+            next(f for f in changed["field_receipts"] if f["name"]==name)[key]=bad
+            with self.subTest(name=name,key=key):
+                with self.assertRaises(ValueError):m.validate_tmc_kham_receipt(changed)
+        changed=copy.deepcopy(receipt)
+        changed["identity"]["image_url"]=m.TMC_KHAM_TICKET_POSTER
         with self.assertRaises(ValueError):m.validate_tmc_kham_receipt(changed)
 
 
