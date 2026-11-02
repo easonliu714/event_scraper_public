@@ -1,0 +1,61 @@
+name: EventRadar P30-L9-DH OPENTIX source role exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  source-role:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9-dh-opentix-sale-reader-roles'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head and immutable production guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l9dh.yml' 'scripts/p30_l9dh_opentix_sale_roles.py' 'tests/p30/test_p30_l9dh_opentix_sale_roles.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          python - <<'PY'
+          import json,subprocess
+          d=json.loads(subprocess.check_output(['git','show','HEAD:docs/platform_status.json']))
+          assert len(d['platforms'])==19
+          assert d['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['production']['goldenAccepted']==0
+          PY
+      - name: Offline source-role and negative tests
+        run: |
+          python -m py_compile scripts/p30_l9dh_opentix_sale_roles.py tests/p30/test_p30_l9dh_opentix_sale_roles.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_l9dh_opentix_sale_roles.py' -v
+      - name: Exact-head evidence manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json,pathlib,subprocess,hashlib
+          files=['scripts/p30_l9dh_opentix_sale_roles.py','tests/p30/test_p30_l9dh_opentix_sale_roles.py','.github/workflows/eventradar_p30_l9dh.yml']
+          d={'gate':'P30-L9-DH','head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'source':'OPENTIX #05','official_ci_get':0,'accepted_fields':0,'golden':0,'published':0,'release':'HARD_HOLD_NO_PUBLICATION','files':{f:hashlib.sha256(pathlib.Path(f).read_bytes()).hexdigest() for f in files}}
+          pathlib.Path('evidence/manifest.json').write_text(json.dumps(d,ensure_ascii=False,indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p30-l9dh-exact-head-evidence
+          path: evidence/manifest.json
+          if-no-files-found: error
