@@ -1,5 +1,5 @@
 """P30-L9-DD tixCraft WTE exact related detail pages; REVIEW-only source observations."""
-from datetime import datetime
+from datetime import datetime, date
 from urllib.parse import urlsplit
 STANDARD="https://tixcraft.com/activity/detail/26_wte"
 VIP="https://tixcraft.com/activity/detail/26_wte_v"
@@ -30,6 +30,12 @@ def inspect(obs, observed_at):
         out["decision"]="HOLD_ADDON_ROLE";return out
     if obs.get("standard_presale")!="2026-05-25" or obs.get("vip_sale_claim")!="2025-05-25":
         out["decision"]="HOLD_SALE_EVIDENCE";return out
+    if obs.get("vip_sale_weekday_label")!="一" or obs.get("vip_refund_purchase_examples")!=["2026-05-25","2026-05-26"] or obs.get("vip_refund_weekday_labels")!=["一","二"]:
+        out["decision"]="HOLD_VIP_INTERNAL_DATE_EVIDENCE";return out
+    # Official VIP page says 2025/05/25 (一), but that date is Sunday; its refund examples cite 2026 dates.
+    # This calendar discrepancy is evidence of a contradiction, NOT permission to correct a sale date.
+    if date.fromisoformat(obs["vip_sale_claim"]).weekday()==0 or date.fromisoformat(obs["vip_refund_purchase_examples"][0]).weekday()!=0 or date.fromisoformat(obs["vip_refund_purchase_examples"][1]).weekday()!=1:
+        out["decision"]="HOLD_VIP_CALENDAR_EVIDENCE";return out
     for k in ("checkout_url","ticket_session_id","inventory","published_event","golden_accepted"):
         if k in obs and not (obs[k] is None or obs[k] is False or (isinstance(obs[k],str) and obs[k]=="")):
             out["decision"]="HOLD_UNVERIFIED_CLAIM";return out
@@ -37,6 +43,10 @@ def inspect(obs, observed_at):
            ("general_price_min",2300,"GENERAL_PRICE_RANGE"),("general_price_max",6300,"GENERAL_PRICE_RANGE"),
            ("service_fee",200,"SERVICE_FEE"),("vip_m_and_g",4800,"VIP_ADDON_NOT_ADMISSION"),
            ("vip_soundcheck",2900,"VIP_ADDON_NOT_ADMISSION")]
+    facts.extend([("vip_sale_claim","2025-05-25","VIP_SALE_CLAIM_NOT_CORRECTED"),
+                  ("vip_sale_weekday","一","VIP_SALE_WEEKDAY_MISMATCH"),
+                  ("vip_refund_example_1","2026-05-25","REFUND_EXAMPLE_NOT_SALE"),
+                  ("vip_refund_example_2","2026-05-26","REFUND_EXAMPLE_NOT_SALE")])
     out["candidateFields"]=[{"field":k,"value":v,"role":role,"source":STANDARD if k in ("show","venue","general_price_min","general_price_max","service_fee") else VIP,"observed_at":observed_at,"decision":"REVIEW"} for k,v,role in facts]
-    out["decision"]="HOLD_SALE_YEAR_CONFLICT"
+    out["decision"]="HOLD_SALE_YEAR_WEEKDAY_REFUND_CONFLICT"
     return out
