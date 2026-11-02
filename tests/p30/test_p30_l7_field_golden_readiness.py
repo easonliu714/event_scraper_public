@@ -114,6 +114,12 @@ class Readiness(unittest.TestCase):
         changed["_candidate"]["field_evidence"]["location"]["source"] = m.VENUE
         self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
         changed = copy.deepcopy(raw)
+        changed["_candidate"]["field_evidence"]["location"]["observed_at"] = "2026-11-02T20:56:00+08:00"
+        self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
+        changed = copy.deepcopy(raw)
+        changed["price"] = "800"
+        self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
+        changed = copy.deepcopy(raw)
         changed["_candidate"]["field_evidence"]["price"] = {
             "value": "1200", "source": m.TICKET, "observed_at": "2026-11-02T20:55:00+08:00",
             "role": "EVENT_ADMISSION_PRICE", "decision": "REVIEW"}
