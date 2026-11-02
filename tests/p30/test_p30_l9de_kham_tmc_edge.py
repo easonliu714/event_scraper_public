@@ -32,7 +32,7 @@ class SourceRoles(unittest.TestCase):
         self.assertEqual(r["canonicalPlatformId"], "04")
         self.assertEqual(r["decision"], "REVIEW_DIRECT_PRODUCT_LINK_HOLD_SESSION_AND_PRICE_AUTHORITY")
         self.assertEqual(len(r["candidateFields"]), 9)
-        self.assertEqual({f["role"] for f in r["candidateFields"] if "KHAM_" in f["role"]}, {"KHAM_STANDARD_PRICE_STRUCK_NOT_STOCK_PROOF","KHAM_WHEELCHAIR_SEPARATE_ROW_NOT_GENERAL_PRICE"})
+        self.assertEqual({f["role"] for f in r["candidateFields"] if f["role"].startswith("KHAM_")}, {"KHAM_STANDARD_PRICE_STRUCK_NOT_STOCK_PROOF","KHAM_WHEELCHAIR_SEPARATE_ROW_NOT_GENERAL_PRICE"})
         self.assertEqual({x["decision"] for x in r["candidateFields"]}, {"REVIEW"})
         self.assertEqual({x["source"] for x in r["candidateFields"]}, {m.KHAM, m.TMC, m.KHAM_SESSION_LIST})
         self.assertEqual(r["acceptedFields"], 0)
