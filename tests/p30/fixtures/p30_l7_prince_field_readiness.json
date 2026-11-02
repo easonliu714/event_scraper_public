@@ -1,0 +1,230 @@
+{
+  "kind": "P30_L7_FIELD_GOLDEN_READINESS_V1",
+  "scope": "ISOLATED_EVIDENCE_ONLY",
+  "observed_at": "2026-11-02T20:55:00+08:00",
+  "observation_method": "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION",
+  "native_official_get_this_gate": 0,
+  "reader_is_not_native_get": true,
+  "local_5_row_candidate_artifact": "LOCAL_ARTIFACT_NOT_MOUNTED",
+  "source_urls": {
+    "A": "https://www.opentix.life/event/2072516129034670080",
+    "B_list": "https://tpac.org.taipei/program",
+    "B_detail": "https://tpac.org.taipei/program/2088"
+  },
+  "identity": {
+    "canonical_ticket_platform_id": "05",
+    "venue_source_id": "TPAC_OFFICIAL",
+    "ticket_event_id": "2072516129034670080",
+    "venue_detail_id": "2088",
+    "title": "C MUSICAL 音樂劇《小王子》",
+    "venue_direct_ticket_edge": "https://www.opentix.life/event/2072516129034670080",
+    "ticket_session_id": null,
+    "identity_decision": "SAME_EVENT_URL_EDGE_REVIEW_NOT_SESSION"
+  },
+  "field_receipts": [
+    {
+      "line": "A",
+      "name": "title",
+      "value": "C MUSICAL 音樂劇《小王子》",
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "EVENT_TITLE",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "Same ticket event page H1, exact event URL",
+      "formal_accepted": false
+    },
+    {
+      "line": "A",
+      "name": "ticket_event_url",
+      "value": "https://www.opentix.life/event/2072516129034670080",
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "EVENT_URL",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "Exact OPENTIX event URL; not ticket Session",
+      "formal_accepted": false
+    },
+    {
+      "line": "A",
+      "name": "venue",
+      "value": "臺北表演藝術中心 藍盒子",
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "EVENT_VENUE",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "OPENTIX venue label on same event page",
+      "formal_accepted": false
+    },
+    {
+      "line": "A",
+      "name": "age_min",
+      "value": 7,
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "AGE_RECOMMENDATION",
+      "decision": "HOLD",
+      "reason": "TPAC official detail says 6+, OPENTIX says 7+",
+      "formal_accepted": false
+    },
+    {
+      "line": "A",
+      "name": "sale_markers",
+      "value": [
+        "07/10(五) 12:00",
+        "07/14(二) 12:00",
+        "07/15(三) 12:00全面啟售"
+      ],
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "SALE_MARKERS_YEAR_UNBOUND",
+      "decision": "HOLD",
+      "reason": "No explicit year; adjacent discounts are not ticket admission",
+      "formal_accepted": false
+    },
+    {
+      "line": "A",
+      "name": "ticket_session_id",
+      "value": null,
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "TICKET_SESSION_ID",
+      "decision": "HOLD",
+      "reason": "Public text reader shows session picker heading, not session IDs",
+      "formal_accepted": false
+    },
+    {
+      "line": "A",
+      "name": "admission_price",
+      "value": null,
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "EVENT_ADMISSION_PRICE",
+      "decision": "HOLD",
+      "reason": "No independently verified generally eligible ticket tier or checkout price",
+      "formal_accepted": false
+    },
+    {
+      "line": "A",
+      "name": "img_url",
+      "value": null,
+      "source": "https://www.opentix.life/event/2072516129034670080",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "OFFICIAL_IMAGE_URL",
+      "decision": "HOLD",
+      "reason": "Image displayed but direct official image URL not independently bound to event",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "title",
+      "value": "C MUSICAL 音樂劇《小王子》",
+      "source": "https://tpac.org.taipei/program/2088",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "EVENT_TITLE",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "TPAC detail H1 and OPENTIX event H1 exact title",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "venue_room",
+      "value": "藍盒子",
+      "source": "https://tpac.org.taipei/program/2088",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "VENUE_ROOM",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "TPAC exact detail room label",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "showtimes",
+      "value": [
+        "2026-11-05T19:30:00+08:00",
+        "2026-11-06T19:30:00+08:00",
+        "2026-11-07T14:30:00+08:00",
+        "2026-11-07T19:30:00+08:00",
+        "2026-11-08T14:30:00+08:00",
+        "2026-11-10T19:30:00+08:00",
+        "2026-11-11T19:30:00+08:00",
+        "2026-11-12T19:30:00+08:00",
+        "2026-11-13T19:30:00+08:00",
+        "2026-11-14T14:30:00+08:00",
+        "2026-11-14T19:30:00+08:00",
+        "2026-11-15T14:30:00+08:00"
+      ],
+      "source": "https://tpac.org.taipei/program/2088",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "VENUE_ANNOUNCED_SHOWTIME",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "12 unique TPAC venue-announced showtimes; NOT ticket Session IDs",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "direct_ticket_event_url",
+      "value": "https://www.opentix.life/event/2072516129034670080",
+      "source": "https://tpac.org.taipei/program/2088",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "VENUE_TO_TICKET_EVENT_EDGE",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "TPAC detail purchase link points to same OPENTIX Event URL, not session",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "index_advertised_range",
+      "value": [
+        "2026-11-04",
+        "2026-11-14"
+      ],
+      "source": "https://tpac.org.taipei/program",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "INDEX_DATE_RANGE",
+      "decision": "HOLD",
+      "reason": "Index 11/04–11/14 conflicts with exact detail 11/05–11/15",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "age_min",
+      "value": 6,
+      "source": "https://tpac.org.taipei/program/2088",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "AGE_RECOMMENDATION",
+      "decision": "HOLD",
+      "reason": "TPAC 6+ versus OPENTIX 7+; no formal age value",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "advertised_price_range",
+      "value": [
+        1200,
+        2200
+      ],
+      "source": "https://tpac.org.taipei/program/2088",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "VENUE_ADVERTISED_PRICE_RANGE",
+      "decision": "HOLD",
+      "reason": "Venue advertised range, not independent ticket tier, eligibility or stock",
+      "formal_accepted": false
+    },
+    {
+      "line": "B",
+      "name": "img_url",
+      "value": null,
+      "source": "https://tpac.org.taipei/program/2088",
+      "observed_at": "2026-11-02T20:55:00+08:00",
+      "role": "OFFICIAL_IMAGE_URL",
+      "decision": "HOLD",
+      "reason": "Image visible in page but direct image URL/asset identity not validated",
+      "formal_accepted": false
+    }
+  ],
+  "formal_accepted_fields": 0,
+  "golden_accepted_events": 0,
+  "published_events": 0,
+  "release_state": "HARD_HOLD_NO_PUBLICATION",
+  "next_gate": "Independent native source receipts, exact image URL ownership, eligible ticket tier and session proof; crosscheck real 5-row JSON only when mounted"
+}
