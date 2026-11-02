@@ -21,6 +21,18 @@ const {formalCardPriceSummary:summary,formalEventDetailEvidence:detail}=ctx.api;
 function e(price){const url='https://official.example/event/1';return {url,price,formal_field_pass:true,golden_accepted:true,_formal_field_evidence:{price:{source:url,value:price,role:'EVENT_ADMISSION_PRICE',decision:'GOLDEN_ACCEPTED',accepted:true,observed_at:'2026-11-02T12:30:00+08:00'}}};}
 assert.equal(summary(e('NT$2880')),'NT$2,880（詳官方）');
 assert.equal(summary(e('NT$2,880')),'NT$2,880（詳官方）');
+assert.equal(summary(e('一般票 NT$2,880／3,380／3,880／4,880；VIP 套票 NT$5,880／6,880')),'NT$2,880 起（詳官方）');
+assert.equal(summary(e('標準票 NT$1,680、2,280；VIP 升級 NT$2,900')),'NT$1,680 起（詳官方）');
+for(const price of [
+  '一般票 NT$2,880／會員優惠 NT$1,280',
+  '一般票 NT$2,880 加 NT$200 服務費',
+  '一般票 NT$2,880／3,380、日期 2026-11-28',
+  '身障票 NT$1,840／一般票 NT$2,880',
+  '預售票 NT$150／原價 NT$250'
+]) assert.equal(summary(e(price)),'票價詳官方資訊',price);
+const untrustedTier=e('一般票 NT$2,880／3,380');
+untrustedTier._formal_field_evidence.price.decision='REVIEW';
+assert.equal(summary(untrustedTier),'票價詳官方資訊');
 assert.equal(summary(e('新台幣 150 元')),'NT$150（詳官方）');
 assert.equal(summary(e('免費')),'免費（詳官方）');
 assert.equal(summary(e('免門票')),'免費（詳官方）');
