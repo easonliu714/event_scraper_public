@@ -321,4 +321,61 @@ class Readiness(unittest.TestCase):
         with self.assertRaises(ValueError):m.validate_ticket_bridge_receipt(d)
 
 
+
+    def test_timeline_package_source_roles_and_explicit_shortlink_hold(self):
+        # Independent source labels: doors/sale/payment windows are not SHOW,
+        # two-person and restricted bundles are not one unrestricted ticket.
+        e=data["timeline_package_indexed_receipt"]
+        self.assertEqual(m.validate_timeline_package_receipt(e),{
+            "A_rejected_session_or_stock":2,"B_review":4,"B_shortlink_hold":1,
+            "B_rejected_general_price":2,"native_get":0,"formal_accepted":0,
+            "golden":0,"published":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"})
+        rows={x["name"]:x for x in e["field_receipts"]}
+        self.assertEqual(rows["venue_klook_shortlink"]["value"],m.TMC_KLOOK_SHORTLINK)
+        self.assertEqual(rows["venue_klook_shortlink"]["decision"],"HOLD_FOR_FINAL_DESTINATION")
+        self.assertEqual(rows["klook_entrance_time"]["value"],"2026-11-21T18:30:00+08:00")
+        self.assertEqual(rows["klook_two_person_bundle_quantity"]["value"],2)
+        self.assertEqual(rows["klook_two_person_bundle_total"]["decision"],"REJECT_FOR_SINGLE_ADMISSION")
+        self.assertFalse(e["identity"]["B_shortlink_final_destination_verified"])
+
+    def test_timeline_package_negative_source_role_identity_release(self):
+        e=data["timeline_package_indexed_receipt"]
+        for name,key,bad in (
+            ("ticket_failed_payment_window","role","TICKET_SESSION"),
+            ("ticket_oct4_release_notice","decision","REVIEW"),
+            ("venue_klook_shortlink","value",m.KLOOK_SCENE),
+            ("venue_klook_shortlink","decision","REVIEW"),
+            ("klook_entrance_time","role","SHOWTIME"),
+            ("klook_presale_start","value","2026-11-21T19:30:00+08:00"),
+            ("klook_presale_end","role","EVENT_END"),
+            ("klook_two_person_bundle_total","decision","REVIEW"),
+            ("klook_two_person_bundle_quantity","value",1),
+            ("klook_accessibility_cassette_bundle","role","GENERAL_ADMISSION"),
+            ("klook_two_person_bundle_total","source",m.TMC_SCENE),
+            ("klook_entrance_time","formal_accepted",True),
+            ("venue_klook_shortlink","observed_at","2026-11-03T04:58:43"),
+        ):
+            d=copy.deepcopy(e)
+            next(x for x in d["field_receipts"] if x["name"]==name)[key]=bad
+            with self.subTest(name=name,key=key):
+                with self.assertRaises(ValueError):m.validate_timeline_package_receipt(d)
+        for key,bad in (
+            ("B_shortlink_final_destination_verified",True),
+            ("B_ticket_event_id","999"),("B_ticket_session_id","invented"),
+            ("A_ticket_session_id","invented"),("B_checkout_eligible_single_ticket_min",400),
+            ("formal_img_url",m.TMC_SCENE_POSTER),("cross_event_identity_merge",True),
+        ):
+            d=copy.deepcopy(e);d["identity"][key]=bad
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError):m.validate_timeline_package_receipt(d)
+        for key in ("native_official_get","formal_accepted_fields","golden_accepted_events","published_events"):
+            d=copy.deepcopy(e);d[key]=1
+            with self.subTest(release=key):
+                with self.assertRaises(ValueError):m.validate_timeline_package_receipt(d)
+        d=copy.deepcopy(e);d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
+        with self.assertRaises(ValueError):m.validate_timeline_package_receipt(d)
+        d=copy.deepcopy(e);d["sources"]["B_ticket_detail"]=m.TIX_FOREVER
+        with self.assertRaises(ValueError):m.validate_timeline_package_receipt(d)
+
+
 if __name__=="__main__":unittest.main()
