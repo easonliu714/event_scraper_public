@@ -5288,3 +5288,30 @@ B TPAC venue [Draft #233 HEAD c5ae98c4d0b20717e2f04e15895a19fdef097bae]
 **Source observation:** Official source indexed reader evidence at [tixCraft](https://tixcraft.com/activity/detail/26_forever), [TPAC LIST](https://tpac.org.taipei/program), [TPAC DETAIL](https://tpac.org.taipei/program/2088), [OPENTIX](https://www.opentix.life/event/2072516129034670080). This incremental run's direct official GET **0**, CI GET **0**; indexed content freshness not guaranteed. Do not claim source field formal PASS or 12 ticket Session parity. A latest exact-head CI [#41424321773](https://github.com/easonliu714/event_scraper_public/actions/runs/41424321773) pending at documentation preparation; B exact-head [#41424290343](https://github.com/easonliu714/event_scraper_public/actions/runs/41424290343) SUCCESS, artifact #13130749101 digest sha256:f501bf3c4969d09f106b67ab85a2dd003ca08580dd410531de69cfebb6d0ad13. Earlier intermediate commits' failed CI were superseded by test fixture updates; inspect final exact HEAD only.
 
 **Immutable boundary:** Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb, Preview 03e515d65e827d5ed67fe341d079907a96bf784a, ShowNews 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad. Formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4, status blob cdeeb3b551e38f862c37759426a14b5129e1224d unchanged. #210 local REVIEW import merged, L8 UI-only #211/#212/#225/#226/#227 Draft/unmerged. Historical Owner 18-row SHA 35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603, this runtime LOCAL_ARTIFACT_NOT_MOUNTED; fresh QC 0. Historical Owner five-card Android UAT, CKSMH5/TWTC39 Android PASS retained; direct live Pages readback UNVERIFIED. **HARD_HOLD_NO_PUBLICATION**; accepted FIELD/Golden/published 0/0/0. No main, formal data/status, Golden, Publisher, Scheduler or Notifier write. Next A: rotate #03 when public Session evidence remains behind member access; next B: seek explicit ticket Session parity without inferring from index or rotate another P0 venue.
+
+
+---
+
+### 2026-11-02 18:50 Asia/Taipei — source-reader session boundary and A/B isolated engineering topology
+
+```text
+A #05 OPENTIX (ticket platform, new Draft #234 HEAD e42db59389cbae02785db7201ac0d21dcdbb996a)
+  /event/2072516129034670080 C MUSICAL 音樂劇《小王子》
+  ├── 7+ ticket source, Taipei Blue Box venue; exact ticket Event ID=1
+  ├── 07/10, 07/14, 07/15 month/day sale markers [year/binding UNKNOWN]
+  ├── conditional discounts [eligibility roles; NOT ticket base/minimum price]
+  ├── text reader "選擇場次" [no exposed ticket rows ≠ zero live JS sessions]
+  └── 嘉義 11/01 cast notice [NOT Taipei session change]
+  6 REVIEW receipts; ticket Session IDs=0, FIELD accepted=0, Golden=0, published=0
+B TPAC official venue (amended Draft #233 HEAD 5f0379ab0d02e2da7a8cbf79d5d35b7b3a07548b)
+  /program/2088 → 12 venue SHOW timestamps 11/05–11/15
+  ├── LIST index 11/04–11/14 vs DETAIL 11/05–11/15 [CONFLICT HOLD]
+  ├── venue age 6+ vs ticket age 7+ [CONFLICT HOLD]
+  └── explicit OPENTIX #05 Event URL (not Session ID)
+        text-reader heading only; no publicly exposed ticket Session rows
+  12 REVIEW receipts; Event URL verified=1, Session IDs=0, FIELD accepted=0
+```
+
+**Exact-head verification:** A [CI #41432207420](https://github.com/easonliu714/event_scraper_public/actions/runs/41432207420) SUCCESS, six unittest methods, artifact #13134496861 digest `sha256:122b009707ddcc66bcb5265567d0f512154e7fd9527ab89eeb49aab56494bee1`; B [CI #41432129126](https://github.com/easonliu714/event_scraper_public/actions/runs/41432129126) SUCCESS, six unittest methods, artifact #13134512858 digest `sha256:61f4618777de2db602cc308f19f9e897e2d6cfec06470eae33bc641c6ad9505b`. A three ADD-only files; B two amendments on existing isolated branch. Public TPAC/OPENTIX source reader crawled on 2026-11-02; native CI official GET 0, live JS Session readback UNKNOWN, independent ZIP CRC UNVERIFIED. No formal FIELD acceptance.
+
+**Boundary:** Source main `9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb`, Preview `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d` (19 IDs, reportDate 2026-10-28, engineering snapshot 2026-11-01 07:55 stale). #210 REVIEW importer merged/Pages historical SUCCESS, live PWA readback UNVERIFIED. Owner 18-row historical structural 18/18 SHA `35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603`, this runtime LOCAL_ARTIFACT_NOT_MOUNTED/fresh QC=0; do not request again. #211/#212/#225/#226/#227 Draft/unmerged; Owner offline five-card L8 UAT and CKSMH5/TWTC39 Android PASS retained. Last three source-reader cycles A/B 3/3, native CI GET 0/3, formal FIELD delta 0; A rotated away from #03 checkout-access blocker, B age/date conflicts HOLD and ticket Session reader limit explicit. **HARD_HOLD_NO_PUBLICATION**, no production writes or merge. Toolkit path UNKNOWN.
