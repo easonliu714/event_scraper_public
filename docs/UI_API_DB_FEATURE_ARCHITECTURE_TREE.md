@@ -5449,3 +5449,23 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE / isolated Draft #236]
 ```
 
 **Evidence tier:** A source readback remains indexed (not native); B TMC distinct event is one new source-bound venue/price-role REVIEW observation, not an accepted eligible checkout tier. Local original 5-row JSON **LOCAL_ARTIFACT_NOT_MOUNTED**; tests use explicitly synthetic bridge sample, not Owner file. Near-three-round exact source-reader counters **UNVERIFIED** pending matched artifacts. Two canonical documents live only in existing Governance Draft #8, with serial compare-head; no second Writer, no duplicate platform, no production write. Source main `f2859b7c72d6e280b850cb253730989f22b01d46`, formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d` unchanged. Next: source-owned ticket Session/eligible general admission and image ownership native receipt; status #53 compatibility/CI root cause without bypass, separate Owner release only when ready.
+
+
+#### P30-L7-REVIEW-PIPELINE-BRIDGE-FINAL-EXACT-HEAD (2026-11-02 23:40 Asia/Taipei)
+
+```text
+Independent source receipt A venue observed_at
+  -> exact timestamp/value/owner/role equality in audit_l7_candidate_parity
+  -> existing L7 normalize_record
+  -> REVIEW_PARITY_ONLY or HOLD (never Golden)
+Raw date/price/description/region without independently accepted role
+  -> HOLD; even if candidate pipeline quarantines to 未確認, no readiness promotion
+Candidate image/session/stock and cross-source venue price
+  -> HOLD; no ticket Session ID inferred
+Final Draft #236: 71b7bde115e50b4e5dc13cc8c0ad01686e2e0391
+CI #41473559178 SUCCESS / 11 tests PASS / Artifact #13156600936
+SHA256 a721ae3bd94f2058d98d9defada11ab212a54a65c19906655ba4d7ffbb1db736
+FORMAL_FIELD 0 / GOLDEN 0 / PUBLICATION 0 / NATIVE_GET 0
+```
+
+Previous bridge HEAD `c3bd8255...` is superseded (historical PASS only). No main/status/data/Golden/production modifications, and no change to Owner L8 formal Android 5/5 CLOSED. `HARD_HOLD_NO_PUBLICATION` persists.
