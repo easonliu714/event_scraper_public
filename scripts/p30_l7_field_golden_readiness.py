@@ -207,6 +207,16 @@ TMC_KHAM_FIELDS = {
     "venue_direct_ticket_url": ("B", TMC_DETAIL, "VENUE_TO_TICKET_PRODUCT_EDGE", KHAM_DETAIL),
 }
 
+def exact_source_url(value, expected):
+    """Preserve a canonical allowlisted PRODUCT_ID query, never strip it."""
+    if not isinstance(value, str) or value != expected:
+        return False
+    try:
+        parsed = urlsplit(value)
+        return parsed.scheme == "https" and bool(parsed.netloc) and not parsed.fragment and not parsed.username and not parsed.password
+    except ValueError:
+        return False
+
 def validate_tmc_kham_receipt(evidence):
     """Reject cross-event/session, sale/show and advertised/eligible price laundering."""
     if not isinstance(evidence, dict) or evidence.get("kind") != "P30_L7_TMC_KHAM_REVIEW_EDGE_V1":
@@ -236,7 +246,7 @@ def validate_tmc_kham_receipt(evidence):
         if name in seen: raise ValueError("TMC_KHAM_DUPLICATE_FIELD")
         seen.add(name)
         line,source,role,value=TMC_KHAM_FIELDS[name]
-        if (f.get("line")!=line or not exact_https(f.get("source"),source)
+        if (f.get("line")!=line or not exact_source_url(f.get("source"),source)
             or f.get("role")!=role or type(f.get("value")) is not type(value)
             or f.get("value")!=value or f.get("decision")!="REVIEW"
             or f.get("formal_accepted") is not False):
