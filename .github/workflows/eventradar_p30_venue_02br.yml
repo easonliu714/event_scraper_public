@@ -52,7 +52,7 @@ jobs:
           import json,pathlib,subprocess
           audit={'gate':'P30-VENUE-02BR','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
                  'sourceObservationDate':'2026-11-02','officialGETinCI':0,
-                 'sourceQuality':'TPAC P0 venue LIST/DETAIL date discrepancy and OPENTIX direct edge',
+                 'sourceQuality':'TPAC P0 LIST 11/10-12 vs DETAIL 11/11-13; OPENTIX Event program 11/11-13 and package sale 9/7-11/13 are distinct roles, HOLD',
                  'acceptedFields':0,'ticketSessionIdsVerified':0,'goldenAccepted':0,
                  'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
           pathlib.Path('evidence/audit.json').write_text(json.dumps(audit,sort_keys=True)+'\n',encoding='utf-8')
