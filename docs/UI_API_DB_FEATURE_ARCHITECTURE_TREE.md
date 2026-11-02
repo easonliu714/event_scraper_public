@@ -5410,3 +5410,42 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; PR #236 Draft, exact HEAD 4947144afa5780f
 ```
 
 **Status UI separate branch:** Source main remains `f2859b7c72d6e280b850cb253730989f22b01d46`; 19-platform status blob `cdeeb3b551e38f862c37759426a14b5129e1224d`, `reportDate=2026-10-28`, engineering snapshot `2026-11-01 07:55` stale. Legacy Draft #53 has older ibon evidence and unresolved security/CI HOLD; no automatic merge or duplicate status PR. Public Pages direct runtime readback UNVERIFIED; Owner 5/5 formal Android UI UAT remains PASS. Formal accepted fields 0, Golden 0, publication 0. Near-three-round native/indexed exact counters UNVERIFIED without independently matched artifacts; same-root-cause age/date/session remains. Preserve one hourly A/B Writer and serial governance writes.
+
+
+---
+
+### P30-L7-REVIEW-PIPELINE-BRIDGE-20261102T2335 — source-to-REVIEW QC integration architecture (2026-11-02 23:35 Asia/Taipei)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE / isolated Draft #236]
+├── Existing A OPENTIX #05 exact same-event source receipt (public indexed reader)
+│   ├── validate(source_contract) -> source URL / role / exact value / timestamp / conflict guards
+│   ├── audit_l7_candidate_parity(contract, candidate) [NEW in existing PR #236]
+│   │   ├── existing L7 normalize_record(raw) provenance & explicit non-publication
+│   │   ├── canonical platform_id=05 + Event ID 2072516129034670080 + exact title/url
+│   │   ├── A-owned venue/room role parity; B venue never owns A ticket price/Session
+│   │   ├── date/price/description/region remain 未確認; img_url=None; sessions=[]
+│   │   └── mismatch / forged image / invented tier / cross-source receipt -> HOLD
+│   ├── REVIEW-ready 4 / HOLD 4; formal FIELD 0
+│   └── native official GET=0 (direct container DNS resolution failure)
+├── B TPAC official /2088 [existing receipt; REVIEW-ready 5 / HOLD 3]
+│   └── index/detail date + 6+/7+ age conflict remain unresolved
+├── B P0 Taipei TMC [existing source, new distinct indexed event rotation]
+│   ├── official LIST -> exact /tw/blog/show/2026SingTheScene DETAIL
+│   ├── show 2026-11-21 19:30-21:30, Legacy TERA (venue-owned REVIEW)
+│   ├── full admission A/B/C 1600/1200/800; accessible 800/600/400
+│   ├── merchandise bundle 1799/1399/999; exhibition bundle separate
+│   └── Klook collaborator + s.klook.com link ≠ verified ticket Event/Session/checkout
+├── #236 exact HEAD c3bd8255017171df1c252277164f3587d1a90c35
+│   ├── CI 41473043627 SUCCESS / Artifact 13155099051
+│   ├── digest sha256:090c749eb0baaba8b2d62f8c04b95a8131b979855ba3fbfa8b830bac4b237f38
+│   └── same 4 ADD-only paths; no main/Golden/status/data/publisher mutation
+├── Status-only Draft #53 [OPEN, NOT RELEASE READY]
+│   ├── first true CI failure 40686748311 step 8: baseline fields-stage assertion
+│   ├── ibon L9-N should be separate evidence overlay, not baseline field replacement
+│   └── #192 main status page compatibility + exact-head tests required before Owner release
+├── L8 formal PWA Android 5/5 USER_ATTESTED_PASS [CLOSED, #235 MERGED]
+└── FORMAL_FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+**Evidence tier:** A source readback remains indexed (not native); B TMC distinct event is one new source-bound venue/price-role REVIEW observation, not an accepted eligible checkout tier. Local original 5-row JSON **LOCAL_ARTIFACT_NOT_MOUNTED**; tests use explicitly synthetic bridge sample, not Owner file. Near-three-round exact source-reader counters **UNVERIFIED** pending matched artifacts. Two canonical documents live only in existing Governance Draft #8, with serial compare-head; no second Writer, no duplicate platform, no production write. Source main `f2859b7c72d6e280b850cb253730989f22b01d46`, formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d` unchanged. Next: source-owned ticket Session/eligible general admission and image ownership native receipt; status #53 compatibility/CI root cause without bypass, separate Owner release only when ready.
