@@ -284,6 +284,17 @@
         "formal_accepted": false
       },
       {
+        "line": "A",
+        "name": "ticket_product_poster",
+        "role": "TICKET_PRODUCT_LINKED_POSTER_REVIEW_ONLY",
+        "value": "https://imgs2.utiki.com.tw/Data/KHAM/Images/UTK2401/P1DF32E2_Large.JPG?v=202610231202",
+        "source": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2",
+        "observed_at": "2026-11-03T01:54:43+08:00",
+        "decision": "REVIEW",
+        "formal_accepted": false,
+        "reason": "Ticket PRODUCT_ID=P1DF32E2 detail image link opens matching event poster; indexed-reader/image-view observation, not native GET, not formal img_url"
+      },
+      {
         "line": "B",
         "name": "venue_title",
         "role": "VENUE_EVENT_TITLE",
@@ -339,6 +350,17 @@
         "observed_at": "2026-11-03T00:52:01+08:00",
         "decision": "REVIEW",
         "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_seat_map_not_poster",
+        "role": "SEAT_MAP_REJECT_AS_EVENT_POSTER",
+        "value": "https://www.tmc.taipei/files/20261015113742345.jpg",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "observed_at": "2026-11-03T01:54:43+08:00",
+        "decision": "REJECT_FOR_EVENT_POSTER",
+        "formal_accepted": false,
+        "reason": "TMC event detail explicitly labels linked image 票區示意圖; image shows seating diagram, not approved event hero poster"
       }
     ],
     "native_official_get": 0,
