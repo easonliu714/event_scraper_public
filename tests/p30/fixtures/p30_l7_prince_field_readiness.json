@@ -106,12 +106,12 @@
     {
       "line": "A",
       "name": "img_url",
-      "value": null,
+      "value": "https://s3.resource.opentix.life/upload/program/1783488303546FNFfEObGMQ.jpeg",
       "source": "https://www.opentix.life/event/2072516129034670080",
-      "observed_at": "2026-11-02T20:55:00+08:00",
+      "observed_at": "2026-11-02T14:01:07.644Z",
       "role": "OFFICIAL_IMAGE_URL",
-      "decision": "HOLD",
-      "reason": "Image displayed but direct official image URL not independently bound to event",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "Same-event OPENTIX page lead image link observed by public indexed reader, URL only, no native GET or Golden",
       "formal_accepted": false
     },
     {
@@ -213,12 +213,12 @@
     {
       "line": "B",
       "name": "img_url",
-      "value": null,
+      "value": "https://backstage.tpac-taipei.org/storage/uploads/program/images/f5182a1f85017d7b56d4643927ed8484.jpg",
       "source": "https://tpac.org.taipei/program/2088",
-      "observed_at": "2026-11-02T20:55:00+08:00",
+      "observed_at": "2026-11-02T14:01:07.644Z",
       "role": "OFFICIAL_IMAGE_URL",
-      "decision": "HOLD",
-      "reason": "Image visible in page but direct image URL/asset identity not validated",
+      "decision": "READY_FOR_INDEPENDENT_GOLDEN_REVIEW",
+      "reason": "Same-event TPAC page lead image link observed by public indexed reader, URL only, no native GET or Golden",
       "formal_accepted": false
     }
   ],
@@ -226,5 +226,5 @@
   "golden_accepted_events": 0,
   "published_events": 0,
   "release_state": "HARD_HOLD_NO_PUBLICATION",
-  "next_gate": "Independent native source receipts, exact image URL ownership, eligible ticket tier and session proof; crosscheck real 5-row JSON only when mounted"
+  "next_gate": "Native official source and image ownership parity receipts; eligible admission tier/session; actual 5-row JSON only if mounted"
 }
