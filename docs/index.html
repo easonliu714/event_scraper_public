@@ -701,6 +701,46 @@
         renderPagination();
     }
 
+
+    // P30-L8 formal list summary is display-only and never changes event data.
+    // A price amount is shown only for a single unqualified general admission
+    // amount (not sale date, VIP add-on, discounted membership, service charge).
+    function formalCardPriceSummary(ev) {
+        if (!ev || typeof ev.price !== 'string' || ev._candidate) return '票價詳官方資訊';
+        const p = ev.price.trim();
+        if (p === '免費' || p === '免門票') return '免費（詳官方）';
+        const noClaim = /VIP|升級|加價|手續費|服務費|會員|優惠|限|資格|預售|早鳥|票況|售罄|缺票|套票|換票|折抵|登記|捐款/u;
+        if (noClaim.test(p)) return '票價詳官方資訊';
+        // Legacy formal data: only one explicit amount is displayable.
+        // Do not guess a minimum from a list of unlabeled numbers.
+        const single = /^(?:NT\$|新臺幣|新台幣)\s*(\d{1,3}(?:,\d{3})+|\d{1,7})\s*(?:元)?$/u.exec(p);
+        if (!single) return '票價詳官方資訊';
+        const n = Number(single[1].replace(/,/g, ''));
+        return Number.isSafeInteger(n) && n > 0 && n < 1000000
+            ? 'NT$' + n.toLocaleString('en-US') + '（詳官方）'
+            : '票價詳官方資訊';
+    }
+
+    // Only explicitly Golden-accepted formal source roles may be added to the
+    // standard modal; candidate REVIEW receipts cannot enter the formal path.
+    function formalEventDetailEvidence(ev) {
+        if (!ev || ev._candidate || ev.formal_field_pass !== true
+            || ev.golden_accepted !== true || !isCandidateOfficialUrl(ev.url)
+            || !Array.isArray(ev.detail_evidence)) return [];
+        const allowed = new Set(['EVENT_DATE','VENUE_EVENT_DATE','OPEN_HOURS','SALE_START',
+            'SERVICE_FEE','EVENT_ADMISSION_PRICE','TICKET_PRODUCT_PRICE',
+            'VENUE_ADVERTISED_PRICE','EVENT_VENUE','SOURCE_IDENTITY']);
+        return ev.detail_evidence.slice(0,20).filter(r => r
+            && typeof r.label === 'string' && r.label.trim() && r.label.length <= 80
+            && typeof r.value === 'string' && r.value.trim() && r.value.length <= 500
+            && r.source === ev.url && allowed.has(r.role)
+            && r.decision === 'GOLDEN_ACCEPTED'
+            && typeof r.observed_at === 'string'
+            && /(Z|[+-]\d{2}:\d{2})$/i.test(r.observed_at)
+            && !Number.isNaN(Date.parse(r.observed_at)))
+            .map(r => ({label:r.label,role:r.role,value:r.value}));
+    }
+
     function renderList() {
         const start = (currentPage - 1) * PAGE_SIZE;
         const pageData = filteredEvents.slice(start, start + PAGE_SIZE);
@@ -742,6 +782,7 @@
                         </div>
                         <div style="font-weight:500; font-size:1rem;">${e.title}</div>
                         <div style="font-size:0.8rem; color:#888;">${e.date || '詳內文'} ${e.location ? `| ${e.location}` : ''}</div>
+                        <div class="formal-card-price" style="font-size:0.82rem;color:#fbbf24;">💰 ${formalCardPriceSummary(e)}</div>
                     </div></div>`;
         }).join('');
     }
@@ -780,6 +821,20 @@
         
         const desc = ev.description ? ev.description : '暫無詳細簡介，請點擊下方按鈕前往官網查看。';
         document.getElementById('m-desc').textContent = desc;
+
+        // Accepted role receipts supplement, but never replace, existing detail.
+        const formalEntries = formalEventDetailEvidence(ev);
+        evidence.hidden = !formalEntries.length;
+        for (const entry of formalEntries) {
+            const item = document.createElement('div');
+            item.className = 'candidate-evidence-item';
+            const label = document.createElement('strong');
+            label.textContent = entry.label + ' · ' + entry.role + '（正式已驗證）';
+            const value = document.createElement('span');
+            value.textContent = entry.value;
+            item.append(label,value);
+            evidence.append(item);
+        }
 
         const img = document.getElementById('m-img');
         if(ev.img_url) { 
