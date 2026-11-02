@@ -559,6 +559,84 @@ def validate_rotated_event_receipt(evidence):
             "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
 
+
+# 2026-11-03 07:55 Asia/Taipei. Public indexed official ticket detail and
+# Taipei Dome calendar: same title/dates/venue REVIEW, not a direct ID edge.
+# A 19:00 SHOW cannot be inferred from B calendar date; 11/12-15 is another event.
+DOME_TICKET = "https://tixcraft.com/activity/detail/26_forever"
+DOME_CALENDAR = "https://www.taipeidome.com.tw/Web/dome/"
+DOME_FIELDS = {
+    "a_event_id": ("A", DOME_TICKET, "TICKET_EVENT_ID", "26_forever", "REVIEW"),
+    "a_shows": ("A", DOME_TICKET, "TICKET_SHOW_TIMES_NOT_STOCK",
+                ["2026-11-28T19:00:00+08:00", "2026-11-29T19:00:00+08:00"], "REVIEW"),
+    "a_general_prices": ("A", DOME_TICKET, "ADVERTISED_GENERAL_NOT_CHECKOUT",
+                         [5880,5280,4880,4280,3680,3280,2680,1680], "REVIEW"),
+    "a_accessibility": ("A", DOME_TICKET, "RESTRICTED_NOT_GENERAL", [2440,1840], "REJECT_GENERAL_MIN"),
+    "a_ibon_fee": ("A", DOME_TICKET, "PER_ORDER_PICKUP_NOT_ADMISSION", 30, "REJECT_ADMISSION"),
+    "a_age_advisory": ("A", DOME_TICKET, "UNDER_SEVEN_NOT_RECOMMENDED_NOT_BANNED", 7, "REVIEW"),
+    "a_child_companion": ("A", DOME_TICKET, "TWELVE_AND_UNDER_REQUIRES_ADULT", 12, "REVIEW"),
+    "a_session": ("A", DOME_TICKET, "CHECKOUT_SESSION_UNVERIFIED", None, "HOLD"),
+    "a_stock": ("A", DOME_TICKET, "ELIGIBLE_STOCK_UNVERIFIED", None, "HOLD"),
+    "b_calendar_title": ("B", DOME_CALENDAR, "VENUE_CALENDAR_TITLE_SHUTTLE_SUFFIX",
+        "F✦FOREVER 恆星之城・光年赴約・臺北 限定場演唱會〖活動加開2線接駁車〗", "REVIEW"),
+    "b_dates": ("B", DOME_CALENDAR, "CALENDAR_DATES_NOT_SHOW_TIMES", ["2026-11-28","2026-11-29"], "REVIEW"),
+    "b_other_event": ("B", DOME_CALENDAR, "DISTINCT_EVENT_NOV12_15",
+        ["2026-11-12","2026-11-13","2026-11-14","2026-11-15"], "REJECT_CROSS_EVENT"),
+    "b_shuttle": ("B", DOME_CALENDAR, "SHUTTLE_ROUTES_NOT_SESSIONS", 2, "REJECT_SESSION"),
+    "b_ticket_href": ("B", DOME_CALENDAR, "DIRECT_TICKET_HREF_UNVERIFIED", None, "HOLD"),
+    "b_show_time": ("B", DOME_CALENDAR, "VENUE_CALENDAR_TIME_UNVERIFIED", None, "HOLD"),
+    "b_img_url": ("B", DOME_CALENDAR, "FORMAL_HERO_IMAGE_UNVERIFIED", None, "HOLD"),
+}
+
+def validate_dome_crosscheck(e):
+    """Source/role/identity fail-closed contract; cannot authorize Golden."""
+    if not isinstance(e, dict) or e.get("kind") != "P30_L7_DOME_CROSSCHECK_V1":
+        raise ValueError("DOME_KIND_HOLD")
+    if (e.get("scope") != "ISOLATED_EVIDENCE_ONLY"
+        or e.get("observation_method") != "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION"
+        or e.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+        or any(type(e.get(k)) is not int or e[k] != 0 for k in
+               ("native_official_get","formal_accepted_fields","golden_accepted_events","published_events"))):
+        raise ValueError("DOME_RELEASE_HOLD")
+    if e.get("sources") != {"A":DOME_TICKET,"B":DOME_CALENDAR}:
+        raise ValueError("DOME_SOURCE_HOLD")
+    if e.get("identity") != {
+        "A_platform_id":"03","A_ticket_event_id":"26_forever",
+        "B_venue_source":"TAIPEI_DOME_OFFICIAL_NOT_FORMAL_19",
+        "B_calendar_event_id":None,"B_direct_ticket_href":None,
+        "B_calendar_show_time":None,"ticket_session_id":None,
+        "formal_eligible_min":None,"formal_img_url":None,
+        "cross_source_identity":"TITLE_DATES_VENUE_REVIEW_NO_DIRECT_ID_EDGE",
+        "cross_event_merge":False}:
+        raise ValueError("DOME_IDENTITY_HOLD")
+    rows=e.get("field_receipts")
+    if not isinstance(rows,list) or len(rows)!=len(DOME_FIELDS):
+        raise ValueError("DOME_COUNT_HOLD")
+    seen=set()
+    for row in rows:
+        if not isinstance(row,dict) or row.get("name") not in DOME_FIELDS:
+            raise ValueError("DOME_UNKNOWN_FIELD_HOLD")
+        name=row["name"]
+        if name in seen: raise ValueError("DOME_DUPLICATE_HOLD")
+        seen.add(name)
+        line,source,role,value,decision=DOME_FIELDS[name]
+        if (row.get("line")!=line or not exact_https(row.get("source"),source)
+            or row.get("role")!=role or type(row.get("value")) is not type(value)
+            or row.get("value")!=value or row.get("decision")!=decision
+            or row.get("formal_accepted") is not False
+            or not isinstance(row.get("reason"),str) or not row["reason"].strip()):
+            raise ValueError("DOME_FIELD_OR_PROMOTION_HOLD")
+        try:
+            dt=datetime.fromisoformat(row["observed_at"].replace("Z","+00:00"))
+            if dt.utcoffset() is None: raise ValueError()
+        except (ValueError,TypeError,KeyError,AttributeError):
+            raise ValueError("DOME_TIMESTAMP_HOLD")
+    if seen!=set(DOME_FIELDS): raise ValueError("DOME_MISSING_HOLD")
+    return {"A_review":5,"A_reject":2,"A_hold":2,
+            "B_review":2,"B_reject":2,"B_hold":3,
+            "native_get":0,"formal_accepted":0,"golden":0,"published":0,
+            "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
