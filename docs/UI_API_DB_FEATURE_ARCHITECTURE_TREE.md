@@ -5654,3 +5654,43 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, existing isolated Draft #236]
 ```
 
 **Evidence:** [A tixCraft detail](https://tixcraft.com/activity/detail/26_forever), [B TMC official venue](https://www.tmc.taipei/tw/blog/show/2026SingTheScene), [B Klook independent ticket Event](https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/). Native GET attempted at standard bounded rate but DNS failed; public indexed reader does not count as native GET. Formal status 19-platform snapshot stale; no production update. Original five-row Owner sample `LOCAL_ARTIFACT_NOT_MOUNTED`; no fabricated read. Next prioritize source rotation and independent field acceptance readiness, not synthetic PR count. Governance serialized solely on Draft #8.
+
+
+---
+
+### P30-L7-A-B-SOURCE-ROTATION-20261103T0555 — source-bound field tree (2026-11-03 05:55 Asia/Taipei)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing isolated Draft #236]
+├── A canonical #18 iNDIEVOX /activity/detail/26_iv04256e8 [INDEXED_REVIEW]
+│   ├── Same-ID GAME /activity/game/26_iv04256e8 [IDENTITY_REVIEW]
+│   ├── Header + GAME 2026-11-13 19:30 vs body + event poster 19:00 [SHOWTIME_HOLD_CONFLICT]
+│   ├── Single presale NT$700 [REVIEW, not stock/checkout minimum]
+│   ├── Two-person NT$1200 [REJECT as one-person minimum]
+│   ├── Restricted accessibility NT$350 [REJECT as general minimum]
+│   ├── Official source-linked event poster [REVIEW only; time conflict]
+│   └── 5 REVIEW + 1 conflict HOLD + 2 REJECT + 1 Session HOLD; formal 0
+├── B existing P0 New Taipei Zepp /schedule/single/?rid=160668 [VENUE]
+│   ├── Venue LIST → exact rid detail → direct KKTIX /events/takasetoya202611 [IDENTITY_REVIEW]
+│   ├── 2026-11-07 18:00 / 2026-11-08 17:00 SHOW parity; DOORS 17:00 / 16:00
+│   ├── KKTIX 3 options: FC two-day pass, Nov07 single-day, Nov08 single-day [not Session IDs]
+│   ├── Single-day general standing NT$1480 [REVIEW advertised, not stock]
+│   ├── FC two-day general NT$2600 [REJECT as single-day minimum]
+│   ├── Accessibility NT$900 [REJECT as general]; pickup fee NT$30 [REJECT as admission]
+│   ├── Zepp + KKTIX same-event source-linked posters [REVIEW, not formal img_url]
+│   └── 7 REVIEW + 3 REJECT + 2 Session/stock HOLD; formal 0
+├── validate_rotated_event_receipt [21 exact A/B source/role/value/decision receipts]
+│   ├── Same-ID, direct href, showtime conflict, tier/quantity/fee and image-source negatives
+│   ├── Native GET 0; indexed public reader is not native CI official GET
+│   └── No checkout Session/stock/eligible minimum/Golden/img_url promotion
+├── Draft #236 HEAD fa4fade80d71cb25d58990525c6dc7664b4f1d6a
+│   ├── CI #41533161656 SUCCESS; all source-field-readiness steps PASS
+│   ├── Artifact #13181859337 digest sha256:9814b2f7f9de302b3abba468c7ed2d5f881e295f32e313c7ae76669d8b9eac76
+│   └── Four original ADD-only paths; main data/status/index/scraper immutable
+├── Last 3 A/B rounds: indexed reader 3/3; successful native official GET 0/3
+├── Status-only Draft #53 OPEN 2 ahead / 30 behind [HOLD_NO_MERGE]
+├── Owner L8 formal PWA Android 5/5 USER_ATTESTED_PASS [CLOSED]
+└── FORMAL_FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+**Source evidence:** [A iNDIEVOX detail](https://www.indievox.com/activity/detail/26_iv04256e8), [A same-ID GAME](https://www.indievox.com/activity/game/26_iv04256e8), [B Zepp rid](https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668), [B direct KKTIX Event](https://freeplanetml.kktix.cc/events/takasetoya202611). Images remain review-only. **NEXT A** resolve official 19:00/19:30 source conflict or rotate; **NEXT B** obtain lawful independent Session/eligible checkout evidence or rotate P0. Main f2859b7c72d6e280b850cb253730989f22b01d46, formal data/status frozen; Owner five-row artifact LOCAL_ARTIFACT_NOT_MOUNTED. No status-only merge without separate authorization; no new Writer/PR.
