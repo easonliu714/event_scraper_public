@@ -5618,3 +5618,39 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, existing isolated Draft #236]
 ```
 
 **NEXT:** A exact same-event Session/eligible tier or canonical rotation; B Klook Event→Session and official hero ownership or P0 venue rotation. Original Owner 5-row artifact not mounted here; preserve prior 5-row/18-row PASS without fabricated re-QC. Do not publish or update formal data/status; status-only requires separate Owner authorization. Governance exclusively Draft #8.
+
+
+---
+
+### P30-L7-TIMELINE-PACKAGE-BOUNDARY-20261103T0458 — source-role tree (2026-11-03 04:58 Asia/Taipei)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, existing isolated Draft #236]
+├── A canonical ticket #03 tixCraft /activity/detail/26_forever [INDEXED_REVIEW]
+│   ├── Failed card payments 2026-10-04 14:00–14:30 → ATM reconciliation [REJECT as ticket Session]
+│   ├── Planned reconciliation release 2026-10-04 17:00 [REJECT as current stock]
+│   ├── Prior partial release 2026-10-13 18:00 [REVIEW, not live inventory]
+│   └── New A 2 REJECT; native GET 0; Session/eligible checkout price HOLD
+├── B P0 TMC venue /2026SingTheScene ↔ independent Klook Event 102001087 [REVIEW]
+│   ├── TMC direct official href https://s.klook.com/c/mXkdqlAMyQ [HOLD final redirect; not proven direct Event href]
+│   ├── Klook 2026-11-21 18:30 doors vs 19:30 show [REVIEW distinct roles]
+│   ├── Klook 2026-09-09 18:00 → 2026-11-20 23:59 presale [REVIEW, not show/stock]
+│   ├── Double-memory package 3200/2400 for TWO tickets [REJECT as single admission]
+│   ├── Restricted accessibility cassette 999/799/599 [REJECT as general admission]
+│   └── New B 4 REVIEW + 1 HOLD + 2 REJECT; Session/eligible minimum/image Golden HOLD
+├── validate_timeline_package_receipt [9 exact source/role/value/time/decision receipts]
+│   ├── Fail-closed: duplicate/cross-event/shortlink redirect claim, sale↔show, doors↔show
+│   ├── Fail-closed: 2-ticket package↔1-ticket minimum, restricted↔general, Session/stock
+│   └── All formal_accepted false; no Golden or production mutation
+├── Draft #236 HEAD fae1f6c39e0c7cbf33313ccd39215f0fa309d1f9
+│   ├── Exact-head CI #41524399780 SUCCESS, all steps PASS
+│   ├── Artifact #13178687284 sha256:2429bff6192ce25ee6370c7d26ee5a7161d1e4274d4baf61906830db855b66e8
+│   └── Original 4 ADD-only files; main formal data/status/index/scraper immutable
+├── Last 3 rounds A/B indexed reader 3/3; successful native official GET 0/3
+│   └── Same-root streak 3: NEXT rotate canonical A ticket + P0 B venue unless new proof
+├── Status-only Draft #53 OPEN stale [HOLD_NO_MERGE; no duplicate Writer]
+├── Owner L8 formal Android 5/5 USER_ATTESTED_PASS [CLOSED]
+└── FORMAL_FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+**Evidence:** [A tixCraft detail](https://tixcraft.com/activity/detail/26_forever), [B TMC official venue](https://www.tmc.taipei/tw/blog/show/2026SingTheScene), [B Klook independent ticket Event](https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/). Native GET attempted at standard bounded rate but DNS failed; public indexed reader does not count as native GET. Formal status 19-platform snapshot stale; no production update. Original five-row Owner sample `LOCAL_ARTIFACT_NOT_MOUNTED`; no fabricated read. Next prioritize source rotation and independent field acceptance readiness, not synthetic PR count. Governance serialized solely on Draft #8.
