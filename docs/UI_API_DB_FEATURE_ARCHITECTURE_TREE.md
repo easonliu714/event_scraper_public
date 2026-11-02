@@ -5534,4 +5534,49 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing Draft #236]
 
 #### P30-L7-KHAM-TMC-IMAGE-ROLE-CI-FINAL-READBACK (2026-11-03 01:57 Asia/Taipei)
 
-Independent final GitHub readback: [exact-head run #41495782054](https://github.com/easonliu714/event_scraper_public/actions/runs/41495782054) **completed SUCCESS** at PR #236 HEAD `d5d516615ada450f3624aab7f95a8ac5c38ec991`; `source-field-readiness` job and all 10 steps SUCCESS, including immutable formal release guard, positive/negative contract tests, SHA256 manifest and artifact upload. [Artifact #13166376633](https://github.com/easonliu714/event_scraper_public/actions/runs/41495782054/artifacts/13166376633) head matches exactly; digest `sha256:5dab360e7e67ee06bb12a1cb25484e0f80a3ca4903d0d51469b53c292fca7997`. `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` and `docs/platform_status.json` blob `cdeeb3b551e38f862c37759426a14b5129e1224d` independently unchanged. Formal FIELD/GOLDEN/PUBLISHED 0/0/0; native official CI GET 0. 
+Independent final GitHub readback: [exact-head run #41495782054](https://github.com/easonliu714/event_scraper_public/actions/runs/41495782054) **completed SUCCESS** at PR #236 HEAD `d5d516615ada450f3624aab7f95a8ac5c38ec991`; `source-field-readiness` job and all 10 steps SUCCESS, including immutable formal release guard, positive/negative contract tests, SHA256 manifest and artifact upload. [Artifact #13166376633](https://github.com/easonliu714/event_scraper_public/actions/runs/41495782054/artifacts/13166376633) head matches exactly; digest `sha256:5dab360e7e67ee06bb12a1cb25484e0f80a3ca4903d0d51469b53c292fca7997`. `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` and `docs/platform_status.json` blob `cdeeb3b551e38f862c37759426a14b5129e1224d` independently unchanged. Formal FIELD/GOLDEN/PUBLISHED 0/0/0; native official CI GET 0.
+
+---
+
+### P30-L7-PRICE-IMAGE-ROTATION-20261103T0300 — source-bound A/B role tree and no-publication boundary (2026-11-03 03:00 Asia/Taipei)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing Draft #236 only]
+├── A canonical ticket #03 tixCraft [new rotation, public indexed reader]
+│   ├── /activity/detail/26_forever [exact ticket event path; no Session ID]
+│   ├── SHOW 2026-11-28/29 19:00 [REVIEW, not sale/checkout]
+│   ├── Standard advertised tiers 5880/5280/4880/4280/3680/3280/2680/1680 [REVIEW, not stock/eligible minimum]
+│   ├── Restricted disability 2440/1840 [REVIEW, not general]
+│   ├── ibon collection 30 / conditional bank transfer 15 [REJECT as admission]
+│   └── A receipt classifications 3 REVIEW + 2 REJECT; native GET 0; formal 0
+├── B existing P0 Taipei TMC venue source [new event; not a new platform]
+│   ├── LIST /tw/blog/show → exact DETAIL /2026SingTheScene
+│   ├── SHOW 2026-11-21 19:30 / Legacy TERA [REVIEW]
+│   ├── Venue standard presale 1600/1200/800 [REVIEW, not ticket stock]
+│   ├── Restricted wheelchair/care 800/600/400 [REVIEW, not general]
+│   ├── Cassette bundle 1799/1399/999 [REJECT as base admission]
+│   ├── Venue says Klook [REVIEW only; no verified Klook Event ID/Session]
+│   ├── Official poster /files/20260916122654324.png [REVIEW source-owned]
+│   ├── Seat-map /files/20261015113836233.jpg [REJECT as hero]
+│   └── B receipt classifications 6 REVIEW + 2 REJECT; native GET 0; formal 0
+├── Exact role/value/URL/time provenance validator [validate_role_rotation_receipt]
+│   ├── 13 exact receipts + positive/negative tests; reject extra/duplicate/cross-event
+│   ├── No A↔B event merge, sale↔show, discount↔general or fee↔admission
+│   ├── No venue price↔ticket eligible tier, image↔seating chart or URL query laundering
+│   └── Ticket Session, stock, checkout, Golden and formal img_url remain NULL/HOLD
+├── Draft #236 HEAD 3afd7f1fcaf119872e0e60ff550df09fe0df88c1
+│   ├── CI #41505876755 SUCCESS, job all steps PASS
+│   ├── Artifact #13169553896 digest sha256:c411950b1d6b9d993fe1d522628e0f6bc7c240e7aa5518f618b6b7b4be52bb36
+│   ├── Four ADD-only paths; immutable main data/status/index/scraper/19-platform PASS
+│   └── Indexed official reader ≠ native GET; native 0/3 recent rounds
+├── Status-only Draft #53 OPEN, 2 ahead / 30 behind main [HOLD_NO_MERGE]
+│   ├── Old ibon L9-N overwrote baseline stages.detail/fields [must preserve]
+│   ├── Main reportDate 2026-10-28 / snapshot 2026-11-01 07:55 stale
+│   └── Reconcile main, independent exact-head CI, Owner separate release authority
+├── Owner L8 formal Android 5/5 USER_ATTESTED_PASS [CLOSED; #235 MERGED]
+└── FORMAL_FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+**Cross-round governance:** 00:52 KHAM/TMC indexed receipt, 01:55 KHAM poster/TMC seating-map reject, 03:00 tixCraft/TMC new-event role rotation. Both lines indexed source-read 3/3, successful native official GET 0/3, formal FIELD increment 0/3. Previous KHAM/TMC same-root streak 2 → rotated; 13 new role classifications are **not** 13 Golden fields or events. Original Owner 5-row artifact `LOCAL_ARTIFACT_NOT_MOUNTED`; no fabricated re-read. Source main `f2859b7c72d6e280b850cb253730989f22b01d46`, formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d` frozen. One hourly :55 Writer; only Governance Draft #8 updated serially; no new PR, no status Writer, no production mutation.
+
+**NEXT A:** legal bounded exact tixCraft ticket Session/eligible tier, otherwise another canonical platform. **NEXT B:** TMC same-event official image ownership/true ticket Event ID or next P0 Taipei/New Taipei source. Keep price role/image identity negative gates; no automatic publication.
