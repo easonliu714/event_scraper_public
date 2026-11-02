@@ -93,6 +93,8 @@ def validate(data):
         raise ValueError("TITLE_IDENTITY_MISMATCH")
     if not exact_https(by["A","ticket_event_url"],TICKET) or not exact_https(by["B","direct_ticket_event_url"],TICKET):
         raise ValueError("TICKET_EVENT_EDGE_HOLD")
+    if by["A","venue"] != "臺北表演藝術中心 藍盒子" or by["B","venue_room"] != "藍盒子":
+        raise ValueError("VENUE_ROOM_PARITY_HOLD")
     if by["A","age_min"] != 7 or by["B","age_min"] != 6:
         raise ValueError("AGE_CONFLICT_NOT_PRESERVED")
     if by["A","ticket_session_id"] is not None or by["A","admission_price"] is not None:
@@ -106,6 +108,13 @@ def validate(data):
     shows = by["B","showtimes"]
     if not isinstance(shows,list) or len(shows) != 12 or len(set(shows)) != 12:
         raise ValueError("VENUE_SHOWS_HOLD")
+    expected_shows = ["2026-11-05T19:30:00+08:00","2026-11-06T19:30:00+08:00",
+        "2026-11-07T14:30:00+08:00","2026-11-07T19:30:00+08:00",
+        "2026-11-08T14:30:00+08:00","2026-11-10T19:30:00+08:00",
+        "2026-11-11T19:30:00+08:00","2026-11-12T19:30:00+08:00",
+        "2026-11-13T19:30:00+08:00","2026-11-14T14:30:00+08:00",
+        "2026-11-14T19:30:00+08:00","2026-11-15T14:30:00+08:00"]
+    if shows != expected_shows: raise ValueError("SOURCE_EXACT_SHOWTIMES_HOLD")
     for show in shows:
         try:
             dt=datetime.fromisoformat(show)
