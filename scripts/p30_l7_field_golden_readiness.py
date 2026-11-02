@@ -152,6 +152,10 @@ def audit_l7_candidate_parity(source_contract, candidate):
         or not exact_https(row["url"], TICKET)
         or row["title"] != receipts[("A", "title")]["value"]):
         reasons.append("CANONICAL_EVENT_IDENTITY_MISMATCH")
+    # A candidate may not attach extra/duplicate HTTPS sources to launder
+    # unrelated event or venue evidence into this exact ticket Event ID.
+    if meta.get("sources") != [TICKET]:
+        reasons.append("UNVERIFIED_EXTRA_OR_DUPLICATE_SOURCE")
     # L7 may preserve the independently source-bound A venue, but it cannot
     # infer an eligible price, show date, ticket Session or cross-venue fields.
     if (row.get("location") != venue_receipt["value"]
