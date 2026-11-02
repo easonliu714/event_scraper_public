@@ -1,0 +1,66 @@
+name: EventRadar L8 candidate field provenance exact-head NO PUBLISH
+on:
+  pull_request:
+    paths:
+      - 'docs/index.html'
+      - 'tests/p30/test_candidate_review_ui_provenance.js'
+      - '.github/workflows/eventradar_p30_l8_review_field_guard.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review-field-guard:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'fix/eventradar-l8-review-field-provenance'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD and immutable formal data and changed-file scope
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          base=9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l8_review_field_guard.yml' 'docs/index.html' 'tests/p30/test_candidate_review_ui_provenance.js' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          echo PASS_EXACT_HEAD_FROZEN_DATA_STATUS_AND_THREE_FILE_SCOPE
+      - name: Existing L7 Python provenance regression
+        run: python -m unittest discover -s tests/p30 -p test_candidate_review_pipeline.py -v
+      - name: L8 inline JS syntax and field receipt regression
+        run: |
+          node tests/p30/test_candidate_review_ui_provenance.js
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('docs/index.html').read_text()
+          scripts=re.findall(r'<script>(.*?)</script>',html,re.S)
+          assert len(scripts)==1
+          Path('/tmp/eventradar_l8_inline.js').write_text(scripts[0])
+          PY
+          node --check /tmp/eventradar_l8_inline.js
+          echo PASS_L8_INLINE_JS_PARSE
+      - name: SHA manifest and immutable release receipt
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p review-guard-evidence
+          printf 'head=%s\nrelease=HARD_HOLD_NO_PUBLICATION\nformal_fields=0\ngolden=0\npublished=0\nkind=SYNTHETIC_REGRESSION_ONLY\n' "$HEAD_SHA" > review-guard-evidence/receipt.txt
+          sha256sum docs/index.html tests/p30/test_candidate_review_ui_provenance.js > review-guard-evidence/SOURCE_SHA256SUMS.txt
+          (cd review-guard-evidence && sha256sum receipt.txt SOURCE_SHA256SUMS.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-l8-review-field-provenance
+          path: review-guard-evidence/
+          if-no-files-found: error
+          retention-days: 30

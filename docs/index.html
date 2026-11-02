@@ -46,6 +46,10 @@
         #event-list { max-width: 800px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-height: 300px; }
         .card { background: var(--card); border-radius: 12px; padding: 12px; display: flex; gap: 12px; border: 1px solid #333; }
         .card.read { opacity: 0.6; }
+        .candidate-evidence{display:grid;gap:8px;margin:12px 0 18px}
+        .candidate-evidence-item{background:#243444;border-left:3px solid #60a5fa;padding:10px;border-radius:6px}
+        .candidate-evidence-item strong{display:block;color:#bfdbfe;font-size:.83rem}
+        .candidate-evidence-item span{display:block;white-space:pre-wrap;font-size:.9rem}
         .card-img { width: 90px; height: 90px; border-radius: 8px; background: #333; object-fit: cover; }
         .card-info { flex: 1; display: flex; flex-direction: column; gap: 4px; }
         .badges { display: flex; flex-wrap: wrap; gap: 4px; font-size: 0.75rem; }
@@ -157,6 +161,7 @@
             <div>💰 <b>票價：</b><span id="m-price" style="color:#ddd"></span></div>
         </div>
 
+        <section id="m-candidate-evidence" class="candidate-evidence" hidden aria-label="來源欄位（REVIEW）"></section>
         <div style="margin-bottom: 20px;">
             <h4 style="margin: 0 0 8px 0; color: #888; font-size: 0.9rem;">📝 活動簡介</h4>
             <p id="m-desc" style="color: #ccc; font-size: 0.95rem; line-height: 1.6; white-space: pre-line; max-height: 300px; overflow-y: auto;"></p>
@@ -227,6 +232,86 @@
         }
     });
 
+    // L8 REVIEW display boundary: row-level HTTPS and REVIEW flags do not prove
+    // an optional field. Only an exact source-bound REVIEW receipt may be shown.
+    // Missing/mismatched provenance stays 未確認, never a guessed event fact.
+    function candidateReviewField(row, meta, key, allowedRoles) {
+        const value = row[key];
+        if (typeof value !== 'string' || !value.trim()
+            || value.trim() === '未確認' || value.trim() === '詳內文')
+            return { value: '未確認', hold: null };
+        const receipt = meta.field_evidence && meta.field_evidence[key];
+        const sources = Array.isArray(meta.sources) ? meta.sources : [];
+        const timestamp = receipt && receipt.observed_at;
+        const validTime = typeof timestamp === 'string'
+            && /(Z|[+-]\d{2}:\d{2})$/i.test(timestamp)
+            && !Number.isNaN(Date.parse(timestamp));
+        const proven = receipt && typeof receipt === 'object'
+            && validTime && receipt.value === value
+            && typeof receipt.source === 'string'
+            && sources.includes(row.url) && sources.includes(receipt.source)
+            // No cross-event receipt may prove a local REVIEW field without
+            // a separately verified same-event identity edge in this schema.
+            && receipt.source === row.url
+            && isCandidateOfficialUrl(receipt.source)
+            && typeof receipt.role === 'string'
+            && allowedRoles.includes(receipt.role)
+            && receipt.decision === 'REVIEW';
+        return proven
+            ? { value, hold: null }
+            : { value: '未確認', hold: 'FIELD_' + key.toUpperCase() + '_PROVENANCE_HOLD' };
+    }
+
+
+    // L8: only an exact-source receipt can authorize a display-price summary.
+    // General admission is separated from service fees, VIP add-ons and presale conditions.
+    function candidatePriceSummary(value, receipt) {
+        if (value === '未確認' || !receipt || receipt.role !== 'EVENT_ADMISSION_PRICE'
+            || receipt.decision !== 'REVIEW') return '票價詳官方資訊';
+        const head = value.split(/[；;\n]/)[0].trim();
+        const normal = /^(?:一般票|標準票|一般入場票)\s*[:：]?\s*(.*)$/u.exec(head);
+        if (normal && !/服務費|手續費|加價|升級|優惠|折扣|補差額|會員|限資格/u.test(normal[1])) {
+            const amounts = [...normal[1].matchAll(/(?:NT\$\s*)?(\d{1,3}(?:,\d{3})+|\d{3,7})(?!\d)/g)]
+                .map(m => Number(m[1].replace(/,/g, ''))).filter(n => Number.isSafeInteger(n) && n > 0 && n < 1000000);
+            if (amounts.length) return 'NT$' + Math.min(...amounts).toLocaleString('en-US') + ' 起（詳官方）';
+        }
+        const presale = /^預售單日\s*NT\$\s*(\d{1,3}(?:,\d{3})+|\d{1,7})(?!\d)/u.exec(head);
+        if (presale) {
+            const n = Number(presale[1].replace(/,/g,''));
+            if (Number.isSafeInteger(n) && n > 0 && n < 1000000)
+                return '單日預售 NT$' + n.toLocaleString('en-US') + ' 起（依預售條件）';
+        }
+        return '票價詳官方資訊';
+    }
+    // Avoid network requests for unproven images supplied by local files.
+    function candidateReviewImage(row, meta) {
+        const r = meta.image_evidence;
+        if (!r || r.source !== row.url || r.image_url !== row.img_url
+            || r.role !== 'EVENT_IMAGE' || r.decision !== 'REVIEW'
+            || !Array.isArray(meta.sources) || !meta.sources.includes(row.url)
+            || typeof r.observed_at !== 'string'
+            || !/(Z|[+-]\d{2}:\d{2})$/i.test(r.observed_at)
+            || Number.isNaN(Date.parse(r.observed_at))
+            || !isCandidateOfficialUrl(row.img_url)) return null;
+        return new URL(row.img_url).href;
+    }
+    // In popup: vetted role-labelled text, never accepted as Golden.
+    function candidateReviewDetailEvidence(row, meta) {
+        const roles = new Set(['EVENT_DATE','VENUE_EVENT_DATE','OPEN_HOURS','SALE_START',
+            'SERVICE_FEE','EVENT_ADMISSION_PRICE','TICKET_PRODUCT_PRICE',
+            'VENUE_ADVERTISED_PRICE','EVENT_VENUE','VENUE_ORGANIZER','SOURCE_IDENTITY']);
+        if (!Array.isArray(meta.detail_evidence)) return [];
+        return meta.detail_evidence.slice(0,16).filter(r => r
+            && typeof r.label === 'string' && r.label.trim() && r.label.length <= 80
+            && typeof r.value === 'string' && r.value.trim() && r.value.length <= 500
+            && roles.has(r.role) && r.decision === 'REVIEW'
+            && r.source === row.url && Array.isArray(meta.sources) && meta.sources.includes(row.url)
+            && typeof r.observed_at === 'string'
+            && /(Z|[+-]\d{2}:\d{2})$/i.test(r.observed_at)
+            && !Number.isNaN(Date.parse(r.observed_at)))
+            .map(r => ({label:r.label,role:r.role,value:r.value}));
+    }
+
     // Review-only: an explicit local-file gesture, strict provenance and fail-closed checks.
     // The candidate dataset stays in memory and cannot trigger official activity notifications.
     async function loadCandidateReview(event) {
@@ -252,14 +337,28 @@
                     || typeof row.url !== 'string' || !isCandidateOfficialUrl(row.url)) {
                     throw new Error('第 ' + (i + 1) + ' 筆缺乏安全的 REVIEW 身分／官方 URL／未發布標記');
                 }
+                // Optional field values must have the same exact provenance
+                // contract as the isolated Python L7 review builder.
+                const fieldRoles = {
+                    date: ['EVENT_DATE', 'VENUE_EVENT_DATE'],
+                    location: ['EVENT_VENUE'],
+                    price: ['EVENT_ADMISSION_PRICE'],
+                    description: ['EVENT_DESCRIPTION']
+                };
+                const fields = Object.fromEntries(Object.entries(fieldRoles)
+                    .map(([key, roles]) => [key, candidateReviewField(row, meta, key, roles)]));
+                const holds = Object.values(fields).map(x => x.hold).filter(Boolean);
                 return {
                     title: row.title, url: row.url, platform: row.platform,
                     type: typeof row.type === 'string' ? row.type : '其他',
-                    date: typeof row.date === 'string' && row.date !== '詳內文' ? row.date : '未確認',
-                    location: typeof row.location === 'string' ? row.location : '未確認',
-                    price: typeof row.price === 'string' ? row.price : '未確認',
-                    description: typeof row.description === 'string' ? row.description : '',
-                    reasons: meta.hold_reasons.map(x => String(x)),
+                    date: fields.date.value,
+                    location: fields.location.value,
+                    price: fields.price.value,
+                    priceSummary: candidatePriceSummary(fields.price.value, meta.field_evidence && meta.field_evidence.price),
+                    imageUrl: candidateReviewImage(row, meta),
+                    detailEvidence: candidateReviewDetailEvidence(row, meta),
+                    description: fields.description.value === '未確認' ? '' : fields.description.value,
+                    reasons: [...meta.hold_reasons.map(x => String(x)), ...holds],
                     decision: meta.decision
                 };
             });
@@ -298,12 +397,21 @@
             for (const [value, css] of [
                 [eventItem.platform + '｜' + eventItem.decision, 'color:#fbbf24;font-size:0.8rem'],
                 [eventItem.title, 'font-weight:600;font-size:1.05rem'],
-                [eventItem.date + '｜' + eventItem.location, 'font-size:0.82rem;color:#a8b8c8']
+                [eventItem.date + '｜' + eventItem.location, 'font-size:0.82rem;color:#a8b8c8'],
+                [eventItem.priceSummary, 'font-size:0.85rem;color:#fcd34d']
             ]) {
                 const el = document.createElement('div');
                 el.style.cssText = css;
                 el.textContent = value;
                 body.append(el);
+            }
+            if (eventItem.imageUrl) {
+                const im = document.createElement('img');
+                im.className = 'card-img'; im.alt = '';
+                im.loading = 'lazy'; im.referrerPolicy = 'no-referrer';
+                im.src = eventItem.imageUrl;
+                im.addEventListener('error', () => im.remove());
+                card.append(im);
             }
             card.append(body);
             card.addEventListener('click', () => openCandidateDetail(i));
@@ -328,6 +436,20 @@
         link.href = e.url; link.rel = 'noopener noreferrer';
         const img = document.getElementById('m-img');
         img.removeAttribute('src'); img.style.display = 'none';
+        if (e.imageUrl) {
+            img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
+            img.onerror = () => { img.style.display = 'none'; img.removeAttribute('src'); };
+            img.src = e.imageUrl; img.style.display = 'block';
+        }
+        const evidence = document.getElementById('m-candidate-evidence');
+        evidence.replaceChildren(); evidence.hidden = !e.detailEvidence.length;
+        for (const entry of e.detailEvidence) {
+            const item = document.createElement('div'); item.className = 'candidate-evidence-item';
+            const label = document.createElement('strong');
+            label.textContent = entry.label + ' · ' + entry.role + '（REVIEW）';
+            const value = document.createElement('span'); value.textContent = entry.value;
+            item.append(label,value); evidence.append(item);
+        }
         document.getElementById('detail-modal').classList.add('open');
     }
 
@@ -335,6 +457,8 @@
         closeModal();
         candidateReviewActive = false;
         candidateReviewRows = [];
+        const evidence = document.getElementById('m-candidate-evidence');
+        evidence.replaceChildren(); evidence.hidden = true;
         for (const sel of ['#event-list', '.pagination', '.filter-section', '.list-header', '#search'])
             document.querySelector(sel).hidden = false;
         document.getElementById('candidate-review-list').hidden = true;
@@ -577,6 +701,74 @@
         renderPagination();
     }
 
+
+    // P30-L8 formal list summary is display-only and never changes event data.
+    // A price amount is shown only for a single unqualified general admission
+    // amount (not sale date, VIP add-on, discounted membership, service charge).
+    function formalCardPriceSummary(ev) {
+        // P30-L8 reconciliation: plain legacy price text is NOT admission proof.
+        // A receipt is an opt-in display gate, not an independent Golden audit.
+        if (!ev || ev._candidate || ev.formal_field_pass !== true
+            || ev.golden_accepted !== true || !isCandidateOfficialUrl(ev.url)
+            || typeof ev.price !== 'string') return '票價詳官方資訊';
+        const receipt = ev._formal_field_evidence && ev._formal_field_evidence.price;
+        if (!receipt || receipt.accepted !== true || receipt.decision !== 'GOLDEN_ACCEPTED'
+            || receipt.role !== 'EVENT_ADMISSION_PRICE' || receipt.source !== ev.url
+            || receipt.value !== ev.price || typeof receipt.observed_at !== 'string'
+            || !/(Z|[+-]\d{2}:\d{2})$/i.test(receipt.observed_at)
+            || Number.isNaN(Date.parse(receipt.observed_at)))
+            return '票價詳官方資訊';
+        const p = ev.price.trim();
+        if (p === '免費' || p === '免門票') return '免費（詳官方）';
+        const noClaim = /VIP|升級|加價|手續費|服務費|會員|優惠|限|資格|預售|早鳥|票況|售罄|缺票|套票|換票|折抵|登記|捐款/u;
+        // Labelled general-admission tiers may yield a "from" price only
+        // after the per-event GOLDEN_ACCEPTED receipt checks above. Do not
+        // mix VIP, presale, accessibility or service-fee products into the min.
+        const firstTier = p.split(/[；;\n]/)[0].trim();
+        const baseTier = /^(?:一般入場票|一般票|標準票)\s*[:：]?\s*(.+)$/u.exec(firstTier);
+        if (baseTier && !noClaim.test(firstTier)) {
+            const values = [];
+            const leftover = baseTier[1].replace(/(?:NT\$\s*)?(\d{1,3}(?:,\d{3})+|\d{3,7})(?:\s*元)?/gu,
+                (_, amount) => {
+                    const n = Number(amount.replace(/,/g, ''));
+                    values.push(n);
+                    return '#';
+                });
+            if (values.length && values.every(n => Number.isSafeInteger(n) && n > 0 && n < 1000000)
+                && /^[#\s／/,、]+$/u.test(leftover)) {
+                return 'NT$' + Math.min(...values).toLocaleString('en-US') + ' 起（詳官方）';
+            }
+        }
+        if (noClaim.test(p)) return '票價詳官方資訊';
+        // Never infer a minimum from unlabeled amounts or conditional tickets.
+        const single = /^(?:NT\$|新臺幣|新台幣)\s*(\d{1,3}(?:,\d{3})+|\d{1,7})\s*(?:元)?$/u.exec(p);
+        if (!single) return '票價詳官方資訊';
+        const n = Number(single[1].replace(/,/g, ''));
+        return Number.isSafeInteger(n) && n > 0 && n < 1000000
+            ? 'NT$' + n.toLocaleString('en-US') + '（詳官方）'
+            : '票價詳官方資訊';
+    }
+
+    // Only explicitly Golden-accepted formal source roles may be added to the
+    // standard modal; candidate REVIEW receipts cannot enter the formal path.
+    function formalEventDetailEvidence(ev) {
+        if (!ev || ev._candidate || ev.formal_field_pass !== true
+            || ev.golden_accepted !== true || !isCandidateOfficialUrl(ev.url)
+            || !Array.isArray(ev.detail_evidence)) return [];
+        const allowed = new Set(['EVENT_DATE','VENUE_EVENT_DATE','OPEN_HOURS','SALE_START',
+            'SERVICE_FEE','EVENT_ADMISSION_PRICE','TICKET_PRODUCT_PRICE',
+            'VENUE_ADVERTISED_PRICE','EVENT_VENUE','SOURCE_IDENTITY']);
+        return ev.detail_evidence.slice(0,20).filter(r => r
+            && typeof r.label === 'string' && r.label.trim() && r.label.length <= 80
+            && typeof r.value === 'string' && r.value.trim() && r.value.length <= 500
+            && r.source === ev.url && allowed.has(r.role)
+            && r.decision === 'GOLDEN_ACCEPTED'
+            && typeof r.observed_at === 'string'
+            && /(Z|[+-]\d{2}:\d{2})$/i.test(r.observed_at)
+            && !Number.isNaN(Date.parse(r.observed_at)))
+            .map(r => ({label:r.label,role:r.role,value:r.value}));
+    }
+
     function renderList() {
         const start = (currentPage - 1) * PAGE_SIZE;
         const pageData = filteredEvents.slice(start, start + PAGE_SIZE);
@@ -618,6 +810,7 @@
                         </div>
                         <div style="font-weight:500; font-size:1rem;">${e.title}</div>
                         <div style="font-size:0.8rem; color:#888;">${e.date || '詳內文'} ${e.location ? `| ${e.location}` : ''}</div>
+                        <div class="formal-card-price" style="font-size:0.82rem;color:#fbbf24;">💰 ${formalCardPriceSummary(e)}</div>
                     </div></div>`;
         }).join('');
     }
@@ -633,6 +826,8 @@
 
     function openDetail(url) {
         if (candidateReviewActive) return; // review records use a separate read-only detail handler
+        const evidence = document.getElementById('m-candidate-evidence');
+        evidence.replaceChildren(); evidence.hidden = true;
 
         const ev = allEvents.find(e => e.url === url);
         if(!ev) return;
@@ -654,6 +849,20 @@
         
         const desc = ev.description ? ev.description : '暫無詳細簡介，請點擊下方按鈕前往官網查看。';
         document.getElementById('m-desc').textContent = desc;
+
+        // Accepted role receipts supplement, but never replace, existing detail.
+        const formalEntries = formalEventDetailEvidence(ev);
+        evidence.hidden = !formalEntries.length;
+        for (const entry of formalEntries) {
+            const item = document.createElement('div');
+            item.className = 'candidate-evidence-item';
+            const label = document.createElement('strong');
+            label.textContent = entry.label + ' · ' + entry.role + '（正式已驗證）';
+            const value = document.createElement('span');
+            value.textContent = entry.value;
+            item.append(label,value);
+            evidence.append(item);
+        }
 
         const img = document.getElementById('m-img');
         if(ev.img_url) { 

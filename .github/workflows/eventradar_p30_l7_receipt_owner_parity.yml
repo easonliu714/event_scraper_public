@@ -1,0 +1,69 @@
+name: EventRadar L7 exact receipt owner parity NO PUBLISH
+on:
+  pull_request:
+    paths:
+      - 'scripts/p30_candidate_review_pipeline.py'
+      - 'tests/p30/test_candidate_review_pipeline.py'
+      - '.github/workflows/eventradar_p30_l7_receipt_owner_parity.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  l7-receipt-owner:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'fix/eventradar-l7-receipt-owner-parity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD, frozen formal data and three-file scope
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          base=9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_receipt_owner_parity.yml' 'scripts/p30_candidate_review_pipeline.py' 'tests/p30/test_candidate_review_pipeline.py' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          echo PASS_EXACT_HEAD_FROZEN_FORMAL_AND_THREE_FILE_SCOPE
+      - name: Existing and A B cross-source Python regression
+        run: |
+          python -m unittest discover -s tests/p30 -p test_candidate_review_pipeline.py -v
+          python -m py_compile scripts/p30_candidate_review_pipeline.py
+      - name: Synthetic candidate isolation and SHA manifest
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p l7-receipt-evidence
+          python scripts/p30_candidate_review_pipeline.py --input tests/fixtures/p30_candidate_review_synthetic.json --output-dir l7-receipt-evidence --repo-root .
+          (cd l7-receipt-evidence && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('l7-receipt-evidence')
+          d=json.loads((p/'data.json').read_text())
+          q=json.loads((p/'quality_report.json').read_text())
+          assert len(d)==2 and q['previewRows']==2 and q['formalFieldAccepted']==0
+          assert q['goldenAccepted']==0 and q['published']==0
+          assert q['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert all(x['_candidate']['published'] is False for x in d)
+          print('PASS_REVIEW_ONLY_ZERO_GOLDEN_ZERO_PUBLICATION')
+          PY
+          printf 'head=%s\nkind=SYNTHETIC_REGRESSION_ONLY\nrelease=HARD_HOLD_NO_PUBLICATION\n' "$HEAD_SHA" > l7-receipt-evidence/receipt.txt
+          sha256sum scripts/p30_candidate_review_pipeline.py tests/p30/test_candidate_review_pipeline.py > l7-receipt-evidence/SOURCE_SHA256SUMS.txt
+          (cd l7-receipt-evidence && sha256sum receipt.txt SOURCE_SHA256SUMS.txt >> SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-l7-receipt-owner-parity
+          path: l7-receipt-evidence/
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,66 @@
+name: EventRadar L8 source-safe summary exact-head NO PUBLISH
+on:
+  pull_request:
+    paths:
+      - 'docs/index.html'
+      - 'tests/p30/test_candidate_source_summary.js'
+      - '.github/workflows/eventradar_p30_l8_source_summary.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  candidate-summary:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-l8-source-summary-modal-image'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD and frozen formal payload
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          base=18e64bd249e49668cdd7ba49c796809b7ccc89ce
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l8_source_summary.yml' 'docs/index.html' 'tests/p30/test_candidate_source_summary.js' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          echo PASS_EXACT_HEAD_FROZEN_THREE_FILE_SCOPE
+      - name: Existing L7 and L8 provenance regression
+        run: |
+          python -m unittest discover -s tests/p30 -p test_candidate_review_pipeline.py -v
+          node tests/p30/test_candidate_review_ui_provenance.js
+      - name: Role-aware price summary and image fail-closed
+        run: |
+          node tests/p30/test_candidate_source_summary.js
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          x=re.findall(r'<script>(.*?)</script>',Path('docs/index.html').read_text(),re.S)
+          assert len(x)==1
+          Path('/tmp/eventradar_l8.js').write_text(x[0])
+          PY
+          node --check /tmp/eventradar_l8.js
+      - name: Immutable SHA manifest and release receipt
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p summary-evidence
+          printf 'head=%s\nrelease=HARD_HOLD_NO_PUBLICATION\nformal_fields=0\ngolden=0\npublished=0\n' "$HEAD_SHA" > summary-evidence/receipt.txt
+          sha256sum docs/index.html tests/p30/test_candidate_source_summary.js > summary-evidence/SOURCE_SHA256SUMS.txt
+          (cd summary-evidence && sha256sum receipt.txt SOURCE_SHA256SUMS.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-l8-summary-source-review
+          path: summary-evidence/
+          if-no-files-found: error
+          retention-days: 30
