@@ -28,12 +28,18 @@ def inspect(obs,observed_at):
         out["decision"]="HOLD_PERIOD_EVIDENCE";return out
     if obs.get("shows")!=SHOWS or obs.get("price")!=600 or obs.get("venue")!="臺北表演藝術中心":
         out["decision"]="HOLD_DETAIL_ROLES";return out
+    # OPENTIX Event text lists 11/11, 11/12, 11/13 themes, not year-bound ticket Session IDs.
+    # Its dated package-sale window must never be interpreted as an event/show date.
+    if obs.get("ticket_program_month_days")!=["11/11","11/12","11/13"] or obs.get("ticket_bundle_sale_period")!=["2026-09-07","2026-11-13"]:
+        out["decision"]="HOLD_TICKET_PROGRAM_ROLE_EVIDENCE";return out
     for key in ("ticket_session_id","ticket_inventory","published_event","golden_accepted"):
         if key in obs and not (obs[key] is None or obs[key] is False or (isinstance(obs[key],str) and obs[key]=="")):
             out["decision"]="HOLD_UNVERIFIED_TICKET_CLAIM";return out
     facts=[("title",TITLE,"VENUE_DETAIL_TITLE"),("detail_period_start","2026-11-11","DETAIL_PERIOD"),
            ("detail_period_end","2026-11-13","DETAIL_PERIOD"),("price",600,"VENUE_ADVERTISED_PRICE")]
     facts.extend(("venue_show_"+str(i+1),value,"VENUE_ANNOUNCED_SESSION_NOT_TICKET_ID") for i,value in enumerate(SHOWS))
-    out["candidateFields"]=[{"field":key,"value":value,"role":role,"source":DETAIL,"observed_at":observed_at,"decision":"REVIEW"} for key,value,role in facts]
-    out["decision"]="HOLD_LIST_DETAIL_DATE_CONFLICT"
+    facts.extend(("ticket_program_day_"+str(i+1),v,"TICKET_PROGRAM_MONTH_DAY_NOT_SESSION") for i,v in enumerate(obs["ticket_program_month_days"]))
+    facts.append(("ticket_bundle_sale_period","2026-09-07~2026-11-13","TICKET_PACKAGE_SALE_NOT_SHOW"))
+    out["candidateFields"]=[{"field":key,"value":value,"role":role,"source":TICKET if key.startswith("ticket_") else DETAIL,"observed_at":observed_at,"decision":"REVIEW"} for key,value,role in facts]
+    out["decision"]="HOLD_LIST_DETAIL_DATE_CONFLICT_TICKET_PROGRAM_CORROBORATED"
     return out
