@@ -7,14 +7,18 @@ def sample():
     return {"list_url":m.LIST,"venue_detail_url":m.DETAIL,"direct_ticket_url":m.TICKET,
             "list_title":m.TITLE,"venue_title":m.TITLE,"ticket_title":m.TITLE,
             "venue_room":"藍盒子","ticket_venue":"臺北表演藝術中心 藍盒子",
+            "list_advertised_range":["2026-11-04","2026-11-14"],
+            "detail_advertised_range":["2026-11-05","2026-11-15"],
+            "ticket_advertised_range":["2026-11-05","2026-11-15"],
             "show_times":list(m.SHOWS),"venue_advertised_price_range":[1200,2200],
             "venue_age_min":6,"ticket_age_min":7,"ticket_notice_city":"嘉義市",
             "ticket_notice_date":"2026-11-01"}
 class Gate(unittest.TestCase):
-    def test_seven_source_bound_receipts_and_one_event_edge(self):
+    def test_ten_source_bound_receipts_and_one_event_edge(self):
         x=m.inspect(sample(),NOW)
         self.assertEqual(x["decision"],"REVIEW_EXACT_TICKET_EVENT_EDGE_AGE_CONFLICT_SESSION_HOLD")
-        self.assertEqual(len(x["candidateFields"]),7)
+        self.assertEqual(len(x["candidateFields"]),10)
+        self.assertTrue(x["listDetailRangeConflict"])
         self.assertEqual({f["source"] for f in x["candidateFields"]},{m.LIST,m.DETAIL,m.TICKET})
         self.assertEqual({f["decision"] for f in x["candidateFields"]},{"REVIEW"})
         self.assertEqual((x["ticketEventIdsVerified"],x["ticketSessionIdsVerified"],x["acceptedFields"],x["goldenAccepted"],x["published"]),(1,0,0,0,False))
@@ -25,6 +29,17 @@ class Gate(unittest.TestCase):
                           ("ticket_title","另一個小王子"),("venue_room","大劇院")):
             with self.subTest(key=key):
                 a=sample();a[key]=value;self.assertEqual(m.inspect(a,NOW)["candidateFields"],[])
+    def test_index_detail_ticket_range_conflict_fail_closed(self):
+        for key,value,reason in (
+            ("list_advertised_range",["2026-11-05","2026-11-15"],"HOLD_LIST_DATE_RANGE_UNVERIFIED"),
+            ("list_advertised_range",None,"HOLD_LIST_DATE_RANGE_UNVERIFIED"),
+            ("detail_advertised_range",["2026-11-04","2026-11-14"],"HOLD_DETAIL_TICKET_DATE_RANGE_PARITY"),
+            ("ticket_advertised_range",["2026-11-04","2026-11-14"],"HOLD_DETAIL_TICKET_DATE_RANGE_PARITY")):
+            with self.subTest(key=key,value=value):
+                a=sample();a[key]=value;x=m.inspect(a,NOW)
+                self.assertEqual(x["decision"],reason)
+                self.assertEqual(x["candidateFields"],[])
+                self.assertEqual((x["acceptedFields"],x["published"]),(0,False))
     def test_session_list_and_advertised_price_roles(self):
         for key,value in (("show_times",list(m.SHOWS[:-1])),
                           ("show_times",list(m.SHOWS[:-1])+[m.SHOWS[0]]),
