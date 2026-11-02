@@ -5486,3 +5486,36 @@ Existing [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/2
 
 Status-only existing Draft #53 remains OPEN and unmerged. Root cause of old CI FAIL: overwriting immutable ibon baseline stages.fields instead of preserving it and attaching L9-N in separate evidence. Current main reportDate 2026-10-28 / snapshot 2026-11-01 07:55; retain 19 platform IDs and formal data blob. No status writer duplication or merge. Formal FIELD/GOLDEN/PUBLISHED remain 0; HARD_HOLD_NO_PUBLICATION and L8 formal Android USER_ATTESTED_PASS 5/5 CLOSED unchanged.
 
+
+---
+
+### P30-L7-KHAM-TMC-ROLE-CONTRACT-20261103T0052 — bounded source-to-field architecture (2026-11-03 00:52 Asia/Taipei)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing Draft #236]
+├── A canonical KHAM #04, PRODUCT_ID=P1DF32E2 [indexed official reader, NOT native GET]
+│   ├── Exact official ticket detail title and source product identity REVIEW
+│   ├── SALE_OPEN 2026-08-22 12:00 / age 6+ recommendation / one-person-one-ticket REVIEW
+│   └── Session ID / eligible admission price / stock / checkout / ticket image HOLD
+├── B P0 Taipei TMC existing venue source [LIST→exact DETAIL 2026SungNien-Yu]
+│   ├── SHOW 2026-11-07 19:30, TMC 表演廳 REVIEW
+│   ├── Venue advertised tiers 4280/3880/3480/2880/2480/1880 TWD REVIEW
+│   ├── Exact direct KHAM PRODUCT_ID link REVIEW; not ticket Session or formal tier
+│   └── Image URL ownership UNKNOWN; no new platform or adapter
+├── Independent source/role/value/observed_at contract [9 receipts A4/B5, distinct event]
+│   ├── Source URLs exactly TMC LIST/DETAIL and KHAM PRODUCT_ID query
+│   ├── Ticket SALE vs venue SHOW must never cross; advertised ≠ eligible price
+│   ├── Ticket Event title vs venue Event title preserve exact source values
+│   ├── Reject wrong product ID, wrong source, role, timestamp, forged tier/session/image
+│   └── REVIEW-only, formal_accepted=false, native_get=0, Golden=0, publication=0
+├── Existing Draft #236 exact HEAD 2ee12d58d136ce181890de687ca42da62b4a8b90
+│   ├── CI #41485873795 SUCCESS, artifact #13160759499
+│   ├── GitHub digest sha256:00a70a38d722434996dab032e4d8f401d6b689c5aeae3d028cd16ebd8fcfc536
+│   └── Four ADD-only paths; immutable data/status/index/scraper and 19-platform PASS
+├── Existing OPENTIX/TPAC A4/B5 receipts remain separate, no cumulative formal promotion
+├── L8 formal PWA Android 5/5 USER_ATTESTED_PASS CLOSED (#235 MERGED)
+├── Legacy status Draft #53 OPEN/stale; main status snapshot 2026-11-01 07:55
+└── FORMAL_FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+**NEXT:** A exact KHAM ticket tier/session eligibility only with independently observed public official receipt; B TMC same-event image ownership then rotate P0 venue if blocked. Indexed reader is not CI-native official GET. Original Owner 5-row artifact not mounted in this run; do not claim a fresh 5-row QC. Governance remains solely Draft #8; do not alter main/production or create competing status Writer/PR.
