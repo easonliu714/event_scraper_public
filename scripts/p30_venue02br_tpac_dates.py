@@ -29,7 +29,7 @@ def inspect(obs,observed_at):
     if obs.get("shows")!=SHOWS or obs.get("price")!=600 or obs.get("venue")!="臺北表演藝術中心":
         out["decision"]="HOLD_DETAIL_ROLES";return out
     for key in ("ticket_session_id","ticket_inventory","published_event","golden_accepted"):
-        if key in obs and obs[key] not in (None,False,""):
+        if key in obs and not (obs[key] is None or obs[key] is False or (isinstance(obs[key],str) and obs[key]=="")):
             out["decision"]="HOLD_UNVERIFIED_TICKET_CLAIM";return out
     facts=[("title",TITLE,"VENUE_DETAIL_TITLE"),("detail_period_start","2026-11-11","DETAIL_PERIOD"),
            ("detail_period_end","2026-11-13","DETAIL_PERIOD"),("price",600,"VENUE_ADVERTISED_PRICE")]
