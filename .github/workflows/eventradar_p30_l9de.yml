@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@v5
@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euo pipefail
           base=9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
-          test "$(git rev-parse HEAD)" = "\${{ github.event.pull_request.head.sha }}"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
           expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l9de.yml' 'scripts/p30_l9de_kham_tmc_edge.py' 'tests/p30/test_p30_l9de_kham_tmc_edge.py' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
