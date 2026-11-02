@@ -25,6 +25,10 @@ def inspect(row, observed_at):
         out["decision"]="HOLD_EXACT_ACTIVITY_GAME_PATH"; return out
     if row.get("detail_title") != TITLE or row.get("game_title") != TITLE:
         out["decision"]="HOLD_SAME_EVENT_TITLE"; return out
+    # Official activity terms require member registration and phone verification
+    # before purchase. This is a checkout access gate, never a ticket Session ID.
+    if row.get("purchase_requires_membership") is not True or row.get("purchase_requires_phone_verification") is not True:
+        out["decision"]="HOLD_CHECKOUT_ACCESS_REQUIREMENTS_UNVERIFIED"; return out
     rows = row.get("rows")
     if not isinstance(rows,list) or len(rows)!=4:
         out["decision"]="HOLD_FOUR_GAME_ROWS"; return out
@@ -37,7 +41,9 @@ def inspect(row, observed_at):
     for key in ("ticket_session_id","session_ids","checkout_url","inventory","sold_out","seat_status","golden_accepted"):
         if key in row and row[key] is not None:
             out["decision"]="HOLD_UNVERIFIED_GAME_CLAIM"; return out
-    fields=[("game_url",GAME,"PUBLIC_GAME_ROUTE_NOT_CHECKOUT"),
+    fields=[("purchase_requires_membership",DETAIL,"MEMBERSHIP_REQUIRED_NOT_SESSION_ACCESS"),
+            ("purchase_requires_phone_verification",DETAIL,"PHONE_VERIFICATION_REQUIRED_NOT_CHECKOUT_PROOF"),
+            ("game_url",GAME,"PUBLIC_GAME_ROUTE_NOT_CHECKOUT"),
             ("rows",GAME,"FOUR_SHOW_PRIORITY_ROWS_NOT_SESSION_IDS"),
             ("detail_title",DETAIL,"SAME_EVENT_IDENTITY_NOT_STOCK")]
     out["candidateFields"]=[{"field":field,"value":row[field],"source":source,
