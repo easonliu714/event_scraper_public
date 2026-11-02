@@ -110,6 +110,13 @@ class Readiness(unittest.TestCase):
             changed = copy.deepcopy(raw); changed["_candidate"][key] = value
             with self.subTest(meta=key):
                 self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
+        for untrusted_sources in ([m.TICKET, m.VENUE], [m.TICKET, m.TICKET], [m.VENUE, m.TICKET]):
+            changed = copy.deepcopy(raw)
+            changed["_candidate"]["sources"] = untrusted_sources
+            with self.subTest(sources=untrusted_sources):
+                outcome = m.audit_l7_candidate_parity(data, changed)
+                self.assertEqual(outcome["decision"], "HOLD")
+                self.assertIn("UNVERIFIED_EXTRA_OR_DUPLICATE_SOURCE", outcome["reasons"])
         changed = copy.deepcopy(raw)
         changed["_candidate"]["field_evidence"]["location"]["source"] = m.VENUE
         self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
