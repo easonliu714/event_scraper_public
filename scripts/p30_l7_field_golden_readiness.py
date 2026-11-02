@@ -467,6 +467,91 @@ def validate_timeline_package_receipt(evidence):
             "golden":0,"published":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
 
+# 2026-11-03 05:55 Asia/Taipei: rotate BOTH workstreams to independent
+# canonical sources. Indexed public source reads are not native GET or Golden.
+# A same-ID detail/GAME conflicts with body and poster time (19:30 vs 19:00).
+# B venue rid=160668 directly links KKTIX, which distinguishes 3 ticket
+# options, 2 SHOW dates, FC-only two-day pass and restricted admission.
+MYCELIUM_DETAIL = "https://www.indievox.com/activity/detail/26_iv04256e8"
+MYCELIUM_GAME = "https://www.indievox.com/activity/game/26_iv04256e8"
+MYCELIUM_POSTER = "https://indievox.static.tixcraft.com/images/activity/26_iv04256e8_37bc28c64de943aeb6fecf15fd7916a6.jpg"
+ZEPP_TAKASE_LIST = "https://www.zepp.co.jp/hall/newtaipei/"
+ZEPP_TAKASE_DETAIL = "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668"
+KKTIX_TAKASE = "https://freeplanetml.kktix.cc/events/takasetoya202611"
+ZEPP_TAKASE_POSTER = "https://www.zepp.co.jp/data/Reserved/image_160668_1"
+KKTIX_TAKASE_POSTER = "https://assets.kktix.io/organization_resource_files/7267/80108/6c8115f58e266791.jpg"
+ROTATED_EVENT_FIELDS = {
+    "a_event_title": ("A",MYCELIUM_DETAIL,"SAME_ID_EVENT_TITLE","菌網 MYCELIUM","REVIEW"),
+    "a_header_show": ("A",MYCELIUM_DETAIL,"HEADER_SHOWTIME_CONFLICT_NOT_FORMAL","2026-11-13T19:30:00+08:00","REVIEW"),
+    "a_game_show": ("A",MYCELIUM_GAME,"SAME_ID_GAME_ROW_SHOWTIME_NOT_CHECKOUT","2026-11-13T19:30:00+08:00","REVIEW"),
+    "a_body_show": ("A",MYCELIUM_DETAIL,"BODY_SHOWTIME_CONFLICT_WITH_HEADER_GAME_POSTER","2026-11-13T19:00:00+08:00","HOLD_CONFLICT"),
+    "a_single_presale": ("A",MYCELIUM_DETAIL,"ADVERTISED_SINGLE_PRESELL_NOT_STOCK",700,"REVIEW"),
+    "a_two_person_total": ("A",MYCELIUM_DETAIL,"TWO_PERSON_BUNDLE_NOT_SINGLE_PRICE",1200,"REJECT_FOR_SINGLE_MIN"),
+    "a_accessibility": ("A",MYCELIUM_DETAIL,"RESTRICTED_ACCESSIBILITY_NOT_GENERAL",350,"REJECT_FOR_GENERAL_MIN"),
+    "a_event_poster": ("A",MYCELIUM_DETAIL,"SOURCE_LINKED_POSTER_TIME_CONFLICT_REVIEW_ONLY",MYCELIUM_POSTER,"REVIEW"),
+    "a_ticket_session": ("A",MYCELIUM_GAME,"TICKET_SESSION_ID_NOT_VISIBLE",None,"HOLD"),
+    "b_venue_shows": ("B",ZEPP_TAKASE_DETAIL,"VENUE_ANNOUNCED_TWO_SHOWS_NOT_TICKET_SESSIONS",["2026-11-07T18:00:00+08:00","2026-11-08T17:00:00+08:00"],"REVIEW"),
+    "b_direct_ticket_event": ("B",ZEPP_TAKASE_DETAIL,"DIRECT_KKTIX_EVENT_URL_NOT_SESSION",KKTIX_TAKASE,"REVIEW"),
+    "b_ticket_options": ("B",KKTIX_TAKASE,"KKTIX_THREE_DISTINCT_TICKET_OPTIONS_NOT_SESSION_IDS",["TWO_DAY_PASS","NOV_07_SINGLE_DAY","NOV_08_SINGLE_DAY"],"REVIEW"),
+    "b_kktix_showtimes": ("B",KKTIX_TAKASE,"TICKET_ANNOUNCED_SHOWTIMES_NOT_STOCK",["2026-11-07T18:00:00+08:00","2026-11-08T17:00:00+08:00"],"REVIEW"),
+    "b_general_single": ("B",KKTIX_TAKASE,"SINGLE_DAY_GENERAL_ADVERTISED_NOT_CHECKOUT",1480,"REVIEW"),
+    "b_fanclub_two_day": ("B",KKTIX_TAKASE,"FC_RESTRICTED_TWO_DAY_PASS_NOT_SINGLE_ADMISSION",2600,"REJECT_FOR_SINGLE_MIN"),
+    "b_accessibility": ("B",KKTIX_TAKASE,"RESTRICTED_ACCESSIBILITY_NOT_GENERAL",900,"REJECT_FOR_GENERAL_MIN"),
+    "b_pickup_fee": ("B",KKTIX_TAKASE,"PER_ORDER_PICKUP_FEE_NOT_ADMISSION",30,"REJECT_FOR_ADMISSION"),
+    "b_venue_poster": ("B",ZEPP_TAKASE_DETAIL,"VENUE_EVENT_POSTER_REVIEW_ONLY",ZEPP_TAKASE_POSTER,"REVIEW"),
+    "b_ticket_poster": ("B",KKTIX_TAKASE,"TICKET_EVENT_POSTER_REVIEW_ONLY",KKTIX_TAKASE_POSTER,"REVIEW"),
+    "b_ticket_session": ("B",KKTIX_TAKASE,"TICKET_SESSION_ID_NOT_IN_INDEXED_TEXT",None,"HOLD"),
+    "b_current_stock": ("B",KKTIX_TAKASE,"LIVE_INVENTORY_UNVERIFIED",None,"HOLD"),
+}
+
+def validate_rotated_event_receipt(evidence):
+    """Strict A/B exact event, source, role and price receipt; never publishes."""
+    if not isinstance(evidence,dict) or evidence.get("kind")!="P30_L7_A_B_SOURCE_ROTATION_V1":
+        raise ValueError("ROTATION_KIND_HOLD")
+    if (evidence.get("observation_method")!="PUBLIC_INDEXED_TEXT_READER_REOBSERVATION"
+        or evidence.get("release_state")!="HARD_HOLD_NO_PUBLICATION"
+        or any(type(evidence.get(k)) is not int or evidence[k]!=0 for k in
+               ("native_official_get","formal_accepted_fields","golden_accepted_events","published_events"))):
+        raise ValueError("ROTATION_RELEASE_OR_NATIVE_HOLD")
+    if evidence.get("sources")!={"A_detail":MYCELIUM_DETAIL,"A_game":MYCELIUM_GAME,
+                                  "B_venue_list":ZEPP_TAKASE_LIST,"B_venue_detail":ZEPP_TAKASE_DETAIL,
+                                  "B_ticket_detail":KKTIX_TAKASE}:
+        raise ValueError("ROTATION_SOURCE_ALLOWLIST_HOLD")
+    if evidence.get("identity")!={"A_event_id":"26_iv04256e8","A_game_event_id":"26_iv04256e8",
+        "A_header_game_time_conflict_with_body_poster":True,"A_ticket_session_id":None,
+        "B_venue_rid":"160668","B_ticket_event_url":KKTIX_TAKASE,
+        "B_ticket_session_id":None,"B_fanclub_two_day_is_single_day":False,
+        "formal_eligible_checkout_min":None,"formal_img_url":None,
+        "cross_event_identity_merge":False}:
+        raise ValueError("ROTATION_IDENTITY_CONFLICT_OR_SESSION_HOLD")
+    rows=evidence.get("field_receipts")
+    if not isinstance(rows,list) or len(rows)!=len(ROTATED_EVENT_FIELDS):
+        raise ValueError("ROTATION_FIELD_COUNT_HOLD")
+    seen=set()
+    for row in rows:
+        if not isinstance(row,dict) or row.get("name") not in ROTATED_EVENT_FIELDS:
+            raise ValueError("ROTATION_UNKNOWN_FIELD_HOLD")
+        name=row["name"]
+        if name in seen: raise ValueError("ROTATION_DUPLICATE_FIELD_HOLD")
+        seen.add(name)
+        line,source,role,value,decision=ROTATED_EVENT_FIELDS[name]
+        if (row.get("line")!=line or not exact_source_url(row.get("source"),source)
+            or row.get("role")!=role or type(row.get("value")) is not type(value)
+            or row.get("value")!=value or row.get("decision")!=decision
+            or row.get("formal_accepted") is not False):
+            raise ValueError("ROTATION_SOURCE_ROLE_VALUE_HOLD")
+        try:
+            stamp=datetime.fromisoformat(row["observed_at"].replace("Z","+00:00"))
+            if stamp.utcoffset() is None: raise ValueError()
+        except (ValueError,TypeError,KeyError,AttributeError):
+            raise ValueError("ROTATION_TIMESTAMP_HOLD")
+    if seen!=set(ROTATED_EVENT_FIELDS): raise ValueError("ROTATION_MISSING_FIELD_HOLD")
+    return {"A_review":5,"A_conflict_hold":1,"A_reject_general_price":2,"A_session_hold":1,
+            "B_review":7,"B_reject_general_price":3,"B_session_stock_hold":2,
+            "native_get":0,"formal_accepted":0,"golden":0,"published":0,
+            "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
