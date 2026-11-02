@@ -5069,3 +5069,43 @@ FORMAL
 
 - Official source-reader evidence 2026-11-02: [FamiTicket TECA](https://www.famiticket.com.tw/Home/Activity/Info/MABvAE4ALwBxAEkAcQB3ADkAawB0AHUASgBlAGwAZwA3AGkAOQBsAEwATwBsAHIAOQBpADIANQBuAEkAcQBmAHYAZwBOADAAegBlAE0AQQBtAEwAZwA9AA2), [TMC Diana Krall](https://www.tmc.taipei/tw/blog/show/DianaKrall2026). These are public source-reader observations, not native CI GET. A 1/3 and B 2/3 new official source-reader rounds over 08:58/09:55/10:59; offline-only streak 0/0; accepted fields 0/0. CI SHA256SUMS internal PASS; independent artifact ZIP CRC UNVERIFIED.
 - NEXT A: investigate another safe same-ID canonical source or L7 #212 source-owner provenance; B: independently verify MNA Event/Session only with explicit source link, else rotate P0 Taipei/New Taipei. No redundant GET, no new platform duplicate, no automatic Golden or publication.
+
+---
+
+### 2026-11-02 — P30-L7-REAL18-QC: recovered real 18-row dataset / candidate provenance architecture
+
+```text
+Git authority:
+  Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb [UNCHANGED]
+  Preview main 03e515d65e827d5ed67fe341d079907a96bf784a [UNCHANGED]
+  ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad [UNCHANGED]
+Existing LIVE:
+  #210 local candidate REVIEW picker merged/deployed (Pages #41316070328 SUCCESS)
+Existing DRAFT:
+  #211 L8 field provenance guard; #212 L7 receipt.source == row.url; unmerged
+  A #221 FamiTicket TECA same-source REVIEW CI SUCCESS
+  B #222 TMC Diana Krall venue-to-MNA REVIEW CI SUCCESS
+REAL DATA QC:
+  recovered Owner JSON exact 26,650 UTF-8 bytes including final LF
+  SHA256 35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603
+  18/18 structural REVIEW pass; 18 exact detail URLs listed in their sources
+  18 unique (platform_id, source_event_id); display platform labels=13
+  source class A=14 / B=4
+  per-field review receipts date=0/18, location=0/18, price=0/18, description=0/18
+  14 rows carried unproven sessions -> quarantine all in SafeReview
+  SafeReview SHA256 3ad01698dbcf1efac3895c5da87c52e5e965ea165f34ad59f6b0c1d932df3caf
+  per-row QC JSON SHA256 f6c65db1d3b2a8b92b03c4fbf2c190f97c9e272e7b8e4ebc26ea33a46657ba72
+  Local UAT ZIP SHA256 83432b3d8c1d5d0a4a600f46f32447dadc8a202e9d392089301039cb251622b5
+  local ZIP CRC and member byte equality PASS
+RELEASE:
+  formal docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [UNCHANGED]
+  formal docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d [UNCHANGED]
+  reportDate 2026-10-28; engineering snapshot 2026-11-01 07:55 STALE
+  FORMAL FIELD=0 / Golden=0 / published=0 / HARD_HOLD_NO_PUBLICATION
+  Android real candidate list/detail/back UAT PENDING_OWNER
+  CKSMH5/TWTC39 USER_ATTESTED_PASS retained
+  Live PWA HTTP readback UNVERIFIED (historical Pages CI != runtime proof)
+```
+
+- **Data/control flow:** authorized project file → byte-exact original recovery → bounded structural source-ID/provenance QC → isolated in-memory local PWA REVIEW. Separate, independently generated *SafeReview* JSON masks all unsupported optional display fields and quarantines unverified sessions while preserving original for audit. Quality report and local ZIP are conversation download artifacts, **not** a third formal governance document, a new permanent repository dataset, or formal publisher input.
+- **Next missing Gate:** Owner Android import/card/detail/return test with SafeReview and independent #211/#212 source-field safety review; UI-only merge requires separate authorization. A/B source-first official event identity/field verification continues independently. No duplicate Writer, new adapter, live GET, forced publication or main mutation in this QC.
