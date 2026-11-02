@@ -1,0 +1,98 @@
+name: EventRadar L8 verified UI-only integration exact-head
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/eventradar_p30_l7_receipt_owner_parity.yml'
+      - '.github/workflows/eventradar_p30_l8_formal_card.yml'
+      - '.github/workflows/eventradar_p30_l8_review_field_guard.yml'
+      - '.github/workflows/eventradar_p30_l8_source_summary.yml'
+      - '.github/workflows/eventradar_p30_l8_verified_integration.yml'
+      - 'docs/index.html'
+      - 'scripts/p30_candidate_review_pipeline.py'
+      - 'tests/p30/test_candidate_review_pipeline.py'
+      - 'tests/p30/test_candidate_review_ui_provenance.js'
+      - 'tests/p30/test_candidate_source_summary.js'
+      - 'tests/p30/test_formal_card_role_summary.js'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  ui-only-integration:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'integration/eventradar-p30-l8-ui-only-verified'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD and immutable production boundaries
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          base=9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_receipt_owner_parity.yml' '.github/workflows/eventradar_p30_l8_formal_card.yml' '.github/workflows/eventradar_p30_l8_review_field_guard.yml' '.github/workflows/eventradar_p30_l8_source_summary.yml' '.github/workflows/eventradar_p30_l8_verified_integration.yml' 'docs/index.html' 'scripts/p30_candidate_review_pipeline.py' 'tests/p30/test_candidate_review_pipeline.py' 'tests/p30/test_candidate_review_ui_provenance.js' 'tests/p30/test_candidate_source_summary.js' 'tests/p30/test_formal_card_role_summary.js' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          echo PASS_EXACT_HEAD_ELEVEN_FILE_SCOPE_FORMAL_BLOBS_FROZEN
+      - name: Python L7 positive negative and source-owner parity
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests/p30 -p test_candidate_review_pipeline.py -v
+      - name: Node candidate provenance, preview, Golden-only modal, and min-price negatives
+        run: |
+          set -euo pipefail
+          node tests/p30/test_candidate_review_ui_provenance.js
+          node tests/p30/test_candidate_source_summary.js
+          node tests/p30/test_formal_card_role_summary.js
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          h=Path('docs/index.html').read_text()
+          scripts=re.findall(r'<script>(.*?)</script>',h,re.S)
+          assert len(scripts)==1
+          assert 'loading="lazy"' in h
+          assert 'HARD_HOLD_NO_PUBLICATION' not in h or '候選' in h
+          Path('/tmp/eventradar_ui_integration.js').write_text(scripts[0])
+          PY
+          node --check /tmp/eventradar_ui_integration.js
+      - name: Independent synthetic candidate review with immutable release boundaries
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-evidence
+          python scripts/p30_candidate_review_pipeline.py --input tests/fixtures/p30_candidate_review_synthetic.json --output-dir candidate-evidence --repo-root .
+          (cd candidate-evidence && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('candidate-evidence')
+          data=json.loads((root/'data.json').read_text())
+          quality=json.loads((root/'quality_report.json').read_text())
+          assert len(data)==2 and quality['previewRows']==2
+          assert quality['formalFieldAccepted']==quality['goldenAccepted']==quality['published']==0
+          assert quality['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert all(row['_candidate']['published'] is False for row in data)
+          print('PASS_REVIEW_LOCAL_ONLY_ZERO_FORMAL_FIELDS_ZERO_GOLDEN_ZERO_PUBLISH')
+          PY
+      - name: SHA manifest and locked release receipt
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p l8-integration-evidence
+          printf 'head=%s\nrelease=HARD_HOLD_NO_PUBLICATION\nformal_data_modified=0\nstatus_modified=0\nnew_golden=0\nnew_published=0\n' "$HEAD_SHA" > l8-integration-evidence/receipt.txt
+          sha256sum docs/index.html scripts/p30_candidate_review_pipeline.py tests/p30/test_candidate_review_pipeline.py tests/p30/*.js > l8-integration-evidence/SOURCE_SHA256SUMS.txt
+          (cd l8-integration-evidence && sha256sum receipt.txt SOURCE_SHA256SUMS.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-l8-verified-ui-only-integration
+          path: l8-integration-evidence/
+          if-no-files-found: error
+          retention-days: 30
