@@ -133,4 +133,39 @@ class Readiness(unittest.TestCase):
         changed["price"] = "1200"
         self.assertEqual(m.audit_l7_candidate_parity(data, changed)["decision"], "HOLD")
 
+
+    def test_tmc_kham_source_edge_is_review_not_formal(self):
+        receipt=data["tmc_kham_indexed_receipt"]
+        self.assertEqual(m.validate_tmc_kham_receipt(receipt),{
+            "A_review":4,"B_review":5,"formal_accepted":0,"golden":0,
+            "published":0,"native_get":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"})
+        # Source role and value cannot be borrowed across venue and ticket.
+        for name,key,bad in (
+            ("ticket_sale_open","value","2026-11-07T19:30:00+08:00"),
+            ("venue_showtime","value","2026-08-22T12:00:00+08:00"),
+            ("venue_advertised_prices","role","EVENT_ADMISSION_ELIGIBLE_MIN"),
+            ("venue_advertised_prices","value",[1880]),
+            ("ticket_age_recommendation","value",7),
+            ("venue_direct_ticket_url","value","https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=OTHER"),
+            ("ticket_title","source",m.TMC_DETAIL),
+            ("venue_room","observed_at","2026-11-03T00:52:00"),
+            ("ticket_one_person_one_ticket","formal_accepted",True),
+        ):
+            changed=copy.deepcopy(receipt)
+            next(f for f in changed["field_receipts"] if f["name"]==name)[key]=bad
+            with self.subTest(name=name,key=key):
+                with self.assertRaises(ValueError): m.validate_tmc_kham_receipt(changed)
+        for key,bad in (("ticket_session_id","invented"),("eligible_general_price",1880),
+                        ("image_url","https://example.org/other.jpg")):
+            changed=copy.deepcopy(receipt);changed["identity"][key]=bad
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError): m.validate_tmc_kham_receipt(changed)
+        for key in ("formal_accepted_fields","golden_accepted_events","published_events","native_official_get"):
+            changed=copy.deepcopy(receipt);changed[key]=1
+            with self.subTest(release=key):
+                with self.assertRaises(ValueError): m.validate_tmc_kham_receipt(changed)
+        changed=copy.deepcopy(receipt);changed["field_receipts"].append(copy.deepcopy(changed["field_receipts"][0]))
+        with self.assertRaises(ValueError):m.validate_tmc_kham_receipt(changed)
+
+
 if __name__=="__main__":unittest.main()
