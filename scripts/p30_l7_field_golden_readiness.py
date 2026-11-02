@@ -130,6 +130,58 @@ def validate(data):
             "golden":0,"published":0,"native_get":0,
             "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
+
+def audit_l7_candidate_parity(source_contract, candidate):
+    """Audit an existing L7 REVIEW candidate against independent same-event A receipts.
+
+    Does not create a candidate, validate a live fetch, or promote any field.
+    The venue B source is an identity edge, never a ticket-session/price owner.
+    """
+    validate(source_contract)
+    from scripts.p30_candidate_review_pipeline import normalize_record
+    row, failures = normalize_record(candidate)
+    if failures:
+        return {"decision": "HOLD", "reasons": sorted(set(failures)),
+                "formal_accepted": 0, "golden": 0, "published": 0}
+    receipts = {(f["line"], f["name"]): f for f in source_contract["field_receipts"]}
+    venue_receipt = receipts[("A", "venue")]
+    meta = row["_candidate"]
+    reasons = []
+    if (row["platform"] != "OPENTIX" or meta["platform_id"] != "05"
+        or meta["source_event_id"] != "2072516129034670080"
+        or not exact_https(row["url"], TICKET)
+        or row["title"] != receipts[("A", "title")]["value"]):
+        reasons.append("CANONICAL_EVENT_IDENTITY_MISMATCH")
+    # L7 may preserve the independently source-bound A venue, but it cannot
+    # infer an eligible price, show date, ticket Session or cross-venue fields.
+    if (row.get("location") != venue_receipt["value"]
+        or meta["field_evidence"].get("location") != {
+            "value": venue_receipt["value"],
+            "source": TICKET,
+            "observed_at": meta["field_evidence"].get("location", {}).get("observed_at"),
+            "role": "EVENT_VENUE",
+            "decision": "REVIEW",
+        }):
+        reasons.append("TICKET_OWNED_VENUE_FIELD_PARITY_HOLD")
+    if (not exact_https(meta["field_evidence"].get("location", {}).get("source"), TICKET)
+        or set(meta["field_evidence"]) != {"location"}):
+        reasons.append("UNVERIFIED_FIELD_OWNER_OR_ROLE")
+    if any(row.get(k) != "未確認" for k in ("date", "price", "description", "region")):
+        reasons.append("UNVERIFIED_OPTIONAL_FIELD_IN_REVIEW")
+    if (row["img_url"] is not None or row["_candidate"]["sessions"]
+        or row["_candidate"]["ticket_session_id"] is not None
+        or row["_candidate"]["inventory"] is not None):
+        reasons.append("IMAGE_SESSION_OR_INVENTORY_NOT_INDEPENDENTLY_ACCEPTED")
+    if isinstance(candidate, dict) and candidate.get("img_url"):
+        reasons.append("UNVERIFIED_IMAGE_IN_RAW_CANDIDATE")
+    if (meta["formal_field_pass"] is not False
+        or meta["golden_accepted"] is not False
+        or meta["published"] is not False):
+        reasons.append("FORMAL_PROMOTION_FORBIDDEN")
+    return {"decision": "HOLD" if reasons else "REVIEW_PARITY_ONLY",
+            "reasons": sorted(set(reasons)), "review_fields": ["title", "url", "location"] if not reasons else [],
+            "formal_accepted": 0, "golden": 0, "published": 0}
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
