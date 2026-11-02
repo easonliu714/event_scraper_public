@@ -5262,3 +5262,29 @@ B TPAC official venue [Draft #233 HEAD 65f1bb30e0ef0f754ba59c691a9f171d6d60f059]
 **Engineering exact-head readback:** A [CI #41419673679](https://github.com/easonliu714/event_scraper_public/actions/runs/41419673679) SUCCESS all steps; artifact #13129766119 digest `sha256:924ef0dce349e3ab57792c84334f1fccb2cfdd8d7614d89a266e0f022e667de6`. B [CI #41419680976](https://github.com/easonliu714/event_scraper_public/actions/runs/41419680976) SUCCESS all steps; artifact #13130260160 digest `sha256:3c21c82cc92d42a29477c7fc834273c7e7a3bcb2bbaa1d6ba172e06f2dc751d6`. Each branch adds exactly 3 files: isolated strict Python inspector, 5 unittest methods with negatives, read-only exact-head workflow and SHA manifest. No CI official GET; public source-reader official observations separately evidenced, indexed freshness potentially cached. Independent ZIP CRC UNVERIFIED. No duplicate canonical platform ID.
 
 **Architecture release boundary:** Source main `9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb`; Preview `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Main formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d` unchanged, 19 platform IDs, reportDate 2026-10-28 and latestEngineering 2026-11-01 07:55 stale. Local REVIEW import #210 merged and historically Pages deployed; direct live Pages readback UNVERIFIED. Owner 18-row JSON historical 18/18 structural, this runtime `LOCAL_ARTIFACT_NOT_MOUNTED` (fresh QC=0). L8 #211/#212/#225/#226/#227 Draft/unmerged; Owner historical offline 5-card UAT and CKSMH5/TWTC39 Android PASS preserved. Recent 3 A/B rounds official reader evidence 3/3 each, formal field delta 0/0; exact new cross-source identity is **not** formal Golden. **HARD_HOLD_NO_PUBLICATION**, accepted FIELD=0, Golden=0, published=0. Next A: public per-row session URL if safe, else source rotation; next B: independent TPAC/OPENTIX session parity and age conflict resolution, else P0 venue rotation. Toolkit path UNKNOWN; no local Toolkit action.
+
+---
+
+## 2026-11-02 17:54 — A/B source-date and checkout-access authority boundary (Draft only)
+
+```text
+A #03 tixCraft [Draft #232 HEAD a7693ea246b22aa1d25789bdf355564ce00ff82f]
+  exact /activity/detail/26_forever -> /activity/game/26_forever
+  4 priority/general show rows = REVIEW, NOT ticket Session IDs
+  NEW official detail access policy: member registration AND phone verification
+  → explicit source-bound prerequisites, not authenticated checkout permission
+  → absent/false/non-boolean policy evidence = HOLD
+  → 5 REVIEW receipts, 0 accepted fields, 0 verified checkout/session/stock
+B TPAC venue [Draft #233 HEAD c5ae98c4d0b20717e2f04e15895a19fdef097bae]
+  official /program LIST index: 2026-11-04..2026-11-14
+  exact /program/2088 DETAIL: 2026-11-05..2026-11-15, 12 SHOW timestamps
+  OPENTIX canonical #05 /event/2072516129034670080: 2026-11-05..2026-11-15
+  → index-range conflict QUARANTINE; never promote index start/end as SHOW
+  → TPAC age 6+ vs OPENTIX age 7+ remains CONFLICT HOLD
+  → direct ticket EVENT URL verified; ticket Session IDs/stock UNKNOWN
+  → 10 REVIEW receipts, 0 accepted fields, Golden 0, published 0
+```
+
+**Source observation:** Official source indexed reader evidence at [tixCraft](https://tixcraft.com/activity/detail/26_forever), [TPAC LIST](https://tpac.org.taipei/program), [TPAC DETAIL](https://tpac.org.taipei/program/2088), [OPENTIX](https://www.opentix.life/event/2072516129034670080). This incremental run's direct official GET **0**, CI GET **0**; indexed content freshness not guaranteed. Do not claim source field formal PASS or 12 ticket Session parity. A latest exact-head CI [#41424321773](https://github.com/easonliu714/event_scraper_public/actions/runs/41424321773) pending at documentation preparation; B exact-head [#41424290343](https://github.com/easonliu714/event_scraper_public/actions/runs/41424290343) SUCCESS, artifact #13130749101 digest sha256:f501bf3c4969d09f106b67ab85a2dd003ca08580dd410531de69cfebb6d0ad13. Earlier intermediate commits' failed CI were superseded by test fixture updates; inspect final exact HEAD only.
+
+**Immutable boundary:** Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb, Preview 03e515d65e827d5ed67fe341d079907a96bf784a, ShowNews 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad. Formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4, status blob cdeeb3b551e38f862c37759426a14b5129e1224d unchanged. #210 local REVIEW import merged, L8 UI-only #211/#212/#225/#226/#227 Draft/unmerged. Historical Owner 18-row SHA 35e9ea0def1611c6d4e682f0e00c57b34f6dab37ef2971e5e998bef7ddfd5603, this runtime LOCAL_ARTIFACT_NOT_MOUNTED; fresh QC 0. Historical Owner five-card Android UAT, CKSMH5/TWTC39 Android PASS retained; direct live Pages readback UNVERIFIED. **HARD_HOLD_NO_PUBLICATION**; accepted FIELD/Golden/published 0/0/0. No main, formal data/status, Golden, Publisher, Scheduler or Notifier write. Next A: rotate #03 when public Session evidence remains behind member access; next B: seek explicit ticket Session parity without inferring from index or rotate another P0 venue.
