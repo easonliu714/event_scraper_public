@@ -5580,3 +5580,41 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing Draft #236 only]
 **Cross-round governance:** 00:52 KHAM/TMC indexed receipt, 01:55 KHAM poster/TMC seating-map reject, 03:00 tixCraft/TMC new-event role rotation. Both lines indexed source-read 3/3, successful native official GET 0/3, formal FIELD increment 0/3. Previous KHAM/TMC same-root streak 2 → rotated; 13 new role classifications are **not** 13 Golden fields or events. Original Owner 5-row artifact `LOCAL_ARTIFACT_NOT_MOUNTED`; no fabricated re-read. Source main `f2859b7c72d6e280b850cb253730989f22b01d46`, formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `cdeeb3b551e38f862c37759426a14b5129e1224d` frozen. One hourly :55 Writer; only Governance Draft #8 updated serially; no new PR, no status Writer, no production mutation.
 
 **NEXT A:** legal bounded exact tixCraft ticket Session/eligible tier, otherwise another canonical platform. **NEXT B:** TMC same-event official image ownership/true ticket Event ID or next P0 Taipei/New Taipei source. Keep price role/image identity negative gates; no automatic publication.
+
+---
+
+### P30-L7-TICKET-BRIDGE-20261103T0354 — A/B independent ticket role and identity architecture (2026-11-03 03:54 Asia/Taipei)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, existing isolated Draft #236]
+├── A canonical #03 tixCraft /activity/detail/26_forever [INDEXED_REVIEW]
+│   ├── 2026-10-04 14:00 general SALE [REVIEW; not SHOW]
+│   ├── 2026-10-13 18:00 partial RE-RELEASE [REVIEW; not inventory]
+│   ├── Current stock inferred from release notice [REJECT_FOR_STOCK]
+│   ├── /activity/game/26_forever indexed access failed [HOLD; no Session ID]
+│   └── New A 2 REVIEW + 1 REJECT; native GET 0; formal FIELD 0
+├── B existing P0 Taipei TMC /2026SingTheScene [VENUE]
+│   ├── Independent Klook /event-detail/102001087-2026-singoursongs-concert-tmc/ [TICKET]
+│   ├── Exact title + 2026-11-21 19:30 + Legacy TERA + TMC organizer parity [REVIEW]
+│   ├── Klook ticket Event ID 102001087 [REVIEW; NOT ticket Session]
+│   ├── TMC direct href not independently verified [HOLD]
+│   ├── Standard full-price 1600/1200/800 [REVIEW; NOT live stock]
+│   ├── Accessibility 800/600/400 [REVIEW; NOT general admission]
+│   ├── Cassette bundle 1799/1399/999 [REJECT_FOR_BASE_ADMISSION]
+│   ├── Mixed Klook display range 800–1799 [REJECT_FOR_ELIGIBLE_MIN]
+│   └── New B 6 REVIEW + 2 REJECT; native GET 0; formal FIELD 0
+├── Exact receipt contract validate_ticket_bridge_receipt [positive/negative]
+│   ├── 11 receipts, strict source URL, event ID, role, timestamp, value and decision
+│   ├── Cross-event/session/date/price/image laundering and promotion fail closed
+│   └── Event ID evidence cannot imply Session/checkout/eligible minimum/Golden
+├── Draft #236 HEAD 5f19fdf82e000a4e8929178b12d8c6f48f9c1156
+│   ├── CI #41514576472 completed SUCCESS, all job steps PASS
+│   ├── Artifact #13173413586 digest sha256:c931d48dec3860c3cf3334d44f77b5eb4b93046c0baf937427613c0d4b19d0c6
+│   └── Four original ADD-only paths; formal data/status/index/scraper immutable
+├── Last 3 rounds: A/B indexed reader 3/3; native official GET 0/3
+├── Status Draft #53 OPEN stale 2 ahead/30 behind [HOLD_NO_MERGE]
+├── Owner L8 formal PWA Android USER_ATTESTED_PASS 5/5 [CLOSED]
+└── FORMAL_FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+```
+
+**NEXT:** A exact same-event Session/eligible tier or canonical rotation; B Klook Event→Session and official hero ownership or P0 venue rotation. Original Owner 5-row artifact not mounted here; preserve prior 5-row/18-row PASS without fabricated re-QC. Do not publish or update formal data/status; status-only requires separate Owner authorization. Governance exclusively Draft #8.
