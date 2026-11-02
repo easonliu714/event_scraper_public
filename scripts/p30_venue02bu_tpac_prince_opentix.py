@@ -49,6 +49,10 @@ def inspect(row, observed_at):
         out["decision"]="HOLD_EXPLICIT_AGE_CONFLICT";return out
     if row.get("ticket_notice_city")!="嘉義市" or row.get("ticket_notice_date")!="2026-11-01":
         out["decision"]="HOLD_NOTICE_SCOPE";return out
+    # Public OPENTIX text-reader exposes a "選擇場次" heading but no session rows.
+    # This is a reader limitation, not proof that the live JS picker has zero sessions.
+    if row.get("ticket_reader_heading")!="選擇場次" or row.get("ticket_reader_session_rows_exposed") is not False:
+        out["decision"]="HOLD_TICKET_READER_SESSION_VISIBILITY";return out
     for key in ("ticket_session_ids","checkout_url","stock","inventory","formal_age_min","ticket_prices_verified","golden_accepted"):
         if key in row and row[key] is not None:
             out["decision"]="HOLD_UNVERIFIED_SESSION_OR_CONFLICT_OVERRIDE";return out
@@ -61,7 +65,9 @@ def inspect(row, observed_at):
             ("venue_advertised_price_range",DETAIL,"VENUE_ADVERTISED_RANGE_NOT_CHECKOUT_PRICE"),
             ("venue_age_min",DETAIL,"AGE_CONFLICT_6_VENUE_VS_7_TICKET_HOLD"),
             ("ticket_age_min",TICKET,"AGE_CONFLICT_7_TICKET_VS_6_VENUE_HOLD"),
-            ("ticket_notice_city",TICKET,"CHIAYI_NOTICE_NOT_TAIPEI_SHOW_CHANGE"))
+            ("ticket_notice_city",TICKET,"CHIAYI_NOTICE_NOT_TAIPEI_SHOW_CHANGE"),
+            ("ticket_reader_heading",TICKET,"TICKET_SESSION_PICKER_HEADING_ONLY"),
+            ("ticket_reader_session_rows_exposed",TICKET,"TEXT_READER_NO_SESSION_ROWS_NOT_JS_EMPTY"))
     out["candidateFields"]=[{"field":field,"value":row[field],"source":source,
          "observed_at":observed_at,"role":role,"decision":"REVIEW"} for field,source,role in fields]
     out["listDetailRangeConflict"]=True
