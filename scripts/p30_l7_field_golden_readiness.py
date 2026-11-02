@@ -502,6 +502,13 @@ ROTATED_EVENT_FIELDS = {
     "b_ticket_poster": ("B",KKTIX_TAKASE,"TICKET_EVENT_POSTER_REVIEW_ONLY",KKTIX_TAKASE_POSTER,"REVIEW"),
     "b_ticket_session": ("B",KKTIX_TAKASE,"TICKET_SESSION_ID_NOT_IN_INDEXED_TEXT",None,"HOLD"),
     "b_current_stock": ("B",KKTIX_TAKASE,"LIVE_INVENTORY_UNVERIFIED",None,"HOLD"),
+    # 2026-11-03 07:00 public indexed reader: three KKTIX option-specific
+    # registration hrefs were observed, but each GET returned HTTP 403.
+    # Route identity is not a checkout Session ID or evidence of stock.
+    "a_explicit_start_time_conflict": ("A",MYCELIUM_DETAIL,"OFFICIAL_BODY_EXPLICIT_START_1900_VS_HEADER_GAME_1930","開演時間為 19：00","HOLD_CONFLICT"),
+    "b_kktix_two_day_registration": ("B",KKTIX_TAKASE,"TWO_DAY_OPTION_REGISTRATION_HREF_403_NOT_SESSION","https://kktix.com/events/takasetoya202611-1/registrations/new","HOLD_403"),
+    "b_kktix_nov07_registration": ("B",KKTIX_TAKASE,"NOV07_OPTION_REGISTRATION_HREF_403_NOT_SESSION","https://kktix.com/events/takasetoya202611-2/registrations/new","HOLD_403"),
+    "b_kktix_nov08_registration": ("B",KKTIX_TAKASE,"NOV08_OPTION_REGISTRATION_HREF_403_NOT_SESSION","https://kktix.com/events/takasetoya202611-3/registrations/new","HOLD_403"),
 }
 
 def validate_rotated_event_receipt(evidence):
@@ -546,8 +553,8 @@ def validate_rotated_event_receipt(evidence):
         except (ValueError,TypeError,KeyError,AttributeError):
             raise ValueError("ROTATION_TIMESTAMP_HOLD")
     if seen!=set(ROTATED_EVENT_FIELDS): raise ValueError("ROTATION_MISSING_FIELD_HOLD")
-    return {"A_review":5,"A_conflict_hold":1,"A_reject_general_price":2,"A_session_hold":1,
-            "B_review":7,"B_reject_general_price":3,"B_session_stock_hold":2,
+    return {"A_review":5,"A_conflict_hold":1,"A_explicit_start_conflict_hold":1,"A_reject_general_price":2,"A_session_hold":1,
+            "B_review":7,"B_reject_general_price":3,"B_session_stock_hold":2,"B_registration_href_403_hold":3,
             "native_get":0,"formal_accepted":0,"golden":0,"published":0,
             "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
