@@ -45,6 +45,14 @@ class Readiness(unittest.TestCase):
                 f["value"]=f["value"][:-1]+[f["value"][0]]
         with self.assertRaises(ValueError):m.validate(d)
         with self.assertRaises(ValueError):m.validate(mutate("A","ticket_session_id","value","123"))
+    def test_source_observed_venue_and_exact_showtime_values(self):
+        with self.assertRaises(ValueError):m.validate(mutate("A","venue","value","臺北表演藝術中心 大劇院"))
+        with self.assertRaises(ValueError):m.validate(mutate("B","venue_room","value","球劇場"))
+        d=copy.deepcopy(data)
+        for f in d["field_receipts"]:
+            if (f["line"],f["name"])==("B","showtimes"):
+                f["value"][0]="2026-11-04T19:30:00+08:00"
+        with self.assertRaises(ValueError):m.validate(d)
     def test_conflict_must_remain_explicit(self):
         with self.assertRaises(ValueError):m.validate(mutate("B","age_min","value",7))
         with self.assertRaises(ValueError):m.validate(mutate("B","index_advertised_range","value",["2026-11-05","2026-11-15"]))
