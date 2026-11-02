@@ -1,0 +1,61 @@
+name: EventRadar P30-L7 field Golden readiness exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  source-field-readiness:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l7-field-golden-readiness-contract'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD and immutable formal release guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=f2859b7c72d6e280b850cb253730989f22b01d46
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/index.html)" = d284e3007d95016312385892eef4449b03946c9c
+          python - <<'PY'
+          import json,subprocess
+          d=json.loads(subprocess.check_output(['git','show','HEAD:docs/platform_status.json']))
+          assert len(d['platforms'])==19
+          assert d['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['production']['goldenAccepted']==0
+          PY
+      - name: Source-bound acceptance contract and negative tests
+        run: |
+          python -m py_compile scripts/p30_l7_field_golden_readiness.py tests/p30/test_p30_l7_field_golden_readiness.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_l7_field_golden_readiness.py' -v
+          python scripts/p30_l7_field_golden_readiness.py
+      - name: Exact-head evidence SHA256 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
+          printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\nnative_get=0\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" f2859b7c72d6e280b850cb253730989f22b01d46 > evidence/readiness.txt
+          sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
+          sha256sum -c evidence/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p30-l7-field-golden-readiness-exact-head
+          path: evidence/
+          if-no-files-found: error
