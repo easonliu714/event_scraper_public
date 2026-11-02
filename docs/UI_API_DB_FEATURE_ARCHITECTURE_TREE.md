@@ -5380,3 +5380,33 @@ B TPAC official venue (amended Draft #233 HEAD 5f0379ab0d02e2da7a8cbf79d5d35b7b3
 
 - A/B independent acceptance contract [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) has an additional **value-parity negative Gate**: not enough for a receipt to have exact URL + role + timestamp; the claimed value must also equal the exact official observed venue room and each of the 12 TPAC showtimes. Reject altered venue room or shifted but plausible showtimes. Ticket Session IDs remain unverified and are never inferred from TPAC venue schedule. Prior intermediate HEAD `0877e7965c6e36c5e6ee733e389075c1f187ade6` is historical only.
 - **Final exact PR HEAD** `661c9e939bcc39c2da21b1c176c2714a3fe33e78`; [CI #41449576482](https://github.com/easonliu714/event_scraper_public/actions/runs/41449576482) **SUCCESS**, [artifact #13143477711](https://github.com/easonliu714/event_scraper_public/actions/runs/41449576482/artifacts/13143477711) SHA256 `7bc598e5715c6f4a625d58a21d7f5f1c429531feca896ff927c61b68c75cd082`. A 3/B 4 source-bound READY_FOR_INDEPENDENT_GOLDEN_REVIEW; A 5/B 4 HOLD; formally accepted FIELD=0, Golden=0, published=0. No native official CI GET, no 5-row local file re-read, no new image URL or eligible ticket-tier verification. `HARD_HOLD_NO_PUBLICATION` preserved.
+
+---
+
+### P30-L7-IMAGE-URL-RECEIPT-ROUND-20261102T2201 — source-owned image URL contract, no Golden promotion
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; PR #236 Draft, exact HEAD 4947144afa5780fa734b3205e5d0a2a209e172e7]
+├── A canonical #05 OPENTIX /event/2072516129034670080
+│   ├── HTTP/LIST/DETAIL/IDENTITY: historical public indexed reader; this CI native GET=0
+│   ├── FIELD: title, exact Event URL, venue, same-event image href = 4 REVIEW-ready (was 3)
+│   ├── HOLD: age conflict, sale-year, ticket Session ID, eligible general price = 4 (was 5)
+│   └── Golden/Publication: 0 / HARD_HOLD_NO_PUBLICATION
+├── B TPAC /program/2088 (distinct venue source; OPENTIX link is an evidence edge)
+│   ├── HTTP/LIST/DETAIL/IDENTITY: historical public indexed reader; this CI native GET=0
+│   ├── FIELD: title, venue room, 12 venue showtimes, OPENTIX event edge, same-event image href = 5 REVIEW-ready (was 4)
+│   ├── HOLD: index/detail date range, age conflict, venue price != eligible checkout tier = 3 (was 4)
+│   └── Golden/Publication: 0 / HARD_HOLD_NO_PUBLICATION
+├── Image source ownership (indexed reader link resolution, NOT native GET)
+│   ├── A: s3.resource.opentix.life/upload/program/1783488303546FNFfEObGMQ.jpeg
+│   └── B: backstage.tpac-taipei.org/storage/uploads/program/images/f5182a1f85017d7b56d4643927ed8484.jpg
+├── Fail-closed validator: HTTPS exact asset URL, owner Event URL, role, observed_at, no query/fragment,
+│   no alternate host/path, no fake image URL, no formal promotion, no asset download in project code
+├── Existing Draft #236: 4 ADD-only paths; CI #41458057137 SUCCESS, artifact #13148021804
+│   └── digest sha256:d6a6fc1d3f89579a68d85dcb8a78447dece4dbef025a3c53f405373b396396a8
+├── Owner L8 production PWA Android: USER_ATTESTED_PASS 5/5 [CLOSED]; CKSMH5/TWTC39 preserved
+└── NEXT: independent native GET + adapter receipt parity, session/price/age/index-date resolution;
+    do not infer Golden from indexed source links or publish docs/data.json
+```
+
+**Status UI separate branch:** Source main remains `f2859b7c72d6e280b850cb253730989f22b01d46`; 19-platform status blob `cdeeb3b551e38f862c37759426a14b5129e1224d`, `reportDate=2026-10-28`, engineering snapshot `2026-11-01 07:55` stale. Legacy Draft #53 has older ibon evidence and unresolved security/CI HOLD; no automatic merge or duplicate status PR. Public Pages direct runtime readback UNVERIFIED; Owner 5/5 formal Android UI UAT remains PASS. Formal accepted fields 0, Golden 0, publication 0. Near-three-round native/indexed exact counters UNVERIFIED without independently matched artifacts; same-root-cause age/date/session remains. Preserve one hourly A/B Writer and serial governance writes.
