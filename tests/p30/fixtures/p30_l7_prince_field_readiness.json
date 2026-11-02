@@ -707,5 +707,142 @@
     "golden_accepted_events": 0,
     "published_events": 0,
     "release_state": "HARD_HOLD_NO_PUBLICATION"
+  },
+  "timeline_package_indexed_receipt": {
+    "kind": "P30_L7_A_B_TIMELINE_PACKAGE_REVIEW_V1",
+    "observation_method": "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION",
+    "observed_at": "2026-11-03T04:58:43+08:00",
+    "sources": {
+      "A_ticket_detail": "https://tixcraft.com/activity/detail/26_forever",
+      "B_venue_detail": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+      "B_ticket_detail": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/"
+    },
+    "identity": {
+      "A_event_path": "26_forever",
+      "A_ticket_session_id": null,
+      "B_venue_detail_id": "2026SingTheScene",
+      "B_ticket_event_id": "102001087",
+      "B_ticket_session_id": null,
+      "B_shortlink_final_destination_verified": false,
+      "B_checkout_eligible_single_ticket_min": null,
+      "formal_img_url": null,
+      "cross_event_identity_merge": false
+    },
+    "field_receipts": [
+      {
+        "line": "A",
+        "name": "ticket_failed_payment_window",
+        "role": "FAILED_PAYMENT_RECONCILIATION_NOT_SESSION",
+        "value": [
+          "2026-10-04T14:00:00+08:00",
+          "2026-10-04T14:30:00+08:00"
+        ],
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REJECT_FOR_TICKET_SESSION",
+        "reason": "Official ticket detail states failed card payments 14:00–14:30 convert to ATM; this is not an event ticket Session.",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "name": "ticket_oct4_release_notice",
+        "role": "ACCOUNT_RECONCILIATION_RELEASE_NOT_CURRENT_STOCK",
+        "value": "2026-10-04T17:00:00+08:00",
+        "source": "https://tixcraft.com/activity/detail/26_forever",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REJECT_FOR_STOCK",
+        "reason": "Official planned reconciliation release on Oct 4 is historic, not live inventory or verified checkout.",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "venue_klook_shortlink",
+        "role": "VENUE_TICKET_SHORTLINK_FINAL_EVENT_DESTINATION_UNVERIFIED",
+        "value": "https://s.klook.com/c/mXkdqlAMyQ",
+        "source": "https://www.tmc.taipei/tw/blog/show/2026SingTheScene",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "HOLD_FOR_FINAL_DESTINATION",
+        "reason": "Exact official venue anchor is s.klook.com; independent reader cannot follow short.klook.com final redirect; do not claim direct Klook Event href.",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_entrance_time",
+        "role": "DOORS_OPEN_NOT_SHOWTIME",
+        "value": "2026-11-21T18:30:00+08:00",
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REVIEW",
+        "reason": "Klook explicitly labels 18:30 as admission/doors, distinct from 19:30 performance start.",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_presale_start",
+        "role": "TICKET_PRESELL_START_NOT_SHOWTIME",
+        "value": "2026-09-09T18:00:00+08:00",
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REVIEW",
+        "reason": "Ticket page explicitly labels presale start; not event showtime.",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_presale_end",
+        "role": "TICKET_PRESELL_END_NOT_SHOWTIME",
+        "value": "2026-11-20T23:59:00+08:00",
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REVIEW",
+        "reason": "Ticket page labels presale period end, not showtime or live stock.",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_two_person_bundle_total",
+        "role": "TWO_TICKET_PACKAGE_TOTAL_NOT_SINGLE_ADMISSION",
+        "value": [
+          3200,
+          2400
+        ],
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REJECT_FOR_SINGLE_ADMISSION",
+        "reason": "Two-person bundle issues two tickets; advertised package total must not be used as per-person minimum or single admission.",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_two_person_bundle_quantity",
+        "role": "TWO_TICKETS_PER_PACKAGE_NOT_ONE",
+        "value": 2,
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REVIEW",
+        "reason": "Ticket page explicitly states two tickets per double-memory package, separate from one-person base tier.",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "name": "klook_accessibility_cassette_bundle",
+        "role": "ACCESSIBILITY_PLUS_MERCH_NOT_GENERAL_ADMISSION",
+        "value": [
+          999,
+          799,
+          599
+        ],
+        "source": "https://www.klook.com/zh-TW/event-detail/102001087-2026-singoursongs-concert-tmc/",
+        "observed_at": "2026-11-03T04:58:43+08:00",
+        "decision": "REJECT_FOR_GENERAL_PRICE",
+        "reason": "Accessibility discounted cassette package cannot be used as unrestricted general admission.",
+        "formal_accepted": false
+      }
+    ],
+    "native_official_get": 0,
+    "formal_accepted_fields": 0,
+    "golden_accepted_events": 0,
+    "published_events": 0,
+    "release_state": "HARD_HOLD_NO_PUBLICATION"
   }
 }
