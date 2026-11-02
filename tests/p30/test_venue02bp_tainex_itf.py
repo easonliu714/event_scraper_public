@@ -36,10 +36,36 @@ class TaiNEXITF(unittest.TestCase):
         for key,value in [("ticket_event_id","709"),("ticket_session_id","709"),
                           ("ticket_href",m.TICKET_DETAIL),("showtime","2026-11-06T10:00"),
                           ("admission_price",100),("inventory",10),
-                          ("cross_source_verified",True),("published_event",True)]:
+                          ("cross_source_verified",True),("published_event",True),
+                          ("admission_price",0),("inventory",0),("published_event",0)]:
             with self.subTest(key=key):
                 x=sample();x[key]=value
                 self.assertEqual(m.inspect(x,STAMP)["decision"],"HOLD_UNVERIFIED_TICKET_OR_CROSS_SOURCE")
+    def test_independent_organizer_roles_review_only(self):
+        x=sample()
+        x["organizer_visit"]=dict(url=m.ORGANIZER_VISIT,date_start="2026-11-06",
+            date_end="2026-11-09",day1_hours="12:00-18:00",
+            later_hours="10:00-18:00",general_admission=200,
+            presale=180,early_bird=150,online_ticket_url=None)
+        r=m.inspect(x,STAMP)
+        self.assertEqual(r["decision"],"REVIEW_WITH_HOLD")
+        self.assertEqual(len(r["candidateFields"]),11)
+        self.assertEqual(len([z for z in r["candidateFields"] if z["source"]==m.ORGANIZER_VISIT]),5)
+        self.assertEqual(r["acceptedFields"],0)
+        self.assertFalse(r["crossSourceIdentityVerified"])
+        for key,value,reason in [
+            ("url","https://www.taiwanitf.org.tw/Other","HOLD_ORGANIZER_DETAIL_SOURCE"),
+            ("general_admission",0,"HOLD_ORGANIZER_DETAIL_ROLES"),
+            ("general_admission",True,"HOLD_ORGANIZER_DETAIL_ROLES"),
+            ("day1_hours","10:00-18:00","HOLD_ORGANIZER_DETAIL_ROLES"),
+            ("online_ticket_url","https://checkout.example/","HOLD_ORGANIZER_UNVERIFIED_TICKET_URL"),
+        ]:
+            with self.subTest(key=key,value=value):
+                y=sample();y["organizer_visit"]=dict(x["organizer_visit"])
+                y["organizer_visit"][key]=value
+                z=m.inspect(y,STAMP)
+                self.assertEqual(z["decision"],reason)
+                self.assertEqual(z["candidateFields"],[])
     def test_bad_timestamp(self):
         self.assertEqual(m.inspect(None,STAMP)["decision"],"HOLD_SOURCE")
         self.assertEqual(m.inspect(sample(),"2026-11-02T07:53:00")["decision"],"HOLD_OBSERVATION")
