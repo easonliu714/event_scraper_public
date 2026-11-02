@@ -42,7 +42,9 @@ class FamiTicketITF(unittest.TestCase):
                           # Python equates numeric zero with False; it must not
                           # silently clear free-price or inventory evidence.
                           ("admission_price",0),("inventory",0),
-                          ("published_event",0),("ticket_session_id",0)]:
+                          ("published_event",0),("ticket_session_id",0),
+                          ("admission_price",False),("inventory",False),
+                          ("ticket_href",False),("ticket_session_id",False)]:
             with self.subTest(key=key):
                 x=sample();x[key]=value
                 self.assertEqual(m.inspect(x,STAMP)["decision"],"HOLD_UNVERIFIED_TICKET_OR_CROSS_SOURCE")
