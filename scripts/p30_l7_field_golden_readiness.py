@@ -189,6 +189,68 @@ def audit_l7_candidate_parity(source_contract, candidate):
             "reasons": sorted(set(reasons)), "review_fields": ["title", "url", "location"] if not reasons else [],
             "formal_accepted": 0, "golden": 0, "published": 0}
 
+
+# Independent indexed-reader KHAM/TMC edge: exact field owner, role, value and time.
+# This is an isolated REVIEW contract, never an event, price or Session release.
+TMC_LIST = "https://www.tmc.taipei/tw/blog/show"
+TMC_DETAIL = "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu"
+KHAM_DETAIL = "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"
+TMC_KHAM_FIELDS = {
+    "ticket_title": ("A", KHAM_DETAIL, "TICKET_EVENT_TITLE", "2026 小宇 宋念宇《不，完美的人》演唱會"),
+    "ticket_sale_open": ("A", KHAM_DETAIL, "TICKET_SALE_OPEN", "2026-08-22T12:00:00+08:00"),
+    "ticket_age_recommendation": ("A", KHAM_DETAIL, "AGE_RECOMMENDATION_NOT_RESTRICTION", 6),
+    "ticket_one_person_one_ticket": ("A", KHAM_DETAIL, "ADMISSION_RULE", True),
+    "venue_title": ("B", TMC_DETAIL, "VENUE_EVENT_TITLE", "小宇 宋念宇 《不，完美的人》 演唱會"),
+    "venue_showtime": ("B", TMC_DETAIL, "VENUE_ANNOUNCED_SHOWTIME", "2026-11-07T19:30:00+08:00"),
+    "venue_room": ("B", TMC_DETAIL, "VENUE_ROOM", "臺北流行音樂中心 表演廳"),
+    "venue_advertised_prices": ("B", TMC_DETAIL, "VENUE_ADVERTISED_PRICE_TIERS_NOT_TICKET_ELIGIBILITY", [4280,3880,3480,2880,2480,1880]),
+    "venue_direct_ticket_url": ("B", TMC_DETAIL, "VENUE_TO_TICKET_PRODUCT_EDGE", KHAM_DETAIL),
+}
+
+def validate_tmc_kham_receipt(evidence):
+    """Reject cross-event/session, sale/show and advertised/eligible price laundering."""
+    if not isinstance(evidence, dict) or evidence.get("kind") != "P30_L7_TMC_KHAM_REVIEW_EDGE_V1":
+        raise ValueError("TMC_KHAM_KIND_HOLD")
+    if (evidence.get("observation_method") != "PUBLIC_INDEXED_TEXT_READER_REOBSERVATION"
+        or evidence.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+        or any(type(evidence.get(k)) is not int or evidence[k] != 0 for k in
+               ("native_official_get", "formal_accepted_fields", "golden_accepted_events", "published_events"))):
+        raise ValueError("TMC_KHAM_RELEASE_OR_NATIVE_HOLD")
+    if evidence.get("sources") != {"B_list":TMC_LIST, "B_detail":TMC_DETAIL, "A_ticket":KHAM_DETAIL}:
+        raise ValueError("TMC_KHAM_SOURCE_ALLOWLIST_HOLD")
+    identity = evidence.get("identity")
+    if (not isinstance(identity,dict) or identity.get("venue_detail_id") != "2026SungNien-Yu"
+        or identity.get("ticket_product_id") != "P1DF32E2"
+        or identity.get("ticket_session_id") is not None
+        or identity.get("eligible_general_price") is not None
+        or identity.get("image_url") is not None):
+        raise ValueError("TMC_KHAM_IDENTITY_SESSION_PRICE_IMAGE_HOLD")
+    receipts=evidence.get("field_receipts")
+    if not isinstance(receipts,list) or len(receipts)!=len(TMC_KHAM_FIELDS):
+        raise ValueError("TMC_KHAM_FIELD_COUNT_HOLD")
+    seen=set()
+    for f in receipts:
+        if not isinstance(f,dict) or f.get("name") not in TMC_KHAM_FIELDS:
+            raise ValueError("TMC_KHAM_UNKNOWN_FIELD")
+        name=f["name"]
+        if name in seen: raise ValueError("TMC_KHAM_DUPLICATE_FIELD")
+        seen.add(name)
+        line,source,role,value=TMC_KHAM_FIELDS[name]
+        if (f.get("line")!=line or not exact_https(f.get("source"),source)
+            or f.get("role")!=role or type(f.get("value")) is not type(value)
+            or f.get("value")!=value or f.get("decision")!="REVIEW"
+            or f.get("formal_accepted") is not False):
+            raise ValueError("TMC_KHAM_FIELD_OWNER_ROLE_VALUE_HOLD")
+        try:
+            stamp=datetime.fromisoformat(f["observed_at"].replace("Z","+00:00"))
+            if stamp.utcoffset() is None: raise ValueError()
+        except (ValueError,TypeError,KeyError,AttributeError):
+            raise ValueError("TMC_KHAM_TIMESTAMP_HOLD")
+    if seen!=set(TMC_KHAM_FIELDS): raise ValueError("TMC_KHAM_MISSING_FIELD")
+    return {"A_review":4,"B_review":5,"formal_accepted":0,"golden":0,
+            "published":0,"native_get":0,"decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
