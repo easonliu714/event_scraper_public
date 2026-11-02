@@ -4962,3 +4962,55 @@ L7/L8
 Near 3 rounds A source 2/3 B source 2/3; formal FIELD A=0 B=0
 HARD_HOLD_NO_PUBLICATION; CI official GET=0; no main write
 ```
+
+
+### 2026-11-02 08:58 Asia/Taipei — dual-line source-role architecture / numeric-zero trust boundary
+
+```text
+Source main 9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb [FROZEN]
+A / FAMITICKET canonical #07 / Draft #219 / L9-DB
+  HEAD fbbc07fc8d19d15d39f98ae94f839ab33b18ab35
+  scripts/p30_l9db_famiticket_itf.py::inspect()
+    numeric 0 is NOT absent False: free admission / zero inventory /
+    ticket_session_id=0 / published_event=0 => HOLD
+  tests/p30/test_l9db_famiticket_itf.py numeric-zero negatives
+  CI #41369848593 SUCCESS, artifact #13108727728
+  same-ID FamiTicket ITF source evidence from prior round REVIEW;
+  this round new A first-party GET=0, accepted FIELD=0
+B / P0 Taipei TaiNEX venue / Draft #220 / VENUE-02BP
+  HEAD aed382713a1e4a265659b1975c6cde42f3a6c6ba
+  scripts/p30_venue02bp_tainex_itf.py::inspect()
+    numeric 0 claims => HOLD; no ticket Event ID inferred
+    optional organizer_visit exact URL = https://www.taiwanitf.org.tw/Information3
+    organizer-owned REVIEW receipts:
+      first-day exhibition opening 12:00-18:00
+      subsequent days exhibition opening 10:00-18:00
+      on-site general admission NT$200
+      presale NT$180 / early bird NT$150
+    all receipts source=organizer URL, observed_at timezone-aware,
+    role distinct from SHOW / SALE / checkout / ticket Session
+    incorrect source, roles, price, unverified ticket URL => HOLD
+  tests/p30/test_venue02bp_tainex_itf.py source and negative tests
+  CI #41369881205 SUCCESS, artifact #13108357507
+  CI official GET=0; source-reader organizer +1 REVIEW, FIELD=0
+CROSS-SOURCE
+  TaiNEX /event/709 generic 旅展
+  FamiTicket exact detail 2026 ITF 台灣國際旅展
+  Organizer third-source admission/hours independent of both
+  dates/venue/organizer similarity != ticket Event ID parity
+  no fuzzy merge, no organizer URL promoted to ticket checkout
+L7/L8
+  #210 merged/deployed local REVIEW import, #211/#212 DRAFT
+  18-row prior structure 18/18, this runtime LOCAL_ARTIFACT_NOT_MOUNTED
+  Android 18-row list/detail/return UAT PENDING
+  CKSMH5/TWTC39 historical Android PASS retained
+FROZEN
+  docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+  docs/platform_status.json blob cdeeb3b551e38f862c37759426a14b5129e1224d
+  19 canonical platforms; reportDate 2026-10-28
+  latestEngineering snapshot 2026-11-01 07:55 STALE
+  formal FIELD=0, Golden=0, published=0
+  HARD_HOLD_NO_PUBLICATION; no main write or publication
+```
+
+- Source: [ITF organizer Plan Your Visit](https://www.taiwanitf.org.tw/Information3), 2026-11-02 public source-reader; not an adapter-live GET. CI/Artifact [A #41369848593](https://github.com/easonliu714/event_scraper_public/actions/runs/41369848593) / [B #41369881205](https://github.com/easonliu714/event_scraper_public/actions/runs/41369881205). Artifact GitHub digests read back; independent ZIP CRC unverified. Near three rounds official evidence A 2/3, B 3/3; accepted fields 0/0; A offline-only streak 1, B 0. Next A rotate #07 distinct source-bound LIST/DETAIL evidence, B exact organizer-ticket link only if independently present, else rotate P0 venue.
