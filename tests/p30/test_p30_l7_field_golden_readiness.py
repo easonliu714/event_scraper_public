@@ -1107,4 +1107,75 @@ class TWTCBilingualConflictAuthority(unittest.TestCase):
 
 
 
+
+class NativeArtifactIndependentAuthorityAudit(unittest.TestCase):
+    """Artifact structure/freshness review cannot authenticate its ZIP or grant Golden."""
+    def sample(self):
+        from datetime import datetime, timezone
+        a='https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'
+        bl='https://twtc.com.tw/exhibition?p=home'
+        bd='https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home'
+        ticket='https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2'
+        title='2026年電器空調影音大展'
+        cases=[
+            ('A','direct_ticket_product','LOCAL_PURCHASE_ANCHOR_NOT_SESSION',a,{'product_id':'P1DF32E2','official_ticket_url':ticket}),
+            ('A','venue_showtime','VENUE_SHOW_NOT_SALE',a,'2026/11/07 19:30'),
+            ('A','venue_hall','VENUE_HALL',a,'臺北流行音樂中心 表演廳'),
+            ('B','list_detail_identity','SAME_ROW_SAME_ID',bl,{'exhibition_id':'29418','same_row_title':title}),
+            ('B','exhibition_title','EXACT_EVENT_TITLE',bd,title),
+            ('B','exhibition_dates','EXHIBITION_DATE_NOT_SALE',bd,{'start':'2026/11/06','end':'2026/11/09'}),
+            ('B','open_hours','DAILY_OPEN_HOURS_NOT_SHOWTIME',bd,{'open':'10:00','close':'18:00'}),
+            ('B','venue_hall','EXHIBITION_HALL_NOT_TICKET_ID',bd,'世貿一館'),
+        ]
+        sources=[{'url':u,'observed_at_utc':'2026-11-03T19:54:40+00:00','http_status':200,
+                  'sha256':h*64,'bytes':100,'decision':'NATIVE_PARSED_REVIEW_ONLY'}
+                 for u,h in ((a,'a'),(bl,'b'),(bd,'c'))]
+        by_url={x['url']:x for x in sources}
+        receipts=[{'line':line,'field':field,'role':role,'event_id':'P1DF32E2' if line=='A' else '29418',
+                   'source_url':url,'observed_at_utc':by_url[url]['observed_at_utc'],
+                   'body_sha256':by_url[url]['sha256'],'native_same_session_match':True,
+                   'observed_value':value,'value_basis':'EXACT_SOURCE_LOCAL_PATTERN_OR_ANCHOR',
+                   'decision':'ACCEPTABLE_FOR_INDEPENDENT_GOLDEN_REVIEW_ONLY',
+                   'formal_accepted':False} for line,field,role,url,value in cases]
+        return {'kind':'P30_L7_NATIVE_SAME_SESSION_FIELD_MATRIX_V1',
+                'request_count':3,'native_http_200':3,'acceptability_review':8,'hold':0,
+                'raw_html_saved':False,'release_state':'HARD_HOLD_NO_PUBLICATION',
+                'formal_accepted_fields':0,'golden':0,'published':0,
+                'sources':sources,'field_receipts':receipts}
+    def test_five_field_native_receipt_parity_still_holds_formal_authority(self):
+        from datetime import datetime
+        r=m.audit_native_same_session_field_matrix(
+            self.sample(),datetime.fromisoformat('2026-11-04T04:55:00+08:00'))
+        self.assertEqual((r['internally_consistent_native_sources'],
+                          r['source_bound_review_fields']), (3,5))
+        self.assertEqual(len(r['field_matrix']),5)
+        self.assertEqual(r['identity_dependencies']['A_KHAM'],
+                         'HOLD_KHAM_PRODUCT_DETAIL_NOT_NATIVE_FETCHED')
+        self.assertIn('HOLD',r['independent_artifact_integrity'])
+        self.assertIn('HOLD',r['bilingual_title'])
+        self.assertEqual((r['formal_accepted_fields'],r['golden_accepted_events'],
+                          r['published_events'],r['formal_pwa_feed_events']), (0,0,0,0))
+        self.assertTrue(all(not x['formal_accepted'] for x in r['field_matrix']))
+    def test_forged_stale_or_cross_event_native_receipts_fail_closed(self):
+        import copy
+        from datetime import datetime
+        now=datetime.fromisoformat('2026-11-04T04:55:00+08:00')
+        changes=(
+            lambda x:x['field_receipts'][0].update(event_id='OTHER'),
+            lambda x:x['field_receipts'][1].update(body_sha256='0'*64),
+            lambda x:x['sources'][0].update(observed_at_utc='2026-11-01T00:00:00+00:00'),
+            lambda x:x['field_receipts'][2].update(role='SALE'),
+            lambda x:x['field_receipts'][5].update(observed_value={'start':'2026/11/12','end':'2026/11/15'}),
+            lambda x:x['field_receipts'][1].update(field='direct_ticket_product'),
+            lambda x:x['sources'][0].update(url='https://other.example/'),
+            lambda x:x.update(formal_accepted_fields=1),
+        )
+        for i,mutate in enumerate(changes):
+            with self.subTest(case=i):
+                data=copy.deepcopy(self.sample()); mutate(data)
+                r=m.audit_native_same_session_field_matrix(data,now)
+                self.assertEqual(r['source_bound_review_fields'],0)
+                self.assertTrue(r['decision'].startswith('HOLD'))
+                self.assertEqual(r['formal_accepted_fields'],0)
+
 if __name__=="__main__":unittest.main()
