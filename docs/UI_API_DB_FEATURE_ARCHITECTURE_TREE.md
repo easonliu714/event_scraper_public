@@ -6215,9 +6215,9 @@ EventRadar Taiwan 目標處理架構（TARGET；各模組不得誤認已全部�
 
 ### P30-L7-FIXED-DETAIL-PARSER-FIRST-IMPLEMENTATION — 2026-11-04 00:03 Asia/Taipei (source code in isolated Draft; no production write)
 
-The approved fixed-Adapter architecture has its first **executable source-detail parsing component**, but not a native network acquisition or automatic publication pipeline. Existing [Draft PR #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD \`8746108dcf1255dfc2fa54c0b18f3295dd25681f\`:
+The approved fixed-Adapter architecture has its first **executable source-detail parsing component**, but not a native network acquisition or automatic publication pipeline. Existing [Draft PR #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD `8746108dcf1255dfc2fa54c0b18f3295dd25681f`:
 
-\`\`\`text
+```text
 Existing main @ d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [#53 STATUS-ONLY MERGED]
 ├─ scraper.py / docs/index.html / docs/data.json [IMMUTABLE]
 ├─ docs/platform_status.json [19 platforms, 18:55 engineering snapshot; unchanged]
@@ -6237,8 +6237,8 @@ Existing main @ d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [#53 STATUS-ONLY MERGED
       ├─ artifact #13247502147, GitHub SHA256 digest
       │  6ad197227fbf128d79404d999f8dd3e9110a99a0caf00db7fd76eb5a71982bb9
       └─ native official GET=0 (one-shot marker absent); no live adapter PASS
-\`\`\`
+```
 
-**Authority and identity (separate official public reader re-observation on 2026-11-04, not native CI GET):** TMC [LIST](https://www.tmc.taipei/tw/blog/show) → [DETAIL 2026SungNien-Yu](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu) → [KHAM PRODUCT_ID=P1DF32E2](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2) confirms two venue-defined fields and a direct product URL edge; KHAM does not independently show a 19:30 Session in this reader. TWTC [LIST](https://www.twtc.com.tw/exhibition) → [same-row DETAIL id=29418&p=home](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home) confirms three exhibition fields and same ID; another \`p=menu1\` page labels hall \`一館1F\` instead of \`世貿一館\`, so retain source URL and granularity, do not silently normalize. Reader field crosschecks **5/5**, identity URL/ID checks **2/2**, all **REVIEW**. Parser output explicitly states \`CALLER_SUPPLIED_HTML_NOT_NATIVE_GET_PROOF\`, \`formal_accepted_fields=0\`, \`golden_accepted_events=0\`, \`published_events=0\`, \`HARD_HOLD_NO_PUBLICATION\`. CI source-native GET=0, no new body SHA; the source HTML input is a test fixture, not a production feed.
+**Authority and identity (separate official public reader re-observation on 2026-11-04, not native CI GET):** TMC [LIST](https://www.tmc.taipei/tw/blog/show) → [DETAIL 2026SungNien-Yu](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu) → [KHAM PRODUCT_ID=P1DF32E2](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2) confirms two venue-defined fields and a direct product URL edge; KHAM does not independently show a 19:30 Session in this reader. TWTC [LIST](https://www.twtc.com.tw/exhibition) → [same-row DETAIL id=29418&p=home](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home) confirms three exhibition fields and same ID; another `p=menu1` page labels hall `一館1F` instead of `世貿一館`, so retain source URL and granularity, do not silently normalize. Reader field crosschecks **5/5**, identity URL/ID checks **2/2**, all **REVIEW**. Parser output explicitly states `CALLER_SUPPLIED_HTML_NOT_NATIVE_GET_PROOF`, `formal_accepted_fields=0`, `golden_accepted_events=0`, `published_events=0`, `HARD_HOLD_NO_PUBLICATION`. CI source-native GET=0, no new body SHA; the source HTML input is a test fixture, not a production feed.
 
 **Integration gap:** The new parser is **not yet called by main scraper.py or a production candidate pipeline**. NEXT A/B integrate bounded LIST/DETAIL native source receipts with this fixed parser, independent identity checks and conflict resolution, then safe candidate snapshot; formal field adjudication remains separate. No additional engineering PR, no main change, no #53 repeat, no new Android UAT. Owner action: none.
