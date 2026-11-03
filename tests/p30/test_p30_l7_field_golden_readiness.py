@@ -711,4 +711,68 @@ class IndependentPublicFieldCrosscheck(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.validate_independent_public_field_crosscheck(e)
 
+
+class FirstUsableNonSessionSubset(unittest.TestCase):
+    def fixture(self):
+        return copy.deepcopy(data["independent_public_field_crosscheck"])
+
+    def test_proposal_has_five_real_values_two_exact_identity_dependencies_and_zero_release(self):
+        source=self.fixture()
+        proposal=m.build_independent_field_subset_proposal(source)
+        result=m.validate_independent_field_subset_proposal(source,proposal)
+        self.assertEqual((result["A_candidate_fields"],result["B_candidate_fields"]), (2,3))
+        self.assertEqual(result["identity_dependencies"],2)
+        self.assertEqual(result["prior_source_value_crosschecks"],8)
+        self.assertEqual((result["native_get_this_gate"],result["formal_accepted"],
+                          result["golden"],result["published"],result["formal_pwa_feed"]), (0,0,0,0,0))
+        self.assertEqual([(r["line"],r["field"]) for r in proposal["candidate_fields"]],
+                         list(m.FIELD_SUBSET_KEYS))
+        self.assertEqual([(r["line"],r["field"]) for r in proposal["identity_dependencies"]],
+                         list(m.FIELD_SUBSET_DEPENDENCIES))
+
+    def test_fail_closed_cross_event_role_conflict_hash_and_unauthorized_promotion(self):
+        source=self.fixture()
+        baseline=m.build_independent_field_subset_proposal(source)
+        for section,index,key,bad in (
+            ("candidate_fields",0,"observed_value","2026/08/22 12:00"),
+            ("candidate_fields",1,"observed_value","臺北流行音樂中心 文化館"),
+            ("candidate_fields",2,"observed_value",{"start":"2026/11/06","end":"2026/11/10"}),
+            ("candidate_fields",3,"observed_value",{"open":"19:30","close":"21:00"}),
+            ("candidate_fields",4,"observed_value","世貿三館"),
+            ("candidate_fields",0,"role","TICKET_SALE_START"),
+            ("candidate_fields",2,"source_url",m.PUBLIC_TWTC_LIST),
+            ("candidate_fields",2,"event_id","29419"),
+            ("candidate_fields",3,"prior_native_body_sha256","0"*64),
+            ("candidate_fields",4,"reader_observed_at_utc","2026-11-03T07:00:00"),
+            ("candidate_fields",0,"formal_accepted",True),
+            ("identity_dependencies",0,"observed_value",{"product_id":"OTHER","official_ticket_url":m.PUBLIC_KHAM_PRODUCT}),
+            ("identity_dependencies",1,"observed_value",{"exhibition_id":"29419","same_row_title":"2026年電器空調影音大展"}),
+        ):
+            p=copy.deepcopy(baseline);p[section][index][key]=bad
+            with self.subTest(section=section,key=key,bad=str(bad)[:40]):
+                with self.assertRaises(ValueError):
+                    m.validate_independent_field_subset_proposal(source,p)
+        for key,bad in (
+            ("release_state","PUBLICATION_ALLOWED"),
+            ("native_get_this_gate",3),
+            ("formal_accepted_fields",1),
+            ("golden_accepted_events",1),
+            ("published_events",1),
+            ("formal_pwa_feed_events",1),
+            ("independent_formal_field_authority","APPROVED"),
+            ("decision","FORMAL_FIELD_PASS"),
+            ("source_freshness","FRESH_NATIVE_THIS_GATE"),
+            ("prior_native_matrix_sha256","0"*64),
+        ):
+            p=copy.deepcopy(baseline);p[key]=bad
+            with self.subTest(key=key):
+                with self.assertRaises(ValueError):
+                    m.validate_independent_field_subset_proposal(source,p)
+        p=copy.deepcopy(baseline);p["candidate_fields"].append(copy.deepcopy(p["candidate_fields"][0]))
+        with self.assertRaises(ValueError):
+            m.validate_independent_field_subset_proposal(source,p)
+        p=copy.deepcopy(baseline);p["identity_dependencies"]=[]
+        with self.assertRaises(ValueError):
+            m.validate_independent_field_subset_proposal(source,p)
+
 if __name__=="__main__":unittest.main()
