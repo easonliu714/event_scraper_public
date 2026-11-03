@@ -828,6 +828,75 @@ def validate_independent_public_field_crosscheck(e):
             "native_get_this_gate":0,"formal_accepted":0,"golden":0,
             "published":0,"decision":"INDEPENDENT_GOLDEN_ADJUDICATION_STILL_REQUIRED"}
 
+
+# First non-session usable-field subset: exact source/value-bound proposal only.
+# These fields do NOT require ticket checkout Session, inventory, or price.
+# No independent authority grants formal FIELD/Golden/PWA publication here.
+FIELD_SUBSET_KEYS = (
+    ("A", "venue_showtime"), ("A", "venue_hall"),
+    ("B", "exhibition_dates"), ("B", "open_hours"), ("B", "venue_hall"),
+)
+FIELD_SUBSET_DEPENDENCIES = (
+    ("A", "direct_ticket_product"), ("B", "list_detail_identity"),
+)
+FIELD_SUBSET_FORBIDDEN_ROLES = (
+    "TICKET_SESSION", "LIVE_INVENTORY", "ADMISSION_PRICE",
+    "OFFICIAL_IMAGE_URL", "SALE_AS_SHOWTIME",
+)
+
+def build_independent_field_subset_proposal(crosscheck):
+    """Derive a review-only, source-locked five-field proposal; no fresh GET."""
+    from copy import deepcopy
+    validate_independent_public_field_crosscheck(crosscheck)
+    lookup = {(r["line"], r["field"]): r for r in crosscheck["field_receipts"]}
+    return {
+        "kind": "P30_L7_FIRST_USABLE_NON_SESSION_FIELD_SUBSET_V1",
+        "scope": "ISOLATED_ARTIFACT_REVIEW_ONLY",
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+        "source_freshness": "HISTORIC_NATIVE_PLUS_SEPARATE_PUBLIC_READER_NOT_NEW_GET",
+        "prior_native_run_id": crosscheck["prior_native_run_id"],
+        "prior_native_artifact_id": crosscheck["prior_native_artifact_id"],
+        "prior_native_matrix_sha256": crosscheck["prior_native_matrix_sha256"],
+        "reader_observed_at_utc": crosscheck["reader_observed_at_utc"],
+        "source_receipts_total": len(lookup),
+        "candidate_fields": [deepcopy(lookup[k]) for k in FIELD_SUBSET_KEYS],
+        "identity_dependencies": [deepcopy(lookup[k]) for k in FIELD_SUBSET_DEPENDENCIES],
+        "excluded_roles": list(FIELD_SUBSET_FORBIDDEN_ROLES),
+        "conflict_disposition": {
+            "A_show_vs_KHAM_sale": "DISTINCT_ROLES_NO_MERGE",
+            "A_product_id_vs_checkout_session": "PRODUCT_ID_NOT_SESSION",
+            "B_exhibition_dates_vs_sale": "EXHIBITION_PERIOD_ONLY",
+            "B_daily_hours_vs_showtime": "DAILY_OPEN_HOURS_ONLY",
+            "B_exhibition_id_vs_ticket_id": "CANONICAL_TWTC_DETAIL_ONLY",
+            "B_admission_children_price_image": "HOLD_UNVERIFIED",
+        },
+        "independent_formal_field_authority": "PENDING_SEPARATE_OWNER_APPROVAL",
+        "decision": "PROPOSE_FOR_INDEPENDENT_FIELD_ADJUDICATION_NOT_ACCEPTED",
+        "native_get_this_gate": 0,
+        "formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "formal_pwa_feed_events": 0,
+    }
+
+def validate_independent_field_subset_proposal(crosscheck, proposal):
+    """Fail closed on every literal, role, identity edge, release and evidence hash."""
+    expected = build_independent_field_subset_proposal(crosscheck)
+    if not isinstance(proposal, dict) or proposal != expected:
+        raise ValueError("FIELD_SUBSET_SOURCE_VALUE_AUTHORITY_OR_RELEASE_HOLD")
+    if (len(proposal["candidate_fields"]) != 5
+        or len(proposal["identity_dependencies"]) != 2
+        or any(row["formal_accepted"] is not False
+               for row in proposal["candidate_fields"] + proposal["identity_dependencies"])):
+        raise ValueError("FIELD_SUBSET_FORMAL_PROMOTION_HOLD")
+    return {
+        "A_candidate_fields": 2, "B_candidate_fields": 3,
+        "identity_dependencies": 2, "prior_source_value_crosschecks": 8,
+        "native_get_this_gate": 0, "formal_accepted": 0,
+        "golden": 0, "published": 0, "formal_pwa_feed": 0,
+        "decision": "PENDING_INDEPENDENT_FIELD_ADJUDICATION_AND_OWNER_AUTHORITY",
+    }
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
