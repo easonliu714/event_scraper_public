@@ -1178,4 +1178,63 @@ class NativeArtifactIndependentAuthorityAudit(unittest.TestCase):
                 self.assertTrue(r['decision'].startswith('HOLD'))
                 self.assertEqual(r['formal_accepted_fields'],0)
 
+
+class DownloadedNativeArtifactIntegrity(unittest.TestCase):
+    """Verify actual ZIP-shaped evidence, but keep field and Golden acceptance locked."""
+    def sample_zip(self):
+        import hashlib, io, zipfile
+        matrix=NativeArtifactIndependentAuthorityAudit().sample()
+        head='1'*40
+        payloads={
+            'readiness.txt':f'head={head}\nformal_fields=0\ngolden=0\npublished=0\n'.encode(),
+            'native_same_session_field_matrix.json':json.dumps(matrix,sort_keys=True).encode(),
+            'field_subset_review_proposal.json':b'{}',
+        }
+        entries={
+            '.github/workflows/eventradar_p30_l7_field_readiness.yml':'a'*64,
+            'scripts/p30_l7_field_golden_readiness.py':'b'*64,
+            'tests/p30/test_p30_l7_field_golden_readiness.py':'c'*64,
+            'tests/p30/fixtures/p30_l7_prince_field_readiness.json':'d'*64,
+        }
+        for name,value in payloads.items():
+            entries['evidence/'+name]=hashlib.sha256(value).hexdigest()
+        payloads['SHA256SUMS.txt']=''.join(
+            f'{h}  {name}\n' for name,h in entries.items()).encode()
+        stream=io.BytesIO()
+        with zipfile.ZipFile(stream,'w',zipfile.ZIP_DEFLATED) as z:
+            for name,value in payloads.items():z.writestr(name,value)
+        data=stream.getvalue()
+        return data,'sha256:'+hashlib.sha256(data).hexdigest(),head
+
+    def test_valid_zip_integrity_cannot_grant_formal_fields(self):
+        from datetime import datetime
+        data,digest,head=self.sample_zip()
+        r=m.audit_downloaded_native_artifact_zip(
+            data,digest,head,datetime.fromisoformat('2026-11-04T04:55:00+08:00'))
+        self.assertEqual((r['zip_sha256'],r['zip_crc'],r['evidence_member_hashes']),
+                         ('PASS','PASS','PASS'))
+        self.assertEqual(r['native_receipt_parity'],'PASS_INTERNAL_ONLY')
+        self.assertEqual(r['independently_verified_evidence_members'],3)
+        self.assertEqual(r['decision'],'ARTIFACT_INTEGRITY_PASS_FORMAL_AUTHORITY_HOLD')
+        self.assertFalse(r['raw_source_html_verified'])
+        self.assertFalse(r['code_files_in_zip_verified'])
+        self.assertEqual((r['formal_accepted_fields'],r['golden_accepted_events'],
+                          r['published_events'],r['formal_pwa_feed_events']),(0,0,0,0))
+
+    def test_digest_head_stale_and_truncated_zip_fail_closed(self):
+        from datetime import datetime
+        import hashlib
+        data,digest,head=self.sample_zip()
+        now=datetime.fromisoformat('2026-11-04T04:55:00+08:00')
+        cases=((data,'sha256:'+'0'*64,head,now),
+               (data,digest,'2'*40,now),
+               (data,digest,head,datetime.fromisoformat('2026-11-07T04:55:00+08:00')),
+               (data[:-8],'sha256:'+hashlib.sha256(data[:-8]).hexdigest(),head,now))
+        for i,args in enumerate(cases):
+            with self.subTest(case=i):
+                r=m.audit_downloaded_native_artifact_zip(*args)
+                self.assertTrue(r['decision'].startswith('HOLD_'))
+                self.assertEqual((r['formal_accepted_fields'],r['golden_accepted_events']),(0,0))
+
+
 if __name__=="__main__":unittest.main()
