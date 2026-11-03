@@ -897,6 +897,157 @@ def validate_independent_field_subset_proposal(crosscheck, proposal):
         "decision": "PENDING_INDEPENDENT_FIELD_ADJUDICATION_AND_OWNER_AUTHORITY",
     }
 
+
+# Fixed, reusable HTML-input field adapter for the two existing canonical sources.
+# This is a parser, NOT an HTTP client or a Golden/publication authority.
+# It never saves HTML and never claims a native GET from a supplied string.
+def parse_official_non_session_html(source_url, html, expected_title,
+                                    observed_at_utc, now_utc=None):
+    """Parse exact-source HTML into non-session REVIEW values; fail closed."""
+    import re
+    from html.parser import HTMLParser
+    from urllib.parse import parse_qs, urlsplit
+    from datetime import timezone
+
+    class PublicFields(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.parts, self.headings, self.links = [], [], []
+            self.heading, self.anchor, self.skip = None, None, 0
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "noscript"):
+                self.skip += 1
+            if tag in ("h1", "h2") and not self.skip:
+                self.heading = []
+            if tag == "a" and not self.skip:
+                self.anchor = {"href": dict(attrs).get("href", ""), "text": []}
+        def handle_data(self, value):
+            if self.skip or not value.strip():
+                return
+            value = " ".join(value.split())
+            self.parts.append(value)
+            if self.heading is not None:
+                self.heading.append(value)
+            if self.anchor is not None:
+                self.anchor["text"].append(value)
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "noscript"):
+                self.skip = max(0, self.skip - 1)
+            if tag in ("h1", "h2") and self.heading is not None:
+                self.headings.append(" ".join(self.heading))
+                self.heading = None
+            if tag == "a" and self.anchor is not None:
+                self.links.append((self.anchor["href"], " ".join(self.anchor["text"])))
+                self.anchor = None
+
+    def one(items, label):
+        values = set(items)
+        if len(values) != 1:
+            raise ValueError("SOURCE_FIELD_MISSING_OR_CONFLICT_" + label)
+        return next(iter(values))
+
+    if not isinstance(html, str) or not 0 < len(html) <= 524288:
+        raise ValueError("SOURCE_HTML_EMPTY_OR_OVERSIZE_HOLD")
+    if not isinstance(expected_title, str) or not expected_title.strip():
+        raise ValueError("SOURCE_TITLE_REQUIRED_HOLD")
+    try:
+        observed = datetime.fromisoformat(observed_at_utc.replace("Z", "+00:00"))
+        now = (now_utc if now_utc is not None
+               else datetime.now(timezone.utc))
+        if observed.utcoffset() is None or now.utcoffset() is None:
+            raise ValueError()
+        age = (now - observed).total_seconds()
+        if age < 0 or age > 86400:
+            raise ValueError()
+    except (ValueError, AttributeError, TypeError):
+        raise ValueError("SOURCE_FRESHNESS_UNATTESTED_OR_STALE_HOLD")
+
+    url = urlsplit(source_url)
+    if (url.scheme != "https" or url.username or url.password or url.fragment):
+        raise ValueError("SOURCE_URL_AUTHORITY_HOLD")
+    tmc = (url.netloc == "www.tmc.taipei"
+           and re.fullmatch(r"/tw/blog/show/[A-Za-z0-9_-]+", url.path)
+           and not url.query)
+    twtc = (url.netloc in ("twtc.com.tw", "www.twtc.com.tw")
+            and url.path == "/exhibition_more.aspx"
+            and set(parse_qs(url.query)) == {"id", "p"}
+            and parse_qs(url.query)["p"] == ["home"]
+            and len(parse_qs(url.query)["id"]) == 1
+            and re.fullmatch(r"[0-9]{1,10}", parse_qs(url.query)["id"][0]))
+    if not (tmc or twtc):
+        raise ValueError("SOURCE_NOT_CANONICAL_ALLOWLIST_HOLD")
+
+    page = PublicFields()
+    page.feed(html)
+    if expected_title not in page.headings:
+        raise ValueError("LIST_DETAIL_TITLE_IDENTITY_HOLD")
+    scope = " ".join(page.parts).split("其他展演活動", 1)[0]
+    if tmc:
+        shows = re.findall(r"20[0-9]{2}[./][0-9]{2}[./][0-9]{2}\s+[0-9]{2}:[0-9]{2}", scope)
+        show = one((re.sub(r"\s+", " ", x.replace(".", "/")) for x in shows),
+                   "TMC_SHOW")
+        halls = re.findall(r"活動地點\s+(臺北流行音樂中心\s+[^\s]{1,16})\s+主辦單位", scope)
+        hall = one((" ".join(x.split()) for x in halls), "TMC_HALL")
+        products = []
+        for href, label in page.links:
+            h = urlsplit(href)
+            if (label == "購票連結" and h.scheme == "https"
+                and h.netloc in ("kham.com.tw", "www.kham.com.tw")
+                and h.path == "/application/UTK02/UTK0201_.aspx"
+                and not h.fragment and not h.username and not h.password
+                and set(parse_qs(h.query)) == {"PRODUCT_ID"}
+                and len(parse_qs(h.query)["PRODUCT_ID"]) == 1
+                and re.fullmatch(r"P[A-Za-z0-9]{6,12}",
+                                 parse_qs(h.query)["PRODUCT_ID"][0])):
+                products.append(parse_qs(h.query)["PRODUCT_ID"][0])
+        product_id = one(products, "TMC_DIRECT_PRODUCT_EDGE")
+        fields = [
+            {"field": "venue_showtime", "role": "VENUE_SHOW_NOT_SALE",
+             "value": show},
+            {"field": "venue_hall", "role": "VENUE_HALL", "value": hall},
+        ]
+        identity = {"kind": "VENUE_TO_KHAM_PRODUCT_NOT_SESSION",
+                    "product_id": product_id}
+        line = "A"
+    else:
+        def label_value(label, pattern):
+            matches = re.findall(re.escape(label) + r"\s*[：:]\s*" + pattern,
+                                 scope)
+            return one(matches, "TWTC_" + label)
+        period = label_value("展出日期",
+            r"(20[0-9]{2}/[0-9]{2}/[0-9]{2}\s*[~～]\s*20[0-9]{2}/[0-9]{2}/[0-9]{2})")
+        hours = label_value("展出時間",
+            r"([0-9]{2}:[0-9]{2}\s*[~～]\s*[0-9]{2}:[0-9]{2})")
+        hall = label_value("展覽館別", r"([^\s]{2,20})")
+        start, end = [x.strip() for x in re.split(r"[~～]", period)]
+        opening, closing = [x.strip() for x in re.split(r"[~～]", hours)]
+        if start > end or opening >= closing:
+            raise ValueError("TWTC_PERIOD_OR_HOURS_CONFLICT_HOLD")
+        fields = [
+            {"field": "exhibition_dates", "role": "EXHIBITION_DATE_NOT_SALE",
+             "value": {"start": start, "end": end}},
+            {"field": "open_hours", "role": "DAILY_OPEN_HOURS_NOT_SHOWTIME",
+             "value": {"open": opening, "close": closing}},
+            {"field": "venue_hall", "role": "EXHIBITION_HALL_NOT_TICKET_ID",
+             "value": hall},
+        ]
+        identity = {"kind": "TWTC_DETAIL_ID_NOT_TICKET_SESSION",
+                    "exhibition_id": parse_qs(url.query)["id"][0]}
+        line = "B"
+    return {"kind": "P30_L7_FIXED_OFFICIAL_DETAIL_HTML_PARSER_V1",
+            "source_url": source_url, "expected_list_title": expected_title,
+            "observed_at_utc": observed.isoformat(),
+            "input_attestation": "CALLER_SUPPLIED_HTML_NOT_NATIVE_GET_PROOF",
+            "line": line, "identity": identity,
+            "candidate_fields": [
+                dict(row, source_url=source_url, observed_at_utc=observed.isoformat(),
+                     decision="SOURCE_LOCAL_PARSE_REVIEW_ONLY",
+                     formal_accepted=False) for row in fields],
+            "native_get_verified": False, "formal_accepted_fields": 0,
+            "golden_accepted_events": 0, "published_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
