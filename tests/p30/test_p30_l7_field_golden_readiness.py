@@ -1163,6 +1163,65 @@ class TWTCBilingualConflictAuthority(unittest.TestCase):
                     m.adjudicate_twtc_executing_agency_public_crosscheck(
                         self.cn,self.en,candidate)
 
+
+class TWTCOrganizerCollisionGuard(unittest.TestCase):
+    """April/November TWTC events share contact but must never share event identity."""
+    def setUp(self):
+        from datetime import datetime, timedelta, timezone
+        import copy
+        base = TWTCBilingualConflictAuthority()
+        base.setUp()
+        self.cn, self.en = copy.deepcopy(base.cn), copy.deepcopy(base.en)
+        self.cn.update(organizer="台北市電器商業同業公會",
+                       organizer_phone="886-2-25064871Ext26")
+        self.en.update(organizer="TAIPEI ELECTRICAL COMMERCIAL ASSOCIATION",
+                       organizer_phone="886-2-25064871Ext26")
+        self.april = {
+            "source_url": "https://www.twtc.com.tw/en/exhibition_More.aspx?id=29417&p=menu1",
+            "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+            "observed_at_utc": "2026-11-04T07:30:00+08:00",
+            "exhibition_id": "29417",
+            "title": "THE 36TH TAIPEI ELECTRIC APPLIANCE FAIR",
+            "organizer": "TAIPEI ELECTRICAL COMMERCIAL ASSOCIATION",
+            "organizer_phone": "886-2-25064871Ext26",
+            "dates": {"start": "2026/04/10", "end": "2026/04/13"},
+            "hours": {"open": "10:00", "close": "18:00"},
+        }
+        self.now = datetime(2026, 11, 4, 7, 57, tzinfo=timezone(timedelta(hours=8)))
+
+    def test_same_organizer_phone_is_explicit_negative_identity_edge(self):
+        r = m.adjudicate_twtc_same_organizer_collision(
+            self.cn, self.en, self.april, self.now)
+        self.assertEqual(r["source_identity"], "NOVEMBER_29418_NOT_APRIL_29417")
+        self.assertIn("REJECT", r["negative_identity_edge"])
+        self.assertEqual(r["reviewable_non_session_fields"], 3)
+        self.assertEqual((r["independent_formal_accepted_fields"],
+                          r["golden_accepted_events"], r["published_events"],
+                          r["formal_pwa_feed_events"]), (0, 0, 0, 0))
+        self.assertEqual(r["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_wrong_id_organizer_phone_dates_or_stale_clock_fail_closed(self):
+        import copy
+        for target, field, value in (
+            ("april", "exhibition_id", "29418"),
+            ("april", "source_url", "https://untrusted.example/id=29417"),
+            ("april", "dates", {"start": "2026/11/06", "end": "2026/11/09"}),
+            ("april", "organizer_phone", "886-2-25064871Ext27"),
+            ("april", "title", "2025 ELECTRIC APPLIANCE FAIR"),
+            ("april", "observed_at_utc", "2026-11-01T07:30:00+08:00"),
+            ("cn", "organizer_phone", "886-2-25064871Ext27"),
+            ("en", "organizer", "ANOTHER ORGANIZER"),
+            ("en", "exhibition_id", "29417"),
+        ):
+            with self.subTest(target=target, field=field):
+                cn, en, april = (copy.deepcopy(self.cn), copy.deepcopy(self.en),
+                                 copy.deepcopy(self.april))
+                {"cn": cn, "en": en, "april": april}[target][field] = value
+                with self.assertRaises(ValueError):
+                    m.adjudicate_twtc_same_organizer_collision(
+                        cn, en, april, self.now)
+
+
 class NativeArtifactIndependentAuthorityAudit(unittest.TestCase):
     """Artifact structure/freshness review cannot authenticate its ZIP or grant Golden."""
     def sample(self):
