@@ -19,10 +19,7 @@
     "l9bSha256": "3906b4e9689987429040ce9508fc88e4dbb0491199fd5984e55fb469065114d0",
     "l9mRun": 40682420113,
     "l9mArtifact": 12813381760,
-    "l9mSha256": "490b6aedb0e28a4e1a07ac2f3782456a138358386b94b62099469c18f0b8c7a5",
-    "l9nRun": 40686039228,
-    "l9nArtifact": 12814702732,
-    "l9nSha256": "a049545092f6a508791f3a12b5c05395de7b4eb975efbb3d9b8813319ec1a5c9"
+    "l9mSha256": "490b6aedb0e28a4e1a07ac2f3782456a138358386b94b62099469c18f0b8c7a5"
   },
   "baselineSummary": {
     "platformsChecked": 19,
@@ -46,11 +43,7 @@
     "ibonL9MCurrentSampleCount": 4,
     "ibonL9MFieldCandidatesAccepted": 0,
     "ibonL9MRefusals": 4,
-    "caution": "各 Gate 使用不同時間及不同採集方式，不能把候選數直接相加、不能宣稱 19 平台已完成",
-    "ibonL9NCurrentTitleMatches": 3,
-    "ibonL9NCurrentFourSamples": 4,
-    "ibonL9NCurrentLocalLabelCount": 0,
-    "ibonL9NCurrentReviewFields": 0
+    "caution": "各 Gate 使用不同時間及不同採集方式，不能把候選數直接相加、不能宣稱 19 平台已完成"
   },
   "production": {
     "eventDataFile": "docs/data.json",
@@ -317,18 +310,18 @@
         "detailTitleMatches": 0,
         "observedAtUTC": "2026-10-26T15:53:41Z"
       },
-      "phase": "瀏覽器可取得清單／跨時間詳情身分漂移 HOLD",
-      "blocker": "正常 Chromium 曾取得 22 筆清單候選；L9-M 四筆標題 4/4，但 L9-N 最新相同四筆僅 3/4（39575 當前不吻合），且此次四筆均未辨識到可安全綁定的日期標籤。官方來源或渲染結構存在時間差異，必須保留歷史證據，不能宣稱日期／票價已修復",
+      "phase": "瀏覽器候選／欄位 HOLD",
+      "blocker": "純 HTML 初始清單 0；正常 Chromium 後取得 22 筆候選，詳情身分有歷史間歇性不一致；日期值與 h3 標籤局部關係不明",
       "stages": {
         "response": "HTTP200_OBSERVED",
         "list": "HOLD_ZERO_OR_UNPARSED",
-        "detail": "HOLD_L9N_CURRENT_3_OF_4_TITLE_MATCH_HISTORIC_L9M_4_OF_4",
-        "fields": "HOLD_L9N_NO_LOCAL_LABELS_NO_SAFE_FIELD_VALUES",
+        "detail": "HOLD_NOT_VERIFIED",
+        "fields": "HOLD_NOT_FORMALLY_VERIFIED",
         "android": "NOT_IN_HISTORICAL_PLATFORM_SPECIFIC_44",
         "publication": "HARD_HOLD_NO_EVENT_RELEASE"
       },
       "independentGate": {
-        "gate": "P30-L9E~L9N",
+        "gate": "P30-L9E~L9M",
         "listCandidates": 22,
         "detailTitleMatchesSampled": 6,
         "detailSampleScope": "累計抽樣非全 22 筆",
@@ -339,19 +332,8 @@
         "refusalReason": "AMBIGUOUS_OR_INTERACTIVE",
         "identityReview": "39961 曾發生標題不符；L9K 跨時間 3/3 相符仍 REVIEW_ONLY",
         "androidUserPass": 0,
-        "notes": "L9-M（較早）四筆標題 4/4，活動日期相鄰元素皆因 AMBIGUOUS_OR_INTERACTIVE 拒絕；L9-N（最新）四筆 HTTP200，但 39575 標題不吻合，另外三筆未找到符合安全規則的活動日期標籤。先前與本輪結果皆保留，不互相覆蓋；場次／票價／日期／庫存皆 UNKNOWN。",
-        "evidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40682420113",
-        "l9nRun": 40686039228,
-        "l9nArtifact": 12814702732,
-        "l9nZipSHA256": "a049545092f6a508791f3a12b5c05395de7b4eb975efbb3d9b8813319ec1a5c9",
-        "l9nCurrentTitleMatches": 3,
-        "l9nCurrentSampleCount": 4,
-        "l9nTitleMismatch": [
-          "39575"
-        ],
-        "l9nLocallyRecognizedLabels": 0,
-        "l9nNewReviewCandidates": 0,
-        "l9nEvidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40686039228"
+        "notes": "索引需正常 Chromium 執行 JS；詳情時間／票價尚未有可接受來源欄位；純 HTTP 清單 0 與 Chromium 清單 22 為不同採集方式，不能相加",
+        "evidence": "https://github.com/easonliu714/event_scraper_public/actions/runs/40682420113"
       }
     },
     {
@@ -535,6 +517,71 @@
     "android": "僅 CKSMH 5 與 TWTC 39 具原本逐平台用戶實機 PASS，其他未宣稱完整實機",
     "publication": "工程狀態頁可公開展示；活動卡片/Golden/Writer/即時庫存仍 LOCKED"
   },
-  "statusRevision": "2026-10-28-L9N",
-  "statusRevisionMeaning": "source status correction only; historic L9M 4/4 retained, latest L9N 3/4 and 0 label observations"
+  "latestEngineering": {
+    "snapshotAtTaipei": "2026-11-03 18:55",
+    "verifiedAtUTC": "2026-11-03T10:55:00Z",
+    "scope": "工程 Gate / 官方來源證據快照；不改動正式活動資料、不表示活動已可售",
+    "governanceDraftPR": 8,
+    "governanceHead": "16ba2be8e3f724ae51ef093265310df410c67dd1",
+    "sourceMainAtSnapshot": "f2859b7c72d6e280b850cb253730989f22b01d46",
+    "existing19PlatformBaselineDate": "2026-10-28",
+    "releaseState": "HARD_HOLD_NO_PUBLICATION",
+    "acceptedFieldsNew": 0,
+    "goldenNew": 0,
+    "publishedEventsNew": 0,
+    "hourlyWriter": {
+      "taskId": "6ae1e6147e548191881f20e730ab0f11",
+      "lastScheduledTaipei": "2026-11-03 17:55",
+      "lastRun": "GOVERNANCE_HEAD_READBACK_ONLY",
+      "sourceEvidenceRecent3Rounds": "native GET 0 new; prior 2026-11-03 13:55 native 3/3",
+      "isSingleWriter": true
+    },
+    "lines": [
+      {
+        "id": "A",
+        "label": "售票平台（既有 19 來源）",
+        "gate": "P30-L7-FIRST-USABLE-NON-SESSION-SUBSET",
+        "draftPR": 236,
+        "head": "ba3f3f92408fada6b65bd36a1ab697976fe31f78",
+        "ciRun": 41599549626,
+        "tests": "29/29 PASS",
+        "artifact": 13214295320,
+        "source": "KHAM #04 ↔ TMC",
+        "evidence": "隔離候選 SHOW 2026-11-07 19:30、HALL 臺北流行音樂中心 表演廳 2/2；PRODUCT_ID=P1DF32E2 非 Session",
+        "decision": "REVIEW_WITH_HOLD",
+        "blocker": "獨立正式欄位驗收權責／時效／衝突簽核待完成；Session/庫存/票價 HOLD",
+        "acceptedFields": 0
+      },
+      {
+        "id": "B",
+        "label": "官方場館（臺北／新北優先）",
+        "gate": "P30-L7-FIRST-USABLE-NON-SESSION-SUBSET",
+        "draftPR": 236,
+        "head": "ba3f3f92408fada6b65bd36a1ab697976fe31f78",
+        "ciRun": 41599549626,
+        "tests": "29/29 PASS",
+        "artifact": 13214295320,
+        "source": "TWTC #16 台北世貿",
+        "evidence": "隔離候選 DETAIL id=29418 展期 2026-11-06~09、每日開放 10:00~18:00、世貿一館 3/3；LIST→同 ID DETAIL",
+        "decision": "REVIEW_WITH_HOLD",
+        "blocker": "獨立正式欄位驗收權責／時效／衝突簽核待完成；入場規則/票價/圖片 HOLD",
+        "acceptedFields": 0
+      }
+    ],
+    "ownerDecision": {
+      "requiredNow": false,
+      "reason": "工程隔離安全修補僅供 PR/CI 審查；正式 status-only Merge/Pages 部署需 Owner 另授權；Golden/活動發布 HOLD"
+    },
+    "candidateReviewFields": 5,
+    "candidateIdentityDependencies": 2,
+    "independentFormalAdjudicatedFields": 0,
+    "nativeOfficialGetThisSnapshot": 0,
+    "statusOnlyReleaseAuthorization": "NOT_GRANTED",
+    "priorVerifiedNativeGet": {
+      "run": 41587253858,
+      "successfulOfficialGet": 3,
+      "source": "TMC DETAIL + TWTC LIST + TWTC DETAIL",
+      "decision": "HISTORIC_NATIVE_REVIEW_ONLY"
+    }
+  }
 }

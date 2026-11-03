@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   readonly-status-contract:
-    if: github.repository == 'easonliu714/event_scraper_public'
+    if: github.repository == 'easonliu714/event_scraper_public' && (github.head_ref == 'feat/eventradar-public-platform-status-20261028' || github.ref_name == 'feat/eventradar-public-platform-status-20261028')
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:

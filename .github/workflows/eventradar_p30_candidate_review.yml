@@ -1,0 +1,112 @@
+name: EventRadar P30 L7-L8 isolated candidate / PWA review CI (NO PUBLISH)
+on:
+  pull_request:
+    paths:
+      - 'scripts/p30_candidate_review_pipeline.py'
+      - 'tests/p30/test_candidate_review_pipeline.py'
+      - 'tests/fixtures/p30_candidate_review_synthetic.json'
+      - 'docs/index.html'
+      - '.github/workflows/eventradar_p30_candidate_review.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  candidate-review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l7-l8-candidate-review-isolated'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD, scope and frozen formal outputs
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          base=309481985c20ab3abd628b2e82dc6da29f07f920
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_candidate_review.yml' 'docs/index.html' 'scripts/p30_candidate_review_pipeline.py' 'tests/fixtures/p30_candidate_review_synthetic.json' 'tests/p30/test_candidate_review_pipeline.py' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo "FAIL_CHANGED_FILES"; printf '%s\n' "$actual"; exit 1; }
+          echo PASS_EXACT_HEAD_FROZEN_FORMAL_DATA_STATUS_AND_FIVE_FILE_SCOPE
+      - name: Python positive negative and regression suite
+        run: |
+          python -m unittest discover -s tests/p30 -p test_candidate_review_pipeline.py -v
+      - name: Isolated synthetic candidate build and SHA256
+        run: |
+          set -euo pipefail
+          mkdir -p review-artifact
+          python scripts/p30_candidate_review_pipeline.py \
+            --input tests/fixtures/p30_candidate_review_synthetic.json \
+            --output-dir review-artifact \
+            --repo-root .
+          (cd review-artifact && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('review-artifact')
+          d=json.loads((p/'data.json').read_text())
+          q=json.loads((p/'quality_report.json').read_text())
+          assert len(d)==2 and q['previewRows']==2 and q['published']==0
+          assert all(x['_candidate']['published'] is False for x in d)
+          assert all(x['img_url'] is None for x in d)
+          assert q['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          print('PASS_SYNTHETIC_REVIEW_ONLY_NO_PUBLICATION')
+          PY
+      - name: PWA inline JS parse, DOM guard and original formal fetch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('docs/index.html').read_text()
+          scripts=re.findall(r'<script>(.*?)</script>',html,re.S)
+          assert len(scripts)==1
+          assert html.count('id="candidate-review-list"')==1
+          assert html.count('id="candidate-file-input"')==1
+          assert "candidateReviewActive = false" in html
+          assert "if (candidateReviewActive) return;" in html
+          assert "meta.published !== false" in html
+          assert "meta.golden_accepted !== false" in html
+          assert "meta.formal_field_pass !== false" in html
+          assert "card.addEventListener('click'" in html
+          assert "body.append(el)" in html
+          assert "document.createElement('div')" in html
+          assert "await file.text()" in html
+          assert "data.json?t=" in html
+          assert "checkAndNotifyNewFavs()" in html
+          assert "'readEvents', JSON.stringify(readEvents)" in html
+          assert "link.href = e.url" in html and "isCandidateOfficialUrl(row.url)" in html
+          assert "candidateReviewRows = items" in html
+          assert "allEvents = items" not in html
+          Path('/tmp/eventradar_p30_candidate_ui.js').write_text(scripts[0])
+          PY
+          node --check /tmp/eventradar_p30_candidate_ui.js
+          echo PASS_REVIEW_UI_CONTRACT_AND_JS_SYNTAX
+      - name: Produce provenance manifest artifact
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          p=Path('review-artifact')
+          info={'head_sha':os.environ['HEAD_SHA'],'run_kind':'SYNTHETIC_ONLY',
+                'formal_data_blob':'7fc4fe32567a57fd504483eeb9a8b9e10b568ea4',
+                'formal_platform_status_blob':'cdeeb3b551e38f862c37759426a14b5129e1224d',
+                'published':0,'golden':0,'release':'HARD_HOLD_NO_PUBLICATION'}
+          (p/'audit.json').write_text(json.dumps(info,sort_keys=True,indent=2))
+          PY
+          (cd review-artifact && sha256sum audit.json >> SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-p30-l7l8-isolated-candidate-review
+          path: review-artifact/
+          if-no-files-found: error
+          retention-days: 30
