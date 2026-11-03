@@ -6279,3 +6279,34 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE/HOLD]
 └── HARD_HOLD_NO_PUBLICATION [LOCKED]
 
 Authority boundary: successful mock tests and independently crawled public pages can establish role/URL consistency, but neither is an immutable same-run native GET receipt. A native runner receipt cannot by itself authorize formal field acceptance. The formal field adjudicator still requires independent authority, source freshness, identity and conflict review, plus separate Owner release authorization. Workflow update was security-blocked and not retried or bypassed. Next Gate is an authorized native integration path, or root-cause/source rotation after two no-quality-increment rounds. Existing #53 status-only MERGED, Pages runtime UNVERIFIED, 19 platform/reportDate baseline preserved; L8 Android 5/5 and CKSMH5/TWTC39 historical PASS remain CLOSED/PRESERVED.
+
+---
+
+### P30-L7 cross-language same-ID conflict boundary — 2026-11-04 02:52 Asia/Taipei (Draft #8 only; NO PUBLISH)
+
+```text
+Official public reader (not native CI GET)
+  A TMC LIST → exact DETAIL 2026SungNien-Yu → KHAM PRODUCT_ID=P1DF32E2
+    ├─ SHOW 2026-11-07 19:30 [TMC DETAIL; REVIEW; independent authority HOLD]
+    ├─ HALL 臺北流行音樂中心 表演廳 [TMC DETAIL; REVIEW; independent authority HOLD]
+    └─ KHAM act title corroborates product identity, NOT ticket Session/showtime
+  B TWTC LIST → Chinese DETAIL id=29418&p=home
+    ├─ DATE 2026/11/06–09 [REVIEW]
+    ├─ DAILY OPEN 10:00–18:00 [REVIEW]
+    ├─ HALL 世貿一館 [REVIEW]
+    └─ English DETAIL same id=29418&p=home
+        ├─ DATE 2026/11/06–09 / 10–18 / Hall 1 [reader corroboration]
+        └─ TITLE "2025 ELECTRIC APPLIANCE FAIR" vs Chinese
+           "2026年電器空調影音大展" [TITLE_YEAR_CONFLICT; HOLD]
+  Same ID ≠ permission to rewrite/translate conflicting year.
+  Same date ≠ permission to join neighboring exhibition rows.
+  Reader ≠ native GET ≠ independent formal authority ≠ Golden.
+  Existing #236 native collector: executable, mock CI 36/36 PASS;
+    actual collector GET 0; security-blocked workflow edit not retried.
+  FORMAL_FIELD 0 / GOLDEN 0 / PUBLICATION 0 / PWA_FEED 0
+  HARD_HOLD_NO_PUBLICATION
+```
+
+Authority matrix: A `venue_showtime` and `venue_hall` each require exact TMC source identity, source-native same-run freshness, venue-owned show/room label and independent acceptance; KHAM product only supports event identity, not Session. B `exhibition_dates`, `open_hours`, `venue_hall` each require exact TWTC id=29418, same-record LIST→DETAIL, source-native freshness, semantic role and bilingual title-year conflict recorded without rewriting event identity. Reader-level cross-language agreement is **not** formal field acceptance. Sources: [TMC LIST](https://www.tmc.taipei/tw/blog/show), [TMC DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC Chinese](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home), [TWTC English same ID](https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home).
+
+No new adapter/platform ID, PR, main edit, formal JSON change, Publisher activation or release authorization. Engineering Draft [#236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD `8f8f2de291cc408bb657cc209075b6fa28f35e89`, [CI #41689765930](https://github.com/easonliu714/event_scraper_public/actions/runs/41689765930) SUCCESS, artifact #13257481480; governance-only addendum. Stop-rule: next iteration should change the acquisition/authority root cause or rotate canonical source, not add a repetitive mock Gate. Existing #53 status-only MERGED, 19-platform baseline, L8 Android 5/5 PASS and formal release HOLD retained.
