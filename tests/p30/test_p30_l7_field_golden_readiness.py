@@ -1037,4 +1037,74 @@ class NativeSameRunFiveFieldReviewGate(unittest.TestCase):
 
 
 
+
+class TWTCBilingualConflictAuthority(unittest.TestCase):
+    """Same ID is not proof that the English 2025 title may overwrite 2026."""
+    def setUp(self):
+        self.cn = {
+            "source_url": "https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home",
+            "language": "ZH", "exhibition_id": "29418",
+            "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+            "observed_at_utc": "2026-11-04T03:50:00+08:00",
+            "title": "2026年電器空調影音大展",
+            "dates": {"start": "2026/11/06", "end": "2026/11/09"},
+            "hours": {"open": "10:00", "close": "18:00"}, "hall": "世貿一館",
+        }
+        self.en = {
+            "source_url": "https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home",
+            "language": "EN", "exhibition_id": "29418",
+            "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+            "observed_at_utc": "2026-11-04T03:50:00+08:00",
+            "title": "2025 ELECTRIC APPLIANCE FAIR",
+            "dates": {"start": "2026/11/06", "end": "2026/11/09"},
+            "hours": {"open": "10", "close": "18"}, "hall": "Hall 1",
+        }
+
+    def test_title_year_conflict_quarantined_but_matching_non_session_roles_reviewable(self):
+        r = m.adjudicate_twtc_bilingual_same_id(self.cn, self.en)
+        self.assertEqual(r["title_decision"], "HOLD_CROSS_LANGUAGE_TITLE_YEAR_CONFLICT")
+        self.assertEqual(r["source_consistent_fields"], 3)
+        self.assertEqual([x["field"] for x in r["field_matrix"]],
+                         ["exhibition_dates", "open_hours", "venue_hall"])
+        self.assertTrue(all(x["decision"] == "REVIEW_BILINGUAL_AGREEMENT_NOT_NATIVE"
+                            and not x["formal_accepted"] for x in r["field_matrix"]))
+        self.assertEqual((r["independent_formal_ready_fields"],
+                          r["formal_accepted_fields"], r["golden_accepted_events"],
+                          r["published_events"], r["formal_pwa_feed_events"]),
+                         (0, 0, 0, 0, 0))
+        self.assertEqual(r["source_freshness"], "READER_TIMESTAMP_NOT_NATIVE_ATTESTATION")
+        self.assertEqual(r["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_field_specific_mismatches_cannot_be_silently_reconciled(self):
+        import copy
+        for section, key, value, field in (
+            ("dates", "end", "2026/11/10", "exhibition_dates"),
+            ("hours", "close", "17", "open_hours"),
+            ("hall", None, "Hall 2", "venue_hall"),
+        ):
+            with self.subTest(field=field):
+                en = copy.deepcopy(self.en)
+                if key is None: en[section] = value
+                else: en[section][key] = value
+                r = m.adjudicate_twtc_bilingual_same_id(self.cn, en)
+                self.assertIn("HOLD", next(x["decision"] for x in r["field_matrix"]
+                                           if x["field"] == field))
+                self.assertEqual(r["formal_accepted_fields"], 0)
+
+    def test_wrong_identity_source_or_unattested_clock_is_rejected(self):
+        import copy
+        for key, value in (
+            ("exhibition_id", "29419"),
+            ("source_url", "https://evil.example/en/exhibition_More.aspx?id=29418&p=home"),
+            ("evidence_kind", "NATIVE_HTTP_200"),
+            ("observed_at_utc", "2026-11-04T03:50:00"),
+        ):
+            with self.subTest(key=key):
+                en = copy.deepcopy(self.en)
+                en[key] = value
+                with self.assertRaises(ValueError):
+                    m.adjudicate_twtc_bilingual_same_id(self.cn, en)
+
+
+
 if __name__=="__main__":unittest.main()
