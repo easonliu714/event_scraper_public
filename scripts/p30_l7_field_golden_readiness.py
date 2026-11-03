@@ -1099,6 +1099,7 @@ def build_non_session_list_detail_candidate(
             super().__init__(convert_charrefs=True)
             self.stack = []
             self.rows = []
+            self.anchors = []
             self.active_anchor = None
             self.skip = 0
 
@@ -1132,6 +1133,7 @@ def build_non_session_list_detail_candidate(
             if tag == "a" and self.active_anchor is not None:
                 link = (self.active_anchor["href"],
                         " ".join(self.active_anchor["text"]))
+                self.anchors.append(link)
                 for row in self.stack:
                     row["links"].append(link)
                 self.active_anchor = None
@@ -1152,8 +1154,15 @@ def build_non_session_list_detail_candidate(
             continue
         for href, label in row["links"]:
             candidate = urljoin(list_url, href)
-            if candidate == detail_url and (line == "B" or label == expected_title):
+            if candidate == detail_url and line == "B":
                 matched.append((text, candidate))
+    # TMC official LIST cards may have no semantic <article>/<tr> wrapper.
+    # Bind the complete title and exact URL within the SAME anchor, never
+    # across unrelated cards or by a page-wide fuzzy title search.
+    if line == "A":
+        matched = [(label, urljoin(list_url, href)) for href, label in parser.anchors
+                   if urljoin(list_url, href) == detail_url
+                   and expected_title in " ".join(label.split())]
     if len(matched) != 1:
         raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
 
