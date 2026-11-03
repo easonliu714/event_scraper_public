@@ -45,14 +45,69 @@ jobs:
           python -m py_compile scripts/p30_l7_field_golden_readiness.py tests/p30/test_p30_l7_field_golden_readiness.py
           python -m unittest discover -s tests/p30 -p 'test_p30_l7_field_golden_readiness.py' -v
           python scripts/p30_l7_field_golden_readiness.py
+      - name: One-shot bounded official native GET acquisition diagnosis (not Golden)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[source-probe-once]'; then
+            echo 'SOURCE_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, socket, ssl, urllib.error, urllib.request
+          from pathlib import Path
+          # Exactly five official public pages. One GET per URL, no retries, login, or redirects.
+          targets = [
+              ('A', 'TMC_LIST', 'https://www.tmc.taipei/tw/blog/show', '2026SungNien-Yu'),
+              ('A', 'TMC_DETAIL', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu', '宋念宇'),
+              ('A', 'KHAM_EVENT', 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2', 'P1DF32E2'),
+              ('B', 'TWTC_LIST', 'https://twtc.com.tw/exhibition?p=home', '電器空調影音'),
+              ('B', 'TWTC_DETAIL', 'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home', '電器空調影音'),
+          ]
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect)
+          results = []
+          for line, role, url, marker in targets:
+              record = {'line': line, 'role': role, 'url': url, 'http_status': None, 'bytes': 0, 'sha256': None, 'marker_present_in_bounded_body': False, 'decision': 'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url, headers={'User-Agent': 'EventRadarSourceAudit/1.0 (read-only public evidence)', 'Accept': 'text/html,application/xhtml+xml', 'Accept-Encoding': 'identity'}, method='GET')
+                  with opener.open(req, timeout=8) as response:
+                      record['http_status'] = response.status
+                      record['content_type'] = response.headers.get('Content-Type', '')[:100]
+                      body = response.read(524289)
+                      record['bytes'] = len(body)
+                      record['sha256'] = hashlib.sha256(body).hexdigest()
+                      record['truncated'] = len(body) > 524288
+                      record['marker_present_in_bounded_body'] = marker.encode('utf-8') in body
+                      record['decision'] = 'HTTP200_ONLY_FIELD_UNVERIFIED' if response.status == 200 and not record['truncated'] else 'BODY_OR_STATUS_HOLD'
+              except urllib.error.HTTPError as exc:
+                  record['http_status'] = exc.code
+                  record['decision'] = 'REDIRECT_BLOCKED' if 300 <= exc.code < 400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as exc:
+                  reason = exc.reason
+                  record['error_type'] = type(reason).__name__
+                  record['decision'] = 'DNS_OR_EGRESS_HOLD' if isinstance(reason, socket.gaierror) else 'NETWORK_OR_TLS_HOLD'
+              except (TimeoutError, socket.timeout, ssl.SSLError, OSError) as exc:
+                  record['error_type'] = type(exc).__name__
+                  record['decision'] = 'NETWORK_OR_TLS_HOLD'
+              results.append(record)
+              print('SOURCE_PROBE', line, role, record['http_status'], record['decision'], flush=True)
+          report = {'kind': 'P30_L7_ONE_SHOT_OFFICIAL_NATIVE_ACQUISITION_DIAGNOSTIC', 'observed_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'request_count': len(targets), 'native_http_200_count': sum(x['http_status'] == 200 for x in results), 'formal_accepted_fields': 0, 'golden': 0, 'published': 0, 'no_raw_pages_saved': True, 'results': results}
+          Path('evidence/source_acquisition.json').write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print('SOURCE_PROBE_SUMMARY', json.dumps({'requests': len(targets), 'native_http_200': report['native_http_200_count'], 'formal_accepted_fields': 0, 'golden': 0, 'published': 0}), flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p evidence
           files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
-          printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\nnative_get=0\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" f2859b7c72d6e280b850cb253730989f22b01d46 > evidence/readiness.txt
+          printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" f2859b7c72d6e280b850cb253730989f22b01d46 > evidence/readiness.txt
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
+          if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
