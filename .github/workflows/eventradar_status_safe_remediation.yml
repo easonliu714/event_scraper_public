@@ -1,0 +1,77 @@
+name: EventRadar status-only safe remediation exact-head NO RELEASE
+on:
+  push:
+    branches: [feat/eventradar-pwa-status-l9n-20261028]
+  pull_request:
+    paths: [docs/platform_status.json, .github/workflows/eventradar_status_safe_remediation.yml]
+permissions:
+  contents: read
+jobs:
+  status-only-immutable:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact head and immutable production scope
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          main=f2859b7c72d6e280b850cb253730989f22b01d46
+          git merge-base --is-ancestor "$main" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          for path in docs/index.html docs/platform-status.html scraper.py docs/manifest.json; do
+            test "$(git rev-parse HEAD:"$path")" = "$(git rev-parse "$main":"$path")"
+          done
+          actual="$(git diff --name-only "$main" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_status_safe_remediation.yml' 'docs/platform_status.json' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_SCOPE_DRIFT; exit 1; }
+          echo PASS_EXACT_HEAD_TWO_FILE_SCOPE_AND_FROZEN_FORMAL_BLOBS
+      - name: Verify 19 platforms and baseline exact byte parity
+        run: |
+          python - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          main='f2859b7c72d6e280b850cb253730989f22b01d46'
+          old=subprocess.check_output(['git','show',main+':docs/platform_status.json']).decode()
+          new=Path('docs/platform_status.json').read_text()
+          marker='  "latestEngineering": {'
+          assert old.count(marker)==new.count(marker)==1
+          assert old.split(marker)[0]==new.split(marker)[0],'baseline bytes changed'
+          o=json.loads(old);n=json.loads(new)
+          assert len(o['platforms'])==len(n['platforms'])==19
+          assert o['platforms']==n['platforms']
+          snap=n.pop('latestEngineering');o.pop('latestEngineering')
+          assert n==o
+          assert snap['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert (snap['acceptedFieldsNew'],snap['goldenNew'],snap['publishedEventsNew'])==(0,0,0)
+          assert (snap['candidateReviewFields'],snap['candidateIdentityDependencies'],snap['independentFormalAdjudicatedFields'])==(5,2,0)
+          assert snap['nativeOfficialGetThisSnapshot']==0
+          assert snap['statusOnlyReleaseAuthorization']=='NOT_GRANTED'
+          assert snap['priorVerifiedNativeGet']['successfulOfficialGet']==3
+          assert [x['id'] for x in snap['lines']]==['A','B']
+          assert all(x['draftPR']==236 and x['acceptedFields']==0 and x['decision']=='REVIEW_WITH_HOLD' for x in snap['lines'])
+          assert all(x['head']=='ba3f3f92408fada6b65bd36a1ab697976fe31f78' for x in snap['lines'])
+          print('PASS_19_PLATFORM_BASELINE_BYTE_PARITY_AND_REVIEW_ONLY')
+          PY
+      - name: Status-only SHA256 evidence manifest
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/exact_head.txt
+          git rev-parse HEAD:docs/data.json > evidence/formal_data_blob.txt
+          git rev-parse HEAD:docs/platform_status.json > evidence/status_candidate_blob.txt
+          sha256sum docs/platform_status.json .github/workflows/eventradar_status_safe_remediation.yml evidence/*.txt > evidence/SHA256SUMS.txt
+          sha256sum -c evidence/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-status-only-safe-remediation
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30

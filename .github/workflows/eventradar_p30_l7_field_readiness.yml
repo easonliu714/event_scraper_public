@@ -23,14 +23,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base=f2859b7c72d6e280b850cb253730989f22b01d46
+          base=d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
           expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
           git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
-          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 99cae0571e36e52dac360b6935c0c09f6f6bed3f
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           test "$(git rev-parse HEAD:docs/index.html)" = d284e3007d95016312385892eef4449b03946c9c
           python - <<'PY'
@@ -563,7 +563,7 @@ jobs:
           set -euo pipefail
           mkdir -p evidence
           files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
-          printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" f2859b7c72d6e280b850cb253730989f22b01d46 > evidence/readiness.txt
+          printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce > evidence/readiness.txt
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
