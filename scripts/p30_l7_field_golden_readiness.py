@@ -1469,6 +1469,65 @@ def adjudicate_twtc_bilingual_same_id(cn, en):
 
 
 
+
+# Third official public source: the executing agency's event page corroborates
+# venue dates/hours/hall and the Chinese 2026 year. It has NO TWTC exhibition
+# ID and its reader transcript is NOT a native GET, source-body hash or formal
+# acceptance authority. Keep the English 2025 title disagreement quarantined.
+def adjudicate_twtc_executing_agency_public_crosscheck(cn, en, agency):
+    """Corroborate field roles across TWTC and event executor; fail closed."""
+    from datetime import datetime, timedelta, timezone
+    bilingual = adjudicate_twtc_bilingual_same_id(cn, en)
+    required = {
+        "source_url": "https://www.sheng-dong.com.tw/activity/appliances-expo/TECO",
+        "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+        "event_label": "2026台北電器空調影音展",
+        "organizer": "台北市電器商業同業公會",
+        "executor": "生動國際展覽事業股份有限公司",
+        "venue": "台北世貿一館",
+        "dates": {"start": "2026/11/06", "end": "2026/11/09"},
+        "hours": {"open": "10:00", "close": "18:00"},
+    }
+    if not isinstance(agency, dict) or any(agency.get(k) != v for k,v in required.items()):
+        raise ValueError("EXECUTOR_SOURCE_OR_FIELD_CONFLICT_HOLD")
+    if (cn.get("title") != "2026年電器空調影音大展"
+            or en.get("title") != "2025 ELECTRIC APPLIANCE FAIR"
+            or cn.get("dates") != required["dates"]
+            or cn.get("hours") != required["hours"]
+            or cn.get("hall") != "世貿一館"
+            or bilingual["source_consistent_fields"] != 3
+            or bilingual["title_decision"] != "HOLD_CROSS_LANGUAGE_TITLE_YEAR_CONFLICT"):
+        raise ValueError("TWTC_ID_OR_TRANSLATION_CONFLICT_NOT_ISOLATED")
+    try:
+        observations = []
+        for record in (cn, en, agency):
+            stamp = datetime.fromisoformat(record["observed_at_utc"].replace("Z", "+00:00"))
+            if stamp.utcoffset() is None:
+                raise ValueError()
+            observations.append(stamp.astimezone(timezone.utc))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise ValueError("EXECUTOR_READER_CLOCK_UNATTESTED")
+    if max(observations)-min(observations)>timedelta(hours=24):
+        raise ValueError("EXECUTOR_READER_CLOCK_SKEW_HOLD")
+    return {
+        "kind": "P30_L7_TWTC_EXECUTOR_THIRD_SOURCE_REVIEW_V1",
+        "source_roles": ["TWTC_ZH_EXHIBITION_29418", "TWTC_EN_EXHIBITION_29418",
+                         "EXECUTING_AGENCY_NO_TWTC_EVENT_ID"],
+        "source_count": 3,
+        "identity_decision": "HOLD_EXECUTOR_HAS_NO_DIRECT_TWTC_ID",
+        "title_decision": "HOLD_EN_2025_VS_ZH_AND_EXECUTOR_2026",
+        "source_freshness": "READER_CLOCK_ONLY_NATIVE_GET_NOT_ATTESTED",
+        "field_matrix": [
+            {"field": field, "decision": "THIRD_SOURCE_CORROBORATED_REVIEW_NOT_NATIVE",
+             "formal_accepted": False}
+            for field in ("exhibition_dates", "open_hours", "venue_hall")
+        ],
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "formal_pwa_feed_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
 # Independent exported native-evidence audit. Caller-provided JSON and internal SHA
 # consistency do not authenticate the downloaded ZIP or grant field acceptance.
 # This gate never issues HTTP requests or writes production data.
