@@ -6325,3 +6325,31 @@ A+B native and independent authority boundary:
 - Still missing: A KHAM same-run detail authority, B English native same-ID evidence or official correction, independent field acceptance authority and separately authorized Golden/publication. Formal FIELD=0, Golden=0, published=0, PWA formal feed=0, HARD_HOLD_NO_PUBLICATION. Formal main data/status/index/scraper frozen, 19 platforms preserved; status-only #53 MERGED/Pages SUCCESS but runtime readback UNVERIFIED; L8 Android 5/5 USER_ATTESTED_PASS preserved.
 - Stop-rule: real native 0→3 breaks prior no-source-increment streak; next work should resolve authority/identity rather than create another synthetic micro Gate.
 
+
+
+---
+
+### P30-L7 independent native artifact authority/freshness boundary — 2026-11-04 05:00 Asia/Taipei
+
+\`\`\`text
+Existing Draft #236 HEAD 220bfaf5b3f729b75af0f2a66ae80d1722e25253
+  scripts/p30_l7_field_golden_readiness.py [original ADD-only path]
+    └─ audit_native_same_session_field_matrix(native_matrix, now_utc)
+       ├─ 3 exact official native source URLs; HTTP200/body size/SHA256
+       ├─ offset-aware observed_at within 24h, same-run skew <=10 minutes
+       ├─ 8 source-local exact role/event-ID/URL/value/hash/clock receipts
+       ├─ 5 non-Session fields → NATIVE_VALUE_REVIEW_PENDING_INDEPENDENT_AUTHORITY
+       ├─ A KHAM PRODUCT_ID → HOLD product DETAIL not same-run native
+       ├─ B TWTC same-row id=29418 → native identity REVIEW, not formal
+       ├─ bilingual title ZH 2026 vs EN 2025 → HOLD
+       ├─ downloaded ZIP CRC/SHA independent readback → HOLD (not performed)
+       └─ FORMAL_FIELD/GOLDEN/PUBLISHED/PWA_FEED = 0; no HTTP/production writes
+  tests/p30/test_p30_l7_field_golden_readiness.py
+    └─ 2 new test methods / 8 fail-closed negative mutations
+  CI #41717568479 SUCCESS 41/41; artifact #13270138758
+  CI one-shot GET SKIPPED, this-run native GET=0
+  Prior CI #41707543622 native 3/3 retained as historic source evidence only
+  HARD_HOLD_NO_PUBLICATION
+\`\`\`
+
+The independent audit checks **internal consistency of a supplied native-evidence JSON**, not whether that JSON is an authentic downloaded artifact. Its hard-coded expected values are comparison guards, **not a new source observation**. External ZIP CRC/SHA and artifact readback, native KHAM product identity, English same-id source authority, and an independently delegated field acceptance decision must remain distinct gates. The 2026-11-04 public official reader independently re-observed A TMC/KHAM and B TWTC ZH/EN; the TWTC same-ID bilingual TITLE_YEAR_CONFLICT remains OPEN and the five non-Session values remain REVIEW. Do not promote these to formal Golden. Exact-head [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41717568479) 41/41 SUCCESS; GitHub artifact digest \`sha256:ad6ce56db9c336b87809d3ac45ff2738e5736ee7934e51cb5b93e0274f587996\`, independent ZIP CRC UNVERIFIED. Existing #53 MERGED/Pages SUCCESS, 19 platforms, reportDate, formal JSON, L8 Android 5/5 and publication HOLD preserved.
