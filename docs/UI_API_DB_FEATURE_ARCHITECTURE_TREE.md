@@ -6079,3 +6079,32 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, existing Draft #236 HEAD ba3f3f92408fada6
 - Official evidence URLs: https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu ; https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2 ; https://twtc.com.tw/exhibition?p=home ; https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home . No raw HTML retained. Reader observation is not a native CI GET or new source-body SHA.
 - Previous Draft #236 exact-head CI #41599549626 SUCCESS 29/29, artifact #13214295320 five-field isolated review proposal. This observation: reader literal consistency 5/5; candidate subset 5→5; formal adjudication 0, accepted FIELD 0, Golden 0, publication 0, PWA feed 0, new native GET 0. NEXT independent authority/freshness review of five fields; never auto-promote.
 - Status-only legacy #53 diverged 2 ahead/30 behind and alters ibon baseline: HOLD_NO_MERGE. Preserve main formal data/status/19 platforms; L8 formal Android 5/5, CKSMH5/TWTC39 PASS; HARD_HOLD_NO_PUBLICATION. Owner action NONE for isolated review; release requires separate authorization.
+
+
+---
+
+### P30-L7-FIVE-FIELD-AUTHORITY-STOPRULE-20261103T1752 — independent source authority and stop-rule (NO PUBLISH)
+
+```text
+P30-L7 first non-session field authority [ACTIVE; existing Draft #236]
+├── A KHAM #04 / TMC [2 source literal fields independently rechecked]
+│   ├── PRODUCT_ID=P1DF32E2 ↔ TMC detail 2026SungNien-Yu [identity edge; NOT Session]
+│   ├── SHOW 2026-11-07 19:30 [REVIEW; KHAM SALE 2026-08-22 12:00 distinct]
+│   └── HALL 臺北流行音樂中心 表演廳 [REVIEW]
+├── B TWTC #16 [3 source literal fields independently rechecked]
+│   ├── LIST exact same-title more → DETAIL id=29418 [identity edge; NOT ticket ID]
+│   ├── EXHIBITION_DATE 2026-11-06–11-09 [NOT sale/session]
+│   ├── DAILY_OPEN_HOURS 10:00–18:00 [NOT performance showtime]
+│   └── HALL 世貿一館 [admission/price/image HOLD]
+├── Independent reader 2026-11-03 17:52 Taipei [public official pages; NOT native CI GET]
+├── Proposal 5→5 / identities 2→2 / new values 0 / new native GET 0
+├── FORMAL FIELD 0 / Golden 0 / published 0 / formal PWA feed 0 [LOCKED]
+├── First blocker: independent acceptance authority, freshness/conflict signoff
+├── Stop-rule: no repeat unchanged source/fixture; rotate to safe acceptance/status pipeline
+├── Status-only Draft #53 2 ahead/30 behind [ibon/root baseline changed; HOLD_NO_MERGE]
+│   └── Future status patch: current-main latestEngineering only, 19 platforms/data immutable, Owner release approval
+├── L8 formal Android 5/5 USER_ATTESTED_PASS [CLOSED], CKSMH5/TWTC39 [PRESERVED]
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+```
+
+Independent official sources: https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu ; https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2 ; https://twtc.com.tw/exhibition?p=home ; https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home . The same source literals were already in the previous 5-field proposal; this round adds an independent freshness/authority boundary audit, **not** new fields, native raw-body SHA, acceptance or publication. Source main f2859b7c72d6e280b850cb253730989f22b01d46, status blob cdeeb3b551e38f862c37759426a14b5129e1224d, formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 unchanged.
