@@ -665,4 +665,50 @@ class PublicNonSessionFieldReadiness(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.validate_public_non_session_receipt(d)
 
+
+class IndependentPublicFieldCrosscheck(unittest.TestCase):
+    def fixture(self):
+        return copy.deepcopy(data["independent_public_field_crosscheck"])
+
+    def test_all_eight_independent_reader_values_remain_review_only(self):
+        r=m.validate_independent_public_field_crosscheck(self.fixture())
+        self.assertEqual((r["A_crosschecked"],r["B_crosschecked"],r["review_only"]),(3,5,8))
+        self.assertEqual((r["formal_accepted"],r["golden"],r["published"],r["native_get_this_gate"]),(0,0,0,0))
+
+    def test_independent_crosscheck_negative_identity_role_value_and_release(self):
+        for field,key,bad in (
+            ("direct_ticket_product","observed_value",{"product_id":"P1DF32E2","official_ticket_url":m.PUBLIC_KHAM_PRODUCT+"&session=guess"}),
+            ("venue_showtime","observed_value","2026/08/22 12:00"),
+            ("venue_hall","observed_value","臺北流行音樂中心 文化館"),
+            ("list_detail_identity","observed_value",{"exhibition_id":"29419","same_row_title":"2026年電器空調影音大展"}),
+            ("exhibition_title","observed_value","2026台北國際旅展"),
+            ("exhibition_dates","observed_value",{"start":"2026/11/06","end":"2026/11/10"}),
+            ("open_hours","role","PERFORMANCE_SHOWTIME"),
+            ("venue_hall","source_url",m.PUBLIC_TWTC_LIST),
+            ("open_hours","prior_native_body_sha256","0"*64),
+            ("exhibition_dates","reader_observed_at_utc","2026-11-03T07:00:00"),
+            ("venue_showtime","formal_accepted",True),
+        ):
+            e=self.fixture()
+            row=next(x for x in e["field_receipts"] if x["field"]==field)
+            row[key]=bad
+            with self.subTest(field=field,key=key):
+                with self.assertRaises(ValueError):
+                    m.validate_independent_public_field_crosscheck(e)
+        for key,bad in (
+            ("this_gate_native_get",3),("formal_accepted_fields",1),
+            ("golden_accepted_events",1),("published_events",1),
+            ("formal_pwa_feed_events",1),
+            ("method","NATIVE_GET"),
+            ("prior_native_artifact_id",0),
+        ):
+            e=self.fixture();e[key]=bad
+            with self.subTest(key=key):
+                with self.assertRaises(ValueError):
+                    m.validate_independent_public_field_crosscheck(e)
+        e=self.fixture()
+        e["field_receipts"].append(copy.deepcopy(e["field_receipts"][0]))
+        with self.assertRaises(ValueError):
+            m.validate_independent_public_field_crosscheck(e)
+
 if __name__=="__main__":unittest.main()
