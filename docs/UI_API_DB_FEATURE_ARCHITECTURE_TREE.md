@@ -5978,3 +5978,49 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, Engineering Draft #236 exact a5504a52093d
 \`\`\`
 
 **Evidence readback:** [exact-head CI #41587253858](https://github.com/easonliu714/event_scraper_public/actions/runs/41587253858), [Artifact #13209075143](https://github.com/easonliu714/event_scraper_public/actions/runs/41587253858/artifacts/13209075143). Native body hashes A TMC \`590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210\`; B TWTC LIST \`385aee1ce2d85ab432e32add10c8fc5ffb27ce2d72a71f0d73375df079906149\`; B DETAIL \`887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116\`. New run body hashes differ from 12:55, exact 8 role values stable. The previous artifact had only match booleans; this run adds independently inspectable values without elevating acceptance. Independent ZIP SHA/CRC and SHA256SUMS verified. Formal data blob \`7fc4fe32567a57fd504483eeb9a8b9e10b568ea4\` and source main \`f2859b7c72d6e280b850cb253730989f22b01d46\` unchanged. Production status runtime UNVERIFIED. Owner action NONE for isolated engineering; separate authorization for status/Golden/publication.
+
+
+---
+
+### P30-L7-INDEPENDENT-OFFICIAL-FIELD-CROSSCHECK — 2026-11-03 15:00 Asia/Taipei (isolated architecture, NO PUBLISH)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, isolated Draft #236 HEAD 9664e0a5322474a79bd8d80dc1ecd02e077f2300]
+├── Prior native source acquisition [CI #41587253858, 3/3 HTTP200; historic, not this round]
+│   ├── TMC DETAIL native SHA256 590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210
+│   ├── TWTC LIST native SHA256 385aee1ce2d85ab432e32add10c8fc5ffb27ce2d72a71f0d73375df079906149
+│   ├── TWTC DETAIL native SHA256 887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116
+│   └── Artifact #13209075143, prior matrix SHA256 ae060f8cb7e00cb7a3376599b577dd4ebfea71c7b3930b5dd890270e0724e76a
+├── Separate official public reader [2026-11-03T07:00:33Z, NOT a native GET, no raw HTML saved]
+│   ├── A canonical KHAM #04 + TMC venue [3/3 SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY]
+│   │   ├── TMC LIST → exact DETAIL 2026SungNien-Yu → local 購票 anchor to KHAM PRODUCT_ID=P1DF32E2
+│   │   ├── SHOW 2026/11/07 19:30 (NOT KHAM SALE 2026/08/22 12:00)
+│   │   └── HALL 臺北流行音樂中心 表演廳 (NOT ticket Session or checkout price)
+│   └── B existing canonical TWTC #16 [5/5 SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY]
+│       ├── LIST same-title row → DETAIL id=29418 (NOT ticket Event ID)
+│       ├── TITLE 2026年電器空調影音大展
+│       ├── EXHIBITION_DATE 2026/11/06–11/09 (NOT sale/showtime)
+│       ├── DAILY_OPEN_HOURS 10:00–18:00 (NOT performance time)
+│       └── HALL 世貿一館; admission/child/price/image remain HOLD
+├── New isolated contract: source URL + event ID + role + literal value + prior native body SHA
+│   ├── 8/8 independent reader crosschecks (A 3/B 5), strict negative mutations
+│   ├── Exact-head CI #41593501018 SUCCESS 27/27, immutable main guards PASS
+│   ├── Artifact #13210663725 ZIP digest ac27b7c2c887a3ff1b17643f07f6c87922fb8bafdb1f7fe7f2f95da16678271e
+│   ├── Artifact is manifest/readiness only; independent 8-row matrix in tracked isolated fixture
+│   └── Independent ZIP CRC UNVERIFIED; no native GET this round, no repeated one-shot source requests
+├── 13:55→15:00 SOURCE_VALUE_CROSSCHECK 0→8; prior value receipts 8→8
+├── Formal FIELD 0 / Golden 0 / Published 0 / Production PWA feed 0 [LOCKED]
+├── NEXT: independent formal field-conflict adjudication/acceptance authority for non-session subset
+├── Status-only remediation [HOLD_NO_MERGE]
+│   ├── main status blob cdeeb3b551e38f862c37759426a14b5129e1224d; 19 platforms
+│   ├── reportDate 2026-10-28; engineering snapshot 2026-11-01 07:55
+│   ├── legacy Draft #53 2 ahead / 30 behind, ibon #12 baseline modified [UNSAFE]
+│   ├── preserve exact 19 platform objects/ibon/reportDate/sourceAuthority/separateEvidence
+│   ├── preserve docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+│   └── future latestEngineering-only exact-head status Gate, Owner release authorization required
+├── L8 formal Android 5/5 USER_ATTESTED_PASS [CLOSED, preserve]
+├── CKSMH5 / TWTC39 historical Android [PASS preserved]
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+```
+
+**Official independent reader:** [TMC LIST](https://www.tmc.taipei/tw/blog/show), [TMC DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM direct PRODUCT](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC LIST](https://twtc.com.tw/exhibition?p=home), [TWTC DETAIL id=29418](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home). **Exact-head readback:** [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236), [CI #41593501018](https://github.com/easonliu714/event_scraper_public/actions/runs/41593501018) SUCCESS, [Artifact #13210663725](https://github.com/easonliu714/event_scraper_public/actions/runs/41593501018/artifacts/13210663725). Previous native matrix's `independent_conflict_adjudication=PENDING` is NOT overwritten by this new separate reader contract; formal Golden approval remains pending. Main f2859b7c72d6e280b850cb253730989f22b01d46 and data/status unchanged. Runtime Pages status readback UNVERIFIED; Owner action NONE for engineering.
