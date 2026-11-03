@@ -5731,3 +5731,40 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; same Draft #236]
 
 **Next:** A rotate a legally accessible canonical ticket source or obtain an independent same-ID official time correction; B rotate next nonduplicated P0 Taipei/New Taipei venue or obtain public non-registration Session evidence. No retry/bypass of KKTIX 403. Sources: [A detail](https://www.indievox.com/activity/detail/26_iv04256e8), [A GAME](https://www.indievox.com/activity/game/26_iv04256e8), [B venue](https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668), [B ticket event](https://freeplanetml.kktix.cc/events/takasetoya202611), [exact-head CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41542036999). Original five-row local artifact LOCAL_ARTIFACT_NOT_MOUNTED. Formal status reportDate 2026-10-28 / snapshot 2026-11-01 07:55 stale, runtime UNVERIFIED; status-only release requires separate Owner authorization.
 
+
+---
+
+### P30-L7-DOME-CALENDAR-TICKET-20261103T0755 — A/B independent official source/field architecture (2026-11-03 07:55 Asia/Taipei)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing isolated Draft #236]
+├── A canonical ticket platform #03 tixCraft Event 26_forever [INDEXED_REVIEW]
+│   ├── Exact official event detail → 2026-11-28/29 19:00 SHOW [REVIEW]
+│   ├── General advertised tiers 5880/5280/4880/4280/3680/3280/2680/1680 [REVIEW]
+│   ├── Accessibility 2440/1840 [REJECT general min]
+│   ├── ibon pickup fee 30 [REJECT admission]
+│   ├── Under-7 advisory ≠ 12-and-under adult companion [separate REVIEW roles]
+│   └── Checkout Session, eligible current stock, formal min [HOLD]
+├── B new P0 Taipei Dome official venue (not a formal 19 platform duplicate)
+│   ├── Official November calendar → Nov 28/29 F✦FOREVER [DATE REVIEW]
+│   ├── 2 shuttle routes ≠ 2 additional SHOW or ticket Sessions [REJECT]
+│   ├── Nov 12–15 is distinct event [REJECT cross-event merge]
+│   ├── Venue calendar 19:00 SHOW, direct tixCraft href, event ID [HOLD]
+│   └── Event-specific official img_url and rights to reuse [HOLD]
+├── A↔B title/date/venue parity [REVIEW, no verified direct same-ID edge]
+├── validate_dome_crosscheck [16 strict source/role/value/decision receipts]
+│   ├── Fail closed on date collision, ticket tiers, restricted price, fee, age
+│   ├── Fail closed on invented Session, official href, SHOW and img_url
+│   └── Native official GET=0; public indexed reader is not native GET
+├── Draft #236 exact HEAD f7766332a50192b077881c2afadb75a36d867b31
+│   ├── CI #41549529166 SUCCESS; all job steps PASS
+│   ├── Artifact #13190471675 sha256:5d4be2424444eee1d08633d52b7f66cfd57bafbfea57b19cd82da54aee5b2230
+│   └── 4 original ADD-only PR paths; main/data/status/index/scraper immutable
+├── Last 3 A/B rounds indexed reader 3/3; native official GET 0/3
+├── Formal FIELD=0 / GOLDEN=0 / PUBLISHED=0 / HARD_HOLD_NO_PUBLICATION
+├── Status-only legacy Draft #53 OPEN 2 ahead/30 behind [HOLD_NO_MERGE]
+└── L8 formal PWA Android Owner USER_ATTESTED_PASS 5/5 [CLOSED]
+```
+
+**Evidence:** [A ticket official](https://tixcraft.com/activity/detail/26_forever), [B venue official calendar](https://www.taipeidome.com.tw/Web/dome/), [exact-head CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41549529166). **NEXT A** independently prove a lawful current eligible checkout tier/Session or rotate another canonical ticket source. **NEXT B** independently verify Dome detail/ticket href/event hero source, else rotate P0. Five-row original local artifact `LOCAL_ARTIFACT_NOT_MOUNTED`; no invented re-read. No production status merge without separate Owner authorization.
+
