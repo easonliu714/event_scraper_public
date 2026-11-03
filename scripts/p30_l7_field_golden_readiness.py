@@ -1376,6 +1376,98 @@ def collect_native_five_field_readiness(fetcher=None, now_utc=None):
     return result
 
 
+
+# Independent cross-language conflict scope, NOT a native GET or publication authority.
+# Same TWTC exhibition ID may corroborate dates/hours/hall while a stale translated
+# title year must remain HOLD. Caller-transcribed reader values never prove freshness.
+def adjudicate_twtc_bilingual_same_id(cn, en):
+    """Scope official bilingual disagreement per field; all results remain REVIEW/HOLD."""
+    import re
+    from datetime import datetime
+    expected = (
+        ("https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home", "ZH"),
+        ("https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home", "EN"),
+    )
+    def check(record, url, language):
+        if (not isinstance(record, dict) or record.get("source_url") != url
+                or record.get("language") != language
+                or record.get("exhibition_id") != "29418"
+                or record.get("evidence_kind") != "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE"):
+            raise ValueError("BILINGUAL_SOURCE_ID_OR_ATTESTATION_HOLD")
+        try:
+            when = datetime.fromisoformat(record["observed_at_utc"].replace("Z", "+00:00"))
+            if when.utcoffset() is None:
+                raise ValueError()
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise ValueError("BILINGUAL_OBSERVATION_CLOCK_HOLD")
+    check(cn, *expected[0])
+    check(en, *expected[1])
+
+    def period(record):
+        d = record.get("dates")
+        if not isinstance(d, dict) or set(d) != {"start", "end"}:
+            raise ValueError("BILINGUAL_DATE_SCHEMA_HOLD")
+        try:
+            a, b = (datetime.strptime(d[k], "%Y/%m/%d") for k in ("start", "end"))
+        except (TypeError, ValueError, KeyError):
+            raise ValueError("BILINGUAL_DATE_VALUE_HOLD")
+        if a > b:
+            raise ValueError("BILINGUAL_DATE_ORDER_HOLD")
+        return (a.strftime("%Y/%m/%d"), b.strftime("%Y/%m/%d"))
+
+    def hours(record):
+        h = record.get("hours")
+        if not isinstance(h, dict) or set(h) != {"open", "close"}:
+            raise ValueError("BILINGUAL_HOURS_SCHEMA_HOLD")
+        def norm(x):
+            if not isinstance(x, str) or not re.fullmatch(
+                    r"(?:[01]?\d|2[0-3])(?::[0-5]\d)?", x):
+                raise ValueError("BILINGUAL_HOURS_VALUE_HOLD")
+            parts = x.split(":")
+            return f"{int(parts[0]):02d}:{parts[1] if len(parts) == 2 else '00'}"
+        a, b = norm(h["open"]), norm(h["close"])
+        if a >= b:
+            raise ValueError("BILINGUAL_HOURS_ORDER_HOLD")
+        return a, b
+
+    dates_ok = period(cn) == period(en)
+    hours_ok = hours(cn) == hours(en)
+    # Only the explicitly identified official TWTC Hall 1 translation is in scope.
+    hall_ok = cn.get("hall") == "世貿一館" and en.get("hall") == "Hall 1"
+    if not all(isinstance(x.get("title"), str) for x in (cn, en)):
+        raise ValueError("BILINGUAL_TITLE_SCHEMA_HOLD")
+    year_cn = re.search(r"20\d{2}", cn["title"])
+    year_en = re.search(r"20\d{2}", en["title"])
+    title_conflict = bool(year_cn and year_en and year_cn.group() != year_en.group())
+    fields = (
+        ("exhibition_dates", dates_ok, "CROSS_LANGUAGE_DATE_MISMATCH_HOLD"),
+        ("open_hours", hours_ok, "CROSS_LANGUAGE_HOURS_MISMATCH_HOLD"),
+        ("venue_hall", hall_ok, "CROSS_LANGUAGE_HALL_IDENTITY_HOLD"),
+    )
+    return {
+        "kind": "P30_L7_TWTC_BILINGUAL_FIELD_CONFLICT_V1",
+        "source_identity": "TWTC_EXHIBITION_ID_29418_NOT_TICKET_SESSION",
+        "input_attestation": "CALLER_SUPPLIED_READER_VALUES_NOT_NATIVE_GET",
+        "source_freshness": "READER_TIMESTAMP_NOT_NATIVE_ATTESTATION",
+        "title_decision": ("HOLD_CROSS_LANGUAGE_TITLE_YEAR_CONFLICT" if title_conflict
+                           else "HOLD_TRANSLATION_NOT_INDEPENDENTLY_ATTESTED"),
+        "field_matrix": [
+            {"field": name,
+             "decision": ("REVIEW_BILINGUAL_AGREEMENT_NOT_NATIVE" if ok else hold),
+             "formal_accepted": False}
+            for name, ok, hold in fields
+        ],
+        "source_consistent_fields": sum(ok for _, ok, _ in fields),
+        "independent_formal_ready_fields": 0,
+        "formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "formal_pwa_feed_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
