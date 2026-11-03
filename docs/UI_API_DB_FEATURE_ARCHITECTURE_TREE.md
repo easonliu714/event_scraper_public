@@ -5837,3 +5837,36 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; isolated Draft #236]
 **Field-level ACCEPTABLE/HOLD matrix:** A source LIST/DETAIL/KHAM availability = HTTP200_PASS only; same-event ID/direct href, SHOW, VENUE, SALE = HOLD_NATIVE_LABEL_CONTEXT; Session, live stock, eligible minimum = HOLD_UNVERIFIED. B native LIST/DETAIL availability = HTTP200_PASS only; id=29418 same-ID href, exhibition dates, opening hours, hall = HOLD_NATIVE_LABEL_CONTEXT (eligible for a future *independent* Golden review only after explicit source-label/observed-at/conflict negatives). B admission/price/image/Session = HOLD_UNVERIFIED. All source-bound REVIEW and native GET observations have formal_accepted=false; no new production activity.
 
 **Evidence:** [Exact-head CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41563152029), [Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41563152029/artifacts/13197527110), [TMC LIST](https://www.tmc.taipei/tw/blog/show), [TMC DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM PRODUCT](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC LIST](https://twtc.com.tw/exhibition?p=home), [TWTC DETAIL](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home). Main data/status/index/scraper immutable, no status merge or new writer, formal Android PASS retained. Next Gate is native same-session field-role evidence, not another marker-only GET.
+
+---
+
+### P30-L7-NATIVE-SEMANTIC-20261103T1055 — native LIST/DETAIL source-role readback (NO PUBLISH)
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; Draft #236, HEAD fd72472ecbc01e066a5e066e3d7f464c226781a5]
+├── Native acquisition [5/5 HTTP200; 5 existing official endpoints, one-shot bounded GET]
+│   └── Native source-role receipts [9 REVIEW / 1 HOLD; NOT formal acceptance]
+├── A KHAM #04 + TMC venue [5/5 native semantic REVIEW]
+│   ├── TMC LIST → exact TMC DETAIL href [REVIEW]
+│   ├── TMC DETAIL → exact KHAM PRODUCT_ID=P1DF32E2 href [REVIEW]
+│   ├── Venue SHOW 2026-11-07 19:30 [REVIEW]
+│   ├── Venue HALL 臺北流行音樂中心 表演廳 [REVIEW]
+│   ├── KHAM SALE 2026-08-22 12:00 [REVIEW, not SHOW]
+│   └── Checkout Session/stock/eligible minimum [HOLD]
+├── B existing TWTC #16 id=29418 [4/5 native semantic REVIEW; 1 HOLD]
+│   ├── LIST → exact DETAIL href equality [HOLD: canonical URL/host/query/encoding]
+│   ├── DETAIL title 2026年電器空調影音大展 [REVIEW]
+│   ├── EXHIBITION_DATE 2026-11-06..09 [REVIEW, not ticket Session]
+│   ├── DAILY_OPEN_HOURS 10:00..18:00 [REVIEW, not SHOWTIME]
+│   ├── HALL 世貿一館 [REVIEW]
+│   └── Admission/ticket ID/hero image [HOLD]
+├── Exact-head CI #41568913197 SUCCESS, 25/25, immutable guards PASS
+├── Artifact #13199514576 SHA256 d506489f5547ccbc7e6cb7ef6eab589c89d549552612ef58abef5fa6c2386804, ZIP CRC PASS
+├── 09:55→10:55 native role checks 0→9; FIELD 0→0, Golden 0→0, PWA feed 0→0
+├── Legacy status #53 2 ahead/30 behind; ibon #12 4 fields differ [HOLD_NO_MERGE]
+│   └── Future safe status-only from current main, preserve 19 rows/ibon/data + Owner authorization [NEXT]
+├── L8 formal Android 5/5 USER_ATTESTED_PASS [CLOSED]
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+```
+
+**Evidence/provenance:** A [TMC LIST](https://www.tmc.taipei/tw/blog/show) → [DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu) → [KHAM exact PRODUCT](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2); B [TWTC LIST](https://twtc.com.tw/exhibition?p=home) and [DETAIL id=29418](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home). Source timestamp, body SHA256, exact role/decision and formal_accepted=false in [CI Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41568913197/artifacts/13199514576). B exact same-ID LIST anchor remains unresolved despite independently verified DETAIL labels; do not promote without identity proof. `docs/data.json`, Golden, production status/main and Publisher unchanged; runtime status readback UNVERIFIED. Next Gate diagnose B canonical link mismatch without another marker-only GET, or rotate if blocked. 
