@@ -1528,6 +1528,69 @@ def adjudicate_twtc_executing_agency_public_crosscheck(cn, en, agency):
     }
 
 
+
+# TWTC April/November records share an organizer and telephone number. These are
+# NOT event keys. This source-observed negative identity edge prevents a bilingual
+# November record from inheriting the April title, dates or a ticket Session.
+# All inputs are caller-transcribed public-reader evidence, never native GET.
+def adjudicate_twtc_same_organizer_collision(cn, en, april, now_utc):
+    """Prove same organizer != same event ID; keep five candidate fields unaccepted."""
+    from datetime import datetime, timedelta, timezone
+    bilingual = adjudicate_twtc_bilingual_same_id(cn, en)
+    expected = {
+        "source_url": "https://www.twtc.com.tw/en/exhibition_More.aspx?id=29417&p=menu1",
+        "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+        "exhibition_id": "29417",
+        "title": "THE 36TH TAIPEI ELECTRIC APPLIANCE FAIR",
+        "organizer": "TAIPEI ELECTRICAL COMMERCIAL ASSOCIATION",
+        "organizer_phone": "886-2-25064871Ext26",
+        "dates": {"start": "2026/04/10", "end": "2026/04/13"},
+        "hours": {"open": "10:00", "close": "18:00"},
+    }
+    if not isinstance(april, dict) or any(april.get(k) != v for k, v in expected.items()):
+        raise ValueError("TWTC_NEIGHBOR_EVENT_IDENTITY_HOLD")
+    if (cn.get("organizer") != "台北市電器商業同業公會"
+            or en.get("organizer") != expected["organizer"]
+            or cn.get("organizer_phone") != expected["organizer_phone"]
+            or en.get("organizer_phone") != expected["organizer_phone"]
+            or cn.get("title") != "2026年電器空調影音大展"
+            or en.get("title") != "2025 ELECTRIC APPLIANCE FAIR"
+            or bilingual["source_consistent_fields"] != 3
+            or bilingual["title_decision"] != "HOLD_CROSS_LANGUAGE_TITLE_YEAR_CONFLICT"):
+        raise ValueError("TWTC_ORGANIZER_OR_TITLE_CONFLICT_HOLD")
+    if not isinstance(now_utc, datetime) or now_utc.utcoffset() is None:
+        raise ValueError("INDEPENDENT_READER_CLOCK_UNATTESTED")
+    now_utc = now_utc.astimezone(timezone.utc)
+    for record in (cn, en, april):
+        try:
+            stamp = datetime.fromisoformat(record["observed_at_utc"].replace("Z", "+00:00"))
+            if stamp.utcoffset() is None:
+                raise ValueError()
+        except (KeyError, TypeError, ValueError, AttributeError):
+            raise ValueError("TWTC_READER_CLOCK_UNATTESTED")
+        age = now_utc - stamp.astimezone(timezone.utc)
+        if not timedelta(minutes=-5) <= age <= timedelta(hours=24):
+            raise ValueError("TWTC_READER_CLOCK_STALE_OR_FUTURE")
+    if (cn["exhibition_id"] == april["exhibition_id"]
+            or cn["dates"] == april["dates"]
+            or en["dates"] == april["dates"]):
+        raise ValueError("TWTC_CROSS_EVENT_COLLISION_HOLD")
+    return {
+        "kind": "P30_L7_TWTC_ORGANIZER_PHONE_COLLISION_V1",
+        "source_identity": "NOVEMBER_29418_NOT_APRIL_29417",
+        "organizer_phone_parity": "MATCHES_BUT_NOT_EVENT_IDENTITY",
+        "negative_identity_edge": "REJECT_SAME_ORGANIZER_PHONE_DIFFERENT_ID_DATE",
+        "bilingual_title": "HOLD_EN_2025_VS_ZH_2026",
+        "independent_source_freshness": "READER_CLOCK_BOUNDED_NOT_NATIVE_GET",
+        "reviewable_non_session_fields": 3,
+        "independent_formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "formal_pwa_feed_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
 # Independent exported native-evidence audit. Caller-provided JSON and internal SHA
 # consistency do not authenticate the downloaded ZIP or grant field acceptance.
 # This gate never issues HTTP requests or writes production data.
