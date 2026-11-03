@@ -1468,6 +1468,127 @@ def adjudicate_twtc_bilingual_same_id(cn, en):
 
 
 
+
+# Independent exported native-evidence audit. Caller-provided JSON and internal SHA
+# consistency do not authenticate the downloaded ZIP or grant field acceptance.
+# This gate never issues HTTP requests or writes production data.
+def audit_native_same_session_field_matrix(matrix, now_utc=None):
+    import re
+    from datetime import datetime, timezone, timedelta
+    urls = (
+        'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu',
+        'https://twtc.com.tw/exhibition?p=home',
+        'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home',
+    )
+    title = '2026年電器空調影音大展'
+    ticket = 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2'
+    expected = (
+        ('A','direct_ticket_product','LOCAL_PURCHASE_ANCHOR_NOT_SESSION',urls[0],
+         {'product_id':'P1DF32E2','official_ticket_url':ticket}),
+        ('A','venue_showtime','VENUE_SHOW_NOT_SALE',urls[0],'2026/11/07 19:30'),
+        ('A','venue_hall','VENUE_HALL',urls[0],'臺北流行音樂中心 表演廳'),
+        ('B','list_detail_identity','SAME_ROW_SAME_ID',urls[1],
+         {'exhibition_id':'29418','same_row_title':title}),
+        ('B','exhibition_title','EXACT_EVENT_TITLE',urls[2],title),
+        ('B','exhibition_dates','EXHIBITION_DATE_NOT_SALE',urls[2],
+         {'start':'2026/11/06','end':'2026/11/09'}),
+        ('B','open_hours','DAILY_OPEN_HOURS_NOT_SHOWTIME',urls[2],
+         {'open':'10:00','close':'18:00'}),
+        ('B','venue_hall','EXHIBITION_HALL_NOT_TICKET_ID',urls[2],'世貿一館'),
+    )
+    result = {
+        'kind':'P30_L7_INDEPENDENT_NATIVE_ARTIFACT_AUTHORITY_AUDIT_V1',
+        'internally_consistent_native_sources':0,'source_bound_review_fields':0,
+        'field_matrix':[{'line':line,'field':field,'decision':'HOLD_UNVERIFIED',
+                         'formal_accepted':False} for line,field,_,_,_ in expected
+                        if field not in ('direct_ticket_product','list_detail_identity','exhibition_title')],
+        'identity_dependencies':{
+            'A_KHAM':'HOLD_KHAM_PRODUCT_DETAIL_NOT_NATIVE_FETCHED',
+            'B_TWTC':'HOLD_NATIVE_SAME_ID_NOT_VALIDATED'},
+        'independent_artifact_integrity':'HOLD_EXTERNAL_ZIP_CRC_SHA_READBACK_REQUIRED',
+        'independent_formal_authority':'HOLD_NOT_DELEGATED',
+        'bilingual_title':'HOLD_TWTC_EN_2025_VS_ZH_2026_SOURCE_CONFLICT',
+        'formal_accepted_fields':0,'golden_accepted_events':0,
+        'published_events':0,'formal_pwa_feed_events':0,
+        'release_state':'HARD_HOLD_NO_PUBLICATION','decision':'HOLD_SOURCE_EVIDENCE',
+    }
+    def fail(reason):
+        result['hold_reason']=reason
+        return result
+    if now_utc is None: now_utc=datetime.now(timezone.utc)
+    if not isinstance(now_utc,datetime) or now_utc.utcoffset() is None:
+        return fail('AUDIT_CLOCK_UNATTESTED')
+    now_utc=now_utc.astimezone(timezone.utc)
+    if not isinstance(matrix,dict) or matrix.get('kind')!='P30_L7_NATIVE_SAME_SESSION_FIELD_MATRIX_V1':
+        return fail('NATIVE_ARTIFACT_KIND_UNVERIFIED')
+    if (matrix.get('request_count')!=3 or matrix.get('native_http_200')!=3
+            or matrix.get('acceptability_review')!=8 or matrix.get('hold')!=0
+            or matrix.get('raw_html_saved') is not False
+            or matrix.get('release_state')!='HARD_HOLD_NO_PUBLICATION'
+            or any(matrix.get(k)!=0 for k in ('formal_accepted_fields','golden','published'))):
+        return fail('NATIVE_ARTIFACT_RELEASE_OR_COUNTS_CONFLICT')
+    sources=matrix.get('sources')
+    if not isinstance(sources,list) or len(sources)!=3:
+        return fail('NATIVE_SOURCE_COUNT_HOLD')
+    by_url={}
+    times=[]
+    for source in sources:
+        if not isinstance(source,dict) or source.get('url') not in urls:
+            return fail('NATIVE_SOURCE_URL_HOLD')
+        url=source['url']
+        if url in by_url: return fail('NATIVE_DUPLICATE_SOURCE_HOLD')
+        if (source.get('http_status')!=200 or source.get('decision')!='NATIVE_PARSED_REVIEW_ONLY'
+                or not isinstance(source.get('bytes'),int)
+                or not 0<source['bytes']<=524288
+                or not isinstance(source.get('sha256'),str)
+                or not re.fullmatch('[0-9a-f]{64}',source['sha256'])):
+            return fail('NATIVE_SOURCE_BODY_HASH_STATUS_HOLD')
+        try:
+            observed=datetime.fromisoformat(source['observed_at_utc'].replace('Z','+00:00'))
+            if observed.utcoffset() is None: raise ValueError()
+            observed=observed.astimezone(timezone.utc)
+        except (KeyError,TypeError,ValueError,AttributeError):
+            return fail('NATIVE_SOURCE_CLOCK_HOLD')
+        if not timedelta(minutes=-5)<=now_utc-observed<=timedelta(hours=24):
+            return fail('NATIVE_SOURCE_STALE_OR_FUTURE_HOLD')
+        times.append(observed)
+        by_url[url]=source
+    if set(by_url)!=set(urls) or max(times)-min(times)>timedelta(minutes=10):
+        return fail('NATIVE_SOURCE_SAME_RUN_SKEW_HOLD')
+    receipts=matrix.get('field_receipts')
+    if not isinstance(receipts,list) or len(receipts)!=8:
+        return fail('NATIVE_FIELD_RECEIPT_COUNT_HOLD')
+    by_key={}
+    for receipt in receipts:
+        if not isinstance(receipt,dict): return fail('NATIVE_FIELD_RECEIPT_SCHEMA_HOLD')
+        key=(receipt.get('line'),receipt.get('field'))
+        if key in by_key: return fail('NATIVE_DUPLICATE_FIELD_HOLD')
+        by_key[key]=receipt
+    for line,field,role,url,value in expected:
+        receipt=by_key.get((line,field))
+        if receipt is None: return fail('NATIVE_FIELD_MISSING_HOLD')
+        source=by_url[url]
+        if (receipt.get('event_id')!=('P1DF32E2' if line=='A' else '29418')
+                or receipt.get('role')!=role or receipt.get('source_url')!=url
+                or receipt.get('observed_at_utc')!=source['observed_at_utc']
+                or receipt.get('body_sha256')!=source['sha256']
+                or receipt.get('native_same_session_match') is not True
+                or receipt.get('observed_value')!=value
+                or receipt.get('value_basis')!='EXACT_SOURCE_LOCAL_PATTERN_OR_ANCHOR'
+                or receipt.get('decision')!='ACCEPTABLE_FOR_INDEPENDENT_GOLDEN_REVIEW_ONLY'
+                or receipt.get('formal_accepted') is not False):
+            return fail('NATIVE_FIELD_VALUE_IDENTITY_PROVENANCE_HOLD')
+    result['internally_consistent_native_sources']=3
+    result['source_bound_review_fields']=5
+    result['identity_dependencies']['B_TWTC']='NATIVE_SAME_ROW_SAME_ID_REVIEW_NOT_FORMAL'
+    result['field_matrix']=[{'line':line,'field':field,
+        'source_url':url,'body_sha256':by_url[url]['sha256'],
+        'decision':'NATIVE_VALUE_REVIEW_PENDING_INDEPENDENT_AUTHORITY',
+        'formal_accepted':False} for line,field,_,url,_ in expected
+        if field not in ('direct_ticket_product','list_detail_identity','exhibition_title')]
+    result['decision']='INTERNAL_RECEIPT_PARITY_ONLY_FORMAL_AUTHORITY_HOLD'
+    return result
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
