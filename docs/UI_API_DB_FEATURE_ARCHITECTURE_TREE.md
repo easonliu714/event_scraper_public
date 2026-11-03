@@ -6436,3 +6436,20 @@ Source references: [TMC exact detail](https://www.tmc.taipei/tw/blog/show/2026Su
 
 
 **A-line additional safety boundary (2026-11-04 06:55):** KHAM [public product-selection table](https://kham.com.tw/application/UTK02/UTK0201_00.aspx?PRODUCT_ID=P1DF32E2) visibly contains same PRODUCT_ID/title and **2026/11/07 19:30 / 臺北流行音樂中心 表演廳**, independently corroborating TMC reader roles. But `UTK0201_00.aspx` is **purchase-flow activity selection** with order controls; do **not** automate native GET or navigate it as a checkout route. It is a reader-only safety-classified corroboration, not approved acquisition, ticket Session, current stock or formal field authority. A native GET 0 / accepted FIELD 0; future A work should use non-checkout organizer/venue official sources or a separately authorized safe route. Existing engineering #236 four ADD-only paths unchanged by this governance note.
+
+
+---
+
+### P30-L7 same-organizer collision guard — 2026-11-04 07:55 Asia/Taipei (Draft #8 only)
+
+Official TWTC source-identity graph (public reader, NOT native GET):
+
+- TWTC ZH November id=29418 → title 2026年電器空調影音大展; dates 2026/11/06–09, daily open 10:00–18:00, 世貿一館; organizer 台北市電器商業同業公會, phone 886-2-25064871Ext26.
+- TWTC EN November **same id=29418** → title 2025 ELECTRIC APPLIANCE FAIR [TITLE_YEAR_CONFLICT HOLD]; dates 2026/11/06–09, hours 10–18, Hall 1, organizer TAIPEI ELECTRICAL COMMERCIAL ASSOCIATION, **same phone**.
+- TWTC EN **different April id=29417** → THE 36TH TAIPEI ELECTRIC APPLIANCE FAIR; 2026/04/10–13, 10:00–18:00, **same organizer and phone**. Hence organizer+phone is a non-unique attribute, not an event-ID edge; April reader cache was six months old, current native freshness UNVERIFIED.
+- Executing agency sheng-dong.com.tw/.../TECO → 2026/11/06–09, 10:00–18:00, 台北世貿一館, organizer and executor labels; no direct TWTC id=29418. Its separate-domain agreement strengthens three field roles only; no automatic cross-source event merge.
+- A TMC official /tw/blog/show/2026SungNien-Yu → SHOW 2026/11/07 19:30, HALL 臺北流行音樂中心 表演廳 (2 REVIEW). KHAM PRODUCT_ID=P1DF32E2 purchase-flow selection is **not** a safe automated source, not ticket Session/stock and not a Golden authority.
+
+Executable engineering Draft [#236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD df0e3078535ee048423eb2dff6173f40085c578e adds adjudicate_twtc_same_organizer_collision(cn,en,april,now_utc) to existing original ADD-only script and two tests. Guard rejects cross-event ID/date, organizer/phone mismatch, wrong URL, reader-clock stale/future and false source identity; all field results remain REVIEW/HOLD. [Exact-head CI #41743318704](https://github.com/easonliu714/event_scraper_public/actions/runs/41743318704) SUCCESS 47/47, [artifact #13282886349](https://github.com/easonliu714/event_scraper_public/actions/runs/41743318704/artifacts/13282886349) digest sha256:30c6207b60515ee5e3b5cf6cd7ddf708c8cbc7caf5b7d9266ebe586511f459bc (independent ZIP CRC UNVERIFIED). This CI native GET=0, historic 3/3 only; no raw official source-body authority.
+
+**Acceptance matrix:** A SHOW/HALL 2/2 REVIEW, B exhibition dates/open hours/hall 3/3 REVIEW; independent accepted FIELD=0, Golden=0, published=0, formal PWA feed=0. Two source-identity dependencies remain HOLD, bilingual title-year conflict remains HOLD. Next work: independent non-checkout source authority/acceptance for A; exact TWTC source-owner bilingual correction or native independent identity evidence for B; stop adding repeated fixture-only Gate when no quality gain. Status-only #53 MERGED, main/status/data/19-platform baseline untouched, Pages runtime HTTP UNVERIFIED, L8 Android 5/5 preserved, HARD_HOLD_NO_PUBLICATION unchanged.
