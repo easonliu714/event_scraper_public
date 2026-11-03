@@ -6024,3 +6024,47 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, isolated Draft #236 HEAD 9664e0a5322474a7
 ```
 
 **Official independent reader:** [TMC LIST](https://www.tmc.taipei/tw/blog/show), [TMC DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM direct PRODUCT](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC LIST](https://twtc.com.tw/exhibition?p=home), [TWTC DETAIL id=29418](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home). **Exact-head readback:** [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236), [CI #41593501018](https://github.com/easonliu714/event_scraper_public/actions/runs/41593501018) SUCCESS, [Artifact #13210663725](https://github.com/easonliu714/event_scraper_public/actions/runs/41593501018/artifacts/13210663725). Previous native matrix's `independent_conflict_adjudication=PENDING` is NOT overwritten by this new separate reader contract; formal Golden approval remains pending. Main f2859b7c72d6e280b850cb253730989f22b01d46 and data/status unchanged. Runtime Pages status readback UNVERIFIED; Owner action NONE for engineering.
+
+
+---
+
+### P30-L7-FIRST-USABLE-NON-SESSION-SUBSET — 2026-11-03 15:55 (isolated)
+
+\`\`\`text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, existing Draft #236 HEAD ba3f3f92408fada6b65bd36a1ab697976fe31f78]
+├── Prior independent official public reader crosschecks [8/8 REVIEW_ONLY; no new native GET]
+│   ├── Prior native CI #41587253858 3/3 HTTP200, historic not current
+│   └── Reader 2026-11-03T07:00:33Z, exact source URL/event ID/value/role/native body SHA
+├── FIRST USABLE non-session field subset [NEW isolated candidate proposal 0→5]
+│   ├── A canonical #04 KHAM / TMC DETAIL 2026SungNien-Yu [2 fields]
+│   │   ├── SHOW 2026/11/07 19:30 (not KHAM ticket SALE)
+│   │   ├── HALL 臺北流行音樂中心 表演廳
+│   │   └── Identity prerequisite: exact official purchase anchor to KHAM PRODUCT_ID=P1DF32E2 (not Session)
+│   ├── B existing #16 TWTC exhibition DETAIL id=29418 [3 fields]
+│   │   ├── EXHIBITION_DATE 2026/11/06–11/09 (not sale/performance Session)
+│   │   ├── DAILY_OPEN_HOURS 10:00–18:00 (not showtime)
+│   │   ├── HALL 世貿一館
+│   │   └── Identity prerequisite: same-title LIST row → exact DETAIL id=29418
+│   └── Negative guards: cross-event, wrong role/value/URL/id, source hash/time,
+│       missing dependency, duplicated fields, forbidden formal/Golden/publication promotion
+├── Existing ADD-only isolated script/test/workflow, no production file changes
+│   ├── build_independent_field_subset_proposal / validate_independent_field_subset_proposal
+│   ├── Exact-head CI #41599549626 SUCCESS, 29/29 unit tests, immutable 19-platform guards PASS
+│   └── Artifact #13214295320 ZIP SHA256 13333df63a1d5dda624469a94f1a6f0e27a000e83d50dd45a92c5b449a171a4a
+│       ├── Independent ZIP CRC PASS and SHA256SUMS PASS
+│       └── field_subset_review_proposal.json [5 field rows + 2 identity rows, formal_accepted=false]
+├── Native official GET this round 0; no repeated identical source request
+├── Source-value crosschecks 8→8; review subset 0→5; formal adjudication 0→0
+├── FORMAL FIELD 0 / GOLDEN 0 / PUBLISHED 0 / PWA formal feed 0 [LOCKED]
+├── NEXT independent field authority adjudication; do not auto-promote or relax freshness
+├── Status-only remediation [HOLD_NO_MERGE]
+│   ├── Main status 19 platforms/reportDate 2026-10-28/snapshot 2026-11-01 07:55
+│   ├── Legacy Draft #53 2 ahead / 30 behind main, ibon #12 baseline mutation, failed old CI
+│   ├── Future safe status-only: current-main exact platform/root baseline, latestEngineering-only
+│   └── No competing Writer, no main merge/deploy without separate Owner authorization
+├── Formal L8 Android 5/5 USER_ATTESTED_PASS [CLOSED]
+├── CKSMH5/TWTC39 historical Android [PASS preserved]
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+\`\`\`
+
+**Independent evidence:** [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact \`ba3f3f92408fada6b65bd36a1ab697976fe31f78\`, [CI #41599549626](https://github.com/easonliu714/event_scraper_public/actions/runs/41599549626), [Artifact #13214295320](https://github.com/easonliu714/event_scraper_public/actions/runs/41599549626/artifacts/13214295320). Independent downloaded ZIP SHA equals GitHub artifact digest; ZIP CRC PASS, 3 members, no raw official HTML. Main \`f2859b7c72d6e280b850cb253730989f22b01d46\`, data blob \`7fc4fe32567a57fd504483eeb9a8b9e10b568ea4\` and status blob \`cdeeb3b551e38f862c37759426a14b5129e1224d\` unchanged. The 5 fields are isolated formal-review candidates, **not** formally accepted fields. Formal runtime status UNVERIFIED; Owner action NONE for isolated engineering.
