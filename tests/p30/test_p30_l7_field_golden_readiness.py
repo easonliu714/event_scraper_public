@@ -1108,6 +1108,61 @@ class TWTCBilingualConflictAuthority(unittest.TestCase):
 
 
 
+
+    def test_executor_third_source_review_not_formal(self):
+        agency = {
+            "source_url": "https://www.sheng-dong.com.tw/activity/appliances-expo/TECO",
+            "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+            "observed_at_utc": "2026-11-04T06:30:00+08:00",
+            "event_label": "2026台北電器空調影音展",
+            "organizer": "台北市電器商業同業公會",
+            "executor": "生動國際展覽事業股份有限公司",
+            "venue": "台北世貿一館",
+            "dates": {"start": "2026/11/06", "end": "2026/11/09"},
+            "hours": {"open": "10:00", "close": "18:00"},
+        }
+        r = m.adjudicate_twtc_executing_agency_public_crosscheck(self.cn,self.en,agency)
+        self.assertEqual(r["source_count"],3)
+        self.assertIn("NO_DIRECT_TWTC_ID",r["identity_decision"])
+        self.assertIn("HOLD",r["title_decision"])
+        self.assertEqual([x["field"] for x in r["field_matrix"]],
+                         ["exhibition_dates","open_hours","venue_hall"])
+        self.assertTrue(all(not x["formal_accepted"] for x in r["field_matrix"]))
+        self.assertEqual((r["formal_accepted_fields"],r["golden_accepted_events"],
+                          r["published_events"],r["formal_pwa_feed_events"]),(0,0,0,0))
+        self.assertEqual(r["release_state"],"HARD_HOLD_NO_PUBLICATION")
+
+    def test_executor_source_identity_role_and_clock_negatives(self):
+        import copy
+        agency = {
+            "source_url": "https://www.sheng-dong.com.tw/activity/appliances-expo/TECO",
+            "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+            "observed_at_utc": "2026-11-04T06:30:00+08:00",
+            "event_label": "2026台北電器空調影音展",
+            "organizer": "台北市電器商業同業公會",
+            "executor": "生動國際展覽事業股份有限公司",
+            "venue": "台北世貿一館",
+            "dates": {"start": "2026/11/06", "end": "2026/11/09"},
+            "hours": {"open": "10:00", "close": "18:00"},
+        }
+        for key,value in (
+            ("source_url","https://untrusted.example/TECO"),
+            ("event_label","2025台北電器展"),
+            ("organizer","另一場主辦單位"),
+            ("venue","南港展覽館"),
+            ("dates",{"start":"2026/11/12","end":"2026/11/15"}),
+            ("hours",{"open":"09:00","close":"18:00"}),
+            ("observed_at_utc","2026-11-04T06:30:00"),
+            ("observed_at_utc","2026-11-01T06:30:00+08:00"),
+            ("evidence_kind","NATIVE_HTTP200"),
+        ):
+            with self.subTest(key=key,value=str(value)):
+                candidate=copy.deepcopy(agency)
+                candidate[key]=value
+                with self.assertRaises(ValueError):
+                    m.adjudicate_twtc_executing_agency_public_crosscheck(
+                        self.cn,self.en,candidate)
+
 class NativeArtifactIndependentAuthorityAudit(unittest.TestCase):
     """Artifact structure/freshness review cannot authenticate its ZIP or grant Golden."""
     def sample(self):
