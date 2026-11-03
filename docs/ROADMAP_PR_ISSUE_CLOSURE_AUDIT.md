@@ -3094,3 +3094,38 @@ Independent final GitHub readback: [exact-head run #41495782054](https://github.
 - **測試／CI：** [exact-head GitHub Actions #41632358710](https://github.com/easonliu714/event_scraper_public/actions/runs/41632358710) **SUCCESS**；`source-field-readiness` Job 及全部 Steps SUCCESS、既有正反驗收 **29/29 PASS**，四路 source/fixture/workflow 與 evidence 的 `sha256sum -c` PASS。[Artifact #13229035753](https://github.com/easonliu714/event_scraper_public/actions/runs/41632358710/artifacts/13229035753) GitHub digest `sha256:256bc2ff9c1918b0ab2b3fc7754c5c733bb3120d5d644f9882d73eb6a5600fcf`；獨立下載 ZIP CRC **UNVERIFIED**，不得冒稱另有完整離線驗證。此 commit 未包含 one-shot GET marker，**本輪 native official GET=0**。
 - **PASS／HOLD：** `STATUS_BASELINE_RECONCILIATION=PASS`、`ENGINEERING_EXACT_HEAD_CI=PASS`、`ENGINEERING_PR_OPEN_DRAFT=PASS`；A TMC/KHAM 2 欄與 B TWTC 3 欄依既有官方源值與角色判讀 **5 REVIEW / 2 identity prerequisites**，`INDEPENDENT_FORMAL_FIELD_ADJUDICATION=HOLD`，正式 accepted FIELD=0、Golden=0、Publication=0、PWA formal feed=0，`HARD_HOLD_NO_PUBLICATION` 不變。保留 L8 正式 Android 5/5 USER_ATTESTED_PASS 與 CKSMH5/TWTC39 舊 PASS。
 - **下一 Gate：** 依 PR #236 現有五欄權威、時效及衝突契約，取得可獨立讀回的官方同活動／同 ID／欄位角色與時效證據；逐欄形成 ACCEPTABLE/HOLD 裁決，必要時輪轉來源解除 source freshness 阻塞。不能重做 L8、重合併 #53、捏造 Native GET、降低測試，或未授權發佈正式活動。唯一 Writer `6ae1e6147e548191881f20e730ab0f11` 與每小時 :55 Asia/Taipei 維持；正式 Pages live HTTP 讀回仍 UNVERIFIED，Owner 本輪不需操作。
+
+
+---
+
+## P30-OWNER-ARCHITECTURE-FIXED-ADAPTER-AUTOMATED-QUALITY-PIPELINE — Owner 同意的最終運作模式與工程落地 Roadmap（2026-11-03 Asia/Taipei）
+
+> **狀態：架構決議 APPROVED_FOR_PLANNING；工程整合與正式發布 NOT IMPLEMENTED / HOLD。** 此節是現有 P30 Roadmap 的架構收斂增量，不新增第三份治理基線、不回退已通過 Gate，也不代表放行 Publisher。依 Owner 本輪明示決議，最終服務須是一套可重複執行的固定程式，不是每次活動都要人工確認、重新解讀頁面或臨時撰寫解析程式。
+
+### A. 目標業務流程與邊界
+
+1. **固定程式入口：** 以目前 \`scraper.py\` 既有多來源清單抓取為遷移起點；逐平台抽出可重用的 Source Adapter（LIST / DETAIL / EVENT_ID / FIELD），與共用的 HTTP、正規化、摘要、身份驗證及品質引擎分離。當站點結構無變動、資料驗證條件滿足時，日常無須人工逐筆確認。
+2. **資料生命週期：** 合規官方 GET（必要時正常 JS 渲染）→ 清單 → 同來源／同活動 ID 詳情 → 欄位角色與來源憑證 → 標準化摘要 → 欄位級 QUALITY GATE → 隔離 REVIEW / HOLD 或進入可接受資料集合 → 差異／去重／快照 → **另經授權啟用**的 Publisher → 正式 \`docs/data.json\` / PWA。HTTP200、TITLE match、Golden 測試 PASS、正式 FIELD ACCEPT、DATA PUBLICATION 是不同 Gate。
+3. **自動品質不等於無限制自動發布：** 對已驗證的 Adapter、身份合約、欄位政策，系統可依固定規則逐批自動分類並產出可追溯候選；不為每筆活動重跑人工簽核。但 Golden 基線或發布政策變更、重大來源衝突、新平台／改版、異常資料下降應 HOLD、回歸驗證與必要 Owner 決策。正式 Publisher / Scheduler / Notifier 仍由 \`HARD_HOLD_NO_PUBLICATION\` 鎖定，解除須另行明示授權及安全 Gate。
+4. **不完整可接受、誤植不可接受：** 未具證據之 date / ticket_sale / door_time / venue / price / age / img_url 應為 UNKNOWN、摘要或官方連結；嚴禁推測或跨活動、場次、票種湊值。明確分別處理 SHOW/SALE/OPEN_HOURS/ADMISSION/TICKET_SESSION/PRODUCT_ID 與海報/座位圖。
+5. **非破壞更新：** 原版 \`save_data_and_notify()\` 直接整份覆寫 \`docs/data.json\` 的風險必須修正。正式 pipeline 需先在隔離工作區產出候選、驗證與可回復快照，保留上次可用資料及差異紀錄；整批空白、站點擷取異常或資料驟減時 fail-closed，不能使已驗證活動無故消失。正式 JSON 與獨立 \`docs/platform_status.json\` 工程狀態不得混寫。
+6. **儲存與展示：** 第一階段沿用 GitHub Pages / 靜態 JSON 與既有正式 PWA；持久化層須有穩定事件主鍵、來源證據／最後成功更新時間、去重及版本快照。是否增加 SQLite / API 應由規模與實證 Gate 決定，禁止為了架構純化重寫已驗證 UI。
+7. **自動化角色分離：** 現有唯一每小時 Writer 是工程研發與治理寫入排程，**不是正式活動抓取／正式 Publisher**；不得新增競爭 Writer。未來正式資料抓取排程的頻率、寫入授權及監控要另訂安全 Gate，未授權不得啟用。
+
+### B. 與現有 Gate 的串接順序（不重做已 PASS）
+
+| 順序 | 對應既有 Roadmap／工作包 | 可交付的可執行程式與驗證 | 判準／目前狀態 |
+|---|---|---|---|
+| 0 | P30-L7-FIELD-GOLDEN-READINESS、現有 Draft #236 | 完成 A TMC SHOW/HALL、B TWTC 日期/開放時間/HALL 五欄的獨立權威、時效、衝突與同 ID 裁決；驗證新證據，勿反覆製作相同 fixture | 5 REVIEW + 2 identity dependencies；正式 FIELD 0、Golden 0；**ACTIVE/HOLD** |
+| 1 | P30 source-first Adapter integration（於現有 Roadmap 依序建立子 Gate） | 固定 LIST→DETAIL→IDENTITY→FIELD parser、事件 ID、source receipt、反例；優先已有正向可重現來源，至少同 ID 端到端可執行，不再只靠零散單次調查 | Adapter 實際執行及 CI/Artifact 證據，**未完成** |
+| 2 | Common Normalizer + Field Quality Contract | 對日期、開賣、入場、價格、圖片、廳別實施同一 schema、UNKNOWN 與來源 provenance；正向／反向／跨活動身份測試 | 同欄位角色跨平台一致，衝突 fail-closed，**待實作** |
+| 3 | Incremental Snapshot + Safe Candidate Pipeline | 稽核孤立 \`scripts/p30_candidate_review_pipeline.py\`；提供穩定主鍵、diff、資料驟減守衛、原資料不覆寫、可回復快照與 candidate/accepted 分流 | 失敗回歸不清空既有已驗證資料，**待實作** |
+| 4 | Production Acceptance / Publication Gate | 獨立資料 Golden 驗收、GitHub exact-head CI、發布前後 JSON/Pages readback、rollback；正式 PWA 讀取已通過資料 | **HARD_HOLD_NO_PUBLICATION**；需額外 Owner 明示授權，現在不可發布 |
+| 5 | Scheduled Operations / Monitoring Gate | 授權後定期執行固定 Adapter、增量更新、健康狀態／異常警示；分離 engineering Writer 與 data pipeline | 正式排程／通知尚未授權；**HOLD** |
+
+### C. 禁止無限 REVIEW-only Gate 的 stop-rule
+
+- 每輪量化 **(1) 新增可直接執行的 Adapter / Field parser，(2) 成功同 ID LIST→DETAIL 身分數，(3) 自動欄位正式接受數，(4) 端到端 candidate→safe snapshot 路徑，(5) HTTP/LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION**。不能以 PR、合成 fixture、HTTP200 或 CI 數量冒充產品可用程度。
+- 連兩輪仍無上述品質／程式整合增量，須轉入根因修復、輪轉可用官方來源，或交付相容的共用核心與 pipeline；停止追加同類只讀 micro-review。
+- 新 Gate 的「已完成」必須有正式可執行程式、正反與回歸測試、exact-head CI、可獨立讀回證據；架構圖、計畫或僅有 fixture 不等於 Adapter 完成。
+- **當輪治理基線：** Source main \`d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce\`；Engineering Draft #236 \`c3b1529cd0cd0ddf1326f934c57308aa64dba7f1\` Open/Draft，先前 exact-head CI #41632358710 SUCCESS（29/29），Governance Draft #8 保持 Open/Draft。正式 \`docs/data.json\` blob \`7fc4fe32567a57fd504483eeb9a8b9e10b568ea4\`、19 平台與既有 Android L8 5/5 USER_ATTESTED_PASS 保留，正式 FIELD / Golden / Publication 新增仍為 0。本次是**架構決議記錄**，沒有宣稱新增來源 GET、Adapter 或正式欄位 PASS。
