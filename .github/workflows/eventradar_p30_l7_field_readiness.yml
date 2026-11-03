@@ -537,6 +537,26 @@ jobs:
               'http200':report['native_http_200'],'review':report['acceptability_review'],
               'hold':report['hold'],'same_id':same_row,'formal':0,'golden':0,'published':0}),flush=True)
           PY
+      - name: Build first usable non-session field subset artifact (review only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              build_independent_field_subset_proposal,
+              validate_independent_field_subset_proposal,
+          )
+          source=json.loads(Path("tests/p30/fixtures/p30_l7_prince_field_readiness.json").read_text(encoding="utf-8"))["independent_public_field_crosscheck"]
+          proposal=build_independent_field_subset_proposal(source)
+          result=validate_independent_field_subset_proposal(source,proposal)
+          assert result["formal_accepted"]==result["golden"]==result["published"]==result["formal_pwa_feed"]==0
+          Path("evidence/field_subset_review_proposal.json").write_text(
+              json.dumps(proposal,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+          print("FIRST_USABLE_SUBSET",json.dumps(result,sort_keys=True),flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -549,6 +569,7 @@ jobs:
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi
+          sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
