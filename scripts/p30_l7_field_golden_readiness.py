@@ -1589,6 +1589,95 @@ def audit_native_same_session_field_matrix(matrix, now_utc=None):
     result['decision']='INTERNAL_RECEIPT_PARITY_ONLY_FORMAL_AUTHORITY_HOLD'
     return result
 
+
+def audit_downloaded_native_artifact_zip(zip_bytes, github_digest, expected_head, now_utc):
+    """Independently validate downloaded evidence bytes; never authorize Golden."""
+    import hashlib
+    import io
+    import re
+    import zipfile
+
+    outcome = {
+        'decision': 'HOLD_UNVERIFIED_ARTIFACT',
+        'zip_sha256': 'HOLD', 'zip_crc': 'HOLD',
+        'evidence_member_hashes': 'HOLD',
+        'native_receipt_parity': 'HOLD',
+        'independently_verified_evidence_members': 0,
+        'formal_accepted_fields': 0, 'golden_accepted_events': 0,
+        'published_events': 0, 'formal_pwa_feed_events': 0,
+        'raw_source_html_verified': False,
+        'code_files_in_zip_verified': False,
+        'independent_field_authority': 'HOLD',
+        'release_state': 'HARD_HOLD_NO_PUBLICATION',
+    }
+    def refuse(reason):
+        outcome['decision'] = 'HOLD_' + reason
+        return outcome
+    if (not isinstance(zip_bytes, bytes) or not 0 < len(zip_bytes) <= 2_000_000
+            or not isinstance(github_digest, str)
+            or not re.fullmatch(r'sha256:[0-9a-f]{64}', github_digest)
+            or not isinstance(expected_head, str)
+            or not re.fullmatch(r'[0-9a-f]{40}', expected_head)):
+        return refuse('ARTIFACT_INPUT_SCHEMA')
+    if hashlib.sha256(zip_bytes).hexdigest() != github_digest.split(':', 1)[1]:
+        return refuse('GITHUB_DIGEST_MISMATCH')
+    outcome['zip_sha256'] = 'PASS'
+    names = {
+        'SHA256SUMS.txt', 'readiness.txt',
+        'native_same_session_field_matrix.json', 'field_subset_review_proposal.json',
+    }
+    manifest_paths = {
+        '.github/workflows/eventradar_p30_l7_field_readiness.yml',
+        'scripts/p30_l7_field_golden_readiness.py',
+        'tests/p30/test_p30_l7_field_golden_readiness.py',
+        'tests/p30/fixtures/p30_l7_prince_field_readiness.json',
+        'evidence/readiness.txt',
+        'evidence/native_same_session_field_matrix.json',
+        'evidence/field_subset_review_proposal.json',
+    }
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
+            infos = z.infolist()
+            if (len(infos) != 4 or {x.filename for x in infos} != names
+                    or any(x.is_dir() or x.flag_bits & 1 or x.file_size > 500_000
+                           for x in infos)):
+                return refuse('ZIP_MEMBERS_OR_LIMITS')
+            if z.testzip() is not None:
+                return refuse('ZIP_CRC')
+            outcome['zip_crc'] = 'PASS'
+            lines = z.read('SHA256SUMS.txt').decode('utf-8').splitlines()
+            entries = {}
+            for line in lines:
+                match = re.fullmatch(r'([0-9a-f]{64})  (.+)', line)
+                if not match or match.group(2) in entries:
+                    return refuse('MANIFEST_SCHEMA_OR_DUPLICATE')
+                entries[match.group(2)] = match.group(1)
+            if set(entries) != manifest_paths:
+                return refuse('MANIFEST_PATH_SET')
+            for member in names - {'SHA256SUMS.txt'}:
+                if hashlib.sha256(z.read(member)).hexdigest() != entries['evidence/' + member]:
+                    return refuse('MANIFEST_EVIDENCE_HASH')
+            outcome['evidence_member_hashes'] = 'PASS'
+            outcome['independently_verified_evidence_members'] = 3
+            readiness = z.read('readiness.txt').decode('utf-8')
+            if (f'head={expected_head}\n' not in readiness
+                    or 'formal_fields=0\n' not in readiness
+                    or 'golden=0\n' not in readiness
+                    or 'published=0\n' not in readiness):
+                return refuse('HEAD_OR_RELEASE_READINESS')
+            matrix = json.loads(z.read('native_same_session_field_matrix.json'))
+    except (zipfile.BadZipFile, UnicodeDecodeError, KeyError, ValueError,
+            OSError, RuntimeError, TypeError):
+        return refuse('ZIP_READ_OR_JSON')
+    reviewed = audit_native_same_session_field_matrix(matrix, now_utc)
+    if (reviewed.get('internally_consistent_native_sources') != 3
+            or reviewed.get('source_bound_review_fields') != 5
+            or len(reviewed.get('field_matrix', [])) != 5):
+        return refuse('NATIVE_RECEIPT_PARITY_OR_FRESHNESS')
+    outcome['native_receipt_parity'] = 'PASS_INTERNAL_ONLY'
+    outcome['decision'] = 'ARTIFACT_INTEGRITY_PASS_FORMAL_AUTHORITY_HOLD'
+    return outcome
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
