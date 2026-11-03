@@ -637,6 +637,117 @@ def validate_dome_crosscheck(e):
             "native_get":0,"formal_accepted":0,"golden":0,"published":0,
             "decision":"INDEPENDENT_GOLDEN_GATE_STILL_REQUIRED"}
 
+
+
+# 2026-11-03: Independent indexed official source review, no native GET.
+# A: TMC venue exact direct KHAM PRODUCT_ID edge; B: TWTC same-site
+# exhibition LIST -> id=29418 DETAIL with explicit opening hours.
+# This is a readiness matrix, NOT a Golden decision or release permission.
+PUBLIC_KHAM_PRODUCT = "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"
+PUBLIC_TMC_LIST = "https://www.tmc.taipei/tw/blog/show"
+PUBLIC_TMC_DETAIL = "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu"
+PUBLIC_TWTC_LIST = "https://twtc.com.tw/exhibition?p=home"
+PUBLIC_TWTC_DETAIL = "https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home"
+PUBLIC_NON_SESSION_FIELDS = {
+    "a_kham_title": ("A", PUBLIC_KHAM_PRODUCT, "TICKET_EVENT_TITLE",
+                     "2026 小宇 宋念宇《不，完美的人》演唱會", "REVIEW"),
+    "a_venue_direct_ticket_href": ("A", PUBLIC_TMC_DETAIL, "EXACT_VENUE_TO_TICKET_PRODUCT_EDGE",
+                                   PUBLIC_KHAM_PRODUCT, "REVIEW"),
+    "a_venue_showtime": ("A", PUBLIC_TMC_DETAIL, "VENUE_ANNOUNCED_SHOWTIME",
+                         "2026-11-07T19:30:00+08:00", "REVIEW"),
+    "a_venue_hall": ("A", PUBLIC_TMC_DETAIL, "VENUE_HALL",
+                     "臺北流行音樂中心 表演廳", "REVIEW"),
+    "a_ticket_sale_start": ("A", PUBLIC_KHAM_PRODUCT, "TICKET_SALE_START_NOT_SHOWTIME",
+                            "2026-08-22T12:00:00+08:00", "REVIEW"),
+    "a_ticket_duration": ("A", PUBLIC_KHAM_PRODUCT, "APPROXIMATE_DURATION_MINUTES_NOT_SHOWTIME",
+                          120, "REVIEW"),
+    "a_ticket_age_advisory": ("A", PUBLIC_KHAM_PRODUCT, "RECOMMENDED_AGE_NOT_MINIMUM",
+                              6, "REVIEW"),
+    "a_ticket_session": ("A", PUBLIC_KHAM_PRODUCT, "CHECKOUT_SESSION_UNVERIFIED",
+                         None, "HOLD"),
+    "a_current_stock": ("A", PUBLIC_KHAM_PRODUCT, "LIVE_INVENTORY_UNVERIFIED",
+                        None, "HOLD"),
+    "a_eligible_min": ("A", PUBLIC_KHAM_PRODUCT, "ELIGIBLE_CHECKOUT_MIN_UNVERIFIED",
+                       None, "HOLD"),
+    "b_list_title": ("B", PUBLIC_TWTC_LIST, "OFFICIAL_EXHIBITION_LIST_TITLE",
+                     "2026年電器空調影音大展", "REVIEW"),
+    "b_detail_title": ("B", PUBLIC_TWTC_DETAIL, "SAME_EVENT_DETAIL_TITLE",
+                       "2026年電器空調影音大展", "REVIEW"),
+    "b_exhibition_dates": ("B", PUBLIC_TWTC_DETAIL, "EXHIBITION_DATES_NOT_TICKET_SESSIONS",
+                           ["2026-11-06", "2026-11-09"], "REVIEW"),
+    "b_daily_open_hours": ("B", PUBLIC_TWTC_DETAIL, "EXHIBITION_DAILY_OPEN_HOURS_NOT_SHOWTIME",
+                           ["10:00", "18:00"], "REVIEW"),
+    "b_exhibition_hall": ("B", PUBLIC_TWTC_DETAIL, "EXHIBITION_VENUE_HALL",
+                          "世貿一館", "REVIEW"),
+    "b_admission_rules": ("B", PUBLIC_TWTC_DETAIL, "ADMISSION_AND_CHILD_RULES_UNVERIFIED",
+                          None, "HOLD"),
+    "b_ticket_event_id": ("B", PUBLIC_TWTC_DETAIL, "TICKET_EVENT_ID_UNVERIFIED",
+                          None, "HOLD"),
+    "b_event_image": ("B", PUBLIC_TWTC_DETAIL, "EVENT_HERO_IMG_URL_UNVERIFIED",
+                      None, "HOLD"),
+}
+
+def validate_public_non_session_receipt(e):
+    """Reject role laundering; indexed reader alone cannot pass formal Golden."""
+    if not isinstance(e, dict) or e.get("kind") != "P30_L7_NON_SESSION_FIELD_READINESS_V1":
+        raise ValueError("NON_SESSION_KIND_HOLD")
+    if (e.get("scope") != "ISOLATED_EVIDENCE_ONLY"
+        or e.get("observation_method") != "PUBLIC_INDEXED_TEXT_READER_NOT_NATIVE_GET"
+        or e.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+        or e.get("source_freshness") != "HOLD_INDEXED_CACHE_NOT_SAME_SESSION_NATIVE"
+        or any(type(e.get(k)) is not int or e[k] != 0 for k in
+               ("native_official_get", "formal_accepted_fields",
+                "golden_accepted_events", "published_events"))):
+        raise ValueError("NON_SESSION_FRESHNESS_RELEASE_HOLD")
+    if e.get("sources") != {"A_venue_list": PUBLIC_TMC_LIST,
+                            "A_venue_detail": PUBLIC_TMC_DETAIL,
+                            "A_ticket_detail": PUBLIC_KHAM_PRODUCT,
+                            "B_venue_list": PUBLIC_TWTC_LIST,
+                            "B_venue_detail": PUBLIC_TWTC_DETAIL}:
+        raise ValueError("NON_SESSION_SOURCE_HOLD")
+    if e.get("identity") != {
+        "A_ticket_platform_id": "04", "A_product_id": "P1DF32E2",
+        "A_venue_detail_id": "2026SungNien-Yu",
+        "A_direct_official_ticket_edge": PUBLIC_KHAM_PRODUCT,
+        "A_ticket_session_id": None, "A_checkout_eligible_min": None,
+        "B_platform_id": "16", "B_exhibition_detail_id": "29418",
+        "B_ticket_session_id": None, "B_admission_verified": False,
+        "B_list_detail_same_native_session": False,
+        "formal_img_url": None, "cross_event_merge": False}:
+        raise ValueError("NON_SESSION_IDENTITY_OR_SESSION_HOLD")
+    rows = e.get("field_receipts")
+    if not isinstance(rows, list) or len(rows) != len(PUBLIC_NON_SESSION_FIELDS):
+        raise ValueError("NON_SESSION_COUNT_HOLD")
+    seen = set()
+    for row in rows:
+        if not isinstance(row, dict) or row.get("name") not in PUBLIC_NON_SESSION_FIELDS:
+            raise ValueError("NON_SESSION_UNKNOWN_FIELD_HOLD")
+        name = row["name"]
+        if name in seen:
+            raise ValueError("NON_SESSION_DUPLICATE_HOLD")
+        seen.add(name)
+        line, source, role, value, decision = PUBLIC_NON_SESSION_FIELDS[name]
+        if (row.get("line") != line
+            or not exact_source_url(row.get("source"), source)
+            or row.get("role") != role
+            or type(row.get("value")) is not type(value)
+            or row.get("value") != value
+            or row.get("decision") != decision
+            or row.get("formal_accepted") is not False
+            or not isinstance(row.get("reason"), str) or not row["reason"].strip()):
+            raise ValueError("NON_SESSION_SOURCE_ROLE_PROMOTION_HOLD")
+        try:
+            stamp = datetime.fromisoformat(row["observed_at"].replace("Z", "+00:00"))
+            if stamp.utcoffset() is None:
+                raise ValueError()
+        except (ValueError, TypeError, KeyError, AttributeError):
+            raise ValueError("NON_SESSION_TIMESTAMP_HOLD")
+    if seen != set(PUBLIC_NON_SESSION_FIELDS):
+        raise ValueError("NON_SESSION_MISSING_FIELD_HOLD")
+    return {"A_review": 7, "A_hold": 3, "B_review": 5, "B_hold": 3,
+            "native_get": 0, "formal_accepted": 0, "golden": 0, "published": 0,
+            "decision": "INDEPENDENT_NATIVE_FRESHNESS_AND_GOLDEN_STILL_REQUIRED"}
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))

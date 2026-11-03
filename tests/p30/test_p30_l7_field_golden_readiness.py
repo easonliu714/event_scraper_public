@@ -557,4 +557,112 @@ class Readiness(unittest.TestCase):
         d=copy.deepcopy(e);d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
         with self.assertRaises(ValueError):m.validate_dome_crosscheck(d)
 
+
+
+# 2026-11-03: Public indexed text-source receipts; no checkout, no native GET.
+class PublicNonSessionFieldReadiness(unittest.TestCase):
+    @staticmethod
+    def fixture():
+        e = {
+            "kind": "P30_L7_NON_SESSION_FIELD_READINESS_V1",
+            "scope": "ISOLATED_EVIDENCE_ONLY",
+            "observation_method": "PUBLIC_INDEXED_TEXT_READER_NOT_NATIVE_GET",
+            "source_freshness": "HOLD_INDEXED_CACHE_NOT_SAME_SESSION_NATIVE",
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "native_official_get": 0, "formal_accepted_fields": 0,
+            "golden_accepted_events": 0, "published_events": 0,
+            "sources": {
+                "A_venue_list": m.PUBLIC_TMC_LIST,
+                "A_venue_detail": m.PUBLIC_TMC_DETAIL,
+                "A_ticket_detail": m.PUBLIC_KHAM_PRODUCT,
+                "B_venue_list": m.PUBLIC_TWTC_LIST,
+                "B_venue_detail": m.PUBLIC_TWTC_DETAIL},
+            "identity": {
+                "A_ticket_platform_id": "04", "A_product_id": "P1DF32E2",
+                "A_venue_detail_id": "2026SungNien-Yu",
+                "A_direct_official_ticket_edge": m.PUBLIC_KHAM_PRODUCT,
+                "A_ticket_session_id": None, "A_checkout_eligible_min": None,
+                "B_platform_id": "16", "B_exhibition_detail_id": "29418",
+                "B_ticket_session_id": None, "B_admission_verified": False,
+                "B_list_detail_same_native_session": False,
+                "formal_img_url": None, "cross_event_merge": False}}
+        e["field_receipts"] = [
+            {"name": name, "line": line, "source": source,
+             "role": role, "value": copy.deepcopy(value),
+             "decision": decision, "formal_accepted": False,
+             "reason": "Exact public indexed official source text; independent native same-session and Golden pending",
+             "observed_at": "2026-11-03T08:53:00+08:00"}
+            for name, (line, source, role, value, decision)
+            in m.PUBLIC_NON_SESSION_FIELDS.items()]
+        return e
+
+    def test_public_source_positive_non_session_roles(self):
+        e = self.fixture()
+        result = m.validate_public_non_session_receipt(e)
+        self.assertEqual((result["A_review"], result["B_review"]), (7, 5))
+        self.assertEqual((result["formal_accepted"], result["native_get"],
+                          result["golden"], result["published"]), (0, 0, 0, 0))
+        self.assertEqual(e["identity"]["B_exhibition_detail_id"], "29418")
+        self.assertEqual(e["identity"]["A_product_id"], "P1DF32E2")
+
+    def test_non_session_source_role_negative_cases(self):
+        e = self.fixture()
+        cases = (
+            ("a_venue_direct_ticket_href", "value", m.PUBLIC_KHAM_PRODUCT + "&SESSION=guess"),
+            ("a_venue_direct_ticket_href", "source", m.PUBLIC_TWTC_DETAIL),
+            ("a_ticket_sale_start", "role", "EVENT_SHOWTIME"),
+            ("a_ticket_age_advisory", "role", "AGE_MINIMUM"),
+            ("a_ticket_duration", "role", "EVENT_SHOWTIME"),
+            ("a_eligible_min", "value", 1880),
+            ("a_current_stock", "value", 0),
+            ("a_ticket_session", "value", "invented"),
+            ("b_list_title", "value", "Different exhibition"),
+            ("b_detail_title", "source", m.PUBLIC_TWTC_LIST),
+            ("b_exhibition_dates", "value", ["2026-11-06", "2026-11-10"]),
+            ("b_daily_open_hours", "role", "SHOWTIME"),
+            ("b_exhibition_hall", "source", m.PUBLIC_TMC_DETAIL),
+            ("b_admission_rules", "value", "free"),
+            ("b_ticket_event_id", "value", "29418"),
+            ("b_event_image", "value", "https://example.com/fake.jpg"),
+            ("b_daily_open_hours", "formal_accepted", True),
+            ("b_exhibition_dates", "observed_at", "2026-11-03T08:53:00"),
+        )
+        for name, key, bad in cases:
+            d = copy.deepcopy(e)
+            next(x for x in d["field_receipts"] if x["name"] == name)[key] = bad
+            with self.subTest(name=name, key=key):
+                with self.assertRaises(ValueError):
+                    m.validate_public_non_session_receipt(d)
+        for key, bad in (
+            ("A_product_id", "wrong"),
+            ("A_direct_official_ticket_edge", "https://kham.com.tw/other"),
+            ("A_ticket_session_id", "invented"),
+            ("B_exhibition_detail_id", "29419"),
+            ("B_list_detail_same_native_session", True),
+            ("B_admission_verified", True),
+            ("formal_img_url", "https://example.com/hero.jpg"),
+            ("cross_event_merge", True),
+        ):
+            d = copy.deepcopy(e)
+            d["identity"][key] = bad
+            with self.subTest(identity=key):
+                with self.assertRaises(ValueError):
+                    m.validate_public_non_session_receipt(d)
+        for key, bad in (
+            ("native_official_get", 1),
+            ("formal_accepted_fields", 1),
+            ("golden_accepted_events", 1),
+            ("published_events", 1),
+            ("source_freshness", "PASS"),
+        ):
+            d = copy.deepcopy(e)
+            d[key] = bad
+            with self.subTest(release=key):
+                with self.assertRaises(ValueError):
+                    m.validate_public_non_session_receipt(d)
+        d = copy.deepcopy(e)
+        d["field_receipts"].append(copy.deepcopy(d["field_receipts"][0]))
+        with self.assertRaises(ValueError):
+            m.validate_public_non_session_receipt(d)
+
 if __name__=="__main__":unittest.main()
