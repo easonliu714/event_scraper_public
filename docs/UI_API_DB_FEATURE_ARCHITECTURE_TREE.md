@@ -6129,3 +6129,27 @@ Independent official sources: https://www.tmc.taipei/tw/blog/show/2026SungNien-Y
 - **Pages deployment:** [run #41630317619](https://github.com/easonliu714/event_scraper_public/actions/runs/41630317619) **completed SUCCESS**, deployed exact merged main SHA `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce`; individual GitHub Pages **Build, Deploy and Report** jobs and all steps SUCCESS. This is authoritative GitHub Pages deployment evidence, not independently observed Android screen or actual HTTP JSON contents. Direct `https://easonliu714.github.io/event_scraper_public/platform_status.json` and formal PWA page retrieval attempted via public web reader (inaccessible/DisabledError) and container URL opener (DNS Errno -3). Therefore **DIRECT_LIVE_PAGES_HTTP_READBACK=UNVERIFIED**, while **GITHUB_MAIN_STATUS_READBACK=PASS**, **PAGES_BUILD_DEPLOY_CI=PASS**. Android PWA visual status UX after this new deploy **PENDING_OWNER** if later required, but no historic L8 USER_ATTESTED_PASS should be reset.
 - **Historical snapshot metadata note:** `latestEngineering.statusOnlyReleaseAuthorization=NOT_GRANTED` refers to *18:55 snapshot construction before subsequent Owner consent*. Its timestamp and original status are retained as historical provenance, not an assertion that this later approved deployment was unauthorized. Current Owner approval + merge + Pages have separate exact-head evidence in this gate. Do not silently rewrite past snapshot provenance.
 - **Writer / next Gate:** Sole hourly EventRadar Writer `6ae1e6147e548191881f20e730ab0f11` remains unchanged enabled every :55 Asia/Taipei. Do not generate redundant new status PR, attempt remerge or re-run historic L8 5/5 Android Gate. Primary Roadmap is independent adjudication of exactly five non-session source-bound review fields in existing [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) (HEAD at decision `ba3f3f92408fada6b65bd36a1ab697976fe31f78`), including source/time/conflict/freshness/authority; formal Golden/admission/stock and data publishing remain HOLD. **Gate statuses:** `STATUS_ONLY_EXACT_HEAD_CI=PASS`, `STATUS_ONLY_MERGE=PASS`, `PAGES_DEPLOY=PASS`, `GITHUB_MAIN_STATUS_READBACK=PASS`, `LIVE_HTTP=UNVERIFIED`, `FORMAL_FIELD=0`, `GOLDEN=0`, `PUBLISHED=0`, `HARD_HOLD_NO_PUBLICATION`. Do not add a third formal governance file.
+
+---
+
+### P30-L7-STATUS-BASELINE-RECONCILIATION-20261103 — PR #236 與 Status-only 正式 main 安全對齊
+
+```text
+Source main @ d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [STATUS-ONLY #53 MERGED; PAGES CI PASS]
+├── docs/platform_status.json @ 99cae0571e36e52dac360b6935c0c09f6f6bed3f [19 PLATFORM BASELINE; engineering snapshot 18:55]
+├── docs/data.json @ 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 [IMMUTABLE; NO NEW PUBLISHED EVENTS]
+├── docs/index.html / scraper.py [UNCHANGED; existing L8 Android 5/5 PASS]
+└── Engineering Draft PR #236 @ c3b1529cd0cd0ddf1326f934c57308aa64dba7f1 [OPEN/DRAFT; NOT MAIN]
+    ├── .github/workflows/eventradar_p30_l7_field_readiness.yml [BASE+STATUS-BLOB GUARD UPDATED]
+    ├── scripts/p30_l7_field_golden_readiness.py [EXISTING ORIGINAL BLOB UNCHANGED]
+    ├── tests/p30/fixtures/p30_l7_prince_field_readiness.json [EXISTING BLOB UNCHANGED]
+    └── tests/p30/test_p30_l7_field_golden_readiness.py [EXISTING BLOB UNCHANGED]
+    ├── CI #41632358710 exact HEAD [SUCCESS; 29/29; artifact #13229035753]
+    ├── A / TMC-KHAM [SHOW + HALL 2 REVIEW; PRODUCT_ID identity prerequisite]
+    ├── B / TWTC #16 [EXHIBITION DATE + DAILY OPEN HOURS + HALL 3 REVIEW; id=29418]
+    └── FIELD/GOLDEN/PUBLICATION/PWA FORMAL FEED = 0 [HARD_HOLD_NO_PUBLICATION]
+```
+
+- 工程安全性：雙 Parent 非強制 Commit 將 #236 Draft 同步至已合併的正式 Status-only main；相對新 main Diff 仍只有原 4 個 ADD-only 檔案。CI exact-head/merge-base、狀態 JSON Blob、19 平台、正式資料/首頁保護仍嚴格執行，無放寬。
+- 驗證邊界：[CI #41632358710](https://github.com/easonliu714/event_scraper_public/actions/runs/41632358710) 29/29 PASS、Artifact #13229035753 GitHub SHA256 digest `256bc2ff9c1918b0ab2b3fc7754c5c733bb3120d5d644f9882d73eb6a5600fcf`。本輪 native GET 0；GitHub Pages 部署已 PASS，但正式 HTTP/Android 新版 readback UNVERIFIED，不能代替既有 Android L8 5/5 PASS。
+- 後續架構 Gate：在現有 P30-L7 源值 receipts 上做五個非 Session 欄位逐欄獨立權威／新鮮度／衝突裁決；仍採 `HTTP → LIST → DETAIL → IDENTITY → FIELD → GOLDEN → PUBLICATION` 分層。Session、票價、庫存、圖片、正式 JSON 發布持續 HOLD。唯一每小時 Writer 不變。
