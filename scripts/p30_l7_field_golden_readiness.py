@@ -748,6 +748,86 @@ def validate_public_non_session_receipt(e):
             "native_get": 0, "formal_accepted": 0, "golden": 0, "published": 0,
             "decision": "INDEPENDENT_NATIVE_FRESHNESS_AND_GOLDEN_STILL_REQUIRED"}
 
+
+# Independent public OFFICIAL reader adjudication of prior native value receipts.
+# This is a separate read of the same public URLs, NOT a new native GET,
+# a checkout session, or permission to write Golden/production data.
+INDEPENDENT_PUBLIC_FIELDS = {
+    ("A", "direct_ticket_product"): ("LOCAL_PURCHASE_ANCHOR_NOT_SESSION",
+        PUBLIC_TMC_DETAIL, {"product_id":"P1DF32E2","official_ticket_url":PUBLIC_KHAM_PRODUCT},
+        "590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210"),
+    ("A", "venue_showtime"): ("VENUE_SHOW_NOT_SALE", PUBLIC_TMC_DETAIL,
+        "2026/11/07 19:30", "590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210"),
+    ("A", "venue_hall"): ("VENUE_HALL", PUBLIC_TMC_DETAIL,
+        "臺北流行音樂中心 表演廳", "590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210"),
+    ("B", "list_detail_identity"): ("SAME_ROW_SAME_ID", PUBLIC_TWTC_LIST,
+        {"exhibition_id":"29418","same_row_title":"2026年電器空調影音大展"},
+        "385aee1ce2d85ab432e32add10c8fc5ffb27ce2d72a71f0d73375df079906149"),
+    ("B", "exhibition_title"): ("EXACT_EVENT_TITLE", PUBLIC_TWTC_DETAIL,
+        "2026年電器空調影音大展",
+        "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116"),
+    ("B", "exhibition_dates"): ("EXHIBITION_DATE_NOT_SALE", PUBLIC_TWTC_DETAIL,
+        {"start":"2026/11/06","end":"2026/11/09"},
+        "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116"),
+    ("B", "open_hours"): ("DAILY_OPEN_HOURS_NOT_SHOWTIME", PUBLIC_TWTC_DETAIL,
+        {"open":"10:00","close":"18:00"},
+        "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116"),
+    ("B", "venue_hall"): ("EXHIBITION_HALL_NOT_TICKET_ID", PUBLIC_TWTC_DETAIL,
+        "世貿一館", "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116"),
+}
+
+def validate_independent_public_field_crosscheck(e):
+    """Strictly validate separate reader-vs-native receipts; review only."""
+    if not isinstance(e,dict) or e.get("kind")!="P30_L7_INDEPENDENT_PUBLIC_FIELD_CROSSCHECK_V1":
+        raise ValueError("CROSSCHECK_KIND_HOLD")
+    if (e.get("method")!="INDEPENDENT_PUBLIC_OFFICIAL_WEB_READER_NOT_NATIVE_GET"
+        or e.get("prior_native_run_id")!=41587253858
+        or e.get("prior_native_artifact_id")!=13209075143
+        or e.get("prior_native_matrix_sha256")!="ae060f8cb7e00cb7a3376599b577dd4ebfea71c7b3930b5dd890270e0724e76a"
+        or e.get("release_state")!="HARD_HOLD_NO_PUBLICATION"
+        or e.get("source_authority")!={"A":"04_KHAM_TMC_VENUE","B":"16_TWTC_EXISTING_CANONICAL"}
+        or e.get("conflict_guards")!={"A_ticket_sale_not_show":True,
+            "A_product_id_not_checkout_session":True,
+            "B_exhibition_date_not_ticket_sale":True,
+            "B_open_hours_not_performance_showtime":True,
+            "B_exhibition_id_not_ticket_event_id":True,
+            "B_admission_and_child_policy_unverified":True,
+            "no_cross_event_merge":True}
+        or any(type(e.get(k)) is not int or e[k]!=0 for k in
+            ("this_gate_native_get","formal_accepted_fields","golden_accepted_events",
+             "published_events","formal_pwa_feed_events"))):
+        raise ValueError("CROSSCHECK_AUTHORITY_RELEASE_HOLD")
+    rows=e.get("field_receipts")
+    if not isinstance(rows,list) or len(rows)!=len(INDEPENDENT_PUBLIC_FIELDS):
+        raise ValueError("CROSSCHECK_COUNT_HOLD")
+    seen=set()
+    for row in rows:
+        if not isinstance(row,dict):
+            raise ValueError("CROSSCHECK_ROW_HOLD")
+        key=(row.get("line"),row.get("field"))
+        if key not in INDEPENDENT_PUBLIC_FIELDS or key in seen:
+            raise ValueError("CROSSCHECK_DUPLICATE_OR_UNKNOWN_HOLD")
+        seen.add(key)
+        role,url,value,prior_hash=INDEPENDENT_PUBLIC_FIELDS[key]
+        if (row.get("event_id")!=("P1DF32E2" if key[0]=="A" else "29418")
+            or row.get("role")!=role or row.get("source_url")!=url
+            or row.get("prior_native_body_sha256")!=prior_hash
+            or type(row.get("observed_value")) is not type(value)
+            or row.get("observed_value")!=value
+            or row.get("independent_decision")!="SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY"
+            or row.get("formal_accepted") is not False):
+            raise ValueError("CROSSCHECK_VALUE_ROLE_PROVENANCE_HOLD")
+        try:
+            stamp=datetime.fromisoformat(row["reader_observed_at_utc"].replace("Z","+00:00"))
+            if stamp.utcoffset() is None: raise ValueError()
+        except (KeyError,ValueError,TypeError,AttributeError):
+            raise ValueError("CROSSCHECK_TIMESTAMP_HOLD")
+    if seen!=set(INDEPENDENT_PUBLIC_FIELDS):
+        raise ValueError("CROSSCHECK_MISSING_HOLD")
+    return {"A_crosschecked":3,"B_crosschecked":5,"review_only":8,
+            "native_get_this_gate":0,"formal_accepted":0,"golden":0,
+            "published":0,"decision":"INDEPENDENT_GOLDEN_ADJUDICATION_STILL_REQUIRED"}
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
