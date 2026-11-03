@@ -518,12 +518,12 @@
     "publication": "工程狀態頁可公開展示；活動卡片/Golden/Writer/即時庫存仍 LOCKED"
   },
   "latestEngineering": {
-    "snapshotAtTaipei": "2026-11-01 07:55",
-    "verifiedAtUTC": "2026-11-01T00:04:00Z",
+    "snapshotAtTaipei": "2026-11-03 18:55",
+    "verifiedAtUTC": "2026-11-03T10:55:00Z",
     "scope": "工程 Gate / 官方來源證據快照；不改動正式活動資料、不表示活動已可售",
     "governanceDraftPR": 8,
-    "governanceHead": "2306c4aca4ece4b707aad57b3c689e462de91d87",
-    "sourceMainAtSnapshot": "fbf4ca02b91159f2423caf3d79fb0ca4bb747069",
+    "governanceHead": "16ba2be8e3f724ae51ef093265310df410c67dd1",
+    "sourceMainAtSnapshot": "f2859b7c72d6e280b850cb253730989f22b01d46",
     "existing19PlatformBaselineDate": "2026-10-28",
     "releaseState": "HARD_HOLD_NO_PUBLICATION",
     "acceptedFieldsNew": 0,
@@ -531,46 +531,57 @@
     "publishedEventsNew": 0,
     "hourlyWriter": {
       "taskId": "6ae1e6147e548191881f20e730ab0f11",
-      "lastScheduledTaipei": "2026-11-01 07:55",
-      "lastRun": "completed",
-      "sourceEvidenceRecent3Rounds": "A 3/3、B 3/3",
+      "lastScheduledTaipei": "2026-11-03 17:55",
+      "lastRun": "GOVERNANCE_HEAD_READBACK_ONLY",
+      "sourceEvidenceRecent3Rounds": "native GET 0 new; prior 2026-11-03 13:55 native 3/3",
       "isSingleWriter": true
     },
     "lines": [
       {
         "id": "A",
         "label": "售票平台（既有 19 來源）",
-        "gate": "P30-L9-CO",
-        "draftPR": 190,
-        "head": "95c233f01433c702b1331ec23fce09ecf5553b87",
-        "ciRun": 41255041223,
-        "tests": "42/42 PASS",
-        "artifact": 13062354505,
-        "source": "寬宏 #04",
-        "evidence": "會員合作通路活動清單 → 相同 PRODUCT_ID=P1FRRCZ9 詳情；類別清單不是寬宏一般活動總清單",
-        "decision": "REVIEW",
-        "blocker": "一般清單覆蓋率、實際購票 href、票券 Session ID 尚未獨立確認",
+        "gate": "P30-L7-FIRST-USABLE-NON-SESSION-SUBSET",
+        "draftPR": 236,
+        "head": "ba3f3f92408fada6b65bd36a1ab697976fe31f78",
+        "ciRun": 41599549626,
+        "tests": "29/29 PASS",
+        "artifact": 13214295320,
+        "source": "KHAM #04 ↔ TMC",
+        "evidence": "隔離候選 SHOW 2026-11-07 19:30、HALL 臺北流行音樂中心 表演廳 2/2；PRODUCT_ID=P1DF32E2 非 Session",
+        "decision": "REVIEW_WITH_HOLD",
+        "blocker": "獨立正式欄位驗收權責／時效／衝突簽核待完成；Session/庫存/票價 HOLD",
         "acceptedFields": 0
       },
       {
         "id": "B",
         "label": "官方場館（臺北／新北優先）",
-        "gate": "P30-VENUE-02BB",
-        "draftPR": 191,
-        "head": "b04d99a8b2614963dc840d32c16d0fba89fd13e8",
-        "ciRun": 41254906585,
-        "tests": "46/46 PASS",
-        "artifact": 13062219649,
-        "source": "Zepp New Taipei",
-        "evidence": "場館 rid=163838 公開節目 → Ticket Plus 官方活動連結；已辨識演出／開賣／優惠等時間角色",
+        "gate": "P30-L7-FIRST-USABLE-NON-SESSION-SUBSET",
+        "draftPR": 236,
+        "head": "ba3f3f92408fada6b65bd36a1ab697976fe31f78",
+        "ciRun": 41599549626,
+        "tests": "29/29 PASS",
+        "artifact": 13214295320,
+        "source": "TWTC #16 台北世貿",
+        "evidence": "隔離候選 DETAIL id=29418 展期 2026-11-06~09、每日開放 10:00~18:00、世貿一館 3/3；LIST→同 ID DETAIL",
         "decision": "REVIEW_WITH_HOLD",
-        "blocker": "售票網站為 JS 應用框架；票券 Event/Session ID、場次票價及庫存尚未確認",
+        "blocker": "獨立正式欄位驗收權責／時效／衝突簽核待完成；入場規則/票價/圖片 HOLD",
         "acceptedFields": 0
       }
     ],
     "ownerDecision": {
       "requiredNow": false,
-      "reason": "工程可持續進行；正式狀態發布須另經受控 PR／部署授權，活動發布 HOLD 未解除"
+      "reason": "工程隔離安全修補僅供 PR/CI 審查；正式 status-only Merge/Pages 部署需 Owner 另授權；Golden/活動發布 HOLD"
+    },
+    "candidateReviewFields": 5,
+    "candidateIdentityDependencies": 2,
+    "independentFormalAdjudicatedFields": 0,
+    "nativeOfficialGetThisSnapshot": 0,
+    "statusOnlyReleaseAuthorization": "NOT_GRANTED",
+    "priorVerifiedNativeGet": {
+      "run": 41587253858,
+      "successfulOfficialGet": 3,
+      "source": "TMC DETAIL + TWTC LIST + TWTC DETAIL",
+      "decision": "HISTORIC_NATIVE_REVIEW_ONLY"
     }
   }
 }
