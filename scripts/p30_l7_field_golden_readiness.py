@@ -902,7 +902,7 @@ def validate_independent_field_subset_proposal(crosscheck, proposal):
 # This is a parser, NOT an HTTP client or a Golden/publication authority.
 # It never saves HTML and never claims a native GET from a supplied string.
 def parse_official_non_session_html(source_url, html, expected_title,
-                                    observed_at_utc, now_utc=None):
+                                    expected_identity_id, observed_at_utc, now_utc=None):
     """Parse exact-source HTML into non-session REVIEW values; fail closed."""
     import re
     from html.parser import HTMLParser
@@ -1034,6 +1034,11 @@ def parse_official_non_session_html(source_url, html, expected_title,
         identity = {"kind": "TWTC_DETAIL_ID_NOT_TICKET_SESSION",
                     "exhibition_id": parse_qs(url.query)["id"][0]}
         line = "B"
+    # LIST-derived identity is a separate required input; never infer it from a
+    # similar title or silently accept a different ticket Product / exhibition ID.
+    actual_id = (identity["product_id"] if tmc else identity["exhibition_id"])
+    if not isinstance(expected_identity_id, str) or actual_id != expected_identity_id:
+        raise ValueError("LIST_DETAIL_OR_PRODUCT_ID_CONFLICT_HOLD")
     return {"kind": "P30_L7_FIXED_OFFICIAL_DETAIL_HTML_PARSER_V1",
             "source_url": source_url, "expected_list_title": expected_title,
             "observed_at_utc": observed.isoformat(),
