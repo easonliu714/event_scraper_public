@@ -6392,3 +6392,44 @@ Independent downloaded HISTORIC native artifact #13266321140 / run #41707543622
 
 The downloaded historical artifact was independently inspected byte-for-byte (ZIP digest, CRC and three packaged evidence-member hashes); the newly added callable is tested with in-memory ZIP fixtures and must not be claimed to have executed against the real historical ZIP inside GitHub CI. The independently re-read [TMC venue detail](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM product](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC Chinese id=29418](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home) and [TWTC English same id](https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home) are public-reader corroboration, not new native CI GET. All five fields stay REVIEW, two identity dependencies remain unresolved, and bilingual title-year conflict remains quarantined. Source quality has no new accepted field; next A/B Gate must change the acquisition/identity/conflict root cause or rotate an existing canonical Taipei/New Taipei source, not generate a repetitive fixture-only test. Original 19-platform baseline, reportDate, status-only #53 MERGED/Pages SUCCESS, formal JSON, L8 Android 5/5 PASS and release HOLD preserved.
 
+
+
+---
+
+### P30-L7 executor-source corroboration architecture — 2026-11-04 06:55 Asia/Taipei (Draft #8 only)
+
+```text
+Official source-local public reader [not native GET / not formal authority]
+  A: TMC exact /tw/blog/show/2026SungNien-Yu
+    -> SHOW 2026-11-07 19:30 [VENUE OWNED, REVIEW]
+    -> HALL 臺北流行音樂中心 表演廳 [VENUE OWNED, REVIEW]
+    -> official direct KHAM PRODUCT_ID=P1DF32E2 [ticket-product identity REVIEW]
+       -> KHAM public product page title matches act
+       -> no same-run native KHAM GET, no Session, stock or independent showtime
+  B: TWTC ZH DETAIL id=29418 [venue exhibition identity]
+    -> DATES 2026-11-06..09 [REVIEW]
+    -> OPEN 10:00..18:00 daily [REVIEW, not ticket Session]
+    -> HALL 世貿一館 [REVIEW]
+    -> TWTC EN DETAIL SAME id=29418 [three roles agree]
+       -> TITLE "2025 ELECTRIC APPLIANCE FAIR" [TITLE_YEAR_CONFLICT HOLD]
+    -> NEW executing-agency domain sheng-dong.com.tw/.../TECO
+       -> 2026 date, 10:00..18:00, 台北世貿一館 [3 roles corroborated]
+       -> organizer 台北市電器商業同業公會 / executor 生動國際
+       -> NO direct TWTC id=29418 on operator page [IDENTITY_EDGE HOLD]
+       -> not an official correction of the TWTC EN 2025 title
+  Existing Draft #236 executable:
+    adjudicate_twtc_bilingual_same_id(cn,en)
+      -> adjudicate_twtc_executing_agency_public_crosscheck(cn,en,agency)
+        -> strict exact domain / executor / organizer / event year / hall
+        -> date, hours, timezone-aware reader-clock and 24h skew guard
+        -> negative cases for other event/venue/date, false native, stale clock
+        -> 3 corroborated fields remain REVIEW, TITLE_YEAR_CONFLICT HOLD
+        -> caller-transcribed values cannot prove native GET or raw source hash
+  Exact-head CI #41735071260 SUCCESS 45/45, artifact #13276509642
+  Independent artifact ZIP CRC [UNVERIFIED for this new run]
+  Current native GET 0 [one-shot skipped]; historical #41707543622 3/3
+  Independent FORMAL FIELD 0 / GOLDEN 0 / PUBLISHED 0 / PWA FEED 0
+  HARD_HOLD_NO_PUBLICATION [LOCKED]
+```
+
+Source references: [TMC exact detail](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM product](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC ZH](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home), [TWTC EN](https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home), [executing agency](https://www.sheng-dong.com.tw/activity/appliances-expo/TECO). Engineering Draft [#236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD `5991762388817ef043f0c013f7f79f534d22a725`, [CI #41735071260](https://github.com/easonliu714/event_scraper_public/actions/runs/41735071260) all steps PASS 45/45, artifact GitHub digest sha256:446fc6f742885182a5d478c7980f9eeee0b3946131a9fcb1c7c8278e90608682. Original four ADD-only engineering paths, formal main unchanged. Next A native KHAM identity or alternate canonical ticket; next B authoritative EN title correction/native executor-to-id evidence. Status-only #53 MERGED/Pages SUCCESS, 19 platforms, reportDate, ibon history, formal JSON, L8 Android 5/5 PASS retained. Owner action none for isolated review; formal release separately authorized only.
