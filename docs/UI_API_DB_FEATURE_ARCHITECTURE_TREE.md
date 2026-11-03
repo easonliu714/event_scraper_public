@@ -6159,9 +6159,9 @@ Source main @ d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [STATUS-ONLY #53 MERGED; 
 
 ## P30-OWNER-ARCHITECTURE-FIXED-ADAPTER-AUTOMATED-QUALITY-PIPELINE — 最終產品架構決議（Owner 已同意；未部署部分均標示 TARGET，2026-11-03）
 
-本節明確規定：**EventRadar 最終必須以固定可執行程式定期取得官方清單、同活動詳情、重點欄位及摘要，自動進行身分／欄位品質驗證；不得把每筆活動都變成一次性人工解析或一次性 PR。** 既有 \`scraper.py\` 為功能遷移基礎，不以大型重寫破壞正式 Android UI 與已通過 Gate。
+本節明確規定：**EventRadar 最終必須以固定可執行程式定期取得官方清單、同活動詳情、重點欄位及摘要，自動進行身分／欄位品質驗證；不得把每筆活動都變成一次性人工解析或一次性 PR。** 既有 `scraper.py` 為功能遷移基礎，不以大型重寫破壞正式 Android UI 與已通過 Gate。
 
-\`\`\`text
+```text
 EventRadar Taiwan 目標處理架構（TARGET；各模組不得誤認已全部存在）
 ├─ [SOURCE] Official platform / official venue
 │  └─ compliant bounded HTTP / normal JS (no login / bypass / checkout)
@@ -6185,27 +6185,27 @@ EventRadar Taiwan 目標處理架構（TARGET；各模組不得誤認已全部�
 └─ [EXISTING] GitHub Pages PWA + docs/index.html
    ├─ docs/data.json: formal event feed (UNCHANGED, NOT a review scratchpad)
    └─ docs/platform_status.json: engineering status only (separate release)
-\`\`\`
+```
 
 ### 工程現況對照（SOURCE OF TRUTH = latest GitHub）
 
 | 模組 | 已存在程式／證據 | 尚缺正式端到端能力 |
 |---|---|---|
-| Legacy entrypoint | \`main:scraper.py\`：多平台 \`fetch_*\`、\`create_event_obj\`、\`main_async\`、\`save_data_and_notify\` | 多數 \`create_event_obj\` 的 \`date\` 為「詳內文」，應有獨立同 ID DETAIL 欄位解析；直接全檔寫入需安全快照替代 |
-| REVIEW-only candidate | \`main:scripts/p30_candidate_review_pipeline.py\`：\`normalize_record\` / \`build_candidate_dataset\` / \`write_isolated_outputs\`；明確拒絕寫正式 \`docs/data.json\` | 稳定 event-key / accepted-vs-review 分流 / 增量快照 / rollback / Publisher |
-| Source field evidence | Draft #236：\`scripts/p30_l7_field_golden_readiness.py\`、fixture、tests、CI Workflow 4 ADD-only 路徑；CI #41632358710 29/29 PASS | 5 個非 Session 欄位仍 REVIEW；獨立權威／新鮮度／矛盾解決；正式 accepted 0 |
-| UI and status | 正式 \`docs/index.html\`、\`docs/platform_status.json\`，PR #53 Status-only 已合併並 Pages 部署，歷史 Android L8 5/5 PASS | 正式 event feed / Publisher 未啟用；不能用 UI PASS 代替活動資料正確 |
-| Automation | 唯一 engineering Writer \`6ae1e6147e548191881f20e730ab0f11\`（每小時 :55 Asia/Taipei） | 未來正式資料更新排程是另一受控職責，尚未授權開啟 |
+| Legacy entrypoint | `main:scraper.py`：多平台 `fetch_*`、`create_event_obj`、`main_async`、`save_data_and_notify` | 多數 `create_event_obj` 的 `date` 為「詳內文」，應有獨立同 ID DETAIL 欄位解析；直接全檔寫入需安全快照替代 |
+| REVIEW-only candidate | `main:scripts/p30_candidate_review_pipeline.py`：`normalize_record` / `build_candidate_dataset` / `write_isolated_outputs`；明確拒絕寫正式 `docs/data.json` | 穩定 event-key / accepted-vs-review 分流 / 增量快照 / rollback / Publisher |
+| Source field evidence | Draft #236：`scripts/p30_l7_field_golden_readiness.py`、fixture、tests、CI Workflow 4 ADD-only 路徑；CI #41632358710 29/29 PASS | 5 個非 Session 欄位仍 REVIEW；獨立權威／新鮮度／矛盾解決；正式 accepted 0 |
+| UI and status | 正式 `docs/index.html`、`docs/platform_status.json`，PR #53 Status-only 已合併並 Pages 部署，歷史 Android L8 5/5 PASS | 正式 event feed / Publisher 未啟用；不能用 UI PASS 代替活動資料正確 |
+| Automation | 唯一 engineering Writer `6ae1e6147e548191881f20e730ab0f11`（每小時 :55 Asia/Taipei） | 未來正式資料更新排程是另一受控職責，尚未授權開啟 |
 
 ### 固定 Adapter 與品質引擎的介面契約（TARGET）
 
 - **Adapter 責任：** 只負責該來源 URL、官方活動 ID、LIST→同一活動 DETAIL、欄位角色解析、官方來源 URL／取得時間／內容指紋，並對來源失敗回傳類型化原因。不得把不同 Event/Session/Product ID 當同一主鍵；跨平台連結須另有證據。
 - **Core 責任：** transport 限速與來源合法性、source identity、正規化欄位模型、事件去重與摘要、來源新鮮度／身份／欄位衝突檢查、候選/正式分類、可重現證據。新平台復用 Core 而不是複製整套爬蟲。
-- **欄位品質：** date/end_date/door_time/sale_start/sale_end/open_hours/venue/room/price_tiers/eligible_general_price/img_url/description 等皆有 \`value, role, source_url, event_id, observed_at, decision, hold_reason\`；未知欄位不造值，缺失可供 UI 顯示 UNKNOWN 與官方詳情連結。價格不能使用優惠／套票／手續費冒充最低一般票價；座位圖不能充活動海報。
-- **儲存與部署：** 先保留靜態 \`docs/data.json\` + 正式 GitHub Pages PWA，隔離快照與 last-known-good；建立 schema/diff 與 rollback 後才可申請正式發布。SQLite / API 屬需要證據與維護收益時才另行評估的可選升級，不是這次決議已實作依賴。
+- **欄位品質：** date/end_date/door_time/sale_start/sale_end/open_hours/venue/room/price_tiers/eligible_general_price/img_url/description 等皆有 `value, role, source_url, event_id, observed_at, decision, hold_reason`；未知欄位不造值，缺失可供 UI 顯示 UNKNOWN 與官方詳情連結。價格不能使用優惠／套票／手續費冒充最低一般票價；座位圖不能充活動海報。
+- **儲存與部署：** 先保留靜態 `docs/data.json` + 正式 GitHub Pages PWA，隔離快照與 last-known-good；建立 schema/diff 與 rollback 後才可申請正式發布。SQLite / API 屬需要證據與維護收益時才另行評估的可選升級，不是這次決議已實作依賴。
 - **日常 vs 例外：** 已驗證平台在預先核准政策內可自動跑 LIST/DETAIL/FIELD/quality，每次活動不逐筆人工重審；新平台、網站改版、重大欄位矛盾、資料異常、Golden/發布政策變更須 HOLD／回歸／Owner 確認。未經 Owner 發布授權不得聲稱自動更新正式活動。
 - **CI／門檻：** 每個里程碑都要示範「實際程式輸入官方資料 → 同 ID DETAIL → 真實欄位角色 → 產出 candidate/accepted+HOLD → 不破壞正式資料」的正反、回歸、安全與 exact-head CI，不能只提供硬編碼來源憑證或多份純合成測試。既有 UI Android PASS 不重做。
 
 ### 下一步與治理不變量
 
-先沿用既有 P30-L7 五欄驗收及可用官方來源；隨後優先整合固定 Adapter 和 Safe Snapshot/Quality Core 的第一條端到端非發布管線，再依 Roadmap 推展各平台。連兩輪只產生 REVIEW-only 類似證據就應換成可執行程式整合／根因修補，而不是新建微型 Gate。**本節僅為 Owner 核准的規劃架構，非程式已落地、非 CI / Golden / 正式發布 PASS。** \`HARD_HOLD_NO_PUBLICATION\`、唯一 Writer、正式 19 平台基線與全部已驗證 Android Gate 保持。
+先沿用既有 P30-L7 五欄驗收及可用官方來源；隨後優先整合固定 Adapter 和 Safe Snapshot/Quality Core 的第一條端到端非發布管線，再依 Roadmap 推展各平台。連兩輪只產生 REVIEW-only 類似證據就應換成可執行程式整合／根因修補，而不是新建微型 Gate。**本節僅為 Owner 核准的規劃架構，非程式已落地、非 CI / Golden / 正式發布 PASS。** `HARD_HOLD_NO_PUBLICATION`、唯一 Writer、正式 19 平台基線與全部已驗證 Android Gate 保持。
