@@ -1371,7 +1371,8 @@ def collect_native_five_field_readiness(fetcher=None, now_utc=None):
         result["decision"] = ("NATIVE_SOURCE_BOUND_REVIEW_READY_NOT_GOLDEN" if native
                               else "MOCK_ONLY_NOT_NATIVE_OR_GOLDEN")
     except (ValueError, KeyError, TypeError) as exc:
-        return hold("IDENTITY_FIELD_OR_CONFLICT_HOLD:" + str(exc)[:100])
+        result["hold_reason"] = str(exc)[:100]
+        return hold("IDENTITY_FIELD_OR_CONFLICT_HOLD")
     return result
 
 
