@@ -6253,3 +6253,29 @@ Existing main @ d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [#53 STATUS-ONLY MERGED
 - **Source receipt boundary:** The new candidate carries list/detail URL, identity scope, observed_at, caller-supplied UTF-8 HTML SHA256, role-specific fields, negative/authority guards and `HARD_HOLD_NO_PUBLICATION`. `input_attestation=CALLER_SUPPLIED_HTML_HASH_ONLY_NOT_NATIVE_GET`; freshness `INPUT_TIMESTAMP_ONLY_SOURCE_FRESHNESS_UNVERIFIED`. This is not a network fetch, publisher, data snapshot persistence, accepted Golden or official native body proof. All output `formal_accepted_fields/golden_accepted_events/published_events/formal_pwa_feed_events=0`.
 - **Tests/CI:** [exact-head run #41679188242](https://github.com/easonliu714/event_scraper_public/actions/runs/41679188242) **SUCCESS**, 34/34 tests; 15 new fail-closed negative subcases; [artifact #13252426214](https://github.com/easonliu714/event_scraper_public/actions/runs/41679188242/artifacts/13252426214) digest `sha256:3749e9347e1a39a7d2ea9c57e563069f6aa06db90f83eef21fa154edbc9482cc`, independent ZIP CRC UNVERIFIED. Native official GET this CI = **0** (one-shot probe skipped). Independent public web reader re-observed both official LIST→DETAIL paths and A KHAM direct link on 2026-11-04, but this is not native CI GET. Existing 19-platform status and Owner-approved #53 Pages SUCCESS are untouched; L8 Android 5/5 PASS preserved.
 - **Next executable interfaces:** bounded source GET acquisition `{url, observed_at_utc, http_status, body_sha256, body_encoding, redirect_policy, list/detail role}` → fixed parser (A/B) → field-level source/time/identity/conflict adjudicator → isolated incremental safe candidate snapshot (no destructive overwrite) → independent Golden authority gate → only then separately authorized publication. Stop-rule two rounds with no quality improvement: rotate source or repair first root cause. Until source-native same-batch proof and independent field authority exist, five REVIEW fields and two identity dependencies remain HOLD; formal field/Golden/published 0, `HARD_HOLD_NO_PUBLICATION`.
+
+
+### P30-L7-NATIVE-INTEGRATED-COLLECTOR-20261104 — authority and conflict architecture (NO PUBLISH)
+
+Existing [engineering Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD 8f8f2de291cc408bb657cc209075b6fa28f35e89, [CI #41689765930](https://github.com/easonliu714/event_scraper_public/actions/runs/41689765930) SUCCESS 36/36, [artifact #13257481480](https://github.com/easonliu714/event_scraper_public/actions/runs/41689765930/artifacts/13257481480) digest sha256:05ecfc3047e45c6b207a5a4b159d211ad6126c6b266fe892e5f249d1c0d5992e. Four ADD-only paths; main and formal data/status/index/scraper frozen.
+
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE/HOLD]
+├── Existing fixed source-local parser [CI PASS; caller HTML does not prove native GET]
+├── Existing LIST→same DETAIL candidate [CI PASS; exact row text now exposed]
+├── New collect_native_five_field_readiness [EXECUTABLE, CI MOCK-TESTED, LIVE NOT RUN]
+│   ├── 5 exact public GET targets [TMC LIST, TMC DETAIL, KHAM PRODUCT, TWTC LIST, TWTC DETAIL]
+│   ├── bounded 512 KiB, one request each, 8 s, no redirect/retry/auth/cookies
+│   ├── URL/HTTP/content type/UTF-8/bytes/SHA256/runner clock receipts
+│   ├── A TMC same LIST→DETAIL title/date/hall + exact KHAM product event identity
+│   ├── B TWTC same-row exact id=29418 → DETAIL period/hours/hall
+│   ├── fail closed on absent source, cross-row, wrong ID, date/hall conflict, stale/clock
+│   └── no raw HTML persistence; all output fields remain formal_accepted=false
+├── Independent official reader 2026-11-04 [NOT native CI GET]
+│   ├── A SHOW 2026-11-07 19:30 / HALL 臺北流行音樂中心 表演廳 [2 REVIEW]
+│   └── B EXHIBITION 2026-11-06~09 / OPEN 10:00~18:00 / HALL 世貿一館 [3 REVIEW]
+├── Two identity dependencies [reader-level exact official URL edges; formal adjudication HOLD]
+├── CI native official GET 0 [one-shot steps skipped; workflow invocation edit security-blocked]
+├── Formal accepted FIELD 0 / Golden 0 / Published 0 / PWA formal feed 0
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+
+Authority boundary: successful mock tests and independently crawled public pages can establish role/URL consistency, but neither is an immutable same-run native GET receipt. A native runner receipt cannot by itself authorize formal field acceptance. The formal field adjudicator still requires independent authority, source freshness, identity and conflict review, plus separate Owner release authorization. Workflow update was security-blocked and not retried or bypassed. Next Gate is an authorized native integration path, or root-cause/source rotation after two no-quality-increment rounds. Existing #53 status-only MERGED, Pages runtime UNVERIFIED, 19 platform/reportDate baseline preserved; L8 Android 5/5 and CKSMH5/TWTC39 historical PASS remain CLOSED/PRESERVED.
