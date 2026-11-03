@@ -1180,6 +1180,7 @@ def build_non_session_list_detail_candidate(
         "line": line,
         "list_url": list_url, "detail_url": detail_url,
         "list_row_title": expected_title,
+        "list_row_text": matched[0][0],
         "identity": detail["identity"],
         "identity_scope": identity_scope,
         "observed_at_utc": detail["observed_at_utc"],
@@ -1203,6 +1204,175 @@ def build_non_session_list_detail_candidate(
         "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
 
+
+
+
+# Native source acquisition and conflict adjudication are deliberately one process.
+# Caller-supplied fixture/HTML can test the contract but cannot establish a live GET,
+# source freshness, formal acceptance, Golden status or production publication.
+def collect_native_five_field_readiness(fetcher=None, now_utc=None):
+    """One-shot, exact-URL public GET -> same-run LIST/DETAIL -> field matrix."""
+    import hashlib
+    import re
+    import socket
+    import ssl
+    import urllib.error
+    import urllib.request
+    from datetime import datetime, timezone
+
+    now = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    if now.utcoffset() is None:
+        raise ValueError("NATIVE_CLOCK_MUST_BE_TIMEZONE_AWARE")
+    native = fetcher is None
+    targets = (
+        ("A_LIST", PUBLIC_TMC_LIST),
+        ("A_DETAIL", PUBLIC_TMC_DETAIL),
+        ("A_KHAM", "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"),
+        ("B_LIST", PUBLIC_TWTC_LIST),
+        ("B_DETAIL", PUBLIC_TWTC_DETAIL),
+    )
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    opener = urllib.request.build_opener(NoRedirect) if native else None
+    records, htmls = [], {}
+    for role, url in targets:
+        receipt = {"role": role, "url": url, "http_status": None,
+                   "body_sha256": None, "bytes": 0, "observed_at_utc": None,
+                   "decision": "SOURCE_FRESHNESS_HOLD"}
+        try:
+            if native:
+                req = urllib.request.Request(url, method="GET", headers={
+                    "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Encoding": "identity"})
+                with opener.open(req, timeout=8) as response:
+                    status = response.status
+                    content_type = response.headers.get("Content-Type", "")
+                    final_url = response.geturl()
+                    body = response.read(524289)
+            else:
+                # Test injection is explicitly untrusted; never promote its results.
+                item = fetcher(role, url)
+                status = item["status"]
+                content_type = item.get("content_type", "text/html; charset=utf-8")
+                final_url = item.get("url", url)
+                body = item["body"]
+            observed = datetime.now(timezone.utc) if native else now
+            receipt["observed_at_utc"] = observed.isoformat()
+            receipt["http_status"] = status
+            receipt["bytes"] = len(body)
+            receipt["body_sha256"] = hashlib.sha256(body).hexdigest()
+            receipt["content_type"] = content_type[:100]
+            if (status != 200 or final_url != url or len(body) > 524288
+                    or not body or not isinstance(body, bytes)
+                    or not content_type.lower().startswith("text/html")
+                    or ("charset=" in content_type.lower()
+                        and not re.search(r"charset=['\"]?utf-8\b", content_type, re.I))):
+                receipt["decision"] = "STATUS_REDIRECT_SIZE_OR_CHARSET_HOLD"
+            else:
+                htmls[role] = body.decode("utf-8", errors="strict")
+                receipt["decision"] = "NATIVE_HTTP200_NOT_FIELD_PASS" if native else "MOCK_HTTP200_NOT_NATIVE"
+        except urllib.error.HTTPError as exc:
+            receipt["http_status"] = exc.code
+            receipt["decision"] = "REDIRECT_BLOCKED" if 300 <= exc.code < 400 else "HTTP_ERROR_HOLD"
+        except urllib.error.URLError as exc:
+            receipt["error_type"] = type(exc.reason).__name__
+            receipt["decision"] = ("DNS_OR_EGRESS_HOLD" if isinstance(exc.reason, socket.gaierror)
+                                   else "NETWORK_OR_TLS_HOLD")
+        except (TimeoutError, socket.timeout, ssl.SSLError, OSError, UnicodeError,
+                ValueError, KeyError, TypeError) as exc:
+            receipt["error_type"] = type(exc).__name__
+            receipt["decision"] = "SOURCE_BODY_OR_NETWORK_HOLD"
+        records.append(receipt)
+
+    fields = (
+        ("A", "venue_showtime", "VENUE_SHOW_NOT_SALE", "A_DETAIL"),
+        ("A", "venue_hall", "VENUE_HALL", "A_DETAIL"),
+        ("B", "exhibition_dates", "EXHIBITION_DATE_NOT_SALE", "B_DETAIL"),
+        ("B", "open_hours", "DAILY_OPEN_HOURS_NOT_SHOWTIME", "B_DETAIL"),
+        ("B", "venue_hall", "EXHIBITION_HALL_NOT_TICKET_ID", "B_DETAIL"),
+    )
+    result = {
+        "kind": "P30_L7_NATIVE_FIVE_FIELD_SAME_RUN_REVIEW_GATE_V1",
+        "attestation": ("CI_NATIVE_PUBLIC_GET_SAME_PROCESS" if native
+                        else "MOCK_CALLER_SUPPLIED_NOT_NATIVE"),
+        "observed_at_utc": now.isoformat(),
+        "request_count": len(records),
+        "native_http_200_count": sum(x["http_status"] == 200 for x in records) if native else 0,
+        "source_receipts": records,
+        "source_identity_dependencies": 2,
+        "field_matrix": [],
+        "source_consistent_fields": 0,
+        "independent_native_review_ready_fields": 0,
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "formal_pwa_feed_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+        "raw_html_saved": False,
+        "decision": "SOURCE_FRESHNESS_HOLD",
+    }
+    def hold(reason):
+        result["decision"] = reason
+        result["field_matrix"] = [
+            {"line": line, "field": field, "role": field_role,
+             "source_url": dict(targets)[source_role],
+             "decision": "HOLD", "formal_accepted": False}
+            for line, field, field_role, source_role in fields]
+        return result
+
+    if len(htmls) != len(targets):
+        return hold("NATIVE_SOURCE_ACQUISITION_INCOMPLETE_HOLD")
+    if native and any(
+            abs((now - datetime.fromisoformat(x["observed_at_utc"])).total_seconds()) > 120
+            for x in records):
+        return hold("NATIVE_SNAPSHOT_TIME_SKEW_HOLD")
+    try:
+        a = build_non_session_list_detail_candidate(
+            PUBLIC_TMC_LIST, htmls["A_LIST"], PUBLIC_TMC_DETAIL, htmls["A_DETAIL"],
+            "小宇 宋念宇 《不，完美的人》 演唱會", "P1DF32E2",
+            records[1]["observed_at_utc"], now_utc=(
+                datetime.now(timezone.utc) if native else now))
+        b = build_non_session_list_detail_candidate(
+            PUBLIC_TWTC_LIST, htmls["B_LIST"], PUBLIC_TWTC_DETAIL, htmls["B_DETAIL"],
+            "2026年電器空調影音大展", "29418",
+            records[4]["observed_at_utc"], now_utc=(
+                datetime.now(timezone.utc) if native else now))
+        # Conflict policy: LIST and DETAIL must agree on date and hall for
+        # the SAME exact event row; KHAM product page must identify this act.
+        a_row = a["list_row_text"]
+        b_row = b["list_row_text"]
+        if not ("2026.11.07" in a_row and "表演廳" in a_row):
+            raise ValueError("A_LIST_DETAIL_SHOW_HALL_CONFLICT")
+        if not (re.search(r"11/06\s*[~～]\s*11/09", b_row)
+                and "世貿一館" in b_row):
+            raise ValueError("B_LIST_DETAIL_PERIOD_HALL_CONFLICT")
+        kham = re.sub(r"\s+", "", htmls["A_KHAM"])
+        if not ("宋念宇" in kham and "不，完美的人" in kham):
+            raise ValueError("A_KHAM_PRODUCT_EVENT_TITLE_UNVERIFIED")
+        if (a["identity"]["product_id"] != "P1DF32E2"
+                or b["identity"]["exhibition_id"] != "29418"):
+            raise ValueError("CROSS_SOURCE_IDENTITY_CONFLICT")
+        a_fields = {x["field"]: x for x in a["candidate_fields"]}
+        b_fields = {x["field"]: x for x in b["candidate_fields"]}
+        receipt_by_role = {x["role"]: x for x in records}
+        result["field_matrix"] = [
+            {"line": line, "field": field, "role": field_role,
+             "source_url": receipt_by_role[source_role]["url"],
+             "body_sha256": receipt_by_role[source_role]["body_sha256"],
+             "observed_at_utc": receipt_by_role[source_role]["observed_at_utc"],
+             "value": (a_fields if line == "A" else b_fields)[field]["value"],
+             "decision": ("INDEPENDENT_NATIVE_REVIEW_READY_NOT_FORMAL"
+                          if native else "MOCK_SOURCE_CONSISTENT_NOT_NATIVE"),
+             "formal_accepted": False}
+            for line, field, field_role, source_role in fields]
+        result["source_consistent_fields"] = len(fields)
+        result["independent_native_review_ready_fields"] = len(fields) if native else 0
+        result["decision"] = ("NATIVE_SOURCE_BOUND_REVIEW_READY_NOT_GOLDEN" if native
+                              else "MOCK_ONLY_NOT_NATIVE_OR_GOLDEN")
+    except (ValueError, KeyError, TypeError) as exc:
+        return hold("IDENTITY_FIELD_OR_CONFLICT_HOLD:" + str(exc)[:100])
+    return result
 
 
 def main():
