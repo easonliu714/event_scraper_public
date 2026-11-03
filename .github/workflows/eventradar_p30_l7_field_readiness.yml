@@ -492,6 +492,22 @@ jobs:
               ('B','open_hours','DAILY_OPEN_HOURS_NOT_SHOWTIME',BD,bool(re.search(r'展出時間\s*[：:]\s*10:00\s*[~～\-]\s*18:00',b_text))),
               ('B','venue_hall','EXHIBITION_HALL_NOT_TICKET_ID',BD,bool(re.search(r'展覽館別\s*[：:]\s*世貿一館',b_text))),
           ]
+          # Exact observed literals: each value is emitted only when the corresponding
+          # source-local anchor or bounded label/value expression matched in THIS run.
+          # Prior boolean-only receipts could not support independent value adjudication.
+          # These are NOT formally accepted values, ticket sessions, or publication data.
+          source_bound_values={
+              ('A','direct_ticket_product'):{'product_id':'P1DF32E2','official_ticket_url':TICKET},
+              ('A','venue_showtime'):'2026/11/07 19:30',
+              ('A','venue_hall'):'臺北流行音樂中心 表演廳',
+              ('B','list_detail_identity'):{'exhibition_id':'29418','same_row_title':TITLE},
+              ('B','exhibition_title'):TITLE,
+              ('B','exhibition_dates'):{'start':'2026/11/06','end':'2026/11/09'},
+              ('B','open_hours'):{'open':'10:00','close':'18:00'},
+              ('B','venue_hall'):'世貿一館',
+          }
+          assert len(source_bound_values)==len(checks)==8
+          assert {(line,field) for line,field,_,_,_ in checks}==set(source_bound_values)
           receipts=[]
           for line,field,role,url,hit in checks:
               source=next((r for r in records.values() if r['url']==url),None)
@@ -500,6 +516,9 @@ jobs:
                   'observed_at_utc':source['observed_at_utc'] if source else None,
                   'body_sha256':source['sha256'] if source else None,
                   'native_same_session_match':bool(hit),
+                  'observed_value':source_bound_values[(line,field)] if hit else None,
+                  'value_basis':'EXACT_SOURCE_LOCAL_PATTERN_OR_ANCHOR' if hit else 'UNVERIFIED',
+                  'independent_conflict_adjudication':'PENDING',
                   'decision':'ACCEPTABLE_FOR_INDEPENDENT_GOLDEN_REVIEW_ONLY' if hit else 'HOLD',
                   'formal_accepted':False,
                   'golden_prerequisites':['independent artifact/readback','source freshness and conflict review',
