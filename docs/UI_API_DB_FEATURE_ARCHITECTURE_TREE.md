@@ -5790,3 +5790,50 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; existing isolated Draft #236]
 - **Contract:** validate_public_non_session_receipt on [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD 287ce69093b1b35f2381566bd7350c0169341d9d, 18 exact source/role/value/decision receipts. Fail-closed negatives reject swapped URL/PRODUCT_ID/event, SALE/SHOW and OPEN_HOURS/SHOW confusion, fake Session/stock/price/image, invalid timezone, promotion or release. [Exact-head CI #41556254307](https://github.com/easonliu714/event_scraper_public/actions/runs/41556254307) SUCCESS; Artifact #13195041572 digest sha256:11cbe2828b9cf90bb3a95923fee38a2a3dea39fa99245441371cf59cd7939343 (CRC independently UNVERIFIED).
 - **Progress:** prior→current native GET 0→0, formal accepted FIELD 0→0, Golden 0→0, published 0→0; +12 indexed REVIEW, +6 explicit HOLD, not formal production rows. First usable-field candidate TWTC date/open-hours/hall, pending lawful independent native same-session source read.
 - **Status:** legacy Draft #53 diverged 2 ahead/30 behind main and status CI #40686748311 failed 19-row/Android/ibon comparison; HOLD_NO_MERGE. Future status-only delta must preserve 19 exact rows, historical ibon, immutable data blob, pass independent CI and separate Owner release authorization. Formal main unchanged; L8 formal PWA Android 5/5 PASS CLOSED; HARD_HOLD_NO_PUBLICATION retained.
+
+
+---
+
+### P30-L7-NATIVE-ACQUISITION-UNBLOCK-20261103T0955 — A/B source-to-field architecture
+
+```text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; isolated Draft #236]
+├── Acquisition environment
+│   ├── Local container: DNS gaierror -3 [HOLD, native GET 0]
+│   └── GitHub-hosted one-shot bounded official HTTPS GET [PASS 5/5]
+│       ├── One GET per allowlisted URL, 8s timeout, <=512KiB, no redirect/retry/login
+│       ├── 5 HTTP200, 5 literal marker hits, no truncation, raw HTML not saved
+│       └── Source reachability PASS != native field semantic PASS
+├── A canonical #04 KHAM + TMC venue [3/3 native GET]
+│   ├── TMC LIST /tw/blog/show [HTTP200; body SHA 0f876ab43a3995bb3...]
+│   ├── TMC DETAIL /2026SungNien-Yu [HTTP200; SHA de3af0ef29063933...]
+│   ├── KHAM PRODUCT_ID=P1DF32E2 [HTTP200; SHA c55562c32c90d679...]
+│   ├── Historic indexed direct source edge [REVIEW]
+│   ├── Native exact LIST→DETAIL→KHAM href/SHOW/VENUE/SALE adjacency [NEXT]
+│   └── Checkout Session, stock, eligible min [HOLD]; formal FIELD=0
+├── B existing #16 TWTC [2/2 native GET]
+│   ├── TWTC LIST /exhibition?p=home [HTTP200; SHA 6a175c1ff2749052...]
+│   ├── TWTC DETAIL /exhibition_more.aspx?id=29418&p=home [HTTP200; SHA 65f21a40b1ee489e...]
+│   ├── Native exact id=29418 LIST→DETAIL href [NEXT]
+│   ├── EXHIBITION_DATE 2026-11-06..09 [INDEXED_REVIEW; NATIVE_ROLE_HOLD]
+│   ├── DAILY_OPEN_HOURS 10:00–18:00 [INDEXED_REVIEW; NATIVE_ROLE_HOLD]
+│   ├── VENUE_HALL 世貿一館 [INDEXED_REVIEW; NATIVE_ROLE_HOLD]
+│   └── Admission/child, ticket Session, hero img_url [HOLD]; formal FIELD=0
+├── Draft #236 exact HEAD eb6de903eedede0cb0b04279fe5280e2cec0ddf0
+│   ├── Exact-head CI #41563152029 SUCCESS, 25 tests, immutable guards PASS
+│   ├── Artifact #13197527110 ZIP SHA256 6076c862645c70eb1dc4558d192f65ad8cefc19b4c5013812afee64e22ce0704
+│   ├── Downloaded ZIP CRC PASS, source_acquisition.json independent readback PASS
+│   └── One-shot commit marker; no automatic repeated native GET
+├── Delta 08:55→09:55: native GET 0→5 (A +3/B +2)
+├── Formal FIELD 0→0 / GOLDEN 0→0 / published 0→0 / PWA feed 0→0
+├── Status-only Draft #53 2 ahead/30 behind main [DIVERGED, HOLD_NO_MERGE]
+│   ├── Main 19 platforms and ibon id=12 exact baseline must be preserved
+│   ├── Main status reportDate 2026-10-28, engineering 2026-11-01 07:55 stale
+│   └── Safe status-only exact-head reconciliation + separate Owner approval [NEXT]
+├── Owner L8 formal PWA Android 5/5 USER_ATTESTED_PASS [CLOSED]
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+```
+
+**Field-level ACCEPTABLE/HOLD matrix:** A source LIST/DETAIL/KHAM availability = HTTP200_PASS only; same-event ID/direct href, SHOW, VENUE, SALE = HOLD_NATIVE_LABEL_CONTEXT; Session, live stock, eligible minimum = HOLD_UNVERIFIED. B native LIST/DETAIL availability = HTTP200_PASS only; id=29418 same-ID href, exhibition dates, opening hours, hall = HOLD_NATIVE_LABEL_CONTEXT (eligible for a future *independent* Golden review only after explicit source-label/observed-at/conflict negatives). B admission/price/image/Session = HOLD_UNVERIFIED. All source-bound REVIEW and native GET observations have formal_accepted=false; no new production activity.
+
+**Evidence:** [Exact-head CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41563152029), [Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41563152029/artifacts/13197527110), [TMC LIST](https://www.tmc.taipei/tw/blog/show), [TMC DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM PRODUCT](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC LIST](https://twtc.com.tw/exhibition?p=home), [TWTC DETAIL](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home). Main data/status/index/scraper immutable, no status merge or new writer, formal Android PASS retained. Next Gate is native same-session field-role evidence, not another marker-only GET.
