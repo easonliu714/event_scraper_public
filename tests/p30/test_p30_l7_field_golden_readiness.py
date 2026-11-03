@@ -864,4 +864,100 @@ class FixedOfficialHTMLAdapter(unittest.TestCase):
                     call()
 
 
+
+class SafeListDetailCandidatePipeline(unittest.TestCase):
+    """In-memory LIST->DETAIL candidate: neither synthetic HTML nor hash proves GET."""
+    NOW = __import__("datetime").datetime.fromisoformat("2026-11-04T00:00:00+08:00")
+    TMC_TITLE = FixedOfficialHTMLAdapter.TMC_TITLE
+    TWTC_TITLE = FixedOfficialHTMLAdapter.TWTC_TITLE
+    TMC_DETAIL = FixedOfficialHTMLAdapter.TMC_HTML
+    TWTC_DETAIL = FixedOfficialHTMLAdapter.TWTC_HTML
+    TMC_LIST = (
+        '<article><a href="/tw/blog/show/2026SungNien-Yu">'
+        + TMC_TITLE + '</a></article>'
+    )
+    TWTC_LIST = (
+        '<table><tr><td>' + TWTC_TITLE + '</td>'
+        '<td><a href="/exhibition_more.aspx?id=29418&amp;p=home">更多</a></td>'
+        '</tr></table>'
+    )
+
+    def run_a(self, **kwargs):
+        return m.build_non_session_list_detail_candidate(
+            kwargs.pop("list_url", m.PUBLIC_TMC_LIST),
+            kwargs.pop("list_html", self.TMC_LIST),
+            kwargs.pop("detail_url", m.PUBLIC_TMC_DETAIL),
+            kwargs.pop("detail_html", self.TMC_DETAIL),
+            kwargs.pop("title", self.TMC_TITLE),
+            kwargs.pop("identity", "P1DF32E2"),
+            kwargs.pop("observed", "2026-11-04T00:00:00+08:00"),
+            kwargs.pop("now", self.NOW))
+
+    def run_b(self, **kwargs):
+        return m.build_non_session_list_detail_candidate(
+            kwargs.pop("list_url", m.PUBLIC_TWTC_LIST),
+            kwargs.pop("list_html", self.TWTC_LIST),
+            kwargs.pop("detail_url", m.PUBLIC_TWTC_DETAIL),
+            kwargs.pop("detail_html", self.TWTC_DETAIL),
+            kwargs.pop("title", self.TWTC_TITLE),
+            kwargs.pop("identity", "29418"),
+            kwargs.pop("observed", "2026-11-04T00:00:00+08:00"),
+            kwargs.pop("now", self.NOW))
+
+    def test_two_sources_list_detail_to_in_memory_candidate(self):
+        import hashlib
+        for line, result, count in (
+            ("A", self.run_a(), 2), ("B", self.run_b(), 3)):
+            with self.subTest(line=line):
+                self.assertEqual(result["line"], line)
+                self.assertEqual(len(result["candidate_fields"]), count)
+                self.assertEqual(result["source_receipts"]["attestation"],
+                                 "CALLER_SUPPLIED_HTML_HASH_ONLY_NOT_NATIVE_GET")
+                self.assertEqual(result["source_receipts"]["freshness"],
+                                 "INPUT_TIMESTAMP_ONLY_SOURCE_FRESHNESS_UNVERIFIED")
+                self.assertEqual((result["native_get_verified"],
+                                  result["formal_accepted_fields"],
+                                  result["golden_accepted_events"],
+                                  result["published_events"],
+                                  result["formal_pwa_feed_events"]),
+                                 (False, 0, 0, 0, 0))
+                self.assertEqual(result["release_state"], "HARD_HOLD_NO_PUBLICATION")
+                self.assertTrue(all(not x["formal_accepted"] for x in result["candidate_fields"]))
+        self.assertEqual(self.run_a()["identity"]["product_id"], "P1DF32E2")
+        self.assertEqual(self.run_b()["identity"]["exhibition_id"], "29418")
+        self.assertEqual(self.run_b()["source_receipts"]["list_html_sha256"],
+                         hashlib.sha256(self.TWTC_LIST.encode("utf-8")).hexdigest())
+
+    def test_cross_row_duplicate_wrong_authority_and_stale_fail_closed(self):
+        from datetime import timedelta
+        cases = (
+            lambda: self.run_a(list_html=self.TMC_LIST + self.TMC_LIST),
+            lambda: self.run_a(list_html='<article>OTHER EVENT'
+                               '<a href="/tw/blog/show/2026SungNien-Yu">other</a></article>'),
+            lambda: self.run_a(list_html=self.TMC_LIST.replace(
+                "/2026SungNien-Yu", "/different-show")),
+            lambda: self.run_a(list_url="https://evil.example/tw/blog/show"),
+            lambda: self.run_a(detail_url="https://evil.example/tw/blog/show/2026SungNien-Yu"),
+            lambda: self.run_a(identity="POTHER123"),
+            lambda: self.run_a(detail_html=self.TMC_DETAIL.replace(
+                "2026.11.07 19:30", "2026.11.08 19:30 / 2026.11.07 19:30")),
+            lambda: self.run_b(list_html=self.TWTC_LIST + self.TWTC_LIST),
+            lambda: self.run_b(list_html=(
+                '<tr><td>' + self.TWTC_TITLE + '</td></tr>'
+                '<tr><td>OTHER</td><td><a href="/exhibition_more.aspx?id=29418&amp;p=home">更多</a></td></tr>')),
+            lambda: self.run_b(list_html=self.TWTC_LIST.replace("id=29418", "id=29419")),
+            lambda: self.run_b(detail_url=m.PUBLIC_TWTC_DETAIL.replace("p=home", "p=menu1")),
+            lambda: self.run_b(identity="29419"),
+            lambda: self.run_b(detail_html=self.TWTC_DETAIL.replace(
+                "展覽館別：世貿一館", "展覽館別：世貿三館 展覽館別：世貿一館")),
+            lambda: self.run_b(observed="2026-11-01T00:00:00+08:00"),
+            lambda: self.run_b(now=self.NOW - timedelta(hours=1)),
+        )
+        for index, call in enumerate(cases):
+            with self.subTest(index=index):
+                with self.assertRaises(ValueError):
+                    call()
+
+
+
 if __name__=="__main__":unittest.main()
