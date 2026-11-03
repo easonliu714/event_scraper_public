@@ -960,4 +960,81 @@ class SafeListDetailCandidatePipeline(unittest.TestCase):
 
 
 
+
+class NativeSameRunFiveFieldReviewGate(unittest.TestCase):
+    """Injected HTML proves only contract behavior; only real GET can attest freshness."""
+    NOW = __import__("datetime").datetime.fromisoformat("2026-11-04T00:00:00+08:00")
+    def bodies(self):
+        t = FixedOfficialHTMLAdapter
+        return {
+            "A_LIST": SafeListDetailCandidatePipeline.TMC_LIST.encode("utf-8"),
+            "A_DETAIL": t.TMC_HTML.encode("utf-8"),
+            "A_KHAM": '<html><h1>2026 小宇 宋念宇《不，完美的人》演唱會</h1></html>'.encode("utf-8"),
+            "B_LIST": ('<table><tr><td>11/06 ~ 11/09</td><td>'
+                       + t.TWTC_TITLE +
+                       '</td><td>世貿一館</td><td><a href="/exhibition_more.aspx?id=29418&amp;p=home">'
+                       '更多</a></td></tr></table>').encode("utf-8"),
+            "B_DETAIL": t.TWTC_HTML.encode("utf-8"),
+        }
+
+    def run_mock(self, bodies=None, statuses=None):
+        bodies = self.bodies() if bodies is None else bodies
+        statuses = {} if statuses is None else statuses
+        def get(role, url):
+            return {"status": statuses.get(role, 200), "body": bodies[role],
+                    "content_type": "text/html; charset=utf-8", "url": url}
+        return m.collect_native_five_field_readiness(fetcher=get, now_utc=self.NOW)
+
+    def test_complete_source_local_fields_stay_mock_review_and_never_publish(self):
+        r = self.run_mock()
+        self.assertEqual(r["request_count"], 5)
+        self.assertEqual(r["source_identity_dependencies"], 2)
+        self.assertEqual(r["source_consistent_fields"], 5)
+        self.assertEqual(r["independent_native_review_ready_fields"], 0)
+        self.assertEqual(r["native_http_200_count"], 0)
+        self.assertEqual(r["decision"], "MOCK_ONLY_NOT_NATIVE_OR_GOLDEN")
+        self.assertEqual([x["field"] for x in r["field_matrix"]],
+                         ["venue_showtime", "venue_hall", "exhibition_dates",
+                          "open_hours", "venue_hall"])
+        self.assertEqual((r["formal_accepted_fields"], r["golden_accepted_events"],
+                          r["published_events"], r["formal_pwa_feed_events"]), (0, 0, 0, 0))
+        self.assertTrue(all(not x["formal_accepted"] for x in r["field_matrix"]))
+        self.assertTrue(all(x["body_sha256"] and x["observed_at_utc"]
+                            for x in r["field_matrix"]))
+        self.assertFalse(r["raw_html_saved"])
+        self.assertEqual(r["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_native_acquisition_failure_and_identity_conflicts_fail_closed(self):
+        cases = []
+        cases.append((self.bodies(), {"A_DETAIL": 403}))
+        cases.append((self.bodies(), {"B_LIST": 403}))
+        b = self.bodies()
+        b["A_KHAM"] = b["A_KHAM"].replace("宋念宇".encode(), "另一活動".encode())
+        cases.append((b, {}))
+        b = self.bodies()
+        b["B_LIST"] = b["B_LIST"].replace("11/06 ~ 11/09".encode(), "11/12 ~ 11/15".encode())
+        cases.append((b, {}))
+        b = self.bodies()
+        b["A_LIST"] = b["A_LIST"].replace("2026.11.07".encode(), "2026.11.08".encode())
+        cases.append((b, {}))
+        b = self.bodies()
+        b["B_LIST"] = b["B_LIST"].replace("id=29418".encode(), "id=29419".encode())
+        cases.append((b, {}))
+        b = self.bodies()
+        b["B_DETAIL"] = b["B_DETAIL"].replace("10:00 ~ 18:00".encode(), "18:00 ~ 10:00".encode())
+        cases.append((b, {}))
+        for i, (body, statuses) in enumerate(cases):
+            with self.subTest(case=i):
+                r = self.run_mock(body, statuses)
+                self.assertTrue(r["decision"].endswith("HOLD"))
+                self.assertEqual(r["source_consistent_fields"], 0)
+                self.assertEqual(r["independent_native_review_ready_fields"], 0)
+                self.assertEqual(len(r["field_matrix"]), 5)
+                self.assertTrue(all(x["decision"] == "HOLD" for x in r["field_matrix"]))
+                self.assertEqual(r["formal_accepted_fields"], 0)
+                self.assertEqual(r["published_events"], 0)
+
+
+
+
 if __name__=="__main__":unittest.main()
