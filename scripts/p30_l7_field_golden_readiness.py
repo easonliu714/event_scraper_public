@@ -1053,6 +1053,149 @@ def parse_official_non_session_html(source_url, html, expected_title,
             "release_state": "HARD_HOLD_NO_PUBLICATION"}
 
 
+
+# Fixed LIST -> exact DETAIL -> source-local FIELD candidate integration.
+# This consumes caller-supplied HTML only: no HTTP, formal feed, Golden or publisher.
+# A TMC ticket PRODUCT_ID is a detail-side edge, never a LIST-derived Session ID.
+def build_non_session_list_detail_candidate(
+        list_url, list_html, detail_url, detail_html, expected_title,
+        expected_identity_id, observed_at_utc, now_utc=None):
+    """Return an in-memory, hash-bound REVIEW snapshot; reject cross-row joins."""
+    import hashlib
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin, urlsplit, parse_qs
+
+    if list_url not in (PUBLIC_TMC_LIST, PUBLIC_TWTC_LIST):
+        raise ValueError("LIST_CANONICAL_SOURCE_HOLD")
+    if not isinstance(list_html, str) or not 0 < len(list_html.encode("utf-8")) <= 524288:
+        raise ValueError("LIST_HTML_EMPTY_OR_OVERSIZE_HOLD")
+    if not isinstance(detail_html, str) or not 0 < len(detail_html.encode("utf-8")) <= 524288:
+        raise ValueError("DETAIL_HTML_EMPTY_OR_OVERSIZE_HOLD")
+    if not isinstance(expected_title, str) or not expected_title.strip():
+        raise ValueError("LIST_EXPECTED_TITLE_HOLD")
+    # Exact URL equality is intentional: different query variants can represent
+    # different field granularity (TWTC p=home versus p=menu1).
+    d = urlsplit(detail_url)
+    if list_url == PUBLIC_TMC_LIST:
+        if (d.scheme != "https" or d.netloc != "www.tmc.taipei"
+            or not d.path.startswith("/tw/blog/show/")
+            or not d.path[len("/tw/blog/show/"):]
+            or "/" in d.path[len("/tw/blog/show/"):]
+            or d.query or d.fragment or d.username or d.password):
+            raise ValueError("TMC_DETAIL_AUTHORITY_HOLD")
+        line = "A"
+    else:
+        if (d.scheme != "https" or d.netloc not in ("twtc.com.tw", "www.twtc.com.tw")
+            or d.path != "/exhibition_more.aspx" or d.fragment
+            or d.username or d.password
+            or set(parse_qs(d.query)) != {"id", "p"}
+            or parse_qs(d.query)["p"] != ["home"]
+            or parse_qs(d.query)["id"] != [expected_identity_id]):
+            raise ValueError("TWTC_LIST_DETAIL_ID_OR_SCOPE_HOLD")
+        line = "B"
+
+    class RowAnchors(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack = []
+            self.rows = []
+            self.active_anchor = None
+            self.skip = 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "noscript"):
+                self.skip += 1
+            if self.skip:
+                return
+            if tag in ("article", "tr", "li"):
+                self.stack.append({"tag": tag, "text": [], "links": []})
+            if tag == "a":
+                self.active_anchor = {"href": dict(attrs).get("href", ""), "text": []}
+
+        def handle_data(self, data):
+            if self.skip:
+                return
+            value = " ".join(data.split())
+            if not value:
+                return
+            for row in self.stack:
+                row["text"].append(value)
+            if self.active_anchor is not None:
+                self.active_anchor["text"].append(value)
+
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "noscript"):
+                self.skip = max(0, self.skip - 1)
+                return
+            if self.skip:
+                return
+            if tag == "a" and self.active_anchor is not None:
+                link = (self.active_anchor["href"],
+                        " ".join(self.active_anchor["text"]))
+                for row in self.stack:
+                    row["links"].append(link)
+                self.active_anchor = None
+            if tag in ("article", "tr", "li") and self.stack:
+                if self.stack[-1]["tag"] != tag:
+                    raise ValueError("LIST_ROW_MARKUP_AMBIGUOUS_HOLD")
+                self.rows.append(self.stack.pop())
+
+    parser = RowAnchors()
+    parser.feed(list_html)
+    if parser.stack or parser.skip:
+        raise ValueError("LIST_HTML_UNCLOSED_ROW_HOLD")
+    matched = []
+    for row in parser.rows:
+        text = " ".join(row["text"])
+        # Whole title, not a fuzzy substring of another event.
+        if expected_title not in text:
+            continue
+        for href, label in row["links"]:
+            candidate = urljoin(list_url, href)
+            if candidate == detail_url and (line == "B" or label == expected_title):
+                matched.append((text, candidate))
+    if len(matched) != 1:
+        raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
+
+    detail = parse_official_non_session_html(
+        detail_url, detail_html, expected_title, expected_identity_id,
+        observed_at_utc, now_utc=now_utc)
+    if detail["line"] != line:
+        raise ValueError("LIST_DETAIL_CROSS_SOURCE_HOLD")
+    # A product identity is proven by the detail's direct KHAM href; not by
+    # the TMC LIST row. B exhibition identity is the exact same LIST href ID.
+    identity_scope = ("DETAIL_DIRECT_KHAM_PRODUCT_NOT_LIST_SESSION" if line == "A"
+                      else "LIST_EXACT_TWTC_EXHIBITION_ID_NOT_TICKET_SESSION")
+    return {
+        "kind": "P30_L7_LIST_DETAIL_SAFE_CANDIDATE_V1",
+        "line": line,
+        "list_url": list_url, "detail_url": detail_url,
+        "list_row_title": expected_title,
+        "identity": detail["identity"],
+        "identity_scope": identity_scope,
+        "observed_at_utc": detail["observed_at_utc"],
+        "source_receipts": {
+            "list_html_sha256": hashlib.sha256(list_html.encode("utf-8")).hexdigest(),
+            "detail_html_sha256": hashlib.sha256(detail_html.encode("utf-8")).hexdigest(),
+            "attestation": "CALLER_SUPPLIED_HTML_HASH_ONLY_NOT_NATIVE_GET",
+            "freshness": "INPUT_TIMESTAMP_ONLY_SOURCE_FRESHNESS_UNVERIFIED",
+        },
+        "candidate_fields": detail["candidate_fields"],
+        "source_quality": "LIST_ROW_DETAIL_ID_AND_FIELD_PARSE_REVIEW_ONLY",
+        "conflict_policy": {
+            "A_show_not_sale_or_session": True,
+            "B_daily_hours_not_showtime": True,
+            "B_p_home_hall_not_p_menu1_hall": True,
+            "ticket_price_stock_image_admission": "HOLD",
+        },
+        "native_get_verified": False, "formal_accepted_fields": 0,
+        "golden_accepted_events": 0, "published_events": 0,
+        "formal_pwa_feed_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
