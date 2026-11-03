@@ -6353,3 +6353,42 @@ Existing Draft #236 HEAD 220bfaf5b3f729b75af0f2a66ae80d1722e25253
 \`\`\`
 
 The independent audit checks **internal consistency of a supplied native-evidence JSON**, not whether that JSON is an authentic downloaded artifact. Its hard-coded expected values are comparison guards, **not a new source observation**. External ZIP CRC/SHA and artifact readback, native KHAM product identity, English same-id source authority, and an independently delegated field acceptance decision must remain distinct gates. The 2026-11-04 public official reader independently re-observed A TMC/KHAM and B TWTC ZH/EN; the TWTC same-ID bilingual TITLE_YEAR_CONFLICT remains OPEN and the five non-Session values remain REVIEW. Do not promote these to formal Golden. Exact-head [CI](https://github.com/easonliu714/event_scraper_public/actions/runs/41717568479) 41/41 SUCCESS; GitHub artifact digest \`sha256:ad6ce56db9c336b87809d3ac45ff2738e5736ee7934e51cb5b93e0274f587996\`, independent ZIP CRC UNVERIFIED. Existing #53 MERGED/Pages SUCCESS, 19 platforms, reportDate, formal JSON, L8 Android 5/5 and publication HOLD preserved.
+
+
+---
+
+### P30-L7 native artifact independent ZIP integrity and source authority boundary — 2026-11-04 05:55 Asia/Taipei
+
+```text
+Existing engineering Draft #236 HEAD 045fdcd4d5b981535300f003923995bcd8e3a14d
+  scripts/p30_l7_field_golden_readiness.py
+    + audit_downloaded_native_artifact_zip(zip_bytes, github_digest, expected_head, now_utc)
+       ├── downloaded ZIP SHA256 vs GitHub artifact digest
+       ├── exact four-member ZIP inventory + CRC + member-size/path guards
+       ├── SHA256SUMS manifest and 3 packaged evidence-member SHA256 parity
+       ├── expected exact HEAD and zero formal release markers
+       ├── 3-source / 8-receipt matrix internal role/hash/clock parity
+       ├── reject digest/head/stale/truncated ZIP, duplicate/cross-event/false-formal
+       ├── raw HTML not packaged → native source-body hash cannot be independently rebuilt
+       ├── source code files not ZIP members → manifest source-code hash not independently rechecked
+       └── never grants field acceptance / Golden / publication
+  tests/p30/test_p30_l7_field_golden_readiness.py
+    + 2 regression methods, including four fail-closed negative cases
+  exact-head CI #41725927359 SUCCESS 43/43
+  new artifact #13274935695 sha256:90301218c1fd464047013c91a79f6bf3702ad935beb1145e3129b146758e7cc4
+  this CI native GET 0 (one-shot skipped)
+
+Independent downloaded HISTORIC native artifact #13266321140 / run #41707543622
+  ZIP SHA256 9ee22fc4375b97897ada0f63853a7582eb65aed5733819ad6fdc926ed839cc30 = GitHub digest [PASS]
+  ZIP CRC [PASS], 3/3 packaged evidence SHA256 manifest [PASS]
+  native matrix 3 official HTTP200 source receipts / 8 role-bound REVIEW receipts [INTERNAL PARITY]
+  A TMC SHOW 2026-11-07 19:30 / HALL 臺北流行音樂中心 表演廳 [2 REVIEW]
+  A KHAM PRODUCT_ID=P1DF32E2 same-run native product-detail [HOLD]
+  B TWTC id=29418 DATE 2026-11-06~09 / OPEN 10:00~18:00 / HALL 世貿一館 [3 REVIEW]
+  B same-ID EN TITLE 2025 vs ZH TITLE 2026 [TITLE_YEAR_CONFLICT HOLD]
+  Independent formal FIELD 0 / GOLDEN 0 / PUBLISHED 0 / PWA_FEED 0
+  HARD_HOLD_NO_PUBLICATION
+```
+
+The downloaded historical artifact was independently inspected byte-for-byte (ZIP digest, CRC and three packaged evidence-member hashes); the newly added callable is tested with in-memory ZIP fixtures and must not be claimed to have executed against the real historical ZIP inside GitHub CI. The independently re-read [TMC venue detail](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu), [KHAM product](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2), [TWTC Chinese id=29418](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home) and [TWTC English same id](https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home) are public-reader corroboration, not new native CI GET. All five fields stay REVIEW, two identity dependencies remain unresolved, and bilingual title-year conflict remains quarantined. Source quality has no new accepted field; next A/B Gate must change the acquisition/identity/conflict root cause or rotate an existing canonical Taipei/New Taipei source, not generate a repetitive fixture-only test. Original 19-platform baseline, reportDate, status-only #53 MERGED/Pages SUCCESS, formal JSON, L8 Android 5/5 PASS and release HOLD preserved.
+
