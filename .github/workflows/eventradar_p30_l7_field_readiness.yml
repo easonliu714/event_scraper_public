@@ -250,6 +250,139 @@ jobs:
               'review':report['field_context_review_count'],'hold':report['field_context_hold_count'],
               'formal':0,'golden':0,'published':0}),flush=True)
           PY
+      - name: One-shot A/B official DOM-local anchor identity (not Golden)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[dom-link-probe-once]'; then
+            echo 'DOM_LINK_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.parse, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          # New hypotheses: A ticket URL must belong to a locally labelled
+          # purchase anchor; B same-ID detail href must be in the title's row.
+          # One public GET per official URL, no redirects/retries/auth/cookies.
+          A_URL = 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'
+          A_TICKET = 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2'
+          B_URL = 'https://twtc.com.tw/exhibition?p=home'
+          B_TITLE = '2026年電器空調影音大展'
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          class Anchors(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.links = []
+                  self.anchor = None
+                  self.row = None
+                  self.rows = []
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if tag == 'tr':
+                      self.row = {'text': [], 'links': []}
+                  if tag == 'a':
+                      self.anchor = {'href': attrs.get('href',''), 'text': []}
+              def handle_data(self, data):
+                  if self.anchor is not None: self.anchor['text'].append(data)
+                  if self.row is not None: self.row['text'].append(data)
+              def handle_endtag(self, tag):
+                  if tag == 'a' and self.anchor is not None:
+                      a = {'href': self.anchor['href'],
+                           'text': ' '.join(' '.join(self.anchor['text']).split())}
+                      self.links.append(a)
+                      if self.row is not None: self.row['links'].append(a)
+                      self.anchor = None
+                  if tag == 'tr' and self.row is not None:
+                      self.rows.append({'text': ' '.join(' '.join(self.row['text']).split()),
+                                        'links': self.row['links']})
+                      self.row = None
+          def fetch(url):
+              rec = {'url':url,'http_status':None,'sha256':None,'bytes':0,
+                     'decision':'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url,method='GET',headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'})
+                  with urllib.request.build_opener(NoRedirect).open(req,timeout=8) as response:
+                      rec['http_status'] = response.status
+                      body = response.read(524289)
+                      rec['bytes'] = len(body)
+                      rec['sha256'] = hashlib.sha256(body).hexdigest()
+                      if response.status != 200 or len(body) > 524288:
+                          rec['decision'] = 'HTTP_OR_SIZE_HOLD'
+                          return rec,None
+                      charset = (response.headers.get_content_charset() or 'utf-8').lower()
+                      if charset not in ('utf-8','big5','cp950'):
+                          rec['decision'] = 'CHARSET_HOLD'
+                          return rec,None
+                      p = Anchors()
+                      p.feed(body.decode(charset,errors='strict'))
+                      rec['decision'] = 'NATIVE_HTML_PARSED_REVIEW_ONLY'
+                      return rec,p
+              except urllib.error.HTTPError as e:
+                  rec['http_status'] = e.code
+                  rec['decision'] = 'REDIRECT_BLOCKED' if 300 <= e.code < 400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as e:
+                  rec['error_type'] = type(e.reason).__name__
+                  rec['decision'] = 'DNS_OR_EGRESS_HOLD' if isinstance(e.reason,socket.gaierror) else 'NETWORK_HOLD'
+              except (UnicodeError,OSError,TimeoutError,ssl.SSLError) as e:
+                  rec['error_type'] = type(e).__name__
+                  rec['decision'] = 'DECODE_OR_NETWORK_HOLD'
+              return rec,None
+          def b_same_id(href):
+              try:
+                  u = urllib.parse.urlsplit(urllib.parse.urljoin(B_URL,href))
+                  if (u.scheme != 'https' or u.hostname not in ('twtc.com.tw','www.twtc.com.tw')
+                      or u.username or u.password or u.fragment
+                      or u.path.lower() != '/exhibition_more.aspx'): return False
+                  pairs = urllib.parse.parse_qsl(u.query,keep_blank_values=True,strict_parsing=True)
+                  return (sum(k.lower()=='id' for k,v in pairs)==1
+                      and any(k.lower()=='id' and v=='29418' for k,v in pairs)
+                      and all(k.lower() in ('id','p') for k,v in pairs)
+                      and all(v=='home' for k,v in pairs if k.lower()=='p'))
+              except (ValueError,TypeError): return False
+          # Synthetic negatives enforce no cross-event ID/host, no duplicate ID.
+          assert b_same_id('/exhibition_more.aspx?id=29418&p=home')
+          for bad in ('/exhibition_more.aspx?id=29419&p=home',
+                      '/exhibition_more.aspx?id=29418&id=29419',
+                      'https://other.example/exhibition_more.aspx?id=29418',
+                      '/exhibition_more.aspx?id=29418&ticket=123'):
+              assert not b_same_id(bad)
+          a,ap = fetch(A_URL)
+          b,bp = fetch(B_URL)
+          a_anchor = bool(ap and any(
+              urllib.parse.urljoin(A_URL,x['href'])==A_TICKET
+              and '購票' in x['text'] for x in ap.links))
+          b_row = bool(bp and any(
+              B_TITLE in row['text'] and any(b_same_id(x['href']) for x in row['links'])
+              for row in bp.rows))
+          b_link_any = bool(bp and any(b_same_id(x['href']) for x in bp.links))
+          checks = [
+              {'line':'A','field':'tmc_same_detail_local_purchase_anchor',
+               'source':A_URL,'role':'LOCAL_ANCHOR_TICKET_PRODUCT_NOT_SESSION',
+               'matched':a_anchor,'decision':'NATIVE_DOM_LOCAL_REVIEW_ONLY' if a_anchor else 'HOLD'},
+              {'line':'B','field':'twtc_same_title_row_exact_detail_id',
+               'source':B_URL,'role':'SAME_ROW_TITLE_AND_DETAIL_ID_NOT_TICKET_SESSION',
+               'matched':b_row,'same_id_href_elsewhere':b_link_any,
+               'decision':'NATIVE_DOM_LOCAL_REVIEW_ONLY' if b_row else 'HOLD'}]
+          report = {'kind':'P30_L7_ONE_SHOT_DOM_LOCAL_IDENTITY_DIAGNOSTIC',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'requests':2,'native_http_200':sum(x['http_status']==200 for x in (a,b)),
+              'sources':[a,b],'field_receipts':checks,'formal_accepted_fields':0,
+              'golden':0,'published':0,'release_state':'HARD_HOLD_NO_PUBLICATION',
+              'raw_html_saved':False,'next_gate':'INDEPENDENT_SAME_ID_FIELD_REVIEW'}
+          Path('evidence/native_dom_identity.json').write_text(
+              json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('NATIVE_DOM_IDENTITY',json.dumps({
+              'http200':report['native_http_200'],'A_local_anchor':a_anchor,
+              'B_same_id_any':b_link_any,'B_same_title_row':b_row,
+              'formal':0,'golden':0,'published':0}),flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -260,6 +393,7 @@ jobs:
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
