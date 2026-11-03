@@ -99,6 +99,157 @@ jobs:
           Path('evidence/source_acquisition.json').write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
           print('SOURCE_PROBE_SUMMARY', json.dumps({'requests': len(targets), 'native_http_200': report['native_http_200_count'], 'formal_accepted_fields': 0, 'golden': 0, 'published': 0}), flush=True)
           PY
+      - name: One-shot native LIST DETAIL field-role semantic receipt (not Golden)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[semantic-probe-once]'; then
+            echo 'SEMANTIC_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.parse, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+          
+          # Independent native source-field hypothesis. Public, bounded, read-only.
+          # No checkout, authentication, redirect, retry, cookies, or raw page persistence.
+          TMC_LIST = 'https://www.tmc.taipei/tw/blog/show'
+          TMC_DETAIL = 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'
+          KHAM = 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2'
+          TWTC_LIST = 'https://twtc.com.tw/exhibition?p=home'
+          TWTC_DETAIL = 'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home'
+          TARGETS = [('A','TMC_LIST',TMC_LIST),('A','TMC_DETAIL',TMC_DETAIL),
+                     ('A','KHAM_EVENT',KHAM),('B','TWTC_LIST',TWTC_LIST),
+                     ('B','TWTC_DETAIL',TWTC_DETAIL)]
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, fp, code, msg, headers, newurl):
+                  return None
+          class PublicHTML(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.texts = []
+                  self.links = []
+                  self.skip = 0
+              def handle_starttag(self, tag, attrs):
+                  if tag in ('script','style','noscript'):
+                      self.skip += 1
+                  if tag == 'a':
+                      self.links.extend(v for k,v in attrs if k == 'href' and v)
+              def handle_endtag(self, tag):
+                  if tag in ('script','style','noscript') and self.skip:
+                      self.skip -= 1
+              def handle_data(self, data):
+                  if not self.skip and data.strip():
+                      self.texts.append(data.strip())
+          def normalized(text):
+              return re.sub(r'\s+', ' ', text).strip()
+          def exact_link(page, target):
+              if not page:
+                  return False
+              return any(urllib.parse.urljoin(page['url'], h) == target for h in page['links'])
+          def match_label(page, pattern):
+              if not page:
+                  return False
+              return bool(re.search(pattern, page['text']))
+          def source(url, line, role):
+              out = {'line':line,'role':role,'url':url,'http_status':None,'bytes':0,
+                     'sha256':None,'decision':'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url, headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'
+                  }, method='GET')
+                  with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as resp:
+                      out['http_status'] = resp.status
+                      raw = resp.read(524289)
+                      out['bytes'] = len(raw)
+                      out['sha256'] = hashlib.sha256(raw).hexdigest()
+                      if resp.status != 200 or len(raw) > 524288:
+                          out['decision'] = 'HTTP_OR_BODY_SIZE_HOLD'
+                          return out, None
+                      charset = resp.headers.get_content_charset() or 'utf-8'
+                      if charset.lower() not in ('utf-8','big5','cp950'):
+                          out['decision'] = 'CHARSET_HOLD'
+                          return out, None
+                      try:
+                          decoded = raw.decode(charset, errors='strict')
+                      except (UnicodeError,LookupError):
+                          out['decision'] = 'DECODE_HOLD'
+                          return out, None
+                      parser = PublicHTML()
+                      parser.feed(decoded)
+                      out['decision'] = 'HTTP200_NATIVE_BODY_REVIEW_ONLY'
+                      return out, {'url':url,'text':normalized(' '.join(parser.texts)),
+                                   'links':parser.links}
+              except urllib.error.HTTPError as err:
+                  out['http_status'] = err.code
+                  out['decision'] = 'REDIRECT_BLOCKED' if 300 <= err.code < 400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as err:
+                  out['error_type'] = type(err.reason).__name__
+                  out['decision'] = 'DNS_OR_EGRESS_HOLD' if isinstance(err.reason,socket.gaierror) else 'NETWORK_HOLD'
+              except (OSError,TimeoutError,ssl.SSLError) as err:
+                  out['error_type'] = type(err).__name__
+                  out['decision'] = 'NETWORK_HOLD'
+              return out, None
+          
+          pages = {}
+          records = []
+          for line,role,url in TARGETS:
+              rec,page = source(url,line,role)
+              records.append(rec)
+              pages[role] = page
+              print('NATIVE_SEMANTIC_SOURCE',line,role,rec['http_status'],rec['decision'],flush=True)
+          
+          # Each field requires its own exact source/role. A literal marker is insufficient.
+          checks = [
+              ('A','tmc_list_exact_detail_href','EXACT_SAME_VENUE_DETAIL_HREF',
+               TMC_LIST,exact_link(pages['TMC_LIST'],TMC_DETAIL)),
+              ('A','tmc_detail_direct_kham_href','EXACT_TICKET_PRODUCT_HREF_NOT_SESSION',
+               TMC_DETAIL,exact_link(pages['TMC_DETAIL'],KHAM)),
+              ('A','tmc_venue_showtime','VENUE_SHOWTIME_NOT_SALE',
+               TMC_DETAIL,match_label(pages['TMC_DETAIL'],r'2026[./]11[./]07\s*19:30')),
+              ('A','tmc_venue_hall','VENUE_HALL_NOT_TICKET_SESSION',
+               TMC_DETAIL,match_label(pages['TMC_DETAIL'],r'活動地點\s*臺北流行音樂中心\s*表演廳')),
+              ('A','kham_sale_time','SALE_TIME_NOT_SHOWTIME',
+               KHAM,match_label(pages['KHAM_EVENT'],r'開賣時間\s*[：:]\s*2026年\s*08月\s*22日.{0,25}12點')),
+              ('B','twtc_list_same_id_href','EXACT_EXHIBITION_DETAIL_ID_HREF',
+               TWTC_LIST,exact_link(pages['TWTC_LIST'],TWTC_DETAIL)),
+              ('B','twtc_detail_title','EXHIBITION_TITLE_NOT_OTHER_EVENT',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'2026年電器空調影音大展')),
+              ('B','twtc_exhibition_dates','EXHIBITION_DATES_NOT_TICKET_SESSION',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'展出日期\s*[：:]\s*2026/11/06\s*[~～\-]\s*2026/11/09')),
+              ('B','twtc_daily_open_hours','EXHIBITION_OPEN_HOURS_NOT_SHOWTIME',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'展出時間\s*[：:]\s*10:00\s*[~～\-]\s*18:00')),
+              ('B','twtc_venue_hall','EXHIBITION_HALL_NOT_TICKET_VENUE_ID',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'展覽館別\s*[：:]\s*世貿一館')),
+          ]
+          field_receipts = [
+              {'line':line,'field':name,'role':role,'source':url,'native_label_or_href_match':bool(hit),
+               'decision':'NATIVE_SOURCE_ROLE_REVIEW_ONLY' if hit else 'NATIVE_LABEL_OR_LINK_HOLD',
+               'formal_accepted':False}
+              for line,name,role,url,hit in checks
+          ]
+          report = {
+              'kind':'P30_L7_ONE_SHOT_NATIVE_SEMANTIC_FIELD_DIAGNOSTIC',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'request_count':len(records),'native_http_200_count':sum(r['http_status']==200 for r in records),
+              'field_context_review_count':sum(x['native_label_or_href_match'] for x in field_receipts),
+              'field_context_hold_count':sum(not x['native_label_or_href_match'] for x in field_receipts),
+              'sources':records,'field_receipts':field_receipts,
+              'formal_accepted_fields':0,'golden':0,'published':0,
+              'no_raw_html_saved':True,'release_state':'HARD_HOLD_NO_PUBLICATION',
+              'next_gate':'INDEPENDENT_SOURCE_IDENTITY_AND_FIELD_GOLDEN_REVIEW'
+          }
+          Path('evidence').mkdir(exist_ok=True)
+          Path('evidence/native_semantic_fields.json').write_text(
+              json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('NATIVE_SEMANTIC_SUMMARY',json.dumps({
+              'requests':report['request_count'],'http200':report['native_http_200_count'],
+              'review':report['field_context_review_count'],'hold':report['field_context_hold_count'],
+              'formal':0,'golden':0,'published':0}),flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -108,6 +259,7 @@ jobs:
           printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" f2859b7c72d6e280b850cb253730989f22b01d46 > evidence/readiness.txt
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
