@@ -844,5 +844,142 @@
     "golden_accepted_events": 0,
     "published_events": 0,
     "release_state": "HARD_HOLD_NO_PUBLICATION"
+  },
+  "independent_public_field_crosscheck": {
+    "kind": "P30_L7_INDEPENDENT_PUBLIC_FIELD_CROSSCHECK_V1",
+    "method": "INDEPENDENT_PUBLIC_OFFICIAL_WEB_READER_NOT_NATIVE_GET",
+    "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+    "prior_native_run_id": 41587253858,
+    "prior_native_artifact_id": 13209075143,
+    "prior_native_matrix_sha256": "ae060f8cb7e00cb7a3376599b577dd4ebfea71c7b3930b5dd890270e0724e76a",
+    "source_authority": {
+      "A": "04_KHAM_TMC_VENUE",
+      "B": "16_TWTC_EXISTING_CANONICAL"
+    },
+    "conflict_guards": {
+      "A_ticket_sale_not_show": true,
+      "A_product_id_not_checkout_session": true,
+      "B_exhibition_date_not_ticket_sale": true,
+      "B_open_hours_not_performance_showtime": true,
+      "B_exhibition_id_not_ticket_event_id": true,
+      "B_admission_and_child_policy_unverified": true,
+      "no_cross_event_merge": true
+    },
+    "field_receipts": [
+      {
+        "line": "A",
+        "event_id": "P1DF32E2",
+        "field": "direct_ticket_product",
+        "role": "LOCAL_PURCHASE_ANCHOR_NOT_SESSION",
+        "source_url": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "prior_native_body_sha256": "590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": {
+          "product_id": "P1DF32E2",
+          "official_ticket_url": "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"
+        },
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "event_id": "P1DF32E2",
+        "field": "venue_showtime",
+        "role": "VENUE_SHOW_NOT_SALE",
+        "source_url": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "prior_native_body_sha256": "590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": "2026/11/07 19:30",
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      },
+      {
+        "line": "A",
+        "event_id": "P1DF32E2",
+        "field": "venue_hall",
+        "role": "VENUE_HALL",
+        "source_url": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "prior_native_body_sha256": "590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": "臺北流行音樂中心 表演廳",
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "event_id": "29418",
+        "field": "list_detail_identity",
+        "role": "SAME_ROW_SAME_ID",
+        "source_url": "https://twtc.com.tw/exhibition?p=home",
+        "prior_native_body_sha256": "385aee1ce2d85ab432e32add10c8fc5ffb27ce2d72a71f0d73375df079906149",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": {
+          "exhibition_id": "29418",
+          "same_row_title": "2026年電器空調影音大展"
+        },
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "event_id": "29418",
+        "field": "exhibition_title",
+        "role": "EXACT_EVENT_TITLE",
+        "source_url": "https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home",
+        "prior_native_body_sha256": "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": "2026年電器空調影音大展",
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "event_id": "29418",
+        "field": "exhibition_dates",
+        "role": "EXHIBITION_DATE_NOT_SALE",
+        "source_url": "https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home",
+        "prior_native_body_sha256": "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": {
+          "start": "2026/11/06",
+          "end": "2026/11/09"
+        },
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "event_id": "29418",
+        "field": "open_hours",
+        "role": "DAILY_OPEN_HOURS_NOT_SHOWTIME",
+        "source_url": "https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home",
+        "prior_native_body_sha256": "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": {
+          "open": "10:00",
+          "close": "18:00"
+        },
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      },
+      {
+        "line": "B",
+        "event_id": "29418",
+        "field": "venue_hall",
+        "role": "EXHIBITION_HALL_NOT_TICKET_ID",
+        "source_url": "https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home",
+        "prior_native_body_sha256": "887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116",
+        "reader_observed_at_utc": "2026-11-03T07:00:33.408Z",
+        "observed_value": "臺北流行音樂中心 表演廳",
+        "independent_decision": "SOURCE_VALUE_CROSSCHECK_REVIEW_ONLY",
+        "formal_accepted": false
+      }
+    ],
+    "this_gate_native_get": 0,
+    "formal_accepted_fields": 0,
+    "golden_accepted_events": 0,
+    "published_events": 0,
+    "formal_pwa_feed_events": 0,
+    "release_state": "HARD_HOLD_NO_PUBLICATION"
   }
 }
