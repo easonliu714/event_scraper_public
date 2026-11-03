@@ -5932,3 +5932,49 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, Draft #236 exact 9093c69bf54bbc1c69dda825
 \`\`\`
 
 **Independent readback:** [CI #41580805735](https://github.com/easonliu714/event_scraper_public/actions/runs/41580805735), [Artifact #13206051096](https://github.com/easonliu714/event_scraper_public/actions/runs/41580805735/artifacts/13206051096). Artifact ZIP independently downloaded, SHA256 matches GitHub digest and CRC PASS; matrix SHA256 \`060b9921fd5512b1b0dff59c704d7a0143d74a631b63d2638fea854709ba21e1\`. A native detail SHA256 \`e1c97aaa44a92d9f3ae4501587eab5ed3b752e9380177629260cc541965dfc45\`; B LIST \`4535a783b1e9345913851fea43587403d9d054d480a3a023a56d34a9ae6b5bc5\`, DETAIL \`2048d57d0167262ab78fb1f96f14d8ff3ee47d399c81ceb732f2311ca5bdadcf\`. Same-session field receipts 0→8, native GET this round 2→3, distinct endpoints 5→5, **formal accepted 0→0**. This is independent source-role evidence, not automatic field acceptance. Source main f2859b7c72d6e280b850cb253730989f22b01d46, formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 unchanged. Runtime status readback UNVERIFIED. Owner action NONE for engineering; eventual status/Golden release needs separate approval.
+
+
+---
+
+### P30-L7-NATIVE-FIELD-VALUE-RECEIPTS-20261103T1355 — source-bound A/B architecture (isolated)
+
+\`\`\`text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, Engineering Draft #236 exact a5504a52093d074f958f2b11baa6d20469dbfc88]
+├── Source acquisition [NATIVE HTTP200 3/3; 3 existing endpoints, same CI session]
+│   ├── HTTPS official allowlist; one GET/URL; 8s/512KiB; no redirect/retry/cookie/login/raw HTML
+│   ├── A TMC DETAIL /tw/blog/show/2026SungNien-Yu
+│   ├── B TWTC LIST /exhibition?p=home
+│   └── B TWTC DETAIL /exhibition_more.aspx?id=29418&p=home
+├── Evidence-contract repair [boolean-only 8/8 → literal value-bound 8/8]
+│   ├── Every receipt: line, event_id, role, source_url, observed_at_utc, body_sha256
+│   ├── observed_value only if exact source-local pattern or anchor matched in same native GET
+│   ├── value_basis=EXACT_SOURCE_LOCAL_PATTERN_OR_ANCHOR
+│   ├── independent_conflict_adjudication=PENDING [8/8; not formal]
+│   └── All formal_accepted=false; no raw HTML persisted
+├── A canonical KHAM #04 + TMC venue [3 VALUE_BOUND_REVIEW]
+│   ├── exact TMC 購票 anchor → KHAM PRODUCT_ID=P1DF32E2 [NOT Session]
+│   ├── SHOW=2026/11/07 19:30 [NOT KHAM SALE]
+│   └── HALL=臺北流行音樂中心 表演廳 [NOT price/inventory]
+├── B canonical TWTC #16, id=29418 [5 VALUE_BOUND_REVIEW]
+│   ├── same-title LIST row → unique same-host DETAIL id=29418
+│   ├── TITLE=2026年電器空調影音大展
+│   ├── EXHIBITION_DATE=2026/11/06–11/09 [NOT ticket sale]
+│   ├── DAILY_OPEN_HOURS=10:00–18:00 [NOT showtime]
+│   └── HALL=世貿一館 [NOT ticket Event ID]
+├── Exact-head CI #41587253858 [SUCCESS job, 25/25 tests, immutable main guards]
+├── Artifact #13209075143 [ZIP SHA256 fa3dd6e8909e3077b2f4b8feeb4dd13aabef932e08b19fbf77c3fdea4a4500a9, CRC PASS]
+│   └── native_same_session_field_matrix.json SHA256 ae060f8cb7e00cb7a3376599b577dd4ebfea71c7b3930b5dd890270e0724e76a
+├── 12:55→13:55: source-role 8→8; value-bound 0→8; native GET 3→3; distinct endpoints 5→5
+├── Independent field conflict/negative adjudication [NEXT; no repeat GET without new hypothesis]
+├── Formal accepted FIELD 0 / Golden 0 / Published 0 / PWA formal feed 0 [LOCKED]
+├── Status-only safe remediation [HOLD_NO_MERGE]
+│   ├── main status 19 rows; reportDate 2026-10-28; snapshot 2026-11-01 07:55
+│   ├── legacy #53 HEAD 4381c01d3132634a8ec6535abddedcfeaaffcb40, 2 ahead/30 behind
+│   ├── ibon #12 historical baseline differs; NEVER merge stale #53
+│   └── future current-main status-only exact-head path, preserve 19 rows/data/ibon, Owner release authority
+├── L8 formal Android 5/5 USER_ATTESTED_PASS [CLOSED; do not re-run]
+├── CKSMH5 / TWTC39 historic Android [PASS retained]
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+\`\`\`
+
+**Evidence readback:** [exact-head CI #41587253858](https://github.com/easonliu714/event_scraper_public/actions/runs/41587253858), [Artifact #13209075143](https://github.com/easonliu714/event_scraper_public/actions/runs/41587253858/artifacts/13209075143). Native body hashes A TMC \`590adff847afe491d89b26b6e7820e2f6b8a8ed9631320e0f2f5161dd101d210\`; B TWTC LIST \`385aee1ce2d85ab432e32add10c8fc5ffb27ce2d72a71f0d73375df079906149\`; B DETAIL \`887761a28e4afb991d5b81e3f6e5cc2e5af57adbc751b0e9274d227f8ee00116\`. New run body hashes differ from 12:55, exact 8 role values stable. The previous artifact had only match booleans; this run adds independently inspectable values without elevating acceptance. Independent ZIP SHA/CRC and SHA256SUMS verified. Formal data blob \`7fc4fe32567a57fd504483eeb9a8b9e10b568ea4\` and source main \`f2859b7c72d6e280b850cb253730989f22b01d46\` unchanged. Production status runtime UNVERIFIED. Owner action NONE for isolated engineering; separate authorization for status/Golden/publication.
