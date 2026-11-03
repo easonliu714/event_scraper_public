@@ -873,8 +873,8 @@ class SafeListDetailCandidatePipeline(unittest.TestCase):
     TMC_DETAIL = FixedOfficialHTMLAdapter.TMC_HTML
     TWTC_DETAIL = FixedOfficialHTMLAdapter.TWTC_HTML
     TMC_LIST = (
-        '<article><a href="/tw/blog/show/2026SungNien-Yu">'
-        + TMC_TITLE + '</a></article>'
+        '<a href="/tw/blog/show/2026SungNien-Yu">演唱會 '
+        + TMC_TITLE + ' 2026.11.07 (六) 表演廳</a>'
     )
     TWTC_LIST = (
         '<table><tr><td>' + TWTC_TITLE + '</td>'
