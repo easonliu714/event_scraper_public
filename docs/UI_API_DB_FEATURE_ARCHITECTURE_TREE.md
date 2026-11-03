@@ -5890,3 +5890,45 @@ The previous B exact href **string** equality false was resolved by strict canon
 **Status-only architecture HOLD:** main status blob cdeeb3b551e38f862c37759426a14b5129e1224d has 19 platforms, reportDate 2026-10-28, engineering snapshot 2026-11-01 07:55; formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 unchanged. Legacy [status Draft #53](https://github.com/easonliu714/event_scraper_public/pull/53) HEAD 4381c01d3132634a8ec6535abddedcfeaaffcb40 diverged 2 ahead/30 behind main and modifies ibon #12 baseline. HOLD_NO_MERGE; future status-only reconciliation must preserve exact 19 platform objects, ibon/Android historical values, reportDate and formal data, update verified latestEngineering only, use exact-head CI/artifact/readback, and require separate Owner merge/deploy authorization. No competing status writer.
 
 **Formal UI:** Owner L8 formal PWA Android USER_ATTESTED_PASS 5/5 CLOSED, CKSMH5/TWTC39 preserved; live Pages status readback UNVERIFIED; HARD_HOLD_NO_PUBLICATION LOCKED. Owner action NONE for isolated engineering.
+
+
+---
+
+### P30-L7-SAME-SESSION-FIELD-MATRIX-20261103T1255 — canonical source/field architecture (isolated)
+
+\`\`\`text
+P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, Draft #236 exact 9093c69bf54bbc1c69dda82591edcdcf57080abf]
+├── Official source acquisition [NATIVE 3/3 HTTP200, one-shot, existing 3 URLs]
+│   ├── No redirect/retry/login/cookie, 8s, 512KiB, no raw HTML saved
+│   ├── A TMC DETAIL /tw/blog/show/2026SungNien-Yu [HTTP200]
+│   ├── B TWTC LIST /exhibition?p=home [HTTP200]
+│   └── B TWTC DETAIL /exhibition_more.aspx?id=29418&p=home [HTTP200]
+├── A #04 KHAM + TMC [3/3 SOURCE-LOCAL REVIEW-READY, not formal]
+│   ├── TMC DETAIL local 購票 anchor → KHAM PRODUCT_ID=P1DF32E2 [REVIEW]
+│   ├── SHOW 2026-11-07 19:30 [REVIEW, not KHAM SALE]
+│   ├── HALL 臺北流行音樂中心 表演廳 [REVIEW]
+│   └── KHAM SALE 2026-08-22 12:00 [separate provenance]; Session/stock/price/img [HOLD]
+├── B #16 TWTC [5/5 SAME-SESSION REVIEW-READY, not formal]
+│   ├── LIST same-title row → unique same-host DETAIL id=29418 [REVIEW]
+│   ├── TITLE 2026年電器空調影音大展 [REVIEW]
+│   ├── EXHIBITION_DATE 2026/11/06–11/09 [REVIEW]
+│   ├── DAILY_OPEN_HOURS 10:00–18:00 [REVIEW, not ticket Session]
+│   ├── HALL 世貿一館 [REVIEW]
+│   └── Wrong/duplicate ID, foreign host, extra ticket query [NEGATIVE 4/4 PASS]
+├── Exact-head CI #41580805735 [SUCCESS, 25/25, immutable 19-platform guards]
+├── Artifact #13206051096 [SHA256 5ee7b61239942eef5c58caaa0e5af30e75c6a725dc0d3caace1118356fec4f2f; ZIP CRC PASS]
+│   └── native_same_session_field_matrix.json: 8 field receipts, 3 source SHA/UTC timestamps, formal_accepted=false
+├── First usable-field Golden-review contract [NEXT, independent conflict adjudication]
+│   ├── source_url + exact event_id + observed_at + body_sha256 + role + negative cases
+│   ├── ACCEPTABLE_FOR_INDEPENDENT_GOLDEN_REVIEW_ONLY ≠ FORMAL_FIELD_PASS
+│   └── Formal accepted FIELD=0 / Golden=0 / published=0 / PWA feed=0 [LOCKED]
+├── Status remediation [HOLD_NO_MERGE]
+│   ├── main status 19 platforms, reportDate 2026-10-28, snapshot 2026-11-01 07:55
+│   ├── legacy Draft #53 2 ahead/30 behind, ibon #12 baseline mutated [UNSAFE]
+│   └── preserve all main platform objects, reportDate and data blob; update latestEngineering only in safe status-only exact-head route, Owner authorization required
+├── L8 formal Android 5/5 USER_ATTESTED_PASS [CLOSED, do not repeat]
+├── CKSMH5/TWTC39 historical Android [PASS preserved]
+└── HARD_HOLD_NO_PUBLICATION [LOCKED]
+\`\`\`
+
+**Independent readback:** [CI #41580805735](https://github.com/easonliu714/event_scraper_public/actions/runs/41580805735), [Artifact #13206051096](https://github.com/easonliu714/event_scraper_public/actions/runs/41580805735/artifacts/13206051096). Artifact ZIP independently downloaded, SHA256 matches GitHub digest and CRC PASS; matrix SHA256 \`060b9921fd5512b1b0dff59c704d7a0143d74a631b63d2638fea854709ba21e1\`. A native detail SHA256 \`e1c97aaa44a92d9f3ae4501587eab5ed3b752e9380177629260cc541965dfc45\`; B LIST \`4535a783b1e9345913851fea43587403d9d054d480a3a023a56d34a9ae6b5bc5\`, DETAIL \`2048d57d0167262ab78fb1f96f14d8ff3ee47d399c81ceb732f2311ca5bdadcf\`. Same-session field receipts 0→8, native GET this round 2→3, distinct endpoints 5→5, **formal accepted 0→0**. This is independent source-role evidence, not automatic field acceptance. Source main f2859b7c72d6e280b850cb253730989f22b01d46, formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 unchanged. Runtime status readback UNVERIFIED. Owner action NONE for engineering; eventual status/Golden release needs separate approval.
