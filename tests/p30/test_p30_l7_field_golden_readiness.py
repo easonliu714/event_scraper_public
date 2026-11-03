@@ -775,4 +775,93 @@ class FirstUsableNonSessionSubset(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.validate_independent_field_subset_proposal(source,p)
 
+
+class FixedOfficialHTMLAdapter(unittest.TestCase):
+    """Executable source-local parser; fixture input never counts as a live GET."""
+    NOW = "2026-11-04T00:00:00+08:00"
+    TMC_TITLE = "小宇 宋念宇 《不，完美的人》 演唱會"
+    TWTC_TITLE = "2026年電器空調影音大展"
+    TMC_HTML = (
+        '<html><h2>小宇 宋念宇 《不，完美的人》 演唱會</h2>'
+        '<div>2026.11.07 19:30 (六)</div>'
+        '<h3>活動地點</h3><p>臺北流行音樂中心 表演廳</p>'
+        '<h3>主辦單位</h3><p>寬宏藝術</p>'
+        '<a href="https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2">購票連結</a>'
+        '<p>演唱會 2026.08.11 發佈日</p></html>'
+    )
+    TWTC_HTML = (
+        '<html><h2>2026年電器空調影音大展</h2>'
+        '<p>展覽館別：世貿一館</p><p>主辦單位：台北市電器商業同業公會</p>'
+        '<p>展出日期：2026/11/06 ~ 2026/11/09</p>'
+        '<p>展出時間：10:00 ~ 18:00</p>'
+        '<p>入場方式及是否開放兒童入場，請逕洽主辦單位。</p></html>'
+    )
+
+    def parse_a(self, html=None, **kwargs):
+        return m.parse_official_non_session_html(
+            kwargs.pop("url", m.PUBLIC_TMC_DETAIL),
+            self.TMC_HTML if html is None else html,
+            kwargs.pop("title", self.TMC_TITLE),
+            kwargs.pop("identity", "P1DF32E2"),
+            kwargs.pop("observed", self.NOW),
+            kwargs.pop("now", __import__("datetime").datetime.fromisoformat(self.NOW)))
+
+    def parse_b(self, html=None, **kwargs):
+        return m.parse_official_non_session_html(
+            kwargs.pop("url", m.PUBLIC_TWTC_DETAIL),
+            self.TWTC_HTML if html is None else html,
+            kwargs.pop("title", self.TWTC_TITLE),
+            kwargs.pop("identity", "29418"),
+            kwargs.pop("observed", self.NOW),
+            kwargs.pop("now", __import__("datetime").datetime.fromisoformat(self.NOW)))
+
+    def test_tmc_fixed_detail_parser_has_two_non_session_fields_and_direct_product_edge(self):
+        r = self.parse_a()
+        self.assertEqual(r["line"], "A")
+        self.assertEqual(r["identity"]["product_id"], "P1DF32E2")
+        self.assertEqual([(x["field"], x["value"]) for x in r["candidate_fields"]],
+                         [("venue_showtime", "2026/11/07 19:30"),
+                          ("venue_hall", "臺北流行音樂中心 表演廳")])
+        self.assertEqual((r["native_get_verified"], r["formal_accepted_fields"],
+                          r["golden_accepted_events"], r["published_events"]),
+                         (False, 0, 0, 0))
+        self.assertTrue(all(not x["formal_accepted"] for x in r["candidate_fields"]))
+
+    def test_twtc_fixed_detail_parser_has_three_distinct_field_roles(self):
+        r = self.parse_b()
+        self.assertEqual(r["identity"]["exhibition_id"], "29418")
+        self.assertEqual([(x["field"], x["value"]) for x in r["candidate_fields"]],
+                         [("exhibition_dates", {"start": "2026/11/06", "end": "2026/11/09"}),
+                          ("open_hours", {"open": "10:00", "close": "18:00"}),
+                          ("venue_hall", "世貿一館")])
+        self.assertTrue(all(x["decision"] == "SOURCE_LOCAL_PARSE_REVIEW_ONLY"
+                            for x in r["candidate_fields"]))
+
+    def test_fail_closed_cross_event_role_ambiguity_staleness_and_wrong_authority(self):
+        from datetime import datetime
+        cases = (
+            lambda: self.parse_a(title="另一場演唱會"),
+            lambda: self.parse_a(identity="POTHER123"),
+            lambda: self.parse_a(url="https://evil.example/tw/blog/show/2026SungNien-Yu"),
+            lambda: self.parse_a(html=self.TMC_HTML.replace(
+                "2026.11.07 19:30", "2026.11.07 19:30 / 2026.11.08 19:30")),
+            lambda: self.parse_a(html=self.TMC_HTML.replace(
+                "活動地點", "開賣地點")),
+            lambda: self.parse_a(html=self.TMC_HTML.replace(
+                "PRODUCT_ID=P1DF32E2", "PRODUCT_ID=PDIFFERENT")),
+            lambda: self.parse_b(identity="29419"),
+            lambda: self.parse_b(title="2026台北國際旅展"),
+            lambda: self.parse_b(html=self.TWTC_HTML.replace(
+                "展出日期", "開賣日期")),
+            lambda: self.parse_b(html=self.TWTC_HTML.replace(
+                "10:00 ~ 18:00", "18:00 ~ 10:00")),
+            lambda: self.parse_b(url="https://twtc.com.tw/exhibition_more.aspx?id=29418&p=menu1"),
+            lambda: self.parse_b(observed="2026-10-31T00:00:00+08:00"),
+        )
+        for i, call in enumerate(cases):
+            with self.subTest(case=i):
+                with self.assertRaises(ValueError):
+                    call()
+
+
 if __name__=="__main__":unittest.main()
