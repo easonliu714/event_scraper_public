@@ -6068,3 +6068,14 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE, existing Draft #236 HEAD ba3f3f92408fada6
 \`\`\`
 
 **Independent evidence:** [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact \`ba3f3f92408fada6b65bd36a1ab697976fe31f78\`, [CI #41599549626](https://github.com/easonliu714/event_scraper_public/actions/runs/41599549626), [Artifact #13214295320](https://github.com/easonliu714/event_scraper_public/actions/runs/41599549626/artifacts/13214295320). Independent downloaded ZIP SHA equals GitHub artifact digest; ZIP CRC PASS, 3 members, no raw official HTML. Main \`f2859b7c72d6e280b850cb253730989f22b01d46\`, data blob \`7fc4fe32567a57fd504483eeb9a8b9e10b568ea4\` and status blob \`cdeeb3b551e38f862c37759426a14b5129e1224d\` unchanged. The 5 fields are isolated formal-review candidates, **not** formally accepted fields. Formal runtime status UNVERIFIED; Owner action NONE for isolated engineering.
+
+
+---
+
+### P30-L7-FIRST-FIVE-FIELDS-INDEPENDENT-READER-REFRESH — 2026-11-03 16:54 (architecture)
+
+- Independent public official reader: A TMC DETAIL 2026SungNien-Yu → SHOW 2026-11-07 19:30, HALL 臺北流行音樂中心 表演廳 → exact local purchase link KHAM PRODUCT_ID=P1DF32E2; KHAM SALE 2026-08-22 12:00 distinct from SHOW. A 2/2 source-literal consistency REVIEW_ONLY, not ticket Session/stock/price.
+- B existing canonical TWTC #16: official LIST same-title row → exact DETAIL id=29418 → EXHIBITION_DATE 2026-11-06–11-09, DAILY_OPEN_HOURS 10:00–18:00, HALL 世貿一館. B 3/3 source-literal consistency REVIEW_ONLY. Adjacent exhibitions distinct, opening hours not performance start, venue ID not ticket Session; admission/price/image HOLD.
+- Official evidence URLs: https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu ; https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2 ; https://twtc.com.tw/exhibition?p=home ; https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home . No raw HTML retained. Reader observation is not a native CI GET or new source-body SHA.
+- Previous Draft #236 exact-head CI #41599549626 SUCCESS 29/29, artifact #13214295320 five-field isolated review proposal. This observation: reader literal consistency 5/5; candidate subset 5→5; formal adjudication 0, accepted FIELD 0, Golden 0, publication 0, PWA feed 0, new native GET 0. NEXT independent authority/freshness review of five fields; never auto-promote.
+- Status-only legacy #53 diverged 2 ahead/30 behind and alters ibon baseline: HOLD_NO_MERGE. Preserve main formal data/status/19 platforms; L8 formal Android 5/5, CKSMH5/TWTC39 PASS; HARD_HOLD_NO_PUBLICATION. Owner action NONE for isolated review; release requires separate authorization.
