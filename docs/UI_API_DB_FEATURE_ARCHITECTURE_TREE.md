@@ -5870,3 +5870,23 @@ P30-L7-FIELD-GOLDEN-READINESS [ACTIVE; Draft #236, HEAD fd72472ecbc01e066a5e066e
 ```
 
 **Evidence/provenance:** A [TMC LIST](https://www.tmc.taipei/tw/blog/show) → [DETAIL](https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu) → [KHAM exact PRODUCT](https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2); B [TWTC LIST](https://twtc.com.tw/exhibition?p=home) and [DETAIL id=29418](https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home). Source timestamp, body SHA256, exact role/decision and formal_accepted=false in [CI Artifact](https://github.com/easonliu714/event_scraper_public/actions/runs/41568913197/artifacts/13199514576). B exact same-ID LIST anchor remains unresolved despite independently verified DETAIL labels; do not promote without identity proof. `docs/data.json`, Golden, production status/main and Publisher unchanged; runtime status readback UNVERIFIED. Next Gate diagnose B canonical link mismatch without another marker-only GET, or rotate if blocked. 
+
+
+---
+
+### P30-L7-NATIVE-DOM-IDENTITY-20261103T1155 — source-local A/B architecture (NO PUBLISH)
+
+P30-L7-FIELD-GOLDEN-READINESS remains ACTIVE in isolated [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236), exact HEAD aa9832059b56a767c21c7d608a58ff20e8ced137. Source main remains f2859b7c72d6e280b850cb253730989f22b01d46. One-shot official native acquisition uses one read-only HTTPS GET per allowlisted A TMC DETAIL and B TWTC LIST, no redirects/retries/auth/cookies, 8s timeout, 512 KiB limit, no raw HTML retained. Previous GET probes skipped by commit marker.
+
+| Lane / canonical source | HTTP | LIST→DETAIL identity | Source-local role evidence | Formal FIELD / Golden / PWA publication |
+| --- | --- | --- | --- | --- |
+| A #04 KHAM + TMC venue | Native TMC DETAIL HTTP200, 1 GET | Prior TMC LIST→DETAIL exact URL REVIEW | TMC DETAIL anchor text 購票 directly owns KHAM PRODUCT_ID=P1DF32E2 href: NATIVE_DOM_LOCAL_REVIEW_ONLY; TMC SHOW/HALL and KHAM SALE distinct; ticket Session/stock/eligible price HOLD | 0 / 0 / 0 |
+| B #16 TWTC | Native TWTC LIST HTTP200, 1 GET | Same table row contains exact title 2026年電器空調影音大展 and official unique id=29418 detail link: NATIVE_DOM_LOCAL_REVIEW_ONLY | Prior native DETAIL date 2026-11-06..09, open hours 10:00..18:00, hall 世貿一館 REVIEW; independent same-session field role/conflict acceptance HOLD | 0 / 0 / 0 |
+
+The previous B exact href **string** equality false was resolved by strict canonical same-host/path/unique-ID/query and same-title-row ownership, not by loosening identity matching. Explicit negative tests reject wrong/duplicate IDs, foreign hosts and unexpected ticket query. A local anchor ownership and B same-row identity both true in independently read-back [CI #41575041234](https://github.com/easonliu714/event_scraper_public/actions/runs/41575041234) SUCCESS (25/25 tests, immutable 19-platform/data/status/index/scraper guards PASS). [Artifact #13203615838](https://github.com/easonliu714/event_scraper_public/actions/runs/41575041234/artifacts/13203615838) GitHub SHA256 digest fe16b85279b26c80198ea7a7b930e4891b35b7c37d6656e380a48e2aa4867ad2; independent ZIP CRC UNVERIFIED. Native source-local checks prior→current 0→2; distinct endpoints 5→5, this-round native HTTP200 2/2, formal FIELD 0→0, Golden 0→0, PWA publication 0→0.
+
+**Next independent Golden-readiness contract:** 1–3 event exact-ID field matrix with field role, official source URL, observed_at, native body hash, same-session LIST/DETAIL linkage, positive/negative contradictions and explicit ACCEPTABLE/HOLD; prioritize TWTC exhibition date/open hours/hall without ticket Session and TMC venue SHOW/HALL separately from KHAM SALE. No formal promotion until independent evidence and Owner release authority; do not repeat marker-only GET.
+
+**Status-only architecture HOLD:** main status blob cdeeb3b551e38f862c37759426a14b5129e1224d has 19 platforms, reportDate 2026-10-28, engineering snapshot 2026-11-01 07:55; formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 unchanged. Legacy [status Draft #53](https://github.com/easonliu714/event_scraper_public/pull/53) HEAD 4381c01d3132634a8ec6535abddedcfeaaffcb40 diverged 2 ahead/30 behind main and modifies ibon #12 baseline. HOLD_NO_MERGE; future status-only reconciliation must preserve exact 19 platform objects, ibon/Android historical values, reportDate and formal data, update verified latestEngineering only, use exact-head CI/artifact/readback, and require separate Owner merge/deploy authorization. No competing status writer.
+
+**Formal UI:** Owner L8 formal PWA Android USER_ATTESTED_PASS 5/5 CLOSED, CKSMH5/TWTC39 preserved; live Pages status readback UNVERIFIED; HARD_HOLD_NO_PUBLICATION LOCKED. Owner action NONE for isolated engineering.
