@@ -2427,3 +2427,90 @@ class TestSongshanCanonicalUUIDRotation(unittest.TestCase):
             m.run_songshan_uuid_review_lkg(self.dest, ROOT)
         with self.assertRaisesRegex(ValueError, "FETCHER_NOT_CALLABLE"):
             m.run_songshan_uuid_review_lkg(self.dest, ROOT, fetcher=123)
+
+
+class TestFixedTmcCksmhCanonicalFieldGate(unittest.TestCase):
+    """A and B field authority contract, no native GET or formal promotion."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dest = pathlib.Path(self.tmp.name) / "review_lkg_snapshot.json"
+        self.now = datetime.now(timezone.utc)
+        pages = {
+            m.CKSMH_PUBLIC_LIST: (
+                '<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=61023">'
+                + m.CKSMH_ROTATION_TITLE + '</a>'),
+            m.CKSMH_PUBLIC_DETAIL: (
+                '<h1>' + m.CKSMH_ROTATION_TITLE + '</h1>'
+                '<p>兩個不同活動場次與集合地點，不能推成單一 SESSION</p>'),
+        }
+        def fake(url):
+            return (200, "text/html; charset=utf-8",
+                    pages[url].encode("utf-8"), url)
+        result = m.run_cksmh_actid_review_lkg(
+            self.dest, ROOT, fetcher=fake, now_utc=self.now)
+        self.assertEqual(result["decision"], "REVIEW_ONLY")
+        self.snapshot = m.load_isolated_review_lkg(self.dest, ROOT)
+        self.original_bytes = self.dest.read_bytes()
+
+    def test_existing_actid_contract_is_not_native_or_formal(self):
+        result = m.assess_cksmh_non_session_field_authority(
+            self.snapshot, self.now)
+        self.assertEqual(result["platform_id"], "17")
+        self.assertEqual(result["source_event_id"], "61023")
+        self.assertEqual(result["decision"], "HOLD_NATIVE_FRESHNESS_OR_AUTHORITY")
+        self.assertEqual(result["first_failure"],
+                         "CKSMH_NATIVE_OR_FRESHNESS_NOT_VERIFIED")
+        self.assertEqual([f["field"] for f in result["field_matrix"]],
+                         ["title", "event_date_sessions", "venue_halls"])
+        self.assertFalse(result["field_matrix"][0]["native_body_receipt"])
+        self.assertIsNone(result["field_matrix"][1]["value"])
+        self.assertIsNone(result["field_matrix"][2]["value"])
+        self.assertEqual((result["new_native_get"], result["formal_accepted_fields"],
+                          result["golden_accepted_events"], result["published_events"]),
+                         (0, 0, 0, 0))
+        self.assertEqual(self.dest.read_bytes(), self.original_bytes)
+
+    def test_fixed_a_b_pipeline_does_not_merge_identity_or_publish(self):
+        result = m.assess_tmc_cksmh_fixed_nonpublishing_field_gate(
+            None, self.snapshot, self.now)
+        self.assertEqual(result["A"]["decision"], "HOLD_NO_SEALED_NATIVE_AUTHORITY")
+        self.assertEqual(result["B"]["platform_id"], "17")
+        self.assertFalse(result["source_identity"]["cross_source_identity_merge"])
+        self.assertNotEqual(result["source_identity"]["A"],
+                            result["source_identity"]["B"])
+        self.assertEqual((result["new_native_get"],
+                          result["native_same_id_review_lkg_new"],
+                          result["formal_accepted_fields"],
+                          result["golden_accepted_events"],
+                          result["published_events"]), (0, 0, 0, 0, 0))
+        self.assertEqual(self.dest.read_bytes(), self.original_bytes)
+
+    def test_missing_stale_or_foreign_lkg_is_fail_closed(self):
+        from datetime import timedelta
+        missing = m.assess_cksmh_non_session_field_authority(None, self.now)
+        self.assertEqual(missing["first_failure"], "CKSMH_NO_SNAPSHOT")
+        stale = m.assess_cksmh_non_session_field_authority(
+            self.snapshot, self.now + timedelta(days=2))
+        self.assertFalse(stale["field_matrix"][0]["fresh_within_24h"])
+        self.assertEqual(stale["formal_accepted_fields"], 0)
+        foreign = copy.deepcopy(self.snapshot)
+        foreign["rows"][0]["_candidate"]["platform_id"] = "13"
+        with self.assertRaises(ValueError):
+            m.assess_cksmh_non_session_field_authority(foreign, self.now)
+
+    def test_source_receipt_or_role_tamper_never_writes(self):
+        for key, value in [
+            ("source", "https://example.org/other"),
+            ("role", "TICKET_SESSION"),
+            ("decision", "ACCEPTED"),
+        ]:
+            with self.subTest(key=key):
+                mutated = copy.deepcopy(self.snapshot)
+                mutated["field_receipts"][0][key] = value
+                with self.assertRaisesRegex(ValueError, "CKSMH_FIELD_UNSEALED"):
+                    m.assess_cksmh_non_session_field_authority(mutated, self.now)
+        self.assertEqual(self.dest.read_bytes(), self.original_bytes)
