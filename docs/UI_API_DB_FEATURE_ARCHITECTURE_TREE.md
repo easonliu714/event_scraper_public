@@ -6981,3 +6981,41 @@ Existing 19-platform canonical dedup, Android L8 5/5 and CKSMH5/TWTC39 historica
 - **B CKSMH canonical platform #17, actId=61023:** reuse historical LIST/DETAIL identity and CKSMH Android 5/5. New extract_cksmh_event_local_session_roles(HTML, detail URL, UTC, SHA256) scopes Session Information to Event Details; requires exact four 01..04 ordinal blocks, isolates SHOWTIME from registration periods and per-row MEETING_POINT from HALL; strict date/clock/venue parity, fail-closed. Native DETAIL GET 1 HTTP200, LIST 0; first true failure CKSMH_SESSION_FOUR_DISTINCT_ORDINALS_HOLD; native parsed rows 0, new same-ID candidate 0, new LKG 0. Possible hidden/duplicate responsive DOM ownership is hypothesis, not proven.
 - **Core / CI:** original isolated review LKG atomic/CAS/SHA and empty-list no-overwrite preserved. Exact-head CI #41892684004 on b0395fe5e1288a59d1371a804f743e209c0948fa, job #126793952362 SUCCESS 107/107 offline tests, artifact #13354332590 GitHub sha256:088fed98999fbd6095768c233829eb8835d5aa8024fc8cd402a2f6ad80150f68. Packaged SHA256SUMS CI PASS; independent ZIP CRC UNVERIFIED.
 - **Evidence separation:** official CKSMH public reader shows four dated sessions (2026-11-08, 11-21, 11-29, 12-05), not native parser PASS; TMC public reader refreshed SHOW/HALL 2026-11-05, not native GET. Songshan H1/H2/H3 and TWTC title-cell identity HOLD retained. Formal accepted FIELD/Golden/Published/formal PWA feed 0/0/0/0; HARD_HOLD_NO_PUBLICATION. No main/data/status/Golden/Publisher/Scheduler/Notifier changes or second Writer. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS retained; direct Pages HTTP UNVERIFIED. Status-only Merge/Pages requires separate Owner approval.
+
+
+---
+
+### P30-L7 03:55 CKSMH server-visible DOM boundary — 2026-11-05 (Draft #8 only)
+
+```text
+A / TMC existing fixed non-session pipeline
+  historical native LIST -> exact DETAIL -> SHOW/HALL 2 REVIEW -> isolated LKG 1
+  this turn new GET/LIST/DETAIL/IDENTITY/LKG = 0/0/0/0/0
+  assess_tmc_non_session_field_authority -> source_age_seconds + first_failure
+    -> TMC_NO_SNAPSHOT (current CI offline input, not historic LKG invalidation)
+    -> test-only / stale-future 24h / missing independent SHOW-HALL authority
+  no KHAM checkout; PRODUCT_ID != Session; formal FIELD 0
+
+B / canonical CKSMH #17 actId=61023, no duplicate platform
+  official rendered reader: four 2026-11-08/21/29, 12-05 sessions
+  native bounded DETAIL GET 1 HTTP200, 97906 bytes, LIST GET 0
+  diagnose_cksmh_session_dom_boundary [NEW reusable source-owned diagnostic]
+    -> visible title TRUE; Session Information heading count 1
+    -> all server-visible ordinal count 0; first section ordinal count 0
+    -> SERVER_HTML_NO_VISIBLE_ORDINALS_HOLD
+    -> raw HTML never stored; no implicit JS/checkout GET
+  extract_cksmh_event_local_session_roles -> FOUR_DISTINCT_ORDINALS_HOLD
+  parsed session rows 0; new same-ID REVIEW LKG 0; accepted FIELD 0
+  rendered public reader != server-returned static HTML; JS/API hypothesis unverified
+
+Core: existing isolated candidate LKG fail-closed, SHA/CAS/atomic,
+  no empty overwrite, no main/formal data/status/Golden/Publisher writes
+  Engineering Draft #236 exact HEAD bd600cc7f47e01de4ab0b6a4b930a694d1d82b64
+  exact-head CI #41902701156 SUCCESS job #126829046404 111/111 offline
+  artifact #13358187321 SHA256 8ef3bdef957c1b84b1438f3b0fcd74bb613d7b35d11fa3d2d79639245ce8b4e6
+  independent ZIP CRC PASS, packaged evidence SHA256 5/5 PASS
+  formal FIELD/Golden/Published/feed = 0/0/0/0
+  HARD_HOLD_NO_PUBLICATION; L8 Android 5/5, CKSMH5/TWTC39 PASS
+```
+
+Next B: do not re-run identical raw CKSMH GET; independently verify legitimate existing JS-rendered source identity/authority or rotate to existing Huashan #13 role contract/next Taipei P0. Next A: fresh independent source-owned SHOW/HALL conflict adjudication using sealed historic TMC receipt, no checkout. Formal status-only Merge/Pages and any publication require separate Owner authorization; direct Pages runtime UNVERIFIED.
