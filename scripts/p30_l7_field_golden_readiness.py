@@ -1867,6 +1867,61 @@ def audit_executor_same_day_venue_collision(index, now_utc):
     }
 
 
+
+def audit_twtc_official_same_id_host_mirror(receipt, now_taipei):
+    """Public-reader official mirror identity only; no native GET or formal acceptance."""
+    from urllib.parse import urlsplit, parse_qs
+    if now_taipei.tzinfo is None or now_taipei.utcoffset() is None:
+        raise ValueError("MIRROR_CLOCK_MUST_HAVE_OFFSET")
+    expected = {
+        "index_url": "https://twtc.org.tw/exhibition.aspx",
+        "mirror_detail_url": "https://twtc.org.tw/exhibition_more.aspx?id=29418&p=home",
+        "primary_detail_url": "https://www.twtc.com.tw/exhibition_more.aspx?id=29418&p=menu1",
+        "organizer_url": "https://www.teca.org.tw/",
+        "organizer_edge_scope": "ORGANIZER_HOMEPAGE_ONLY_NOT_EVENT_ID",
+        "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+        "observed_date_taipei": "2026-11-04",
+        "event_title": "2026年電器空調影音大展",
+        "organizer": "台北市電器商業同業公會",
+        "date_start": "2026/11/06",
+        "date_end": "2026/11/09",
+        "hours": "10:00 ~ 18:00",
+        "venue": "世貿一館",
+        "native_official_get": 0,
+        "formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "formal_pwa_feed_events": 0,
+    }
+    if type(receipt) is not dict or set(receipt) != set(expected):
+        raise ValueError("MIRROR_RECEIPT_SHAPE_HOLD")
+    for key, value in expected.items():
+        if type(receipt[key]) is not type(value) or receipt[key] != value:
+            raise ValueError("MIRROR_RECEIPT_MISMATCH_" + key)
+    if (datetime.fromisoformat(receipt["observed_date_taipei"]).date()
+            != now_taipei.date()):
+        raise ValueError("MIRROR_READER_DATE_STALE")
+    for key in ("mirror_detail_url", "primary_detail_url"):
+        u = urlsplit(receipt[key])
+        if parse_qs(u.query).get("id") != ["29418"]:
+            raise ValueError("MIRROR_EVENT_ID_HOLD")
+    return {
+        "kind": "P30_L7_TWTC_OFFICIAL_SAME_ID_HOST_MIRROR_READER_V1",
+        "same_id_official_host_pair": 2,
+        "source_local_identity": "REVIEW_CORROBORATED_SAME_TWTC_ID_29418",
+        "field_roles": {"exhibition_dates": "REVIEW", "daily_open_hours": "REVIEW", "hall": "REVIEW"},
+        "organizer_homepage_is_event_identity": False,
+        "executor_to_twtc_id_edge": "HOLD",
+        "english_title_year_conflict": "HOLD",
+        "native_official_get": 0,
+        "independent_formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "formal_pwa_feed_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
