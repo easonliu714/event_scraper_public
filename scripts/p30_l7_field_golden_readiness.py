@@ -4217,3 +4217,77 @@ def run_huashan_field_aware_review_lkg(destination, repo_root, *,
     except (ValueError, UnicodeError, TypeError, OSError, TimeoutError) as exc:
         result["first_failure"] = type(exc).__name__ + ":" + str(exc)[:120]
         return result
+
+
+# A / TMC fixed non-publishing integration. Pre-acquired official bytes only:
+# validate exact LIST/DETAIL identity and two roles before sealed REVIEW LKG.
+# Never GET checkout, attest caller data as native, or accept formal fields.
+def run_tmc_field_aware_review_lkg(destination, repo_root, *,
+                                   source_bodies, expected_title, now_utc=None):
+    import hashlib
+    from datetime import timezone
+    urls = (PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL)
+    out = {"kind": "P30_L7_TMC_FIXED_FIELD_AWARE_LKG_V1", "line": "A",
+           "decision": "HOLD_PREACQUIRED_SOURCE", "first_failure": "TMC_SOURCE_BODIES_MISSING",
+           "source_receipts": [], "field_matrix": [],
+           "same_event_review_lkg": 0, "native_get_this_call": 0,
+           "formal_accepted_fields": 0, "golden_accepted_events": 0,
+           "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    if not isinstance(source_bodies, dict) or set(source_bodies) != set(urls):
+        return out
+    now = now_utc or datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        out["first_failure"] = "TMC_SOURCE_CLOCK_HOLD"
+        return out
+    if not isinstance(expected_title, str) or not expected_title.strip():
+        out["first_failure"] = "TMC_EXPECTED_TITLE_HOLD"
+        return out
+    try:
+        decoded = {}
+        for url in urls:
+            response = source_bodies[url]
+            if not isinstance(response, tuple) or len(response) != 4:
+                raise ValueError("TMC_RESPONSE_SHAPE_HOLD")
+            status, ctype, raw, final_url = response
+            if (type(status) is not int or status != 200 or final_url != url
+                    or not isinstance(ctype, str)
+                    or ctype.split(";", 1)[0].strip().lower() != "text/html"
+                    or not isinstance(raw, bytes) or not 0 < len(raw) <= 524288):
+                raise ValueError("TMC_SOURCE_HTTP_OR_BODY_HOLD")
+            params = [x.strip().lower() for x in ctype.split(";")[1:]]
+            if any(x.startswith("charset=") and
+                   x.split("=", 1)[1].strip('"') != "utf-8" for x in params):
+                raise ValueError("TMC_SOURCE_UTF8_ONLY_HOLD")
+            decoded[url] = raw.decode("utf-8", errors="strict")
+            out["source_receipts"].append({
+                "url": url, "http_status": 200, "body_bytes": len(raw),
+                "body_sha256": hashlib.sha256(raw).hexdigest(),
+                "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED"})
+        parsed = build_non_session_list_detail_candidate(
+            urls[0], decoded[urls[0]], urls[1], decoded[urls[1]],
+            expected_title, "P1DF32E2", now.isoformat(), now_utc=now)
+        if (parsed["line"] != "A" or
+                {f["field"] for f in parsed["candidate_fields"]}
+                != {"venue_showtime", "venue_hall"}):
+            raise ValueError("TMC_FIELD_ROLE_PREFLIGHT_HOLD")
+        result = run_bounded_native_source_to_review_lkg(
+            urls[0], urls[1], expected_title, "P1DF32E2",
+            destination, repo_root,
+            fetcher=lambda url: source_bodies[url], now_utc=now)
+        if not result.get("persisted"):
+            out["first_failure"] = result.get(
+                "reason", "TMC_REVIEW_LKG_CAS_OR_IDENTITY_HOLD")
+            return out
+        snap = load_isolated_review_lkg(destination, repo_root)
+        authority = assess_tmc_non_session_field_authority(snap, now_utc=now)
+        if len(authority["field_matrix"]) != 2:
+            out["first_failure"] = authority["first_failure"]
+            return out
+        out["same_event_review_lkg"] = 1
+        out["lkg_sha256"] = snap["last_known_good_sha256"]
+        out["field_matrix"] = authority["field_matrix"]
+        out["decision"] = "REVIEW_TWO_SOURCE_ROLES_AUTHORITY_HOLD"
+        out["first_failure"] = authority["first_failure"]
+    except (ValueError, TypeError, UnicodeError, OSError, TimeoutError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:120]
+    return out
