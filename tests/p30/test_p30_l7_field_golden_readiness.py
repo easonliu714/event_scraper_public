@@ -2664,3 +2664,85 @@ class TestCKSMHNativeDomBoundaryEvidence(unittest.TestCase):
             with self.subTest(url=url, sha=sha):
                 with self.assertRaises(ValueError):
                     m.diagnose_cksmh_session_dom_boundary(value, url, sha)
+
+
+class TestCanonicalHuashanSealedFieldGate(unittest.TestCase):
+    """B #13 path-identity LKG -> field roles -> explicit independent HOLD."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dest = pathlib.Path(self.tmp.name) / "review_lkg_snapshot.json"
+        self.now = datetime(2026, 11, 4, 14, 0, tzinfo=timezone.utc)
+        self.detail = (
+            "<h1>" + m.HUASHAN_ROTATION_TITLE + "</h1>"
+            "<h3>活動時間：</h3>2026 11.07(六) 11.07(六) 11:00 ~ 16:30 "
+            "西1館11:30開放 /西2館、西5-1館11:00開放 "
+            "<h3>地點：</h3>西5-1館 壓縮兼包裝工場 / 西2館 第三乾餾場 / 西1館 第二乾餾場 "
+            "<h3>主辦單位：</h3>測試主辦"
+            "<footer>開放時間：每日09:30 ~ 21:00</footer>"
+        )
+
+    def seed(self, detail=None):
+        html = self.detail if detail is None else detail
+        listing = ('<a href="' + m.HUASHAN_PUBLIC_DETAIL + '">'
+                   + m.HUASHAN_ROTATION_TITLE + '</a>')
+        pages = {m.HUASHAN_PUBLIC_LIST: listing,
+                 m.HUASHAN_PUBLIC_DETAIL: html}
+        def fake(url):
+            return 200, "text/html; charset=utf-8", pages[url].encode(), url
+        out = m.run_huashan_exact_path_review_lkg(
+            self.dest, ROOT, fetcher=fake, now_utc=self.now)
+        self.assertEqual(out["decision"], "REVIEW_ONLY")
+        return m.load_isolated_review_lkg(self.dest, ROOT)
+
+    def test_fixed_a_b_gate_reuses_four_roles_but_no_native_or_release(self):
+        snap = self.seed()
+        original = self.dest.read_bytes()
+        out = m.assess_tmc_huashan_fixed_nonpublishing_gate(
+            huashan_snapshot=snap, huashan_detail_html=self.detail,
+            now_utc=self.now)
+        self.assertEqual(out["A"]["first_failure"], "TMC_NO_SNAPSHOT")
+        self.assertEqual(out["B"]["decision"], "HOLD_TEST_INJECTED_NOT_NATIVE")
+        self.assertEqual([f["field"] for f in out["B"]["field_matrix"]],
+                         ["event_date", "event_public_hours", "event_halls",
+                          "hall_opening_exceptions"])
+        self.assertTrue(all(not f["independent_field_authority"]
+                            and not f["official_numeric_event_id_verified"]
+                            and f["decision"] == "OFFLINE_TEST_INJECTED_NOT_NATIVE"
+                            for f in out["B"]["field_matrix"]))
+        self.assertEqual(out["B"]["native_same_numeric_id"], 0)
+        self.assertEqual((out["formal_accepted_fields"],
+                          out["golden_accepted_events"], out["published_events"]),
+                         (0, 0, 0))
+        self.assertFalse(out["source_identity"]["cross_source_identity_merge"])
+        self.assertEqual(self.dest.read_bytes(), original)
+
+    def test_body_receipt_conflict_and_stale_source_fail_closed(self):
+        snap = self.seed()
+        original = self.dest.read_bytes()
+        changed = self.detail.replace("西1館 第二乾餾場", "西1館 其他")
+        out = m.assess_huashan_sealed_nonpublishing_field_gate(
+            snap, changed, now_utc=self.now)
+        self.assertEqual(out["first_failure"],
+                         "HUASHAN_SEALED_DETAIL_SHA_MISMATCH")
+        self.assertEqual(out["field_matrix"], [])
+        from datetime import timedelta
+        stale = m.assess_huashan_sealed_nonpublishing_field_gate(
+            snap, self.detail, now_utc=self.now + timedelta(days=2))
+        self.assertEqual(stale["first_failure"],
+                         "HUASHAN_SEALED_STALE_OR_FUTURE_24H")
+        self.assertEqual(self.dest.read_bytes(), original)
+
+    def test_matching_receipt_does_not_override_hall_semantics(self):
+        changed = self.detail.replace("西1館 第二乾餾場", "西1館 其他")
+        snap = self.seed(changed)
+        out = m.assess_huashan_sealed_nonpublishing_field_gate(
+            snap, changed, now_utc=self.now)
+        self.assertEqual(out["decision"], "HOLD_FIELD_SEMANTICS_CONFLICT")
+        self.assertEqual(out["first_failure"],
+                         "HUASHAN_FIELD_MULTI_HALL_EXACT_PARITY_HOLD")
+        self.assertEqual(out["field_matrix"], [])
+        self.assertEqual(out["formal_accepted_fields"], 0)
