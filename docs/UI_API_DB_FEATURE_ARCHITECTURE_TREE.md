@@ -6785,3 +6785,27 @@ Existing #236 run_bounded_native_source_to_review_lkg
 
 
 **18:55 Gate exact-head final readback (supersedes CI_PENDING above):** Engineering #236 HEAD `6a3ef1460f0355a5f2aa89da3f4113d8126267f1`, [CI #41818624086](https://github.com/easonliu714/event_scraper_public/actions/runs/41818624086) **SUCCESS 79/79** (all steps PASS), [Artifact #13315792954](https://github.com/easonliu714/event_scraper_public/actions/runs/41818624086/artifacts/13315792954) SHA256 `a0d8e5e84d1516525b3ef11c91a0ed394f8deab7fa572fcb01d2abc5b8f3603d` independently downloaded and ZIP CRC/digest PASS. One-shot B native LIST/DETAIL **2/2 HTTP200**, but **first real failure persists: `LIST_TITLE_CELL_CONFLICTING_DETAIL_IDS_HOLD`**, native same-ID candidate **0**, isolated B LKG **0**. Same-ID `p=menu1` hypothesis did not solve real DOM; no further identical-source GET without new structural evidence. **Stop-rule engaged:** next B cycle prioritize offline root-cause classification of already observed receipts or rotate to existing canonical P0 source, not a fourth repeated TWTC probe. A prior native 1 REVIEW candidate unchanged, new A GET 0; formal FIELD/Golden/Published/feed **0/0/0/0**; all production HOLD and Android PASS unchanged. Owner action **none**.
+
+
+### P30-L7 19:55 CKSMH #17 canonical B rotation source-adapter architecture — 2026-11-04
+
+The existing fixed, non-publishing Source Adapter → exact same-ID DETAIL → provenance → REVIEW candidate → atomic/CAS LKG pipeline is extended **in-place on Engineering Draft #236** (no second platform adapter, no production scraper or PWA rewrite):
+
+```text
+B official canonical platform #17 CKSMH (reuse historic actId/Android PASS)
+  public LIST https://event.culture.tw/CKSMH [native 200, 491-byte response]
+    -> strict title-bearing CKSMH-only actId anchor (MUST independently prove)
+  public DETAIL /mocweb/reg/CKSMH/Detail.init.ctr?actId=61023
+    [native 200, 97,907-byte response; title H1/H2 strict check]
+    -> source role EVENT_TITLE REVIEW; four distinct advertised
+       walk sessions / multiple meeting points stay UNKNOWN/HOLD
+    -> existing main scripts/p30_candidate_review_pipeline.build_candidate_dataset
+    -> platform_id=17, source_event_id=61023, REVIEW_WITH_HOLD
+    -> existing isolated checksum-sealed CAS + atomic LKG (never docs/)
+    X no checkout, session/price/stock inference, Publisher or formal data
+```
+
+- **Actual first native failure:** CKSMH_LIST_EXACT_ACTID_EDGE_HOLD; two official native HTTP200 receipts do **not** prove a LIST→same-ID DETAIL link. No B native REVIEW LKG persisted. The 491-byte homepage is a concrete source-acquisition/DOM hypothesis requiring inspection of an alternative existing official query/list route or title-card ownership, not a license to cross-ID join. No raw source HTML retained. TWTC conflicting-title-cell ID root cause remains frozen HOLD, not retried.
+- **Reusable functions:** run_cksmh_actid_review_lkg (bounded official GET with explicit new hypothesis, strict actId/host/title, no redirect/retry, injected mock transport separated from native), existing load_isolated_review_lkg, persist_isolated_review_lkg, _validate_isolated_lkg_snapshot, build_candidate_dataset. Offline mock positive 1 and wrong ID/host/duplicate title/detail title/HTTP status negatives PASS; mock is not native evidence.
+- **Evidence:** [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD 772ccac32af1898b67b1c211b1e192f4c253d114; [exact-head CI #41825720278](https://github.com/easonliu714/event_scraper_public/actions/runs/41825720278) SUCCESS 82/82; [Artifact #13318568263](https://github.com/easonliu714/event_scraper_public/actions/runs/41825720278/artifacts/13318568263) ZIP SHA256 8e6528f59ea2f8cf5a18c95fbc379c144f345a48a44077ca98bee073ebd26848 independently matched, CRC/manifest PASS.
+- **A unchanged:** existing TMC official native same-ID 1 REVIEW LKG with SHOW/HALL 2 REVIEW; new GET 0. Next A must independently adjudicate freshness, venue/time role authority and conflicts; KHAM PRODUCT is not SESSION. B new native GET 2, B same-ID/LKG 0. Independent accepted FIELD/Golden/Published/formal feed 0/0/0/0. Formal docs/data.json and docs/platform_status.json untouched, Pages HTTP UNVERIFIED; all Android L8 5/5 and CKSMH5/TWTC39 PASS protected; HARD_HOLD_NO_PUBLICATION locked. Owner action none for isolated engineering.
