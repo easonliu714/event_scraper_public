@@ -1646,7 +1646,7 @@ class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
         self.assertEqual(len(snap["field_receipts"]), 3)
         self.assertEqual({f["field"] for f in snap["field_receipts"]},
                          {"exhibition_dates", "open_hours", "venue_hall"})
-        self.assertEqual(snap["incremental_diff"]["added_ids"], [["16", "29418"]])
+        self.assertEqual(snap["incremental_diff"]["added_ids"], [("16", "29418")])
         self.assertFalse(snap["native_get_verified"])
         self.assertEqual((snap["formal_accepted_fields"], snap["golden_accepted_events"],
                           snap["published_events"]), (0, 0, 0))
