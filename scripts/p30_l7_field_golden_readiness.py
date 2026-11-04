@@ -2023,22 +2023,24 @@ def audit_native_source_link_edges(tmc_html, twtc_index_html, twtc_detail_html,
     rows = [row for row in parsers[1].rows
             if "2026年電器空調影音大展" in row["text"]
             and any(urljoin(urls[1], href) == expected_detail for href in row["hrefs"])]
-    if len(rows) != 1:
-        raise ValueError("TWTC_SAME_ROW_SAME_ID_EDGE_HOLD")
-    if "11/06" not in rows[0]["text"] or "11/09" not in rows[0]["text"]:
-        raise ValueError("TWTC_ROW_DATE_CONTEXT_HOLD")
+    # Independent A/B decisions: a B layout/identity failure must not erase a
+    # proven A exact href. B remains HOLD, never promoted by global title/date.
     detail_text = " ".join(twtc_detail_html.split())
-    if not all(s in detail_text for s in (
+    b_row_valid = (len(rows) == 1 and "11/06" in rows[0]["text"]
+                   and "11/09" in rows[0]["text"])
+    b_detail_valid = all(s in detail_text for s in (
         "2026年電器空調影音大展", "世貿一館", "台北市電器商業同業公會",
-        "2026/11/06", "2026/11/09", "10:00", "18:00")):
-        raise ValueError("TWTC_DETAIL_FIELD_CONTEXT_HOLD")
+        "2026/11/06", "2026/11/09", "10:00", "18:00"))
+    b_valid = b_row_valid and b_detail_valid
 
     return {
         "kind": "P30_L7_NATIVE_OFFICIAL_SOURCE_LINK_EDGES_V1",
-        "source_local_native_link_edges": 2,
+        "source_local_native_link_edges": 1 + int(b_valid),
         "A_venue_to_kham_product": "REVIEW_DIRECT_ANCHOR_PRODUCT_NOT_SESSION",
         "A_kham_product_same_event_native": "HOLD_NO_KHAM_GET",
-        "B_twtc_index_to_same_id_detail": "REVIEW_DIRECT_SAME_ROW_ID29418",
+        "B_twtc_index_to_same_id_detail": (
+            "REVIEW_DIRECT_SAME_ROW_ID29418" if b_valid
+            else "HOLD_SAME_ROW_OR_DETAIL_CONTEXT_UNPROVEN"),
         "B_executor_to_twtc_id": "HOLD_NO_EXECUTOR_ID_EDGE",
         "B_bilingual_title_year": "HOLD_2025_VS_2026",
         "field_roles": {"A_show": "REVIEW", "A_hall": "REVIEW",
