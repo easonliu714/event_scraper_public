@@ -1695,3 +1695,97 @@ class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
                                              .replace("</table>", "") + "</table>"))
         with self.assertRaises(ValueError):
             self.b(identity="29417")
+
+
+class TestDurableIsolatedReviewLKG(unittest.TestCase):
+    """Real tempfile atomic persistence, tamper detection and rollback."""
+
+    def setUp(self):
+        import tempfile
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.destination = pathlib.Path(self.temp.name) / "review_lkg_snapshot.json"
+        self.case = TestFixedSourceAdapterToReviewPipeline(
+            "test_b_twtc_same_id_review_pipeline_with_daily_hours_sidecar")
+        self.case.setUp()
+
+    def run_b(self, index=None, detail=None):
+        c = self.case
+        return m.run_persistent_isolated_review_lkg(
+            m.PUBLIC_TWTC_LIST, c.blist if index is None else index,
+            m.PUBLIC_TWTC_DETAIL, c.bdetail if detail is None else detail,
+            c.btitle, "29418", c.stamp, self.destination, ROOT, c.now)
+
+    def test_atomic_write_reload_and_idempotent_diff(self):
+        first = self.run_b()
+        self.assertTrue(first["persisted"])
+        self.assertEqual(first["snapshot"]["quality"]["previewRows"], 1)
+        self.assertTrue(self.destination.is_file())
+        old = m.load_isolated_review_lkg(self.destination, ROOT)
+        self.assertEqual(old["last_known_good_sha256"],
+                         first["snapshot"]["last_known_good_sha256"])
+        second = self.run_b()
+        self.assertTrue(second["persisted"])
+        self.assertFalse(second["snapshot"]["incremental_diff"]["changed"])
+        self.assertEqual(second["snapshot"]["incremental_diff"]["added_ids"], [])
+        self.assertEqual(second["snapshot"]["formal_accepted_fields"], 0)
+        self.assertEqual(second["snapshot"]["golden_accepted_events"], 0)
+        self.assertEqual(second["snapshot"]["published_events"], 0)
+
+    def test_empty_and_conflicting_source_preserve_exact_disk_bytes(self):
+        self.run_b()
+        before = self.destination.read_bytes()
+        for index, detail in (
+            ("", self.case.bdetail),
+            (self.case.blist.replace("29418", "29419"), self.case.bdetail),
+            (self.case.blist, "<h1>unrelated event</h1>"),
+        ):
+            with self.subTest(index=index[:15]):
+                result = self.run_b(index, detail)
+                self.assertFalse(result["persisted"])
+                self.assertEqual(result["snapshot"]["decision"],
+                                 "ROLLBACK_TO_ISOLATED_LAST_KNOWN_GOOD")
+                self.assertEqual(self.destination.read_bytes(), before)
+        self.assertFalse(self.destination.with_name(
+            self.destination.name + ".lock").exists())
+
+    def test_tamper_is_hold_never_auto_overwrite(self):
+        self.run_b()
+        bad = json.loads(self.destination.read_text(encoding="utf-8"))
+        bad["snapshot"]["rows"][0]["title"] = "cross-event tampering"
+        self.destination.write_text(json.dumps(bad), encoding="utf-8")
+        with self.assertRaises(ValueError):
+            self.run_b()
+        self.assertEqual(json.loads(self.destination.read_text())["snapshot"]
+                         ["rows"][0]["title"], "cross-event tampering")
+
+    def test_cas_and_untrusted_release_flags_are_rejected(self):
+        first = self.run_b()
+        with self.assertRaisesRegex(ValueError, "COMPARE_AND_SWAP"):
+            m.persist_isolated_review_lkg(
+                first["snapshot"], self.destination, ROOT)
+        bad = copy.deepcopy(first["snapshot"])
+        bad["published_events"] = 1
+        with self.assertRaises(ValueError):
+            m.persist_isolated_review_lkg(
+                bad, self.destination, ROOT,
+                first["snapshot"]["last_known_good_sha256"])
+
+    def test_forbidden_repo_path_and_missing_initial_input(self):
+        with self.assertRaisesRegex(ValueError, "OUTSIDE_REPOSITORY"):
+            m.run_persistent_isolated_review_lkg(
+                m.PUBLIC_TWTC_LIST, self.case.blist, m.PUBLIC_TWTC_DETAIL,
+                self.case.bdetail, self.case.btitle, "29418",
+                self.case.stamp, ROOT / "docs" / "review_lkg_snapshot.json",
+                ROOT, self.case.now)
+        with self.assertRaises(ValueError):
+            self.run_b(index="")
+        self.assertFalse(self.destination.exists())
+
+    def test_existing_lock_fails_closed(self):
+        self.run_b()
+        lock = self.destination.with_name(self.destination.name + ".lock")
+        lock.write_text("another writer", encoding="utf-8")
+        with self.assertRaises(FileExistsError):
+            self.run_b()
+        self.assertEqual(lock.read_text(), "another writer")

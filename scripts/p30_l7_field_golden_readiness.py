@@ -2171,3 +2171,160 @@ def build_source_adapter_review_snapshot(
             "incremental_diff": {"added_ids": [], "removed_ids": [],
                                  "changed": False},
         }
+
+
+# Non-publishing durable LKG: one checksum-sealed JSON envelope, atomic replacement.
+# Deliberately outside the repository, so neither Pages nor legacy publisher can
+# discover it by walking docs/ or by calling save_data_and_notify().
+def _isolated_lkg_digest(value):
+    import hashlib
+    return hashlib.sha256(json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        allow_nan=False).encode("utf-8")).hexdigest()
+
+
+def _isolated_lkg_path(destination, repo_root):
+    target = Path(destination)
+    root = Path(repo_root).resolve(strict=True)
+    if target.name != "review_lkg_snapshot.json":
+        raise ValueError("ISOLATED_LKG_EXACT_FILENAME_REQUIRED")
+    # Reject symlink traversal before resolving the target. The caller creates
+    # the isolated directory; this function never creates publication paths.
+    if any(p.is_symlink() for p in (target, *target.parents)):
+        raise ValueError("ISOLATED_LKG_SYMLINK_HOLD")
+    if not target.parent.is_dir():
+        raise ValueError("ISOLATED_LKG_PARENT_MUST_EXIST")
+    resolved = target.resolve(strict=False)
+    if resolved == root or resolved.is_relative_to(root):
+        raise ValueError("ISOLATED_LKG_MUST_BE_OUTSIDE_REPOSITORY")
+    return target
+
+
+def _validate_isolated_lkg_snapshot(snapshot):
+    from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+    if (not isinstance(snapshot, dict)
+            or snapshot.get("kind") != "P30_L7_ISOLATED_SOURCE_ADAPTER_SNAPSHOT_V1"
+            or snapshot.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+            or snapshot.get("decision") not in (
+                "REVIEW_ONLY_NEW_OR_UPDATED",
+                "ROLLBACK_TO_ISOLATED_LAST_KNOWN_GOOD")
+            or snapshot.get("native_get_verified") is not False
+            or any(snapshot.get(k) != 0 for k in (
+                "formal_accepted_fields", "golden_accepted_events",
+                "published_events"))
+            or not isinstance(snapshot.get("rows"), list)
+            or len(snapshot["rows"]) != 1
+            or snapshot.get("last_known_good_sha256") !=
+               _isolated_lkg_digest(snapshot["rows"])):
+        raise ValueError("ISOLATED_LKG_RELEASE_OR_INTEGRITY_HOLD")
+    normalized, report = build_candidate_dataset(snapshot["rows"])
+    if normalized != snapshot["rows"] or report["rejectedRows"] != 0:
+        raise ValueError("ISOLATED_LKG_CANDIDATE_SCHEMA_HOLD")
+    if (not isinstance(snapshot.get("quality"), dict)
+            or snapshot["quality"].get("previewRows") != 1
+            or snapshot["quality"].get("rejectedRows") != 0
+            or snapshot["quality"].get("releaseState") !=
+               "HARD_HOLD_NO_PUBLICATION"):
+        raise ValueError("ISOLATED_LKG_QUALITY_HOLD")
+    if (not isinstance(snapshot.get("field_receipts"), list)
+            or not isinstance(snapshot.get("source_receipts"), list)
+            or not isinstance(snapshot.get("incremental_diff"), dict)):
+        raise ValueError("ISOLATED_LKG_RECEIPTS_HOLD")
+    return snapshot
+
+
+def load_isolated_review_lkg(destination, repo_root):
+    """Verify one durable non-public REVIEW snapshot; missing file means None."""
+    target = _isolated_lkg_path(destination, repo_root)
+    if not target.exists():
+        return None
+    if not target.is_file() or target.stat().st_size > 262144:
+        raise ValueError("ISOLATED_LKG_FILE_SIZE_OR_TYPE_HOLD")
+    try:
+        envelope = json.loads(target.read_text(encoding="utf-8"))
+        if (not isinstance(envelope, dict)
+                or set(envelope) != {"kind", "snapshot", "sha256"}
+                or envelope["kind"] != "P30_L7_ISOLATED_DURABLE_LKG_V1"
+                or envelope["sha256"] !=
+                   _isolated_lkg_digest(envelope["snapshot"])):
+            raise ValueError("ISOLATED_LKG_ENVELOPE_HASH_HOLD")
+        return _validate_isolated_lkg_snapshot(envelope["snapshot"])
+    except (UnicodeError, json.JSONDecodeError, TypeError, KeyError,
+            OverflowError) as exc:
+        raise ValueError("ISOLATED_LKG_UNREADABLE_HOLD") from exc
+
+
+def persist_isolated_review_lkg(snapshot, destination, repo_root,
+                                expected_previous_sha256=None):
+    """Single-file fsync+replace with exclusive writer lock and LKG CAS guard."""
+    import os
+    import tempfile
+    target = _isolated_lkg_path(destination, repo_root)
+    _validate_isolated_lkg_snapshot(snapshot)
+    if snapshot["decision"] != "REVIEW_ONLY_NEW_OR_UPDATED":
+        raise ValueError("ISOLATED_LKG_ROLLBACK_MUST_NOT_OVERWRITE")
+    lock = target.with_name(target.name + ".lock")
+    lock_fd = None
+    temp_name = None
+    try:
+        lock_fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        prior = load_isolated_review_lkg(target, repo_root)
+        actual_sha = (prior["last_known_good_sha256"]
+                      if prior is not None else None)
+        if actual_sha != expected_previous_sha256:
+            raise ValueError("ISOLATED_LKG_COMPARE_AND_SWAP_HOLD")
+        envelope = {"kind": "P30_L7_ISOLATED_DURABLE_LKG_V1",
+                    "snapshot": snapshot,
+                    "sha256": _isolated_lkg_digest(snapshot)}
+        payload = (json.dumps(envelope, ensure_ascii=False, sort_keys=True,
+                              allow_nan=False, separators=(",", ":")) +
+                   "\n").encode("utf-8")
+        if len(payload) > 262144:
+            raise ValueError("ISOLATED_LKG_TOO_LARGE")
+        fd, temp_name = tempfile.mkstemp(
+            prefix=".review_lkg.", suffix=".tmp", dir=str(target.parent))
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temp_name, 0o600)
+        os.replace(temp_name, target)
+        temp_name = None
+        # Durable directory entry on POSIX. On Windows, the atomic replace
+        # still applies; directory fsync is unavailable.
+        if os.name == "posix":
+            directory_fd = os.open(target.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        return {"path": str(target), "snapshot_sha256": envelope["sha256"],
+                "last_known_good_sha256": snapshot["last_known_good_sha256"],
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    finally:
+        if temp_name is not None:
+            os.unlink(temp_name)
+        if lock_fd is not None:
+            os.close(lock_fd)
+            os.unlink(lock)
+
+
+def run_persistent_isolated_review_lkg(
+        list_url, list_html, detail_url, detail_html, expected_title,
+        expected_identity_id, observed_at_utc, destination, repo_root,
+        now_utc=None):
+    """Existing adapter + candidate pipeline + disk LKG; no HTTP or publishing."""
+    prior = load_isolated_review_lkg(destination, repo_root)
+    snapshot = build_source_adapter_review_snapshot(
+        list_url, list_html, detail_url, detail_html, expected_title,
+        expected_identity_id, observed_at_utc, now_utc, prior)
+    if snapshot["decision"] == "ROLLBACK_TO_ISOLATED_LAST_KNOWN_GOOD":
+        # The file remains byte-for-byte unchanged after a failed scrape.
+        return {"snapshot": snapshot, "persisted": False,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    receipt = persist_isolated_review_lkg(
+        snapshot, destination, repo_root,
+        expected_previous_sha256=(
+            prior["last_known_good_sha256"] if prior else None))
+    return {"snapshot": snapshot, "persisted": True, "receipt": receipt,
+            "release_state": "HARD_HOLD_NO_PUBLICATION"}
