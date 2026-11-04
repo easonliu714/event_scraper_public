@@ -6572,3 +6572,34 @@ HARD_HOLD_NO_PUBLICATION [LOCKED]
 ```
 
 Architecture decision: keep A venue-owned show/hall independent from KHAM purchase Session. B's native HTTP200 and exact URL/body hash do not substitute for a proven same-row anchor or correction of the bilingual title-year conflict. Stop-rule: do not repeat this TWTC DOM-layout root cause without a new authoritative observation; rotate B to another canonical P0 Taipei/New Taipei venue with a verifiable LIST→same-ID DETAIL edge, while A seeks safe non-checkout independent identity. No Owner action required for isolated review.
+
+---
+
+### P30-L7-FIXED-SOURCE-ADAPTER-REVIEW-LKG-20261104T1254 — isolated reusable source-to-review architecture
+
+```text
+Existing scraper.py source-list URLs [READ-ONLY METADATA; no legacy main_async]
+   A TMC official LIST /tw/blog/show
+   B TWTC canonical #16 LIST /exhibition?p=home
+      ↓ caller-supplied bounded HTML [NO NATIVE AUTHORITY IN THIS GATE]
+Existing #236 build_non_session_list_detail_candidate
+      ↓ exact title + same source row/anchor + DETAIL URL / ID
+Existing #236 parse_official_non_session_html
+      ├─ A VENUE_SHOW + VENUE_HALL; KHAM PRODUCT_ID edge ≠ ticket Session
+      └─ B EXHIBITION_DATE + DAILY_OPEN_HOURS + EXHIBITION_HALL
+      ↓ field-specific source_url + observed_at + REVIEW role; raw HTML excluded
+NEW #236 build_source_adapter_review_snapshot
+      ├─ exact canonical platform/source event identity
+      ├─ map only VENUE_EVENT_DATE and EVENT_VENUE to PWA preview fields
+      ├─ B DAILY_OPEN_HOURS remains separate source receipt (not SHOWTIME)
+      ↓ existing main scripts/p30_candidate_review_pipeline.py
+         ::build_candidate_dataset (REVIEW-only validation; never formal)
+      ├─ deterministic candidate SHA256 and ID incremental diff
+      ├─ validated in-memory last-known-good on malformed/empty/conflicting input
+      ├─ NO disk persistence / atomic snapshot yet [NEXT]
+      └─ NO docs/data.json / Publisher / Scheduler / Notifier / formal PWA feed
+```
+
+- Engineering [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD `68c7f80819db05038722dca70ce137b66c029bc2`; [CI #41775939358](https://github.com/easonliu714/event_scraper_public/actions/runs/41775939358) SUCCESS **60/60**, [artifact #13296558677](https://github.com/easonliu714/event_scraper_public/actions/runs/41775939358/artifacts/13296558677) digest `sha256:e16ea7666a79276f8f81a21724168ec5441cc065ef1de2cc449d1f0b77b6abb5`; downloaded ZIP CRC UNVERIFIED. Four original ADD-only engineering paths; changed code/test only. No new native GET; no change to formal main or deployed Pages.
+- A synthetic end-to-end same-source LIST→DETAIL candidate **1**, SHOW/HALL REVIEW **2**; B synthetic end-to-end same-ID LIST→DETAIL candidate **1**, exhibition dates/daily hours/hall REVIEW **3**. **These are test-injected HTML, not independently observed native 1+1 successes.** TWTC real responsive duplicate same-row edge HOLD; EN title-year conflict HOLD; executor-to-id HOLD; KHAM non-checkout independent identity HOLD. Source freshness requires new lawful native evidence; never infer from caller-supplied timestamp.
+- Formal FIELD **0**, Golden **0**, publication **0**, formal PWA feed **0**. `HARD_HOLD_NO_PUBLICATION`; main formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, `docs/platform_status.json` blob `99cae0571e36e52dac360b6935c0c09f6f6bed3f` unchanged. L8 Android 5/5, CKSMH5/TWTC39 PASS preserved. Next: isolated atomic on-disk LKG + one safe source-acquisition integration; no legacy `save_data_and_notify` reuse.
