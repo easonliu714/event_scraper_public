@@ -1018,6 +1018,51 @@ jobs:
                     b['same_path_review_lkg'], b['native_same_numeric_id'],
                     b.get('reason', 'NONE'), flush=True)
           PY
+      - name: Fixed A TMC and B canonical CKSMH independent field gate (NO GET, NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, json, tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              CKSMH_PUBLIC_LIST, CKSMH_PUBLIC_DETAIL, CKSMH_ROTATION_TITLE,
+              run_cksmh_actid_review_lkg,
+              load_isolated_review_lkg,
+              assess_tmc_cksmh_fixed_nonpublishing_field_gate)
+          pages = {
+              CKSMH_PUBLIC_LIST: (
+                  '<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=61023">'
+                  + CKSMH_ROTATION_TITLE + '</a>'),
+              CKSMH_PUBLIC_DETAIL: (
+                  '<h1>' + CKSMH_ROTATION_TITLE + '</h1>'
+                  '<p>場次與集合地點待獨立驗收</p>'),
+          }
+          def offline_fetch(url):
+              return (200, 'text/html; charset=utf-8',
+                      pages[url].encode('utf-8'), url)
+          now = datetime.datetime.now(datetime.timezone.utc)
+          with tempfile.TemporaryDirectory(prefix='eventradar_cksmh_offline_') as tmp:
+              dest = Path(tmp) / 'review_lkg_snapshot.json'
+              rotated = run_cksmh_actid_review_lkg(
+                  dest, Path.cwd(), fetcher=offline_fetch, now_utc=now)
+              assert rotated['decision'] == 'REVIEW_ONLY'
+              snapshot = load_isolated_review_lkg(dest, Path.cwd())
+              report = assess_tmc_cksmh_fixed_nonpublishing_field_gate(
+                  None, snapshot, now)
+          assert report['B']['platform_id'] == '17'
+          assert report['B']['decision'] == 'HOLD_NATIVE_FRESHNESS_OR_AUTHORITY'
+          assert report['formal_accepted_fields'] == report['golden_accepted_events'] == report['published_events'] == 0
+          assert report['new_native_get'] == 0
+          report['evidence_scope'] = 'OFFLINE_TEST_INJECTED_CKSMH_NOT_NATIVE'
+          report['native_get_claim'] = 0
+          Path('evidence/canonical_field_authority_contract.json').write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2)
+              + '\n', encoding='utf-8')
+          print('FIXED_CANONICAL_FIELD_GATE', report['A']['decision'],
+                report['B']['decision'], 'formal=0 native=0', flush=True)
+          PY
       - name: One-shot Huashan event-local field role native GET (new hypothesis only)
         shell: bash
         run: |
@@ -1201,6 +1246,7 @@ jobs:
           if [ -f evidence/native_adapter_structural_audit.json ]; then sha256sum evidence/native_adapter_structural_audit.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_cksmh_rotation.json ]; then sha256sum evidence/native_cksmh_rotation.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
+          sha256sum evidence/canonical_field_authority_contract.json >> evidence/SHA256SUMS.txt
           if [ -f evidence/native_huashan_rotation.json ]; then sha256sum evidence/native_huashan_rotation.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_huashan_field_roles.json ]; then sha256sum evidence/native_huashan_field_roles.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_authority_identity_hypothesis.json ]; then sha256sum evidence/native_authority_identity_hypothesis.json >> evidence/SHA256SUMS.txt; fi
