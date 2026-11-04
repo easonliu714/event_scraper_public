@@ -6946,3 +6946,28 @@ Core:
 ```
 
 Existing 19-platform canonical dedup, Android L8 5/5 and CKSMH5/TWTC39 historical PASS retained. Formal status snapshot remains 2026-11-03 18:55; status-only release requires separate Owner approval. Direct Pages runtime and independent artifact ZIP CRC UNVERIFIED.
+
+---
+
+### P30-L7 01:55 canonical A/B field authority contract — 2026-11-05 (Governance Draft #8)
+
+**A / TMC existing fixed non-session source:**
+- Historic official native LIST→same-event DETAIL→SHOW/HALL two REVIEW fields→isolated atomic/CAS/SHA LKG one row; this turn new native GET/LIST/DETAIL/IDENTITY/LKG 0/0/0/0/0.
+- Reuse assess_tmc_non_session_field_authority in new assess_tmc_cksmh_fixed_nonpublishing_field_gate. Exact source-owned event identity, sealed receipt, 24h freshness and independent field-conflict authority required. KHAM PRODUCT_ID remains PRODUCT, never ticket SESSION; no checkout GET.
+- Formal accepted FIELD 0; no stale synthetic or CI candidate promoted.
+
+**B / existing canonical CKSMH #17, rotated after Songshan #14 H1/H2/H3 identity HOLD:**
+- Reuse existing run_cksmh_actid_review_lkg exact LIST→actId=61023 DETAIL and historical CKSMH 5/5 PASS, not a new platform or second adapter.
+- New assess_cksmh_non_session_field_authority validates isolated LKG checksum, source URLs, platform/actId/title/role, native-vs-test acquisition and UTC freshness. Output TITLE source REVIEW, event_date_sessions HOLD, venue_halls HOLD; no invented single SESSION/HALL or cross-source identity.
+- This turn B new native GET/LIST/DETAIL/IDENTITY/LKG 0/0/0/0/0; offline injected positive/negative fixture only. Songshan first real failure SONGSHAN_DETAIL_EXACT_HEADING_HOLD:h1=0,h2=0,h3=0 preserved; no identical retry. TWTC title-cell conflicting detail IDs HOLD; Huashan JSON-LD numeric identity HOLD.
+
+**Fixed non-publishing pipeline:**
+    existing TMC source LKG -> A authority matrix --+
+                                                     +-> canonical_field_authority_contract.json
+    existing CKSMH #17 LKG -> B authority matrix ----+   (OFFLINE TEST INJECTED, HOLD)
+        -> no native GET / no ID merge / no formal field / no Golden / no Publisher
+        -> existing SHA256SUMS + CI artifact, formal blobs immutable
+
+- Engineering Draft #236 exact HEAD 741af2debd1be663b6f4593104c72a08c045d429; [CI #41882737073](https://github.com/easonliu714/event_scraper_public/actions/runs/41882737073) SUCCESS, job 126759125465, 103/103 offline PASS; [Artifact #13350146686](https://github.com/easonliu714/event_scraper_public/actions/runs/41882737073/artifacts/13350146686) GitHub sha256 0617adf417f213e409c395148cfc37dbb30d290526d48372f7009578eac69c2b; independent ZIP CRC UNVERIFIED.
+- Source main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce, Preview main 03e515d65e827d5ed67fe341d079907a96bf784a, ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad unchanged; formal docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4, docs/platform_status.json blob 99cae0571e36e52dac360b6935c0c09f6f6bed3f. Formal accepted FIELD/Golden/Published/feed 0/0/0/0, HARD_HOLD_NO_PUBLICATION. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS retained; Pages direct HTTP UNVERIFIED.
+- NEXT A: independently adjudicate TMC SHOW/HALL freshness and conflicts using historic native sealed receipts; B: independently verify CKSMH multi-session/multi-hall field authority or use Huashan #13 existing field-role evidence. Do not repeat Songshan/TWTC same DOM GET without a genuinely new independently testable hypothesis. Status-only merge/Pages and any formal publication require separate Owner authorization.
