@@ -2378,6 +2378,24 @@ class TestSongshanCanonicalUUIDRotation(unittest.TestCase):
                           result["golden_accepted_events"],
                           result["published_events"]), (0, 0, 0))
 
+    def test_exact_h3_with_nested_span_is_detail_owned(self):
+        # Official-detail DOM hypothesis: H3 is a valid exact title heading,
+        # not a global text match. This remains REVIEW-only and non-publishing.
+        detail = ('<main><h1>展演資訊</h1><h3><span>' + self.title +
+                  '</span></h3><p>日期 2026-11-14 - 2026-11-22</p></main>')
+        result = self.run_source(detail=detail)
+        self.assertEqual(result["decision"], "REVIEW_ONLY")
+        self.assertEqual(result["same_uuid_review_lkg"], 1)
+        self.assertEqual(result["formal_accepted_fields"], 0)
+
+    def test_duplicate_h3_heading_remains_fail_closed(self):
+        detail = ('<main><h2>' + self.title + '</h2><h3>' +
+                  self.title + '</h3></main>')
+        report = self.run_source(detail=detail)
+        self.assertEqual(report["decision"], "SOURCE_OR_IDENTITY_HOLD_NO_WRITE")
+        self.assertIn("SONGSHAN_DETAIL_EXACT_HEADING_HOLD", report["reason"])
+        self.assertFalse(self.dest.exists())
+
     def test_unrelated_title_cannot_borrow_another_card_uuid(self):
         self.assertEqual(self.run_source()["decision"], "REVIEW_ONLY")
         before = self.dest.read_bytes()

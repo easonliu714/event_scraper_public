@@ -3526,10 +3526,20 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                len(list_text[idx]) <= 500
                for idx, uid in listing.anchors):
             raise ValueError("SONGSHAN_LIST_TITLE_CONFLICTING_UUID_HOLD")
-        headings = [norm(detail_text[idx]) for idx in detail.headings
-                    if detail.nodes[idx]["tag"] in ("h1", "h2")]
-        if headings.count(expected_title) != 1:
-            raise ValueError("SONGSHAN_DETAIL_EXACT_HEADING_HOLD")
+        # Native 2/2 HTTP200 first failed at H1/H2-only heading ownership.
+        # Test the independently observable H3 detail-title hypothesis; never
+        # borrow an unscoped body/footer title or accept duplicate headings.
+        heading_roles = [(detail.nodes[idx]["tag"], norm(detail_text[idx]))
+                         for idx in detail.headings
+                         if detail.nodes[idx]["tag"] in ("h1", "h2", "h3")]
+        exact_matches = [(tag, value) for tag, value in heading_roles
+                         if value == expected_title]
+        if len(exact_matches) != 1:
+            by_tag = {tag: sum(1 for kind, value in heading_roles
+                               if kind == tag and value == expected_title)
+                      for tag in ("h1", "h2", "h3")}
+            raise ValueError("SONGSHAN_DETAIL_EXACT_HEADING_HOLD:" +
+                             ",".join(f"{tag}={count}" for tag, count in by_tag.items()))
         if activity_uuid(SONGSHAN_PUBLIC_DETAIL) != SONGSHAN_EVENT_UUID:
             raise ValueError("SONGSHAN_DETAIL_UUID_IDENTITY_HOLD")
         observed = datetime.now(timezone.utc) if native else (
