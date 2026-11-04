@@ -1552,10 +1552,16 @@ class TestNativeOfficialLinkEdges(unittest.TestCase):
             ("formal_accepted_fields", "golden", "published", "formal_pwa_feed")), (0, 0, 0, 0))
         self.assertEqual(result["release_state"], "HARD_HOLD_NO_PUBLICATION")
 
+    def test_exact_href_accepts_responsive_duplicate_and_image_only_label(self):
+        duplicate = self.tmc.replace("</article>",
+            '<a href="https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2">'
+            '<img alt="票券"/></a></article>')
+        self.assertEqual(self.audit(tmc=duplicate)["source_local_native_link_edges"], 2)
+
     def test_cross_event_link_wrong_id_or_false_ticket_anchor_refused(self):
         cases = [
             (self.tmc.replace("P1DF32E2", "OTHER"), self.index, self.detail),
-            (self.tmc.replace("購票連結", "查看詳情"), self.index, self.detail),
+            (self.tmc.replace("<a ", "<span ").replace("</a>", "</span>"), self.index, self.detail),
             (self.tmc, self.index.replace("id=29418", "id=29417"), self.detail),
             (self.tmc, self.index.replace("11/06", "11/05"), self.detail),
             (self.tmc, self.index.replace("2026年電器空調影音大展", "另一個活動"), self.detail),
