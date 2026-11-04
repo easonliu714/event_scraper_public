@@ -2302,3 +2302,28 @@ class TestHuashanEmbeddedNumericIdentityHypothesis(unittest.TestCase):
             {"@type": "Event", "url": m.HUASHAN_PUBLIC_DETAIL,
              "identifier": "12345", "description": "X" * 530000}
         )["decision"].startswith("HOLD_"))
+
+
+class TestTmcNativeAuthorityExpectedTitleParity(unittest.TestCase):
+    """A first real failure was using a synthetic fixture H1 in a native probe."""
+
+    def test_source_owned_official_title_parses_but_never_accepts(self):
+        from datetime import datetime, timezone
+        title = m.TMC_KHAM_FIELDS["venue_title"][3]
+        self.assertNotEqual(title, "小宇 宋念宇《不，完美的人》")
+        html = ('<h1>' + title + '</h1>'
+                '<p>2026.11.07 19:30</p>'
+                '<p>活動地點 臺北流行音樂中心 表演廳 主辦單位 小宇</p>'
+                '<a href="https://kham.com.tw/application/UTK02/UTK0201_.aspx'
+                '?PRODUCT_ID=P1DF32E2">購票連結</a>')
+        observed = "2026-11-04T14:57:31+00:00"
+        parsed = m.parse_official_non_session_html(
+            m.PUBLIC_TMC_DETAIL, html, title, "P1DF32E2", observed,
+            datetime(2026, 11, 4, 14, 58, tzinfo=timezone.utc))
+        self.assertEqual([f["field"] for f in parsed["candidate_fields"]],
+                         ["venue_showtime", "venue_hall"])
+        with self.assertRaisesRegex(ValueError, "LIST_DETAIL_TITLE_IDENTITY_HOLD"):
+            m.parse_official_non_session_html(
+                m.PUBLIC_TMC_DETAIL, html, "小宇 宋念宇《不，完美的人》",
+                "P1DF32E2", observed,
+                datetime(2026, 11, 4, 14, 58, tzinfo=timezone.utc))
