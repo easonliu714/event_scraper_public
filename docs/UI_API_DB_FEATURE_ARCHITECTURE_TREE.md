@@ -6840,3 +6840,45 @@ B official canonical platform #17 CKSMH (reuse historic actId/Android PASS)
 - NEXT A historical sealed receipt freshness/conflict authority; B numeric identity and three-hall independent authority. No identical native GET without new hypothesis. Status-only Merge/Pages needs separate Owner authorization.
 
 **21:55–22:03 exact native GET accounting correction (supersedes the preceding per-final-CI count):** This Writer turn executed **two** bounded official Huashan DETAIL GET requests to **one unique URL**, both HTTP200: first [CI #41843506735](https://github.com/easonliu714/event_scraper_public/actions/runs/41843506735) exact HEAD 83ce065b8a5c366d3cf077fbf587e3ef39ec67b8 -> field scope `HUASHAN_FIELD_EVENT_TIME_HEADING_SCOPE_HOLD` (0 parsed roles); then [CI #41843731387](https://github.com/easonliu714/event_scraper_public/actions/runs/41843731387) exact HEAD 12b22babc4244521142193d30480061148e5ec77 -> heading-bounded split-token hypothesis PASS, **4 REVIEW roles**. Thus **this turn B new native GET=2 (HTTP200 2), unique URL=1, new LIST=0, new same-path LKG=0, new numeric ID=0**; previous turn B LIST+DETAIL GET=2 and same-path LKG=1. Do not miscount two GETs as two events or two LKG; no further identical GET without a genuinely new validation question. A new native GET=0; formal FIELD/Golden/Published=0/0/0.
+
+
+---
+
+### P30-L7 22:55 fixed non-publishing A/B source-authority and embedded-identity architecture — 2026-11-04
+
+The existing Engineering Draft #236 remains the **single isolated implementation branch**, with no formal Publisher/Scheduler/Notifier invocation, no new platform identity, no main or docs/data.json write:
+
+    A / existing TMC official non-session source
+      historic native LIST -> same DETAIL -> 2 REVIEW roles -> isolated atomic/CAS LKG 1
+      new bounded native DETAIL HTTP200 (1 GET, body SHA256 00d830c5...)
+      -> parse_official_non_session_html(source-owned exact H1, PRODUCT_ID edge)
+      -> first probe failure LIST_DETAIL_TITLE_IDENTITY_HOLD:
+         synthetic fixture H1 was incorrectly passed to the native reader
+      -> CI source-owned title constant TMC_KHAM_FIELDS["venue_title"] fixed
+      -> offline positive/negative parity PASS; native parser re-observation NOT DONE
+      -> assess_tmc_non_session_field_authority: independent authority HOLD
+      X no KHAM checkout GET, PRODUCT_ID is not ticket Session
+
+    B / canonical #13 Huashan official venue
+      historic native LIST -> exact DETAIL path -> REVIEW LKG 1 (not numeric ID)
+      historic native DETAIL -> 4 REVIEW event-local field roles
+      new bounded native DETAIL HTTP200 (1 GET, body SHA256 65b2e4c7...)
+      -> inspect_huashan_embedded_event_identity:
+           strict HTTPS exact URL, JSON-LD Event node URL ownership,
+           bounded parse/depth/count, numeric identifier and ambiguity guards
+      -> HUASHAN_EMBEDDED_JSONLD_ABSENT_OR_EXCESS_HOLD
+      X no verified official numeric event ID, no new same-path LKG
+      X no source-crossing ID, no single-hall inference from 3 halls
+
+    Shared:
+      exact-head source/test/workflow four-path immutable guard
+      -> offline unit tests + one-shot 2 GET (A 1, B 1) in a marked commit only
+      -> digest-sealed CI artifact and independent ZIP SHA/CRC readback
+      -> all REVIEW or HOLD, accepted FIELD 0, Golden 0, Published 0
+      -> HARD_HOLD_NO_PUBLICATION, formal blobs and 19 platforms frozen
+
+- New reusable function: inspect_huashan_embedded_event_identity(html, source_url). A numeric ID, even if explicitly present in JSON-LD, is only REVIEW until exact LIST→DETAIL official identity and independent conflict authority are proven; this native response had no acceptable JSON-LD evidence. No raw HTML saved. The B JSON-LD hypothesis is exhausted for this page and must not cause repeat GET.
+- A parser correction is **not** a new native source-quality PASS: corrected official title ownership now uses the existing source-bound TMC_KHAM_FIELDS venue title rather than the shortened synthetic test fixture. No second A GET was made. A accepted FIELD 0.
+- Native exact-head evidence [CI #41852731021](https://github.com/easonliu714/event_scraper_public/actions/runs/41852731021), HEAD c229541c9ac4ac224c439ae1dd5498b0423c0682, Artifact #13336182468 SHA256 0867d6c0617f79659389532430ce72b8a4d251695bceb4507c61d24fb28ddac8 (independent ZIP CRC PASS); final corrected exact-head [CI #41852915753](https://github.com/easonliu714/event_scraper_public/actions/runs/41852915753) SUCCESS, HEAD b2631ff5e7163f6cadbfeaf415f5bd2fbf9274a3, Artifact #13335478032 SHA256 74ec8bd71880832bfce26d7777a76d7f591790482b485cfe4b6a4a5ea2c4c90b (independent ZIP CRC PASS). Final run is no-native-GET regression, not another official source observation.
+- Source main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce, Preview main 03e515d65e827d5ed67fe341d079907a96bf784a, ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad. Formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 and status blob 99cae0571e36e52dac360b6935c0c09f6f6bed3f unchanged; status snapshot 2026-11-03 18:55 remains stale. Pages HTTP UNVERIFIED. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS protected. Owner action none for isolated work; separate authorization required for any formal status-only Merge/Pages or Golden publication.
+- NEXT: A sealed native TMC receipt reconciliation + independent SHOW/HALL conflict matrix without repeated GET; B rotate to existing canonical #14 Songshan official LIST→DETAIL identity (dedup first), or independently adjudicate already observed Huashan multi-hall roles. Never repeat TWTC/CKSMH/Huashan same-root-cause requests or manufacture official numeric IDs.
