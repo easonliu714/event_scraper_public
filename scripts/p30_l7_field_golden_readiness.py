@@ -3992,3 +3992,131 @@ def diagnose_cksmh_session_dom_boundary(detail_html, source_url, body_sha256):
         "published_events": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
+
+
+# B canonical #13 rotation: connect the EXISTING same-path REVIEW LKG and
+# four source-local field roles to a deterministic, sealed authority decision.
+# This is pure/offline. A path hash is not a venue-issued numeric event ID;
+# no cross-platform identity, formal field, Golden or Publisher is inferred.
+def assess_huashan_sealed_nonpublishing_field_gate(snapshot, detail_html=None,
+                                                  now_utc=None):
+    import hashlib
+    from datetime import timezone
+    from urllib.parse import unquote, urlsplit
+
+    report = {
+        "kind": "P30_L7_HUASHAN_CANONICAL_SEALED_FIELD_GATE_V1",
+        "platform_id": "13", "source_event_id": None,
+        "identity_authority": "OFFICIAL_SAME_PATH_NOT_NUMERIC_EVENT_ID",
+        "decision": "HOLD_NO_SEALED_REVIEW_LKG",
+        "first_failure": "HUASHAN_NO_SNAPSHOT",
+        "source_age_seconds": None, "field_matrix": [],
+        "native_get_this_call": 0, "native_same_numeric_id": 0,
+        "native_same_id_review_lkg_new": 0,
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+    if snapshot is None:
+        return report
+    _validate_isolated_lkg_snapshot(snapshot)
+    row = snapshot["rows"][0]
+    meta = row["_candidate"]
+    src = snapshot["source_receipts"]
+    expected_path = unquote(urlsplit(HUASHAN_PUBLIC_DETAIL).path)
+    expected_id = "path-sha256-" + hashlib.sha256(
+        expected_path.encode("utf-8")).hexdigest()[:24]
+    if (meta.get("platform_id") != "13"
+            or meta.get("source_event_id") != expected_id
+            or meta.get("source_identity_kind")
+               != "OFFICIAL_PATH_HASH_NOT_NUMERIC_ID"
+            or meta.get("record_id") != "13:" + expected_id
+            or meta.get("sources") != [HUASHAN_PUBLIC_LIST, HUASHAN_PUBLIC_DETAIL]
+            or row.get("url") != HUASHAN_PUBLIC_DETAIL
+            or row.get("title") != HUASHAN_ROTATION_TITLE
+            or src.get("list_url") != HUASHAN_PUBLIC_LIST
+            or src.get("detail_url") != HUASHAN_PUBLIC_DETAIL):
+        raise ValueError("HUASHAN_SEALED_CROSS_EVENT_OR_PLATFORM_HOLD")
+    if snapshot["field_receipts"] != [{
+            "field": "title", "value": HUASHAN_ROTATION_TITLE,
+            "role": "EVENT_TITLE", "source": HUASHAN_PUBLIC_DETAIL,
+            "observed_at": row["scraped_at"], "decision": "REVIEW"}]:
+        raise ValueError("HUASHAN_SEALED_TITLE_ROLE_HOLD")
+    receipt = _validate_nonpublishing_source_receipt(
+        src.get("bounded_acquisition"), HUASHAN_PUBLIC_LIST,
+        HUASHAN_PUBLIC_DETAIL, row["scraped_at"])
+    report["source_event_id"] = expected_id
+    now = now_utc or datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("HUASHAN_SEALED_NOW_CLOCK_HOLD")
+    try:
+        observed = datetime.fromisoformat(
+            row["scraped_at"].replace("Z", "+00:00"))
+    except (AttributeError, TypeError, ValueError):
+        raise ValueError("HUASHAN_SEALED_OBSERVED_CLOCK_HOLD") from None
+    if observed.utcoffset() is None:
+        raise ValueError("HUASHAN_SEALED_OBSERVED_CLOCK_HOLD")
+    age = (now - observed).total_seconds()
+    report["source_age_seconds"] = int(age)
+    if not 0 <= age <= 86400:
+        report["decision"] = "HOLD_SOURCE_FRESHNESS"
+        report["first_failure"] = "HUASHAN_SEALED_STALE_OR_FUTURE_24H"
+        return report
+    if detail_html is None:
+        report["decision"] = "HOLD_NO_SOURCE_BODY_FOR_FIELD_AUTHORITY"
+        report["first_failure"] = "HUASHAN_SEALED_DETAIL_BODY_NOT_AVAILABLE"
+        return report
+    if not isinstance(detail_html, str) or not detail_html.strip():
+        report["decision"] = "HOLD_INVALID_DETAIL_BODY"
+        report["first_failure"] = "HUASHAN_SEALED_DETAIL_BODY_INVALID"
+        return report
+    if hashlib.sha256(detail_html.encode("utf-8")).hexdigest() != receipt[
+            "detail_body_sha256"]:
+        report["decision"] = "HOLD_DETAIL_BODY_RECEIPT_CONFLICT"
+        report["first_failure"] = "HUASHAN_SEALED_DETAIL_SHA_MISMATCH"
+        return report
+    parsed = adjudicate_huashan_detail_field_roles(
+        detail_html, HUASHAN_PUBLIC_DETAIL, row["scraped_at"],
+        receipt["detail_body_sha256"], now_utc=now)
+    if parsed["decision"] != (
+            "REVIEW_FOUR_SOURCE_ROLES_INDEPENDENT_ACCEPTANCE_HOLD"):
+        report["decision"] = "HOLD_FIELD_SEMANTICS_CONFLICT"
+        report["first_failure"] = parsed["first_failure"]
+        return report
+    native = receipt["transport"] == "BUILTIN_NATIVE_GET"
+    report["field_matrix"] = [
+        dict(field, native_body_receipt=native,
+             independent_field_authority=False,
+             official_numeric_event_id_verified=False,
+             decision=("REVIEW_PATH_IDENTITY_ONLY_INDEPENDENT_AUTHORITY_HOLD"
+                       if native else "OFFLINE_TEST_INJECTED_NOT_NATIVE"))
+        for field in parsed["field_matrix"]
+    ]
+    report["decision"] = ("REVIEW_FOUR_ROLES_NUMERIC_ID_AND_AUTHORITY_HOLD"
+                          if native else "HOLD_TEST_INJECTED_NOT_NATIVE")
+    report["first_failure"] = (
+        "HUASHAN_OFFICIAL_NUMERIC_EVENT_ID_AND_INDEPENDENT_AUTHORITY_MISSING"
+        if native else "HUASHAN_TEST_INJECTED_NOT_NATIVE")
+    return report
+
+
+def assess_tmc_huashan_fixed_nonpublishing_gate(tmc_snapshot=None,
+                                                huashan_snapshot=None,
+                                                huashan_detail_html=None,
+                                                now_utc=None):
+    """Reusable A+B source authority contract; never GET or write a feed."""
+    a = assess_tmc_non_session_field_authority(tmc_snapshot, now_utc)
+    b = assess_huashan_sealed_nonpublishing_field_gate(
+        huashan_snapshot, huashan_detail_html, now_utc)
+    return {
+        "kind": "P30_L7_FIXED_A_TMC_B_HUASHAN_ROTATION_V1",
+        "A": a, "B": b,
+        "source_identity": {
+            "A": "TMC_OFFICIAL:" + PUBLIC_TMC_DETAIL.rsplit("/", 1)[-1],
+            "B": "13:" + (b["source_event_id"] or "UNVERIFIED_PATH_ID"),
+            "cross_source_identity_merge": False,
+        },
+        "new_native_get": 0, "native_same_id_review_lkg_new": 0,
+        "decision": "HOLD_INDEPENDENT_FIELD_AUTHORITY",
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
