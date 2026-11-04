@@ -1789,3 +1789,108 @@ class TestDurableIsolatedReviewLKG(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.run_b()
         self.assertEqual(lock.read_text(), "another writer")
+
+
+class TestBoundedNativeToReviewLKG(unittest.TestCase):
+    """No CI network: two explicit official URLs -> same-ID REVIEW disk LKG."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.destination = pathlib.Path(self.temp.name) / "review_lkg_snapshot.json"
+        self.case = TestFixedSourceAdapterToReviewPipeline(
+            "test_b_twtc_same_id_review_pipeline_with_daily_hours_sidecar")
+        self.case.setUp()
+        self.now = datetime(2026, 11, 4, 6, 55, tzinfo=timezone.utc)
+        self.calls = []
+
+    def fake(self, mapping, *, bad_status=None, bad_content_type=None):
+        def fetch(url):
+            self.calls.append(url)
+            body = mapping[url].encode("utf-8")
+            return (bad_status if bad_status and url == m.PUBLIC_TWTC_DETAIL
+                    else 200,
+                    bad_content_type if bad_content_type else
+                    "text/html; charset=utf-8", body, url)
+        return fetch
+
+    def b(self, fetcher):
+        c = self.case
+        return m.run_bounded_native_source_to_review_lkg(
+            m.PUBLIC_TWTC_LIST, m.PUBLIC_TWTC_DETAIL,
+            c.btitle, "29418", self.destination, ROOT,
+            fetcher=fetcher, now_utc=self.now)
+
+    def test_b_two_bounded_gets_to_durable_same_id_review(self):
+        c = self.case
+        mapping = {m.PUBLIC_TWTC_LIST: c.blist,
+                   m.PUBLIC_TWTC_DETAIL: c.bdetail}
+        out = self.b(self.fake(mapping))
+        self.assertTrue(out["persisted"])
+        self.assertEqual(self.calls, [m.PUBLIC_TWTC_LIST, m.PUBLIC_TWTC_DETAIL])
+        self.assertEqual(len(out["source_receipts"]), 2)
+        self.assertEqual(len(out["snapshot"]["field_receipts"]), 3)
+        self.assertEqual(out["snapshot"]["rows"][0]["_candidate"]
+                         ["source_event_id"], "29418")
+        self.assertFalse(out["native_get_verified"])
+        self.assertEqual(out["source_receipts"][0]["transport"],
+                         "TEST_INJECTED_NOT_NATIVE")
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertEqual(out["published_events"], 0)
+        self.assertEqual(out["release_state"], "HARD_HOLD_NO_PUBLICATION")
+        self.assertIsNotNone(m.load_isolated_review_lkg(
+            self.destination, ROOT))
+
+    def test_a_two_gets_never_fetch_checkout_and_keep_product_hold(self):
+        c = self.case
+        mapping = {m.PUBLIC_TMC_LIST: c.alist,
+                   m.PUBLIC_TMC_DETAIL: c.adetail}
+        out = m.run_bounded_native_source_to_review_lkg(
+            m.PUBLIC_TMC_LIST, m.PUBLIC_TMC_DETAIL,
+            c.atitle, "P1DF32E2", self.destination, ROOT,
+            fetcher=self.fake(mapping), now_utc=self.now)
+        self.assertTrue(out["persisted"])
+        self.assertEqual(self.calls, [m.PUBLIC_TMC_LIST, m.PUBLIC_TMC_DETAIL])
+        self.assertTrue(all("kham.com.tw" not in url for url in self.calls))
+        self.assertIn("KHAM_PRODUCT_NOT_CHECKOUT_SESSION",
+                      out["snapshot"]["rows"][0]["_candidate"]["hold_reasons"])
+        self.assertEqual(len(out["snapshot"]["field_receipts"]), 2)
+        self.assertFalse(out["native_get_verified"])
+
+    def test_http_failure_and_cross_id_keep_lkg_bytes_unchanged(self):
+        c = self.case
+        mapping = {m.PUBLIC_TWTC_LIST: c.blist,
+                   m.PUBLIC_TWTC_DETAIL: c.bdetail}
+        self.assertTrue(self.b(self.fake(mapping))["persisted"])
+        prior = self.destination.read_bytes()
+        failed = self.b(self.fake(mapping, bad_status=503))
+        self.assertEqual(failed["decision"], "SOURCE_ACQUISITION_HOLD_NO_WRITE")
+        self.assertEqual(self.destination.read_bytes(), prior)
+        conflicting = dict(mapping)
+        conflicting[m.PUBLIC_TWTC_LIST] = c.blist.replace("29418", "29419")
+        result = self.b(self.fake(conflicting))
+        self.assertFalse(result["persisted"])
+        self.assertEqual(result["snapshot"]["decision"],
+                         "ROLLBACK_TO_ISOLATED_LAST_KNOWN_GOOD")
+        self.assertEqual(self.destination.read_bytes(), prior)
+
+    def test_reject_checkout_redirect_non_html_and_implicit_network(self):
+        c = self.case
+        with self.assertRaisesRegex(ValueError, "EXACT_ALLOWLIST"):
+            m.run_bounded_native_source_to_review_lkg(
+                m.PUBLIC_TMC_LIST,
+                "https://kham.com.tw/application/UTK02/UTK0201_.aspx"
+                "?PRODUCT_ID=P1DF32E2",
+                c.atitle, "P1DF32E2", self.destination, ROOT,
+                fetcher=lambda _: None, now_utc=self.now)
+        with self.assertRaisesRegex(ValueError, "EXPLICIT_NEW_HYPOTHESIS"):
+            m.run_bounded_native_source_to_review_lkg(
+                m.PUBLIC_TWTC_LIST, m.PUBLIC_TWTC_DETAIL,
+                c.btitle, "29418", self.destination, ROOT)
+        mapping = {m.PUBLIC_TWTC_LIST: c.blist,
+                   m.PUBLIC_TWTC_DETAIL: c.bdetail}
+        failed = self.b(self.fake(mapping, bad_content_type="application/json"))
+        self.assertEqual(failed["decision"], "SOURCE_ACQUISITION_HOLD_NO_WRITE")
+        self.assertFalse(self.destination.exists())
