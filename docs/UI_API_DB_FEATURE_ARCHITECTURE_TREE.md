@@ -7019,3 +7019,21 @@ Core: existing isolated candidate LKG fail-closed, SHA/CAS/atomic,
 ```
 
 Next B: do not re-run identical raw CKSMH GET; independently verify legitimate existing JS-rendered source identity/authority or rotate to existing Huashan #13 role contract/next Taipei P0. Next A: fresh independent source-owned SHOW/HALL conflict adjudication using sealed historic TMC receipt, no checkout. Formal status-only Merge/Pages and any publication require separate Owner authorization; direct Pages runtime UNVERIFIED.
+
+
+---
+
+### P30-L7 04:55 Architecture Tree catch-up (previous governance write HOLD)
+
+At Engineering Draft #236 HEAD 0ed7fddbf2f59491d96c4846d4e815bb9df58a3f, existing TMC source contract was joined to canonical Huashan #13 sealed field gate (source path, SHA256 receipts, UTC freshness, four event-local roles). CI #41911692344 SUCCESS 114/114 offline, artifact #13361469646. Historic native TMC LKG was not mounted; B four roles were injected test evidence only; new native GET/numeric identity/formal FIELD/Golden/publication 0. The prior Roadmap was updated but Architecture Tree update was safety-blocked; this entry reconciles the missing Architecture record while preserving historical PASS/HOLD.
+
+
+---
+
+### P30-L7 2026-11-05 05:55 — A/B fixed non-publishing source pipeline increment (Governance Draft #8 only)
+
+- **Engineering:** Draft #236 https://github.com/easonliu714/event_scraper_public/pull/236 exact HEAD 29bf371866137f3d39998a24e840e353b0dadafc, base main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce. Exact-head CI #41920227078 https://github.com/easonliu714/event_scraper_public/actions/runs/41920227078 SUCCESS **117/117 offline**, job 126890459617, artifact #13366926285 digest sha256:51d7b96a600ed762255dc0f7de0439fd71bc8488b2d14c7635e11e769d91cae2. CI SHA256 manifest PASS; independent ZIP CRC UNVERIFIED. Original four ADD-only PR paths; only two files modified in this commit.
+- **A TMC:** new native GET/LIST/DETAIL/IDENTITY/LKG 0/0/0/0/0. Historical native official LIST -> same-event DETAIL -> SHOW/HALL 2 REVIEW -> sealed isolated LKG 1 retained. Existing assess_tmc_non_session_field_authority remains HOLD if native snapshot is unavailable or independent field authority/freshness absent. KHAM checkout not fetched, PRODUCT_ID not EVENT_SESSION.
+- **B canonical Huashan #13:** new reusable run_huashan_field_aware_review_lkg composes caller-supplied bounded exact official LIST/DETAIL bytes -> four-role event-local semantic preflight -> existing exact-path/H1 identity -> approved L7 REVIEW candidate -> atomic/CAS/SHA LKG -> sealed field authority matrix. Semantic conflict, cross-host/redirect and HTTP errors do not write LKG. Positive CI: one **TEST_INJECTED_NOT_NATIVE** same-path REVIEW LKG and 4/4 roles; new native GET/LIST/DETAIL/numeric ID/LKG 0/0/0/0/0. Source path hash is not an official numeric EVENT_ID. Independent identity/field authority HOLD; no native GET this CI.
+- **First failure and stop-rule:** current CI no failure; prior #41911576599 normalize_record intentionally drops source_identity_kind, fixed at prior HEAD. TWTC title-cell conflicting IDs, Songshan H1/H2/H3 absent and CKSMH native HTML no visible ordinals remain HOLD; no repeated identical GET. Next A: reuse historic sealed native TMC receipt with independent SHOW/HALL conflict decision. Next B: only a new independently evidenced Huashan numeric identity hypothesis may justify limited GET; otherwise rotate to another deduped Taipei P0 source, not repeated synthetic tests.
+- **Formal invariants:** Source/Preview/ShowNews main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce / 03e515d65e827d5ed67fe341d079907a96bf784a / 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad. Formal data/status blobs 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 / 99cae0571e36e52dac360b6935c0c09f6f6bed3f. Accepted FIELD/Golden/Published/feed 0/0/0/0, HARD_HOLD_NO_PUBLICATION. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS preserved. Formal status snapshot 2026-11-03 18:55 stale; status-only Merge/Pages requires separate Owner approval. Pages HTTP UNVERIFIED. Owner action NONE for isolated engineering.
