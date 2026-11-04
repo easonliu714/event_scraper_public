@@ -1880,8 +1880,18 @@ class TestBoundedNativeToReviewLKG(unittest.TestCase):
         self.assertEqual(out["formal_accepted_fields"], 0)
         self.assertEqual(out["published_events"], 0)
         self.assertEqual(out["release_state"], "HARD_HOLD_NO_PUBLICATION")
-        self.assertIsNotNone(m.load_isolated_review_lkg(
-            self.destination, ROOT))
+        durable = m.load_isolated_review_lkg(self.destination, ROOT)
+        self.assertIsNotNone(durable)
+        import hashlib
+        acquired = durable["source_receipts"]["bounded_acquisition"]
+        self.assertEqual(acquired["transport"], "TEST_INJECTED_NOT_NATIVE")
+        self.assertEqual(acquired["list_url"], m.PUBLIC_TWTC_LIST)
+        self.assertEqual(acquired["detail_url"], m.PUBLIC_TWTC_DETAIL)
+        self.assertEqual(acquired["list_body_sha256"],
+                         hashlib.sha256(c.blist.encode("utf-8")).hexdigest())
+        self.assertEqual(acquired["detail_body_sha256"],
+                         hashlib.sha256(c.bdetail.encode("utf-8")).hexdigest())
+        self.assertFalse(durable["native_get_verified"])
 
     def test_a_two_gets_never_fetch_checkout_and_keep_product_hold(self):
         c = self.case
@@ -1934,3 +1944,29 @@ class TestBoundedNativeToReviewLKG(unittest.TestCase):
         failed = self.b(self.fake(mapping, bad_content_type="application/json"))
         self.assertEqual(failed["decision"], "SOURCE_ACQUISITION_HOLD_NO_WRITE")
         self.assertFalse(self.destination.exists())
+
+    def test_sealed_acquisition_receipt_cannot_rebind_identity_or_time(self):
+        c = self.case
+        mapping = {m.PUBLIC_TWTC_LIST: c.blist,
+                   m.PUBLIC_TWTC_DETAIL: c.bdetail}
+        self.assertTrue(self.b(self.fake(mapping))["persisted"])
+        original = json.loads(self.destination.read_text(encoding="utf-8"))
+        for key, bad in (
+                ("list_url", "https://example.org/unrelated"),
+                ("detail_url", m.PUBLIC_TWTC_DETAIL.replace("29418", "29419")),
+                ("observed_at_utc", "2025-01-01T00:00:00+00:00"),
+                ("list_body_sha256", "not-a-sha256")):
+            with self.subTest(key=key):
+                forged = copy.deepcopy(original)
+                forged["snapshot"]["source_receipts"]["bounded_acquisition"][key] = bad
+                # Rehash the envelope to prove semantic provenance validation
+                # is independent of the envelope's byte-integrity check.
+                forged["sha256"] = m._isolated_lkg_digest(forged["snapshot"])
+                self.destination.write_text(
+                    json.dumps(forged, ensure_ascii=False), encoding="utf-8")
+                with self.assertRaisesRegex(
+                        ValueError, "ISOLATED_LKG_ACQUISITION_PROVENANCE_HOLD"):
+                    m.load_isolated_review_lkg(self.destination, ROOT)
+        self.destination.write_text(
+            json.dumps(original, ensure_ascii=False), encoding="utf-8")
+        self.assertIsNotNone(m.load_isolated_review_lkg(self.destination, ROOT))
