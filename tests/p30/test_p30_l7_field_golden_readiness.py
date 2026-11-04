@@ -2850,7 +2850,7 @@ class TestTmcFieldAwareReusablePipeline(unittest.TestCase):
 
     def test_two_roles_to_atomic_review_without_native_or_publication(self):
         out = self.run_pair(self.pair())
-        self.assertEqual(out["same_event_review_lkg"], 1)
+        self.assertEqual(out["same_event_review_lkg"], 1, out)
         self.assertEqual({x["field"] for x in out["field_matrix"]},
                          {"venue_showtime", "venue_hall"})
         self.assertEqual(out["first_failure"], "TMC_TEST_INJECTED_NOT_NATIVE")
