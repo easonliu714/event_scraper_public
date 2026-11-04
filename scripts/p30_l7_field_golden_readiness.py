@@ -1101,6 +1101,7 @@ def build_non_session_list_detail_candidate(
             self.rows = []
             self.anchors = []
             self.active_anchor = None
+            self.active_cell = None
             self.skip = 0
 
         def handle_starttag(self, tag, attrs):
@@ -1114,7 +1115,14 @@ def build_non_session_list_detail_candidate(
                 if self.stack:
                     self.stack[-1]["has_nested_semantic"] = True
                 self.stack.append({"tag": tag, "text": [], "links": [],
-                                   "has_nested_semantic": False})
+                                   "cells": [], "has_nested_semantic": False})
+            if tag in ("td", "th") and self.stack:
+                # Bind identity to the exact title-bearing cell, not a
+                # responsive row containing links for unrelated events.
+                if self.active_cell is not None:
+                    raise ValueError("LIST_NESTED_TABLE_CELL_AMBIGUOUS_HOLD")
+                self.active_cell = {"tag": tag, "text": [], "links": []}
+                self.stack[-1]["cells"].append(self.active_cell)
             if tag == "a":
                 self.active_anchor = {"href": dict(attrs).get("href", ""), "text": []}
 
@@ -1126,6 +1134,8 @@ def build_non_session_list_detail_candidate(
                 return
             for row in self.stack:
                 row["text"].append(value)
+            if self.active_cell is not None:
+                self.active_cell["text"].append(value)
             if self.active_anchor is not None:
                 self.active_anchor["text"].append(value)
 
@@ -1144,7 +1154,13 @@ def build_non_session_list_detail_candidate(
                 # for responsive <article>/<tr> nesting.
                 if self.stack:
                     self.stack[-1]["links"].append(link)
+                if self.active_cell is not None:
+                    self.active_cell["links"].append(link)
                 self.active_anchor = None
+            if tag in ("td", "th") and self.active_cell is not None:
+                if self.active_cell["tag"] != tag:
+                    raise ValueError("LIST_CELL_MARKUP_AMBIGUOUS_HOLD")
+                self.active_cell = None
             if tag in ("article", "tr", "li") and self.stack:
                 if self.stack[-1]["tag"] != tag:
                     raise ValueError("LIST_ROW_MARKUP_AMBIGUOUS_HOLD")
@@ -1152,8 +1168,8 @@ def build_non_session_list_detail_candidate(
 
     parser = RowAnchors()
     parser.feed(list_html)
-    if parser.stack or parser.skip:
-        raise ValueError("LIST_HTML_UNCLOSED_ROW_HOLD")
+    if parser.stack or parser.skip or parser.active_cell is not None:
+        raise ValueError("LIST_HTML_UNCLOSED_ROW_OR_CELL_HOLD")
     matched = []
     for row in parser.rows:
         # Only the innermost semantic row may attest an exact event edge.
@@ -1165,11 +1181,29 @@ def build_non_session_list_detail_candidate(
         # Whole title, not a fuzzy substring of another event.
         if expected_title not in text:
             continue
+        # Prefer a source-local exact-title cell containing its own DETAIL
+        # link. A sibling cell's unrelated event link must not poison the
+        # target cell or become a false same-ID edge. Without such a local
+        # edge, retain the strict whole-row single-ID fallback.
+        title_cells = [cell for cell in row.get("cells", [])
+                       if expected_title in " ".join(cell["text"])]
+        cell_links = [
+            (urljoin(list_url, href), " ".join(cell["text"]))
+            for cell in title_cells for href, label in cell["links"]
+            if urlsplit(urljoin(list_url, href)).path
+            == "/exhibition_more.aspx"]
+        if line == "B" and cell_links:
+            if {url for url, _ in cell_links} != {detail_url}:
+                raise ValueError("LIST_TITLE_CELL_CONFLICTING_DETAIL_IDS_HOLD")
+            matched.extend((cell_text, detail_url)
+                           for url, cell_text in cell_links
+                           if url == detail_url)
+            continue
         row_detail_links = [urljoin(list_url, href)
                             for href, label in row["links"]
                             if urlsplit(urljoin(list_url, href)).path
                             == "/exhibition_more.aspx"]
-        # A title-bearing row with another event ID is not a safe identity.
+        # A title-only cell cannot be joined to one of multiple row IDs.
         if line == "B" and row_detail_links:
             if set(row_detail_links) != {detail_url}:
                 raise ValueError("LIST_ROW_CONFLICTING_DETAIL_IDS_HOLD")
