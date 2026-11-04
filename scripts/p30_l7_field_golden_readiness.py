@@ -1352,15 +1352,54 @@ def build_non_session_list_detail_candidate(
     if line == "A" and len(matched) != 1:
         raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
     unique_matches = set(matched)
+    duplicate_period = None
     if len(unique_matches) != 1:
-        raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
-    matched = [next(iter(unique_matches))]
+        # Native TWTC has two responsive title cells for the same official ID.
+        # Ignore layout-only row wording ONLY if each atomic title+ID row has
+        # exactly the same explicit two-date period. Different dates, missing
+        # dates, extra date labels or more than two copies fail closed.
+        if line != "B" or not 1 <= len(unique_matches) <= 2:
+            raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
+
+        def row_period(row_text):
+            import re
+            tokens = re.findall(
+                r"(?<!\\d)(?:20\\d{2}[/-])?\\d{1,2}[/-]\\d{1,2}(?!\\d)",
+                row_text)
+            if len(tokens) != 2:
+                return None
+            normalized = []
+            for token in tokens:
+                parts = [int(p) for p in token.replace("-", "/").split("/")]
+                if len(parts) == 3:
+                    year, month, day = parts
+                    if year != 2026:
+                        return None
+                else:
+                    month, day = parts
+                if not (1 <= month <= 12 and 1 <= day <= 31):
+                    return None
+                normalized.append("2026/%02d/%02d" % (month, day))
+            return tuple(normalized)
+
+        periods = {row_period(row_text) for row_text, _ in unique_matches}
+        if None in periods or len(periods) != 1:
+            raise ValueError("LIST_RESPONSIVE_PERIOD_CONFLICT_OR_MISSING_HOLD")
+        duplicate_period = next(iter(periods))
+    # Deterministic representative; never manufacture a source row or identity.
+    matched = [min(unique_matches, key=lambda pair: (len(pair[0]), pair[0]))]
 
     detail = parse_official_non_session_html(
         detail_url, detail_html, expected_title, expected_identity_id,
         observed_at_utc, now_utc=now_utc)
     if detail["line"] != line:
         raise ValueError("LIST_DETAIL_CROSS_SOURCE_HOLD")
+    if duplicate_period is not None:
+        period = next((f["value"] for f in detail["candidate_fields"]
+                       if f["field"] == "exhibition_dates"), None)
+        if (not isinstance(period, dict)
+                or (period.get("start"), period.get("end")) != duplicate_period):
+            raise ValueError("LIST_RESPONSIVE_PERIOD_DETAIL_MISMATCH_HOLD")
     # A product identity is proven by the detail's direct KHAM href; not by
     # the TMC LIST row. B exhibition identity is the exact same LIST href ID.
     identity_scope = ("DETAIL_DIRECT_KHAM_PRODUCT_NOT_LIST_SESSION" if line == "A"

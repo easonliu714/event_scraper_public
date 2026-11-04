@@ -1717,6 +1717,28 @@ class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
             self.b(identity="29417")
 
 
+    def test_responsive_same_id_layout_variants_require_identical_detail_period(self):
+        # Distinct desktop/mobile row wording must not create a second event.
+        # Both title cells independently carry the exact same ID and dates.
+        base = self.blist.replace("<table>", "").replace("</table>", "")
+        mobile = base.replace("11/06 ~ 11/09",
+                              "2026/11/06 ~ 2026/11/09").replace(
+                                  "<td>2026/11/06", "<td>Mobile 2026/11/06")
+        merged = "<table>" + base + mobile + "</table>"
+        result = self.b(index=merged)
+        self.assertEqual(result["quality"]["previewRows"], 1)
+        self.assertEqual(result["rows"][0]["_candidate"]["source_event_id"],
+                         "29418")
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        # A different date context is NOT a responsive duplicate.
+        changed = mobile.replace("2026/11/09", "2026/11/10")
+        with self.assertRaisesRegex(ValueError, "RESPONSIVE_PERIOD_CONFLICT"):
+            self.b(index="<table>" + base + changed + "</table>")
+        # Even matching responsive rows cannot override official DETAIL dates.
+        wrong_detail = self.bdetail.replace("2026/11/09", "2026/11/10")
+        with self.assertRaisesRegex(ValueError, "RESPONSIVE_PERIOD_DETAIL_MISMATCH"):
+            self.b(index=merged, detail=wrong_detail)
+
     def test_twtc_title_cell_local_edge_excludes_unrelated_sibling_cell(self):
         # A responsive row may contain a second unrelated event anchor.
         # The exact title+ID within ONE cell is authoritative for REVIEW;
