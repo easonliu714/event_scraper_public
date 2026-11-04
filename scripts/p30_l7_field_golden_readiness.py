@@ -3365,3 +3365,248 @@ def inspect_huashan_embedded_event_identity(html, source_url):
     report["embedded_numeric_id_review"] = numeric_ids[0]
     report["decision"] = "REVIEW_EMBEDDED_ID_NOT_LIST_BOUND"
     return report
+
+
+# B P0 canonical #14 Songshan: strict official UUID LIST -> DETAIL identity.
+# Reuse the existing candidate quality gate and atomic/CAS sealed LKG, never
+# create a second platform, infer ticket Session, or write production data.
+SONGSHAN_PUBLIC_LIST = "https://www.songshanculturalpark.org/exhibition"
+SONGSHAN_EVENT_UUID = "d44f6cfd-c232-41db-9124-adcc49302f2a"
+SONGSHAN_PUBLIC_DETAIL = SONGSHAN_PUBLIC_LIST + "/activity/" + SONGSHAN_EVENT_UUID
+SONGSHAN_EVENT_TITLE = "2026 紙上躍躍然．典美插畫大賞"
+
+
+def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
+                                network_authorized=False, source_hypothesis="",
+                                now_utc=None):
+    """Bounded official two-GET UUID edge -> existing isolated REVIEW LKG."""
+    import hashlib, re, urllib.request
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin, urlsplit
+    from datetime import timezone
+    from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+
+    _isolated_lkg_path(destination, repo_root)
+    previous = load_isolated_review_lkg(destination, repo_root)
+    if fetcher is None and (network_authorized is not True or
+                            not isinstance(source_hypothesis, str) or
+                            not 8 <= len(source_hypothesis.strip()) <= 200):
+        raise ValueError("SONGSHAN_NATIVE_REQUIRES_NEW_HYPOTHESIS")
+    if fetcher is not None and not callable(fetcher):
+        raise ValueError("SONGSHAN_FETCHER_NOT_CALLABLE")
+    native, receipts = fetcher is None, []
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    def public_get(url):
+        request = urllib.request.Request(url, method="GET", headers={
+            "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+            "Accept": "text/html", "Accept-Encoding": "identity"})
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=8) as res:
+            return (res.status, res.headers.get("Content-Type", ""),
+                    res.read(524289), res.geturl())
+
+    def activity_uuid(href):
+        try:
+            resolved = urlsplit(urljoin(SONGSHAN_PUBLIC_LIST, href))
+            if (resolved.scheme != "https" or
+                    resolved.netloc != "www.songshanculturalpark.org" or
+                    resolved.username or resolved.password or
+                    resolved.query or resolved.fragment):
+                return None
+            match = re.fullmatch(
+                r"/exhibition/activity/([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})",
+                resolved.path)
+            return match.group(1) if match else None
+        except (TypeError, ValueError):
+            return None
+
+    class BoundedDOM(HTMLParser):
+        """Find an event-owned title/UUID in one bounded DOM subtree."""
+        VOID = frozenset(("area", "base", "br", "col", "embed", "hr",
+                          "img", "input", "link", "meta", "param",
+                          "source", "track", "wbr"))
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.nodes = [{"tag": "root", "parent": None, "text": "",
+                           "uuid": None}]
+            self.stack = [0]
+            self.anchors = []
+            self.headings = []
+        def handle_starttag(self, tag, attrs):
+            if len(self.nodes) >= 16000 or len(self.stack) > 80:
+                raise ValueError("SONGSHAN_DOM_BOUNDS_HOLD")
+            attributes = dict(attrs)
+            idx = len(self.nodes)
+            uid = activity_uuid(attributes.get("href", "")) if tag == "a" else None
+            self.nodes.append({"tag": tag, "parent": self.stack[-1],
+                               "text": "", "uuid": uid})
+            if uid:
+                self.anchors.append((idx, uid))
+            if tag in ("h1", "h2", "h3"):
+                self.headings.append(idx)
+            if tag not in self.VOID:
+                self.stack.append(idx)
+        def handle_startendtag(self, tag, attrs):
+            self.handle_starttag(tag, attrs)
+            if tag not in self.VOID:
+                self.handle_endtag(tag)
+        def handle_data(self, value):
+            if self.nodes[self.stack[-1]]["tag"] not in (
+                    "script", "style", "noscript"):
+                self.nodes[self.stack[-1]]["text"] += value
+        def handle_endtag(self, tag):
+            for i in range(len(self.stack)-1, 0, -1):
+                if self.nodes[self.stack[i]]["tag"] == tag:
+                    del self.stack[i:]
+                    return
+        def scopes(self):
+            texts = [x["text"] for x in self.nodes]
+            ids = [{x["uuid"]} if x["uuid"] else set() for x in self.nodes]
+            for idx in range(len(self.nodes)-1, 0, -1):
+                parent = self.nodes[idx]["parent"]
+                texts[parent] += " " + texts[idx]
+                ids[parent].update(ids[idx])
+            return texts, ids
+
+    def norm(s):
+        return re.sub(r"\s+", " ", s).strip()
+
+    def hold(reason):
+        return {"kind": "P30_L7_SONGSHAN_CANONICAL_ROTATION_V1",
+                "platform_id": "14", "decision": "SOURCE_OR_IDENTITY_HOLD_NO_WRITE",
+                "reason": str(reason)[:160], "source_receipts": receipts,
+                "native_get_200_count": (sum(r["http_status"] == 200 for r in receipts)
+                                          if native else 0),
+                "same_uuid_review_lkg": 0, "persisted": False,
+                "formal_accepted_fields": 0, "golden_accepted_events": 0,
+                "published_events": 0,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    try:
+        pages = []
+        for url in (SONGSHAN_PUBLIC_LIST, SONGSHAN_PUBLIC_DETAIL):
+            status, content_type, raw, final_url = (public_get if native else fetcher)(url)
+            if type(status) is not int or status != 200 or final_url != url:
+                raise ValueError("SONGSHAN_HTTP_STATUS_OR_REDIRECT_HOLD")
+            if not isinstance(raw, bytes) or not 0 < len(raw) <= 524288:
+                raise ValueError("SONGSHAN_EMPTY_OR_OVERSIZE_HOLD")
+            if not isinstance(content_type, str):
+                raise ValueError("SONGSHAN_CONTENT_TYPE_HOLD")
+            parts = [part.strip().lower() for part in content_type.split(";")]
+            if parts[0] != "text/html":
+                raise ValueError("SONGSHAN_NOT_HTML_HOLD")
+            charset = next((part.split("=", 1)[1].strip('"') for part in parts[1:]
+                            if part.startswith("charset=")), "utf-8")
+            if charset not in ("utf-8", "big5", "cp950"):
+                raise ValueError("SONGSHAN_CHARSET_HOLD")
+            pages.append(raw.decode(charset, errors="strict"))
+            receipts.append({"url": url, "http_status": 200, "bytes": len(raw),
+                             "body_sha256": hashlib.sha256(raw).hexdigest(),
+                             "transport": ("BUILTIN_NATIVE_GET" if native
+                                           else "TEST_INJECTED_NOT_NATIVE")})
+        listing, detail = BoundedDOM(), BoundedDOM()
+        listing.feed(pages[0])
+        detail.feed(pages[1])
+        list_text, list_ids = listing.scopes()
+        detail_text, _ = detail.scopes()
+        expected_title = norm(SONGSHAN_EVENT_TITLE)
+        if not listing.anchors or not any(
+                uid == SONGSHAN_EVENT_UUID and
+                any(expected_title in norm(list_text[parent]) and
+                    list_ids[parent] == {SONGSHAN_EVENT_UUID} and
+                    len(list_text[parent]) <= 2500 and
+                    listing.nodes[parent]["tag"] not in ("body", "html", "root")
+                    for parent in _songshan_ancestors(listing.nodes, idx))
+                for idx, uid in listing.anchors):
+            raise ValueError("SONGSHAN_LIST_TITLE_UUID_LOCAL_EDGE_HOLD")
+        if any(uid != SONGSHAN_EVENT_UUID and
+               expected_title in norm(list_text[idx]) and
+               len(list_text[idx]) <= 500
+               for idx, uid in listing.anchors):
+            raise ValueError("SONGSHAN_LIST_TITLE_CONFLICTING_UUID_HOLD")
+        headings = [norm(detail_text[idx]) for idx in detail.headings
+                    if detail.nodes[idx]["tag"] in ("h1", "h2")]
+        if headings.count(expected_title) != 1:
+            raise ValueError("SONGSHAN_DETAIL_EXACT_HEADING_HOLD")
+        if activity_uuid(SONGSHAN_PUBLIC_DETAIL) != SONGSHAN_EVENT_UUID:
+            raise ValueError("SONGSHAN_DETAIL_UUID_IDENTITY_HOLD")
+        observed = datetime.now(timezone.utc) if native else (
+            now_utc or datetime.now(timezone.utc))
+        if not isinstance(observed, datetime) or observed.utcoffset() is None:
+            raise ValueError("SONGSHAN_OBSERVATION_CLOCK_HOLD")
+        if previous and (previous["rows"][0]["_candidate"].get("platform_id") != "14" or
+                         previous["rows"][0]["_candidate"].get("source_event_id") !=
+                         SONGSHAN_EVENT_UUID):
+            raise ValueError("SONGSHAN_PREVIOUS_LKG_OTHER_SOURCE_HOLD")
+        stamp = observed.isoformat()
+        candidate = {
+            "title": SONGSHAN_EVENT_TITLE, "url": SONGSHAN_PUBLIC_DETAIL,
+            "platform": "松山文創", "type": "展覽", "scraped_at": stamp,
+            "_candidate": {
+                "scope": "CANDIDATE_PREVIEW_ONLY", "decision": "REVIEW_WITH_HOLD",
+                "published": False, "golden_accepted": False,
+                "formal_field_pass": False, "record_id": "14:" + SONGSHAN_EVENT_UUID,
+                "platform_id": "14", "source_event_id": SONGSHAN_EVENT_UUID,
+                "source_identity_kind": "OFFICIAL_LIST_DETAIL_UUID_REVIEW",
+                "source_class": "OFFICIAL_VENUE_NON_SESSION",
+                "sources": [SONGSHAN_PUBLIC_LIST, SONGSHAN_PUBLIC_DETAIL],
+                "hold_reasons": ["DATE_VENUE_FIELD_INDEPENDENT_AUTHORITY_PENDING",
+                                 "REVIEW_ONLY_NOT_FORMAL"]}}
+        rows, quality = build_candidate_dataset([candidate])
+        if len(rows) != 1 or quality["rejectedRows"]:
+            raise ValueError("SONGSHAN_CANDIDATE_PIPELINE_HOLD")
+        digest = _isolated_lkg_digest(rows)
+        snapshot = {
+            "kind": "P30_L7_ISOLATED_SOURCE_ADAPTER_SNAPSHOT_V1",
+            "decision": "REVIEW_ONLY_NEW_OR_UPDATED", "rows": rows,
+            "quality": quality,
+            "field_receipts": [{
+                "field": "title", "role": "EVENT_TITLE",
+                "value": SONGSHAN_EVENT_TITLE, "source": SONGSHAN_PUBLIC_DETAIL,
+                "observed_at": stamp, "decision": "REVIEW"}],
+            "source_receipts": {
+                "list_url": SONGSHAN_PUBLIC_LIST,
+                "detail_url": SONGSHAN_PUBLIC_DETAIL,
+                "bounded_acquisition": {
+                    "kind": "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1",
+                    "observed_at_utc": stamp,
+                    "transport": ("BUILTIN_NATIVE_GET" if native
+                                  else "TEST_INJECTED_NOT_NATIVE"),
+                    "list_body_sha256": receipts[0]["body_sha256"],
+                    "detail_body_sha256": receipts[1]["body_sha256"],
+                    "list_url": SONGSHAN_PUBLIC_LIST,
+                    "detail_url": SONGSHAN_PUBLIC_DETAIL,
+                    "decision": "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL"}},
+            "incremental_diff": {
+                "added_ids": ["14:" + SONGSHAN_EVENT_UUID] if not previous else [],
+                "removed_ids": [],
+                "changed": not previous or digest != previous["last_known_good_sha256"]},
+            "last_known_good_sha256": digest, "native_get_verified": False,
+            "formal_accepted_fields": 0, "golden_accepted_events": 0,
+            "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
+        persist_isolated_review_lkg(
+            snapshot, destination, repo_root,
+            expected_previous_sha256=(previous["last_known_good_sha256"]
+                                      if previous else None))
+        return {"kind": "P30_L7_SONGSHAN_CANONICAL_ROTATION_V1",
+                "platform_id": "14", "decision": "REVIEW_ONLY",
+                "source_receipts": receipts,
+                "native_get_200_count": 2 if native else 0,
+                "same_uuid_review_lkg": 1, "persisted": True,
+                "official_uuid": SONGSHAN_EVENT_UUID,
+                "lkg_sha256": digest, "formal_accepted_fields": 0,
+                "golden_accepted_events": 0, "published_events": 0,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    except (ValueError, OSError, TimeoutError, UnicodeError, TypeError) as exc:
+        return hold(type(exc).__name__ + ":" + str(exc))
+
+
+def _songshan_ancestors(nodes, idx):
+    """At most six local DOM parents, never global page-title matching."""
+    for _ in range(6):
+        if idx is None:
+            break
+        yield idx
+        idx = nodes[idx]["parent"]
