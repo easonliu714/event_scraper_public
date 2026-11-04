@@ -1753,6 +1753,28 @@ class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
         self.assertEqual(snap["quality"]["previewRows"], 1)
         self.assertEqual(snap["formal_accepted_fields"], 0)
 
+    def test_twtc_title_cell_same_id_secondary_scope_is_not_second_event(self):
+        # Native parser previously counted p=menu1 as a competing URL.
+        # It is a different presentation scope, not a different event ID.
+        html = ('<table><tr><td>' + self.btitle +
+                '<a href="/exhibition_more.aspx?id=29418&amp;p=home">詳情</a>'
+                '<a href="/exhibition_more.aspx?id=29418&amp;p=menu1">更多</a>'
+                '</td></tr></table>')
+        snap = self.b(index=html)
+        self.assertEqual(snap["quality"]["previewRows"], 1)
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"],
+                         "29418")
+        self.assertEqual(snap["formal_accepted_fields"], 0)
+        # A different event ID in the same cell remains an explicit HOLD.
+        with self.assertRaisesRegex(ValueError, "CONFLICTING_DETAIL_IDS"):
+            self.b(index=html.replace("id=29418&amp;p=menu1",
+                                      "id=29419&amp;p=menu1"))
+        # Secondary scope alone cannot establish the canonical p=home edge.
+        with self.assertRaisesRegex(ValueError, "CONFLICTING_DETAIL_IDS"):
+            self.b(index=html.replace(
+                '<a href="/exhibition_more.aspx?id=29418&amp;p=home">詳情</a>',
+                ''))
+
     def test_twtc_title_cell_conflict_or_cross_cell_ambiguity_holds(self):
         local_conflict = ('<table><tr><td>' + self.btitle +
                           '<a href="/exhibition_more.aspx?id=29418&amp;p=home">詳情</a>'

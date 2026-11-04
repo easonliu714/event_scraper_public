@@ -1318,14 +1318,31 @@ def build_non_session_list_detail_candidate(
             if urlsplit(urljoin(list_url, href)).path
             == "/exhibition_more.aspx"]
         if line == "B" and cell_links:
-            if {url for url, _ in cell_links} != {detail_url}:
+            # Native source may put both p=home and p=menu1 URLs for the
+            # SAME exhibition ID in one exact-title cell. A p=menu1 link is
+            # not the canonical DETAIL evidence, but is not another event.
+            # Reject foreign IDs/hosts, malformed scopes and missing exact
+            # p=home href; do not weaken cross-event negative safety.
+            def local_exhibition_id(href):
+                u = urlsplit(href)
+                query = parse_qs(u.query)
+                if (u.scheme != "https" or u.netloc not in (
+                        "twtc.com.tw", "www.twtc.com.tw")
+                        or u.path != "/exhibition_more.aspx" or u.fragment
+                        or u.username or u.password
+                        or set(query) != {"id", "p"}
+                        or query["p"] not in (["home"], ["menu1"])
+                        or len(query["id"]) != 1
+                        or not query["id"][0].isdigit()):
+                    raise ValueError("LIST_TITLE_CELL_UNTRUSTED_DETAIL_HREF_HOLD")
+                return query["id"][0]
+            if (detail_url not in {url for url, _ in cell_links}
+                    or {local_exhibition_id(url) for url, _ in cell_links}
+                    != {expected_identity_id}):
                 raise ValueError("LIST_TITLE_CELL_CONFLICTING_DETAIL_IDS_HOLD")
-            # Preserve the complete row's date/context in the duplicate
-            # fingerprint. Same title+ID with different dates is NOT a
-            # responsive duplicate and must remain ambiguous.
-            matched.extend((text, detail_url)
-                           for url, cell_text in cell_links
-                           if url == detail_url)
+            # One atomic title cell is one edge, even with a same-ID
+            # secondary display link; dates remain part of the row fingerprint.
+            matched.append((text, detail_url))
             continue
         row_detail_links = [urljoin(list_url, href)
                             for href, label in row["links"]
