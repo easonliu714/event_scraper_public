@@ -1352,3 +1352,77 @@ class DownloadedNativeArtifactIntegrity(unittest.TestCase):
 
 
 if __name__=="__main__":unittest.main()
+
+
+class ExecutorSameDayVenueCollisionGuard(unittest.TestCase):
+    """A separate public executor index lists three distinct events at one hall/date."""
+    def setUp(self):
+        from datetime import datetime, timedelta, timezone
+        self.now = datetime(2026, 11, 4, 9, 55, tzinfo=timezone(timedelta(hours=8)))
+        self.receipt = {
+            "source_url": "https://www.sheng-dong.com.tw/",
+            "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+            "observed_at_utc": "2026-11-04T09:40:00+08:00",
+            "native_official_get": 0,
+            "formal_accepted_fields": 0,
+            "golden_accepted_events": 0,
+            "published_events": 0,
+            "events": [
+                {"title": "2026台北電器空調影音大展｜超越雙11家電週年慶",
+                 "start_date": "2026/11/06", "end_date": "2026/11/09",
+                 "venue": "台北世貿一館", "twtc_exhibition_id": None,
+                 "ticket_session_id": None},
+                {"title": "台北Méng萌寵物用品展",
+                 "start_date": "2026/11/06", "end_date": "2026/11/09",
+                 "venue": "台北世貿一館", "twtc_exhibition_id": None,
+                 "ticket_session_id": None},
+                {"title": "2026玩轉文具暨手作創意展｜11/6-9世貿一館",
+                 "start_date": "2026/11/06", "end_date": "2026/11/09",
+                 "venue": "台北世貿一館", "twtc_exhibition_id": None,
+                 "ticket_session_id": None},
+            ],
+        }
+
+    def test_same_day_venue_is_not_event_identity(self):
+        out = m.audit_executor_same_day_venue_collision(self.receipt, self.now)
+        self.assertEqual(out["distinct_event_labels"], 3)
+        self.assertFalse(out["shared_date_venue_is_unique_event_identity"])
+        self.assertIsNone(out["twtc_id_29418_from_executor_index"])
+        self.assertEqual(out["identity_decision"], "REJECT_DATE_VENUE_ONLY_CROSS_EVENT_MERGE")
+        self.assertEqual(
+            (out["independent_formal_accepted_fields"], out["golden_accepted_events"],
+             out["published_events"], out["formal_pwa_feed_events"]), (0, 0, 0, 0))
+        self.assertEqual(out["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_cross_event_freshness_and_false_authority_refused(self):
+        for key, value in (
+            ("source_url", "https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home"),
+            ("evidence_kind", "NATIVE_HTTP200"),
+            ("observed_at_utc", "2026-11-04T09:40:00"),
+            ("observed_at_utc", "2026-11-02T09:40:00+08:00"),
+            ("native_official_get", 1),
+            ("formal_accepted_fields", 1),
+            ("golden_accepted_events", 1),
+            ("published_events", 1),
+        ):
+            changed = copy.deepcopy(self.receipt)
+            changed[key] = value
+            with self.subTest(key=key, value=value):
+                with self.assertRaises(ValueError):
+                    m.audit_executor_same_day_venue_collision(changed, self.now)
+        for row_key, value in (
+            ("title", self.receipt["events"][0]["title"]),
+            ("start_date", "2026/11/07"),
+            ("venue", "台北世貿二館"),
+            ("twtc_exhibition_id", "29418"),
+            ("ticket_session_id", "invented"),
+        ):
+            changed = copy.deepcopy(self.receipt)
+            changed["events"][1][row_key] = value
+            with self.subTest(row_key=row_key):
+                with self.assertRaises(ValueError):
+                    m.audit_executor_same_day_venue_collision(changed, self.now)
+        changed = copy.deepcopy(self.receipt)
+        changed["events"].pop()
+        with self.assertRaises(ValueError):
+            m.audit_executor_same_day_venue_collision(changed, self.now)
