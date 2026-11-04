@@ -557,6 +557,130 @@ jobs:
               json.dumps(proposal,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
           print("FIRST_USABLE_SUBSET",json.dumps(result,sort_keys=True),flush=True)
           PY
+      - name: One-shot independent native venue/bilingual conflict authority (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[bilingual-native-once]'; then
+            echo 'BILINGUAL_NATIVE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          # Four allowlisted public non-checkout URLs, one GET each. No retry,
+          # redirects, credentials, cookies, JavaScript circumvention or raw HTML files.
+          sources = (
+              ('A_TMC_VENUE', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'),
+              ('B_TWTC_ZH_ID29418', 'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home'),
+              ('B_TWTC_EN_ID29418', 'https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home'),
+              ('B_EXECUTOR_NO_TWTC_ID', 'https://www.sheng-dong.com.tw/activity/appliances-expo/TECO'),
+          )
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          class TextOnly(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.parts = []
+              def handle_data(self, data):
+                  self.parts.append(data)
+          opener = urllib.request.build_opener(NoRedirect)
+          receipts, texts = [], {}
+          for role, url in sources:
+              stamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+              r = {'role':role,'url':url,'observed_at_utc':stamp,'http_status':None,
+                   'body_sha256':None,'bytes':0,'decision':'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url, method='GET', headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (read-only public evidence)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'})
+                  with opener.open(req,timeout=8) as resp:
+                      r['http_status'] = resp.status
+                      ctype = resp.headers.get('Content-Type','')
+                      r['content_type'] = ctype[:100]
+                      raw = resp.read(524289)
+                      r['bytes'] = len(raw)
+                      r['body_sha256'] = hashlib.sha256(raw).hexdigest()
+                      if resp.status != 200 or len(raw)>524288 or 'html' not in ctype.lower():
+                          r['decision']='BODY_STATUS_OR_TYPE_HOLD'
+                      else:
+                          enc = 'utf-8'
+                          m = re.search(r'charset\s*=\s*["\x27]?([\w-]+)',ctype,re.I)
+                          if m:
+                              enc=m.group(1)
+                          parsed=TextOnly()
+                          parsed.feed(raw.decode(enc,errors='strict'))
+                          texts[role]=' '.join(' '.join(parsed.parts).split())
+                          r['decision']='NATIVE_HTTP200_BODY_HASH_ONLY'
+              except urllib.error.HTTPError as exc:
+                  r['http_status']=exc.code
+                  r['decision']='REDIRECT_BLOCKED' if 300<=exc.code<400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as exc:
+                  r['error_type']=type(exc.reason).__name__
+                  r['decision']='DNS_OR_EGRESS_HOLD' if isinstance(exc.reason,socket.gaierror) else 'NETWORK_OR_TLS_HOLD'
+              except (TimeoutError,socket.timeout,ssl.SSLError,OSError,UnicodeError,LookupError,ValueError) as exc:
+                  r['error_type']=type(exc).__name__
+                  r['decision']='BODY_OR_NETWORK_HOLD'
+              receipts.append(r)
+              print('BILINGUAL_NATIVE',role,r['http_status'],r['decision'],flush=True)
+
+          a=texts.get('A_TMC_VENUE','')
+          zh=texts.get('B_TWTC_ZH_ID29418','')
+          en=texts.get('B_TWTC_EN_ID29418','')
+          ex=texts.get('B_EXECUTOR_NO_TWTC_ID','')
+          checks={
+              'A_SHOW':bool(re.search(r'2026[./]11[./]07\s+19:30',a)),
+              'A_HALL':bool(re.search(r'活動地點\s*臺北流行音樂中心\s*表演廳',a)),
+              'B_ZH_ID_TITLE':bool('2026年電器空調影音大展' in zh),
+              'B_EN_ID_TITLE_CONFLICT':bool('2025 ELECTRIC APPLIANCE FAIR' in en),
+              'B_ZH_DATES':bool(re.search(r'展出日期\s*[：:]\s*2026/11/06\s*[~～-]\s*2026/11/09',zh)),
+              'B_EN_DATES':bool(re.search(r'Show Dates\s*[：:]\s*2026/11/06\s*[~～-]\s*2026/11/09',en)),
+              'B_ZH_HOURS':bool(re.search(r'展出時間\s*[：:]\s*10:00\s*[~～-]\s*18:00',zh)),
+              'B_EN_HOURS':bool(re.search(r'Show Hours\s*[：:]\s*10\s*[~～-]\s*18',en)),
+              'B_ZH_HALL':bool('展覽館別：世貿一館' in zh),
+              'B_EN_HALL':bool('Venue：Hall 1' in en),
+              'B_EXECUTOR_DATES':bool(re.search(r'2026/11/6\s*-\s*2026/11/9',ex)),
+              'B_EXECUTOR_HOURS':bool(re.search(r'展出時間\s*10:00\s*-\s*18:00',ex)),
+              'B_EXECUTOR_HALL':bool('台北世貿一館' in ex),
+          }
+          field_roles=(
+              ('A','venue_showtime',('A_SHOW',)),
+              ('A','venue_hall',('A_HALL',)),
+              ('B','exhibition_dates',('B_ZH_DATES','B_EN_DATES','B_EXECUTOR_DATES')),
+              ('B','open_hours',('B_ZH_HOURS','B_EN_HOURS','B_EXECUTOR_HOURS')),
+              ('B','venue_hall',('B_ZH_HALL','B_EN_HALL','B_EXECUTOR_HALL')),
+          )
+          matrix=[{'line':line,'field':field,'checks':list(keys),
+                   'native_source_consistent':all(checks[k] for k in keys),
+                   'decision':'NATIVE_ROLE_REVIEW_ONLY' if all(checks[k] for k in keys) else 'HOLD_SOURCE_OR_ROLE',
+                   'formal_accepted':False} for line,field,keys in field_roles]
+          title_conflict=checks['B_ZH_ID_TITLE'] and checks['B_EN_ID_TITLE_CONFLICT']
+          report={
+              'kind':'P30_L7_ONE_SHOT_NATIVE_BILINGUAL_AUTHORITY_CONFLICT_V1',
+              'attestation':'CI_PUBLIC_NATIVE_GET_SAME_PROCESS',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'request_count':len(sources),
+              'native_http_200_count':sum(r['http_status']==200 for r in receipts),
+              'source_receipts':receipts,'bounded_source_checks':checks,'field_matrix':matrix,
+              'title_decision':'NATIVE_TWTC_SAME_ID_TITLE_YEAR_CONFLICT_HOLD' if title_conflict else 'BILINGUAL_TITLE_NATIVE_UNVERIFIED_HOLD',
+              'a_ticket_product_identity':'HOLD_KHAM_NO_SAFE_NATIVE_GET_IN_THIS_GATE',
+              'b_executor_identity':'HOLD_NO_DIRECT_TWTC_EXHIBITION_ID_ON_EXECUTOR',
+              'source_consistent_review_fields':sum(x['native_source_consistent'] for x in matrix),
+              'formal_accepted_fields':0,'golden':0,'published':0,'formal_pwa_feed':0,
+              'raw_html_saved':False,'release_state':'HARD_HOLD_NO_PUBLICATION'
+          }
+          Path('evidence/native_bilingual_authority.json').write_text(
+              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('BILINGUAL_NATIVE_SUMMARY',json.dumps({
+              'http200':report['native_http_200_count'],
+              'source_consistent_review_fields':report['source_consistent_review_fields'],
+              'title_decision':report['title_decision'],
+              'formal':0,'golden':0,'published':0},sort_keys=True),flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -569,6 +693,7 @@ jobs:
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_bilingual_authority.json ]; then sha256sum evidence/native_bilingual_authority.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
