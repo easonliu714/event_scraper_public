@@ -681,6 +681,96 @@ jobs:
               'title_decision':report['title_decision'],
               'formal':0,'golden':0,'published':0},sort_keys=True),flush=True)
           PY
+      - name: One-shot native source-local official link edges (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[identity-native-once]'; then
+            echo 'NATIVE_LINK_EDGE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import audit_native_source_link_edges
+
+          # Three exact official non-checkout pages, one normal GET per URL.
+          # The TMC->KHAM link is parsed only; the KHAM purchase flow is NEVER fetched.
+          sources = (
+              ('A_TMC_VENUE', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'),
+              ('B_TWTC_MIRROR_INDEX', 'https://twtc.org.tw/exhibition.aspx'),
+              ('B_TWTC_MIRROR_DETAIL', 'https://twtc.org.tw/exhibition_more.aspx?id=29418&p=home'),
+          )
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect)
+          receipts, htmls = [], []
+          for role, url in sources:
+              rec = {'role':role,'url':url,
+                     'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                     'http_status':None,'body_sha256':None,'bytes':0,
+                     'decision':'SOURCE_FRESHNESS_HOLD'}
+              body = ''
+              try:
+                  req = urllib.request.Request(url,method='GET',headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (read-only public evidence)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'})
+                  with opener.open(req,timeout=8) as response:
+                      rec['http_status']=response.status
+                      ctype=response.headers.get('Content-Type','')
+                      rec['content_type']=ctype[:100]
+                      raw=response.read(524289)
+                      rec['bytes']=len(raw)
+                      rec['body_sha256']=hashlib.sha256(raw).hexdigest()
+                      if response.status==200 and 0<len(raw)<=524288 and 'html' in ctype.lower():
+                          enc='utf-8'
+                          match=re.search(r'charset\s*=\s*["\x27]?([\w-]+)',ctype,re.I)
+                          if match: enc=match.group(1)
+                          body=raw.decode(enc,errors='strict')
+                          rec['decision']='NATIVE_HTTP200_BODY_HASH_ONLY'
+                      else:
+                          rec['decision']='BODY_STATUS_SIZE_OR_TYPE_HOLD'
+              except urllib.error.HTTPError as exc:
+                  rec['http_status']=exc.code
+                  rec['decision']='REDIRECT_BLOCKED' if 300<=exc.code<400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as exc:
+                  rec['error_type']=type(exc.reason).__name__
+                  rec['decision']='DNS_OR_EGRESS_HOLD' if isinstance(exc.reason,socket.gaierror) else 'NETWORK_OR_TLS_HOLD'
+              except (TimeoutError,socket.timeout,ssl.SSLError,OSError,UnicodeError,LookupError,ValueError) as exc:
+                  rec['error_type']=type(exc).__name__
+                  rec['decision']='BODY_OR_NETWORK_HOLD'
+              receipts.append(rec)
+              htmls.append(body)
+              print('NATIVE_LINK_SOURCE',role,rec['http_status'],rec['decision'],flush=True)
+
+          result=None
+          decision='HOLD_NATIVE_SOURCE_OR_IDENTITY'
+          if all(htmls) and all(r['decision']=='NATIVE_HTTP200_BODY_HASH_ONLY' for r in receipts):
+              try:
+                  result=audit_native_source_link_edges(*htmls,receipts,
+                      datetime.datetime.now(datetime.timezone.utc))
+                  decision='REVIEW_NATIVE_SOURCE_LOCAL_LINK_EDGES_ONLY'
+              except ValueError as exc:
+                  decision='HOLD_'+str(exc)
+          report={'kind':'P30_L7_ONE_SHOT_NATIVE_OFFICIAL_LINK_EDGE_RECEIPT_V1',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'request_count':len(sources),
+              'native_http_200':sum(r['http_status']==200 for r in receipts),
+              'source_receipts':receipts,'link_decision':decision,
+              'source_local_verified_link_edges':result['source_local_native_link_edges'] if result else 0,
+              'link_result':result,'A_KHAM_NATIVE_GET':0,
+              'B_EXECUTOR_TO_ID':'HOLD','B_TITLE_YEAR_CONFLICT':'HOLD',
+              'formal_accepted_fields':0,'golden':0,'published':0,'formal_pwa_feed':0,
+              'raw_html_saved':False,'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          Path('evidence/native_source_link_edges.json').write_text(
+              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('NATIVE_LINK_EDGE_SUMMARY',json.dumps({
+              'native_http_200':report['native_http_200'],
+              'verified_edges':report['source_local_verified_link_edges'],
+              'decision':decision,'formal':0,'golden':0,'published':0},sort_keys=True),flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -694,6 +784,7 @@ jobs:
           if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_bilingual_authority.json ]; then sha256sum evidence/native_bilingual_authority.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_source_link_edges.json ]; then sha256sum evidence/native_source_link_edges.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
