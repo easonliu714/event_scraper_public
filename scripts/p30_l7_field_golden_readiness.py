@@ -2742,3 +2742,196 @@ def run_bounded_native_source_to_review_lkg(
             "published_events": 0, "formal_pwa_feed_events": 0,
             "release_state": "HARD_HOLD_NO_PUBLICATION",
         }
+
+
+# B rotation: reuse canonical CKSMH #17 and the existing REVIEW/LKG core.
+# Strict actId ownership; no Session/price/venue inference or publication.
+CKSMH_PUBLIC_LIST = "https://event.culture.tw/CKSMH"
+CKSMH_PUBLIC_DETAIL = "https://event.culture.tw/mocweb/reg/CKSMH/Detail.init.ctr?actId=61023"
+CKSMH_ROTATION_TITLE = "「民主女路」走讀活動"
+
+
+def run_cksmh_actid_review_lkg(destination, repo_root, *, fetcher=None,
+                               network_authorized=False, source_hypothesis="",
+                               now_utc=None):
+    """One-shot public LIST/actId DETAIL -> isolated REVIEW LKG or no-write HOLD."""
+    import hashlib
+    import re
+    import urllib.request
+    from datetime import timezone, timedelta
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin, urlsplit, parse_qs
+    from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+
+    _isolated_lkg_path(destination, repo_root)
+    previous = load_isolated_review_lkg(destination, repo_root)
+    if fetcher is None and (network_authorized is not True or
+                           not isinstance(source_hypothesis, str) or
+                           not 8 <= len(source_hypothesis.strip()) <= 200):
+        raise ValueError("CKSMH_NATIVE_REQUIRES_NEW_HYPOTHESIS")
+    if fetcher is not None and not callable(fetcher):
+        raise ValueError("CKSMH_FETCHER_NOT_CALLABLE")
+    native = fetcher is None
+    receipts = []
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    def public_get(url):
+        req = urllib.request.Request(url, method="GET", headers={
+            "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+            "Accept": "text/html", "Accept-Encoding": "identity"})
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as res:
+            return (res.status, res.headers.get("Content-Type", ""),
+                    res.read(524289), res.geturl())
+
+    class LocalHTML(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.anchors = []
+            self.headings = []
+            self.anchor = None
+            self.heading = None
+        def handle_starttag(self, tag, attrs):
+            attrs = dict(attrs)
+            if tag == "a":
+                self.anchor = [attrs.get("href", ""), []]
+            if tag in ("h1", "h2"):
+                self.heading = [tag, []]
+        def handle_data(self, value):
+            if self.anchor is not None:
+                self.anchor[1].append(value)
+            if self.heading is not None:
+                self.heading[1].append(value)
+        def handle_endtag(self, tag):
+            if tag == "a" and self.anchor is not None:
+                self.anchors.append((self.anchor[0], "".join(self.anchor[1])))
+                self.anchor = None
+            if tag in ("h1", "h2") and self.heading is not None:
+                self.headings.append("".join(self.heading[1]))
+                self.heading = None
+
+    def norm(value):
+        return re.sub(r"\s+", " ", value).strip()
+
+    def identity(href):
+        try:
+            url = urlsplit(urljoin(CKSMH_PUBLIC_LIST, href))
+            if (url.scheme != "https" or url.netloc != "event.culture.tw" or
+                url.path not in ("/mocweb/reg/CKSMH/Detail.init.ctr",
+                                 "/CKSMH/portal/Registration/C0103MAction") or
+                url.fragment or url.username or url.password):
+                return None
+            ids = parse_qs(url.query, keep_blank_values=True).get("actId", [])
+            return ids[0] if len(ids) == 1 and re.fullmatch(r"[0-9]{1,8}", ids[0]) else None
+        except ValueError:
+            return None
+
+    def hold(reason):
+        return {"kind": "P30_L7_CKSMH_ROTATION_REVIEW_V1",
+                "decision": "SOURCE_OR_IDENTITY_HOLD_NO_WRITE",
+                "reason": str(reason)[:140], "line": "B", "platform_id": "17",
+                "source_event_id": "61023", "source_receipts": receipts,
+                "native_get_200_count": (sum(x["http_status"] == 200 for x in receipts)
+                                         if native else 0),
+                "same_id_review_lkg": 0, "persisted": False,
+                "prior_lkg_sha256": (previous["last_known_good_sha256"] if previous else None),
+                "formal_accepted_fields": 0, "golden_accepted_events": 0,
+                "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+    try:
+        pages = []
+        for url in (CKSMH_PUBLIC_LIST, CKSMH_PUBLIC_DETAIL):
+            status, content_type, raw, final_url = (public_get if native else fetcher)(url)
+            if type(status) is not int or status != 200 or final_url != url:
+                raise ValueError("CKSMH_HTTP_STATUS_OR_REDIRECT_HOLD")
+            if not isinstance(raw, bytes) or not 0 < len(raw) <= 524288:
+                raise ValueError("CKSMH_EMPTY_OR_OVERSIZE_HOLD")
+            parts = [v.strip().lower() for v in content_type.split(";")]
+            if parts[0] != "text/html":
+                raise ValueError("CKSMH_NOT_HTML_HOLD")
+            charset = next((v.split("=", 1)[1].strip('"') for v in parts[1:]
+                            if v.startswith("charset=")), "utf-8")
+            if charset not in ("utf-8", "big5", "cp950"):
+                raise ValueError("CKSMH_CHARSET_HOLD")
+            decoded = raw.decode(charset, errors="strict")
+            if not decoded.strip():
+                raise ValueError("CKSMH_EMPTY_HTML_HOLD")
+            receipts.append({"url": url, "http_status": 200,
+                             "body_sha256": hashlib.sha256(raw).hexdigest(),
+                             "bytes": len(raw),
+                             "transport": ("BUILTIN_NATIVE_GET" if native else
+                                           "TEST_INJECTED_NOT_NATIVE")})
+            pages.append(decoded)
+        index, detail = LocalHTML(), LocalHTML()
+        index.feed(pages[0]); detail.feed(pages[1])
+        edges = [identity(href) for href, title in index.anchors
+                 if norm(title) == CKSMH_ROTATION_TITLE]
+        if not edges or set(edges) != {"61023"}:
+            raise ValueError("CKSMH_LIST_EXACT_ACTID_EDGE_HOLD")
+        headings = [norm(x) for x in detail.headings if norm(x)]
+        if CKSMH_ROTATION_TITLE not in headings:
+            raise ValueError("CKSMH_DETAIL_TITLE_HEADING_HOLD")
+        observed = datetime.now(timezone.utc) if native else (now_utc or datetime.now(timezone.utc))
+        if (not isinstance(observed, datetime) or observed.utcoffset() is None or
+            abs(datetime.now(timezone.utc) - observed.astimezone(timezone.utc)) > timedelta(days=2)):
+            raise ValueError("CKSMH_OBSERVATION_CLOCK_HOLD")
+        if previous is not None:
+            old = previous["rows"][0]["_candidate"]
+            if old.get("platform_id") != "17" or old.get("source_event_id") != "61023":
+                raise ValueError("CKSMH_PREVIOUS_LKG_OTHER_SOURCE_HOLD")
+        stamp = observed.isoformat()
+        candidate = {"title": CKSMH_ROTATION_TITLE, "url": CKSMH_PUBLIC_DETAIL,
+                     "platform": "中正紀念堂", "type": "活動", "scraped_at": stamp,
+                     "_candidate": {
+                         "scope": "CANDIDATE_PREVIEW_ONLY", "decision": "REVIEW_WITH_HOLD",
+                         "published": False, "golden_accepted": False,
+                         "formal_field_pass": False, "record_id": "17:61023",
+                         "platform_id": "17", "source_event_id": "61023",
+                         "source_class": "OFFICIAL_VENUE_NON_SESSION",
+                         "sources": [CKSMH_PUBLIC_LIST, CKSMH_PUBLIC_DETAIL],
+                         "hold_reasons": ["CKSMH_MULTI_SESSION_DATE_VENUE_HOLD",
+                                          "INDEPENDENT_FIELD_AUTHORITY_PENDING",
+                                          "REVIEW_ONLY_NOT_FORMAL"]}}
+        rows, quality = build_candidate_dataset([candidate])
+        if len(rows) != 1 or quality["rejectedRows"]:
+            raise ValueError("CKSMH_REVIEW_PIPELINE_REJECT_HOLD")
+        digest = _isolated_lkg_digest(rows)
+        snapshot = {
+            "kind": "P30_L7_ISOLATED_SOURCE_ADAPTER_SNAPSHOT_V1",
+            "decision": "REVIEW_ONLY_NEW_OR_UPDATED", "rows": rows,
+            "quality": quality,
+            "field_receipts": [{"field": "title", "value": CKSMH_ROTATION_TITLE,
+                                "role": "EVENT_TITLE", "source": CKSMH_PUBLIC_DETAIL,
+                                "observed_at": stamp, "decision": "REVIEW"}],
+            "source_receipts": {"list_url": CKSMH_PUBLIC_LIST,
+                                "detail_url": CKSMH_PUBLIC_DETAIL,
+                                "bounded_acquisition": {
+                                    "kind": "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1",
+                                    "observed_at_utc": stamp,
+                                    "transport": ("BUILTIN_NATIVE_GET" if native else
+                                                  "TEST_INJECTED_NOT_NATIVE"),
+                                    "list_body_sha256": receipts[0]["body_sha256"],
+                                    "detail_body_sha256": receipts[1]["body_sha256"],
+                                    "list_url": CKSMH_PUBLIC_LIST,
+                                    "detail_url": CKSMH_PUBLIC_DETAIL,
+                                    "decision": "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL"}},
+            "incremental_diff": {"added_ids": (["17:61023"] if previous is None else []),
+                                 "removed_ids": [],
+                                 "changed": previous is None or digest != previous["last_known_good_sha256"]},
+            "last_known_good_sha256": digest, "native_get_verified": False,
+            "formal_accepted_fields": 0, "golden_accepted_events": 0,
+            "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
+        persist_isolated_review_lkg(snapshot, destination, repo_root,
+                                    expected_previous_sha256=(
+                                        previous["last_known_good_sha256"] if previous else None))
+        return {"kind": "P30_L7_CKSMH_ROTATION_REVIEW_V1", "decision": "REVIEW_ONLY",
+                "line": "B", "platform_id": "17", "source_event_id": "61023",
+                "source_receipts": receipts, "native_get_200_count": 2 if native else 0,
+                "same_id_review_lkg": 1, "persisted": True,
+                "lkg_sha256": digest, "native_transport": native,
+                "formal_accepted_fields": 0, "golden_accepted_events": 0,
+                "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    except (ValueError, OSError, TimeoutError, UnicodeError, TypeError) as exc:
+        return hold(type(exc).__name__ + ":" + str(exc))
