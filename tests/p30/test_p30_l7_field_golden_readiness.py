@@ -2144,3 +2144,49 @@ class TestCKSMHCanonicalRotation(unittest.TestCase):
             m.run_cksmh_actid_review_lkg(self.dest, self.repo)
         with self.assertRaises(ValueError):
             m.run_cksmh_actid_review_lkg(self.dest, self.repo, fetcher=123)
+
+
+
+class TestTMCAuthorityContractAndHuashanRotation(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dest = pathlib.Path(self.tmp.name) / "review_lkg_snapshot.json"
+        self.title = m.HUASHAN_ROTATION_TITLE
+        self.index = '<a href="' + m.HUASHAN_PUBLIC_DETAIL + '">2026.11.07 ' + self.title + ' 西1館</a>'
+        self.detail = '<h1>' + self.title + '</h1>'
+    def run_huashan(self, index=None, detail=None, status=200):
+        from datetime import datetime, timezone
+        pages = {m.HUASHAN_PUBLIC_LIST: self.index if index is None else index,
+                 m.HUASHAN_PUBLIC_DETAIL: self.detail if detail is None else detail}
+        def fake(url):
+            return status, "text/html; charset=utf-8", pages[url].encode(), url
+        return m.run_huashan_exact_path_review_lkg(
+            self.dest, ROOT, fetcher=fake, now_utc=datetime.now(timezone.utc))
+    def test_a_no_native_snapshot_does_not_accept_fields(self):
+        a = m.assess_tmc_non_session_field_authority(None)
+        self.assertEqual(a["decision"], "HOLD_NO_SEALED_NATIVE_AUTHORITY")
+        self.assertEqual((a["formal_accepted_fields"], a["published_events"]), (0, 0))
+    def test_b_same_official_path_is_review_not_numeric_id(self):
+        out = self.run_huashan()
+        self.assertEqual((out["same_path_review_lkg"], out["native_same_numeric_id"]), (1, 0))
+        snap = m.load_isolated_review_lkg(self.dest, ROOT)
+        self.assertEqual(snap["rows"][0]["_candidate"]["platform_id"], "13")
+        self.assertTrue(snap["rows"][0]["_candidate"]["source_event_id"].startswith("path-sha256-"))
+        self.assertEqual(snap["rows"][0]["date"], "未確認")
+    def test_b_cross_path_missing_link_wrong_h1_http_fail_closed(self):
+        self.assertEqual(self.run_huashan()["decision"], "REVIEW_ONLY")
+        old = self.dest.read_bytes()
+        cases = [{"index": '<a href="/exhibition/other">' + self.title + '</a>'},
+                 {"index": "<div>" + self.title + "</div>"},
+                 {"detail": "<h1>另一個活動</h1>"},
+                 {"status": 403}]
+        for case in cases:
+            with self.subTest(case=case):
+                out = self.run_huashan(**case)
+                self.assertEqual(out["decision"], "SOURCE_OR_IDENTITY_HOLD_NO_WRITE")
+                self.assertEqual(self.dest.read_bytes(), old)
+    def test_b_no_implicit_network(self):
+        with self.assertRaises(ValueError):
+            m.run_huashan_exact_path_review_lkg(self.dest, ROOT)

@@ -2935,3 +2935,222 @@ def run_cksmh_actid_review_lkg(destination, repo_root, *, fetcher=None,
                 "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
     except (ValueError, OSError, TimeoutError, UnicodeError, TypeError) as exc:
         return hold(type(exc).__name__ + ":" + str(exc))
+
+
+
+# A: fixed automated authority/freshness adjudication; never caller-granted FIELD.
+def assess_tmc_non_session_field_authority(snapshot, now_utc=None):
+    from datetime import timezone
+    from urllib.parse import urlsplit
+    report = {"kind": "P30_L7_TMC_FIELD_AUTHORITY_CONTRACT_V1",
+              "decision": "HOLD_NO_SEALED_NATIVE_AUTHORITY", "field_matrix": [],
+              "requirements": ["EXACT_SOURCE_EVENT_PATH", "NATIVE_SHA256_FRESH_UTC",
+                               "SHOW_NOT_SALE_OR_SESSION", "HALL_NOT_TICKET_ID",
+                               "INDEPENDENT_FIELD_CONFLICT_ADJUDICATION"],
+              "formal_accepted_fields": 0, "golden_accepted_events": 0,
+              "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    if snapshot is None:
+        return report
+    _validate_isolated_lkg_snapshot(snapshot)
+    row = snapshot["rows"][0]
+    meta = row["_candidate"]
+    src = snapshot["source_receipts"]
+    fields = snapshot["field_receipts"]
+    if (meta.get("platform_id") != "TMC_OFFICIAL" or
+        meta.get("source_event_id") != urlsplit(PUBLIC_TMC_DETAIL).path.rsplit("/", 1)[-1] or
+        meta.get("sources") != [PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL] or
+        src.get("list_url") != PUBLIC_TMC_LIST or
+        src.get("detail_url") != PUBLIC_TMC_DETAIL):
+        raise ValueError("TMC_CONTRACT_EXACT_SOURCE_ID_HOLD")
+    expected = {"venue_showtime": "VENUE_SHOW_NOT_SALE", "venue_hall": "VENUE_HALL"}
+    if (len(fields) != 2 or
+        {f.get("field"): f.get("role") for f in fields} != expected or
+        any(f.get("source_url") != PUBLIC_TMC_DETAIL or
+            f.get("observed_at_utc") != row["scraped_at"] or
+            f.get("formal_accepted") is not False for f in fields)):
+        raise ValueError("TMC_CONTRACT_ROLE_PROVENANCE_HOLD")
+    now = now_utc or datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("TMC_CONTRACT_CLOCK_HOLD")
+    observed = datetime.fromisoformat(row["scraped_at"].replace("Z", "+00:00"))
+    fresh = 0 <= (now - observed).total_seconds() <= 86400
+    native = src.get("bounded_acquisition", {}).get("transport") == "BUILTIN_NATIVE_GET"
+    report["field_matrix"] = [
+        {"field": f["field"], "role": f["role"], "value": f["value"],
+         "source_url": PUBLIC_TMC_DETAIL, "observed_at_utc": row["scraped_at"],
+         "native_body_receipt": native, "fresh_within_24h": fresh,
+         "independent_authority": False,
+         "decision": ("SOURCE_AUTHORITY_REVIEW_ONLY" if native and fresh
+                      else "HOLD_NATIVE_FRESHNESS_OR_AUTHORITY")}
+        for f in fields]
+    report["decision"] = ("REVIEW_INDEPENDENT_AUTHORITY_PENDING" if native and fresh
+                          else "HOLD_NATIVE_FRESHNESS_OR_AUTHORITY")
+    return report
+
+
+# B: canonical #13 Huashan, not a new platform. Same official detail PATH
+# is independently checkable; local path hash is NOT an official numeric ID.
+from urllib.parse import quote as _huashan_quote
+HUASHAN_ROTATION_TITLE = "2026小黃帽交通安全童樂會《成為全家的安全小英雄》"
+HUASHAN_PUBLIC_LIST = "https://www.huashan1914.com/exhibition"
+HUASHAN_PUBLIC_DETAIL = HUASHAN_PUBLIC_LIST + "/" + _huashan_quote(HUASHAN_ROTATION_TITLE, safe="")
+
+
+def run_huashan_exact_path_review_lkg(destination, repo_root, *, fetcher=None,
+                                      network_authorized=False, source_hypothesis="",
+                                      now_utc=None):
+    """One-shot public LIST->same detail path->sealed REVIEW LKG; no publication."""
+    import hashlib, re, urllib.request
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin, urlsplit, unquote
+    from datetime import timezone
+    from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+    _isolated_lkg_path(destination, repo_root)
+    previous = load_isolated_review_lkg(destination, repo_root)
+    if fetcher is None and (network_authorized is not True or
+                           not isinstance(source_hypothesis, str) or
+                           not 8 <= len(source_hypothesis.strip()) <= 200):
+        raise ValueError("HUASHAN_NATIVE_REQUIRES_NEW_HYPOTHESIS")
+    if fetcher is not None and not callable(fetcher):
+        raise ValueError("HUASHAN_FETCHER_NOT_CALLABLE")
+    native, receipts = fetcher is None, []
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+    def public_get(url):
+        req = urllib.request.Request(url, method="GET", headers={
+            "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+            "Accept": "text/html", "Accept-Encoding": "identity"})
+        with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as res:
+            return res.status, res.headers.get("Content-Type", ""), res.read(524289), res.geturl()
+    class Page(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.anchors, self.headings, self.a, self.h, self.skip = [], [], None, None, 0
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "noscript"): self.skip += 1
+            if self.skip: return
+            if tag == "a": self.a = [dict(attrs).get("href", ""), []]
+            if tag == "h1": self.h = []
+        def handle_data(self, s):
+            if self.skip: return
+            if self.a is not None: self.a[1].append(s)
+            if self.h is not None: self.h.append(s)
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "noscript"):
+                self.skip = max(0, self.skip - 1)
+                return
+            if tag == "a" and self.a is not None:
+                self.anchors.append((self.a[0], "".join(self.a[1]))); self.a = None
+            if tag == "h1" and self.h is not None:
+                self.headings.append("".join(self.h)); self.h = None
+    def norm(s): return re.sub(r"\s+", " ", s).strip()
+    def path(href):
+        try:
+            u = urlsplit(urljoin(HUASHAN_PUBLIC_LIST, href))
+            if (u.scheme != "https" or u.netloc != "www.huashan1914.com"
+                    or u.username or u.password or u.query or u.fragment):
+                return None
+            return unquote(u.path)
+        except ValueError:
+            return None
+    def hold(reason):
+        return {"kind": "P30_L7_HUASHAN_ROTATION_REVIEW_V1",
+                "decision": "SOURCE_OR_IDENTITY_HOLD_NO_WRITE",
+                "reason": str(reason)[:140], "platform_id": "13",
+                "source_receipts": receipts,
+                "native_get_200_count": sum(x["http_status"] == 200 for x in receipts) if native else 0,
+                "same_path_review_lkg": 0, "native_same_numeric_id": 0,
+                "persisted": False, "formal_accepted_fields": 0,
+                "golden_accepted_events": 0, "published_events": 0,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    try:
+        pages = []
+        for url in (HUASHAN_PUBLIC_LIST, HUASHAN_PUBLIC_DETAIL):
+            status, content_type, raw, final_url = (public_get if native else fetcher)(url)
+            if type(status) is not int or status != 200 or final_url != url:
+                raise ValueError("HUASHAN_HTTP_STATUS_OR_REDIRECT_HOLD")
+            if not isinstance(raw, bytes) or not 0 < len(raw) <= 524288:
+                raise ValueError("HUASHAN_EMPTY_OR_OVERSIZE_HOLD")
+            if not isinstance(content_type, str):
+                raise ValueError("HUASHAN_CONTENT_TYPE_HOLD")
+            parts = [x.strip().lower() for x in content_type.split(";")]
+            if parts[0] != "text/html": raise ValueError("HUASHAN_NOT_HTML_HOLD")
+            charset = next((x.split("=", 1)[1].strip('"') for x in parts[1:]
+                            if x.startswith("charset=")), "utf-8")
+            if charset not in ("utf-8", "big5", "cp950"):
+                raise ValueError("HUASHAN_CHARSET_HOLD")
+            decoded = raw.decode(charset, errors="strict")
+            if not decoded.strip(): raise ValueError("HUASHAN_EMPTY_HTML_HOLD")
+            pages.append(decoded)
+            receipts.append({"url": url, "http_status": 200, "bytes": len(raw),
+                             "body_sha256": hashlib.sha256(raw).hexdigest(),
+                             "transport": "BUILTIN_NATIVE_GET" if native else "TEST_INJECTED_NOT_NATIVE"})
+        listing, detail = Page(), Page()
+        listing.feed(pages[0]); detail.feed(pages[1])
+        title = norm(HUASHAN_ROTATION_TITLE)
+        expected_path = path(HUASHAN_PUBLIC_DETAIL)
+        matches = [path(href) for href, label in listing.anchors if title in norm(label)]
+        if not matches or set(matches) != {expected_path}:
+            raise ValueError("HUASHAN_LIST_EXACT_TITLE_PATH_EDGE_HOLD")
+        if [norm(x) for x in detail.headings].count(title) != 1:
+            raise ValueError("HUASHAN_DETAIL_EXACT_H1_HOLD")
+        observed = datetime.now(timezone.utc) if native else (now_utc or datetime.now(timezone.utc))
+        if not isinstance(observed, datetime) or observed.utcoffset() is None:
+            raise ValueError("HUASHAN_OBSERVATION_CLOCK_HOLD")
+        identity = "path-sha256-" + hashlib.sha256(expected_path.encode()).hexdigest()[:24]
+        if previous and (previous["rows"][0]["_candidate"].get("platform_id") != "13" or
+                         previous["rows"][0]["_candidate"].get("source_event_id") != identity):
+            raise ValueError("HUASHAN_PREVIOUS_LKG_OTHER_SOURCE_HOLD")
+        stamp = observed.isoformat()
+        candidate = {"title": HUASHAN_ROTATION_TITLE, "url": HUASHAN_PUBLIC_DETAIL,
+                     "platform": "華山1914", "type": "活動", "scraped_at": stamp,
+                     "_candidate": {"scope": "CANDIDATE_PREVIEW_ONLY",
+                                    "decision": "REVIEW_WITH_HOLD",
+                                    "published": False, "golden_accepted": False,
+                                    "formal_field_pass": False,
+                                    "record_id": "13:" + identity,
+                                    "platform_id": "13", "source_event_id": identity,
+                                    "source_identity_kind": "OFFICIAL_PATH_HASH_NOT_NUMERIC_ID",
+                                    "source_class": "OFFICIAL_VENUE_NON_SESSION",
+                                    "sources": [HUASHAN_PUBLIC_LIST, HUASHAN_PUBLIC_DETAIL],
+                                    "hold_reasons": ["NO_INDEPENDENT_NUMERIC_EVENT_ID",
+                                                     "DATE_TIME_HALL_AUTHORITY_PENDING",
+                                                     "REVIEW_ONLY_NOT_FORMAL"]}}
+        rows, quality = build_candidate_dataset([candidate])
+        if len(rows) != 1 or quality["rejectedRows"]:
+            raise ValueError("HUASHAN_REVIEW_PIPELINE_REJECT_HOLD")
+        digest = _isolated_lkg_digest(rows)
+        snapshot = {"kind": "P30_L7_ISOLATED_SOURCE_ADAPTER_SNAPSHOT_V1",
+                    "decision": "REVIEW_ONLY_NEW_OR_UPDATED", "rows": rows,
+                    "quality": quality,
+                    "field_receipts": [{"field": "title", "value": HUASHAN_ROTATION_TITLE,
+                                        "role": "EVENT_TITLE", "source": HUASHAN_PUBLIC_DETAIL,
+                                        "observed_at": stamp, "decision": "REVIEW"}],
+                    "source_receipts": {"list_url": HUASHAN_PUBLIC_LIST,
+                                        "detail_url": HUASHAN_PUBLIC_DETAIL,
+                                        "bounded_acquisition": {
+                                            "kind": "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1",
+                                            "observed_at_utc": stamp,
+                                            "transport": "BUILTIN_NATIVE_GET" if native else "TEST_INJECTED_NOT_NATIVE",
+                                            "list_body_sha256": receipts[0]["body_sha256"],
+                                            "detail_body_sha256": receipts[1]["body_sha256"],
+                                            "list_url": HUASHAN_PUBLIC_LIST,
+                                            "detail_url": HUASHAN_PUBLIC_DETAIL,
+                                            "decision": "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL"}},
+                    "incremental_diff": {"added_ids": ["13:" + identity] if not previous else [],
+                                         "removed_ids": [], "changed": not previous or digest != previous["last_known_good_sha256"]},
+                    "last_known_good_sha256": digest, "native_get_verified": False,
+                    "formal_accepted_fields": 0, "golden_accepted_events": 0,
+                    "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
+        persist_isolated_review_lkg(snapshot, destination, repo_root,
+                                    expected_previous_sha256=previous["last_known_good_sha256"] if previous else None)
+        return {"kind": "P30_L7_HUASHAN_ROTATION_REVIEW_V1", "decision": "REVIEW_ONLY",
+                "platform_id": "13", "source_receipts": receipts,
+                "native_get_200_count": 2 if native else 0, "same_path_review_lkg": 1,
+                "native_same_numeric_id": 0, "persisted": True,
+                "lkg_sha256": digest, "formal_accepted_fields": 0,
+                "golden_accepted_events": 0, "published_events": 0,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    except (ValueError, OSError, TimeoutError, UnicodeError, TypeError) as exc:
+        return hold(type(exc).__name__ + ":" + str(exc))

@@ -985,6 +985,39 @@ jobs:
                 'same_id_review_lkg', result['same_id_review_lkg'],
                 'first_hold', result.get('reason', 'NONE'), flush=True)
           PY
+      - name: A TMC independent authority contract and B Huashan one-shot native path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json, subprocess, tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              assess_tmc_non_session_field_authority, run_huashan_exact_path_review_lkg)
+          a = assess_tmc_non_session_field_authority(None)
+          assert a['formal_accepted_fields'] == 0
+          Path('evidence/tmc_field_authority_contract.json').write_text(
+              json.dumps(a, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8')
+          msg = subprocess.check_output(['git', 'log', '-1', '--format=%s'], text=True)
+          if '[huashan-source-probe-once]' not in msg:
+              print('HUASHAN_NATIVE_SKIPPED_NO_NEW_HYPOTHESIS_MARKER')
+          else:
+              with tempfile.TemporaryDirectory(prefix='eventradar_huashan_') as tmp:
+                  b = run_huashan_exact_path_review_lkg(
+                      Path(tmp) / 'review_lkg_snapshot.json', Path.cwd(),
+                      network_authorized=True,
+                      source_hypothesis='Huashan #13 exact official LIST title anchor to DETAIL canonical path')
+              assert b['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
+              assert b['formal_accepted_fields'] == b['golden_accepted_events'] == b['published_events'] == 0
+              Path('evidence/native_huashan_rotation.json').write_text(
+                  json.dumps(b, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+                  encoding='utf-8')
+              print('HUASHAN_NATIVE_ROTATION', b['decision'], b['native_get_200_count'],
+                    b['same_path_review_lkg'], b['native_same_numeric_id'],
+                    b.get('reason', 'NONE'), flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1002,6 +1035,8 @@ jobs:
           if [ -f evidence/native_twtc_adapter_lkg.json ]; then sha256sum evidence/native_twtc_adapter_lkg.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_adapter_structural_audit.json ]; then sha256sum evidence/native_adapter_structural_audit.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_cksmh_rotation.json ]; then sha256sum evidence/native_cksmh_rotation.json >> evidence/SHA256SUMS.txt; fi
+          sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
+          if [ -f evidence/native_huashan_rotation.json ]; then sha256sum evidence/native_huashan_rotation.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
