@@ -6643,7 +6643,7 @@ A synthetic same-ID candidate 1 with SHOW/HALL 2 REVIEW; B synthetic same-ID can
 
 ### P30-L7 14:55 bounded native acquisition and composite-row repair — 2026-11-04 (Draft #8 only)
 
-\`\`\`text
+```text
 Existing scraper.py source-list metadata [NO production execution]
   A TMC official LIST /tw/blog/show
   B canonical TWTC #16 LIST /exhibition?p=home
@@ -6668,8 +6668,8 @@ Existing #236 run_persistent_isolated_review_lkg
     ├─ isolated disk SHA / exclusive lock / CAS / atomic replace
     └─ failure => no write or LKG rollback
     ╳ no docs/data.json, Golden, Publisher, Scheduler, Notifier or main
-\`\`\`
+```
 
-- Native B one-shot [CI #41789331882](https://github.com/easonliu714/event_scraper_public/actions/runs/41789331882) obtained TWTC LIST/DETAIL **2/2 HTTP200** (body hashes \`1086f4e2eaab52116ab6da0b6706b973055f67145231c34ada87860dcb30b39c\` / \`8d7f05517d98cfa15805a00f0f8d117a1c3f1f6667b0aff089bb23e7e40cbae2\`), but **first true failure** \`LIST_ROW_CONFLICTING_DETAIL_IDS_HOLD\`. The source HTML was not stored. Artifact #13302318713 SHA256 \`7d62ed035b7e87375049e8ec7322c2667f9057afc8a4fb406890200f45e2043b\`, independent ZIP CRC + 3 evidence hashes PASS. No native same-ID candidate or persisted LKG from that run.
-- Root-cause fix in existing Engineering [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD \`7ef620152dfec0396429dc558815054d959e89da\`, [CI #41789482482](https://github.com/easonliu714/event_scraper_public/actions/runs/41789482482) **SUCCESS 71/71**, artifact #13303030946 digest \`sha256:188c679552f109e868770492cd5fd2846b6567a001372aeeefd7a9bdbf31b4b6\`. Current fix validated on injected nested responsive HTML only; native re-verification **PENDING**. A mock same-ID 1 / 2 REVIEW, B mock same-ID 1 / 3 REVIEW; native B end-to-end 0; formal FIELD/Golden/Published/PWA feed 0. EN 2025/ZH 2026 and executor-to-id HOLD; KHAM checkout never fetched.
-- Source main \`d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce\`, data blob \`7fc4fe32567a57fd504483eeb9a8b9e10b568ea4\`, status blob \`99cae0571e36e52dac360b6935c0c09f6f6bed3f\`, 19 platforms frozen. Pages runtime HTTP UNVERIFIED; historical CKSMH5/TWTC39 and L8 Android 5/5 USER_ATTESTED_PASS retained. HARD_HOLD_NO_PUBLICATION; no Owner action for isolated work.
+- Native B one-shot [CI #41789331882](https://github.com/easonliu714/event_scraper_public/actions/runs/41789331882) obtained TWTC LIST/DETAIL **2/2 HTTP200** (body hashes `1086f4e2eaab52116ab6da0b6706b973055f67145231c34ada87860dcb30b39c` / `8d7f05517d98cfa15805a00f0f8d117a1c3f1f6667b0aff089bb23e7e40cbae2`), but **first true failure** `LIST_ROW_CONFLICTING_DETAIL_IDS_HOLD`. The source HTML was not stored. Artifact #13302318713 SHA256 `7d62ed035b7e87375049e8ec7322c2667f9057afc8a4fb406890200f45e2043b`, independent ZIP CRC + 3 evidence hashes PASS. No native same-ID candidate or persisted LKG from that run.
+- Root-cause fix in existing Engineering [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD `7ef620152dfec0396429dc558815054d959e89da`, [CI #41789482482](https://github.com/easonliu714/event_scraper_public/actions/runs/41789482482) **SUCCESS 71/71**, artifact #13303030946 digest `sha256:188c679552f109e868770492cd5fd2846b6567a001372aeeefd7a9bdbf31b4b6`. Current fix validated on injected nested responsive HTML only; native re-verification **PENDING**. A mock same-ID 1 / 2 REVIEW, B mock same-ID 1 / 3 REVIEW; native B end-to-end 0; formal FIELD/Golden/Published/PWA feed 0. EN 2025/ZH 2026 and executor-to-id HOLD; KHAM checkout never fetched.
+- Source main `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce`, data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `99cae0571e36e52dac360b6935c0c09f6f6bed3f`, 19 platforms frozen. Pages runtime HTTP UNVERIFIED; historical CKSMH5/TWTC39 and L8 Android 5/5 USER_ATTESTED_PASS retained. HARD_HOLD_NO_PUBLICATION; no Owner action for isolated work.
