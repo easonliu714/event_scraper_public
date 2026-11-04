@@ -2258,6 +2258,27 @@ def _validate_isolated_lkg_snapshot(snapshot):
             or not isinstance(snapshot.get("source_receipts"), dict)
             or not isinstance(snapshot.get("incremental_diff"), dict)):
         raise ValueError("ISOLATED_LKG_RECEIPTS_HOLD")
+    # An acquisition receipt is optional for caller-HTML offline snapshots.
+    # When present, seal exact source URLs, observation time, transport role
+    # and both raw response hashes to the validated one-row REVIEW candidate.
+    acquired = snapshot["source_receipts"].get("bounded_acquisition")
+    if acquired is not None:
+        import re
+        row = snapshot["rows"][0]
+        sources = row["_candidate"].get("sources")
+        if (not isinstance(acquired, dict)
+                or acquired.get("kind") != "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1"
+                or acquired.get("decision") != "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL"
+                or acquired.get("transport") not in (
+                    "BUILTIN_NATIVE_GET", "TEST_INJECTED_NOT_NATIVE")
+                or acquired.get("observed_at_utc") != row["scraped_at"]
+                or not isinstance(sources, list) or len(sources) != 2
+                or acquired.get("list_url") != sources[0]
+                or acquired.get("detail_url") != sources[1]
+                or any(not isinstance(acquired.get(key), str)
+                       or re.fullmatch(r"[0-9a-f]{64}", acquired[key]) is None
+                       for key in ("list_body_sha256", "detail_body_sha256"))):
+            raise ValueError("ISOLATED_LKG_ACQUISITION_PROVENANCE_HOLD")
     return snapshot
 
 
@@ -2450,10 +2471,30 @@ def run_bounded_native_source_to_review_lkg(
                      else datetime.now(timezone.utc)))
         if not isinstance(observed, datetime) or observed.utcoffset() is None:
             raise ValueError("NATIVE_OBSERVATION_CLOCK_HOLD")
-        result = run_persistent_isolated_review_lkg(
+        # Keep native/raw-byte receipts in the sealed isolated REVIEW LKG.
+        # The parser's caller-HTML hash alone must never be mislabeled native.
+        snapshot = build_source_adapter_review_snapshot(
             list_url, pages[0], detail_url, pages[1], expected_title,
-            expected_identity_id, observed.isoformat(), destination,
-            repo_root, now_utc=observed)
+            expected_identity_id, observed.isoformat(), now_utc=observed,
+            previous=previous)
+        if snapshot["decision"] == "ROLLBACK_TO_ISOLATED_LAST_KNOWN_GOOD":
+            result = {"snapshot": snapshot, "persisted": False}
+        else:
+            snapshot["source_receipts"]["bounded_acquisition"] = {
+                "kind": "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1",
+                "observed_at_utc": observed.isoformat(),
+                "transport": ("BUILTIN_NATIVE_GET" if native
+                              else "TEST_INJECTED_NOT_NATIVE"),
+                "list_body_sha256": receipts[0]["body_sha256"],
+                "detail_body_sha256": receipts[1]["body_sha256"],
+                "list_url": list_url, "detail_url": detail_url,
+                "decision": "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL",
+            }
+            persist_isolated_review_lkg(
+                snapshot, destination, repo_root,
+                expected_previous_sha256=(
+                    previous["last_known_good_sha256"] if previous else None))
+            result = {"snapshot": snapshot, "persisted": True}
         return {
             "kind": "P30_L7_BOUNDED_NATIVE_TO_REVIEW_LKG_V1",
             "line": pairs[(list_url, detail_url)][0],
