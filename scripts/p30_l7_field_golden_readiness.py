@@ -3253,3 +3253,115 @@ def adjudicate_huashan_detail_field_roles(html, source_url, observed_at_utc,
         for name,role,value in roles]
     report["decision"]="REVIEW_FOUR_SOURCE_ROLES_INDEPENDENT_ACCEPTANCE_HOLD"
     return report
+
+
+# B #13: a NEW, independently testable DOM hypothesis. Some official event
+# pages may embed schema.org Event.identifier. It is never inferred from the
+# slug, local path hash, analytics IDs, tickets or unrelated JSON-LD entities.
+# Even an embedded numeric ID is REVIEW until an exact LIST->DETAIL ID edge
+# and an independent authority/conflict check have both been established.
+def inspect_huashan_embedded_event_identity(html, source_url):
+    """Inspect bounded official JSON-LD without network, persistence or release."""
+    import re
+    from html.parser import HTMLParser
+
+    report = {
+        "kind": "P30_L7_HUASHAN_EMBEDDED_EVENT_IDENTITY_V1",
+        "source_url": source_url,
+        "decision": "HOLD_NO_OFFICIAL_EMBEDDED_NUMERIC_EVENT_ID",
+        "first_failure": None,
+        "embedded_numeric_id_review": None,
+        "same_numeric_event_id": 0,
+        "formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+    def hold(reason):
+        report["first_failure"] = reason
+        return report
+
+    if source_url != HUASHAN_PUBLIC_DETAIL:
+        return hold("HUASHAN_EMBEDDED_EXACT_DETAIL_URL_HOLD")
+    if not isinstance(html, str) or not 0 < len(html.encode("utf-8")) <= 524288:
+        return hold("HUASHAN_EMBEDDED_EMPTY_OR_OVERSIZE_HOLD")
+
+    class Scripts(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.current = None
+            self.documents = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "script":
+                attributes = dict(attrs)
+                media_type = attributes.get("type", "").split(";", 1)[0].strip().lower()
+                self.current = [] if media_type == "application/ld+json" else None
+
+        def handle_data(self, data):
+            if self.current is not None:
+                self.current.append(data)
+
+        def handle_endtag(self, tag):
+            if tag == "script" and self.current is not None:
+                self.documents.append("".join(self.current))
+                self.current = None
+
+    parser = Scripts()
+    try:
+        parser.feed(html)
+    except (ValueError, TypeError) as exc:
+        return hold("HUASHAN_EMBEDDED_HTML_PARSER_HOLD:" + type(exc).__name__)
+    if not parser.documents or len(parser.documents) > 16:
+        return hold("HUASHAN_EMBEDDED_JSONLD_ABSENT_OR_EXCESS_HOLD")
+
+    numeric_ids = []
+    event_nodes = 0
+
+    def walk(value, depth=0):
+        nonlocal event_nodes
+        if depth > 8:
+            raise ValueError("HUASHAN_EMBEDDED_JSONLD_DEPTH_HOLD")
+        if isinstance(value, list):
+            if len(value) > 40:
+                raise ValueError("HUASHAN_EMBEDDED_JSONLD_LIST_BOUND_HOLD")
+            for child in value:
+                walk(child, depth + 1)
+        elif isinstance(value, dict):
+            if len(value) > 80:
+                raise ValueError("HUASHAN_EMBEDDED_JSONLD_OBJECT_BOUND_HOLD")
+            types = value.get("@type")
+            is_event = types == "Event" or (
+                isinstance(types, list) and "Event" in types)
+            if is_event:
+                event_nodes += 1
+                if event_nodes > 16:
+                    raise ValueError("HUASHAN_EMBEDDED_TOO_MANY_EVENTS_HOLD")
+                # The node must explicitly own THIS official detail URL.
+                # A generic site-wide Event node is not an identity authority.
+                if value.get("url") == HUASHAN_PUBLIC_DETAIL:
+                    identifier = value.get("identifier")
+                    if (type(identifier) in (str, int)
+                            and re.fullmatch(r"[0-9]{1,16}", str(identifier))):
+                        numeric_ids.append(str(identifier))
+            for key in ("@graph", "itemListElement"):
+                if key in value:
+                    walk(value[key], depth + 1)
+
+    try:
+        for document in parser.documents:
+            if len(document.encode("utf-8")) > 131072:
+                raise ValueError("HUASHAN_EMBEDDED_JSONLD_SIZE_HOLD")
+            walk(json.loads(document))
+    except (ValueError, TypeError, RecursionError) as exc:
+        return hold("HUASHAN_EMBEDDED_JSONLD_INVALID_OR_AMBIGUOUS_HOLD:"
+                    + str(exc)[:90])
+
+    report["event_nodes_seen"] = event_nodes
+    report["matching_numeric_id_count"] = len(numeric_ids)
+    if len(numeric_ids) != 1:
+        return hold("HUASHAN_EMBEDDED_NUMERIC_ID_MISSING_OR_CONFLICT_HOLD")
+    report["embedded_numeric_id_review"] = numeric_ids[0]
+    report["decision"] = "REVIEW_EMBEDDED_ID_NOT_LIST_BOUND"
+    return report
