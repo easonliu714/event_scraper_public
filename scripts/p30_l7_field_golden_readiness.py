@@ -2960,8 +2960,10 @@ def assess_tmc_non_session_field_authority(snapshot, now_utc=None):
     if (meta.get("platform_id") != "TMC_OFFICIAL" or
         meta.get("source_event_id") != urlsplit(PUBLIC_TMC_DETAIL).path.rsplit("/", 1)[-1] or
         meta.get("sources") != [PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL] or
-        src.get("list_url") != PUBLIC_TMC_LIST or
-        src.get("detail_url") != PUBLIC_TMC_DETAIL):
+        # Existing source adapter stores URL ownership inside bounded_acquisition,
+        # not as top-level source_receipts keys. The strict receipt validator
+        # below verifies the exact official URL pair, clock and body hashes.
+        not isinstance(src.get("bounded_acquisition"), dict)):
         raise ValueError("TMC_CONTRACT_EXACT_SOURCE_ID_HOLD")
     expected = {"venue_showtime": "VENUE_SHOW_NOT_SALE", "venue_hall": "VENUE_HALL"}
     if (len(fields) != 2 or
