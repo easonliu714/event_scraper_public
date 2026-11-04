@@ -1088,7 +1088,8 @@ jobs:
           from pathlib import Path
           from scripts.p30_l7_field_golden_readiness import (
               PUBLIC_TMC_DETAIL,HUASHAN_PUBLIC_DETAIL,
-              parse_official_non_session_html,inspect_huashan_embedded_event_identity)
+              parse_official_non_session_html,inspect_huashan_embedded_event_identity,
+              TMC_KHAM_FIELDS)
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,req,fp,code,msg,headers,newurl): return None
           opener=urllib.request.build_opener(NoRedirect)
@@ -1126,7 +1127,7 @@ jobs:
                       out['native_http200']+=1
                   if line=='A':
                       parsed=parse_official_non_session_html(
-                          url,html,'小宇 宋念宇《不，完美的人》',
+                          url,html,TMC_KHAM_FIELDS['venue_title'][3],
                           'P1DF32E2',record['observed_at_utc'])
                       record['decision']='REVIEW_NATIVE_DETAIL_ROLES_INDEPENDENT_AUTHORITY_HOLD'
                       record['identity_kind']='KHAM_PRODUCT_NOT_EVENT_SESSION'
