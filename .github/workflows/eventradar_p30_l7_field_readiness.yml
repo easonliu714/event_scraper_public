@@ -698,6 +698,7 @@ jobs:
           # Three exact official non-checkout pages, one normal GET per URL.
           # The TMC->KHAM link is parsed only; the KHAM purchase flow is NEVER fetched.
           # Recheck exact href after first native run exposed responsive/image-only label ambiguity.
+          # Partial A/B adjudication and TWTC index structure diagnostic; no raw HTML.
           sources = (
               ('A_TMC_VENUE', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'),
               ('B_TWTC_MIRROR_INDEX', 'https://twtc.org.tw/exhibition.aspx'),
@@ -746,13 +747,23 @@ jobs:
               htmls.append(body)
               print('NATIVE_LINK_SOURCE',role,rec['http_status'],rec['decision'],flush=True)
 
+          # Structural diagnostics only: no source HTML or sensitive payload in logs/artifacts.
+          if htmls[1]:
+              import html as html_module
+              index_decoded=html_module.unescape(htmls[1])
+              print('TWTC_INDEX_STRUCTURE',json.dumps({
+                  'tr_count':len(re.findall(r'<tr\b',index_decoded,re.I)),
+                  'title_literal_count':index_decoded.count('2026年電器空調影音大展'),
+                  'target_id_count':index_decoded.count('29418'),
+                  'href_target_id_count':len(re.findall(r'<a\b[^>]{0,500}29418',index_decoded,re.I)),
+              },sort_keys=True),flush=True)
           result=None
           decision='HOLD_NATIVE_SOURCE_OR_IDENTITY'
           if all(htmls) and all(r['decision']=='NATIVE_HTTP200_BODY_HASH_ONLY' for r in receipts):
               try:
                   result=audit_native_source_link_edges(*htmls,receipts,
                       datetime.datetime.now(datetime.timezone.utc))
-                  decision='REVIEW_NATIVE_SOURCE_LOCAL_LINK_EDGES_ONLY'
+                  decision=('REVIEW_NATIVE_SOURCE_LOCAL_LINK_EDGES_ONLY' if result['source_local_native_link_edges']==2 else 'REVIEW_A_NATIVE_LINK_B_IDENTITY_HOLD')
               except ValueError as exc:
                   decision='HOLD_'+str(exc)
           report={'kind':'P30_L7_ONE_SHOT_NATIVE_OFFICIAL_LINK_EDGE_RECEIPT_V1',
