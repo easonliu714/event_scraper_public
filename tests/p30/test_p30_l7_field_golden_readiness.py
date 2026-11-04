@@ -2083,3 +2083,64 @@ class TestTWTCNativeStructuralRootCauseAudit(unittest.TestCase):
             m.diagnose_twtc_title_row_structure(
                 "<tr><td>2026年電器空調影音大展</td></tr>",
                 "2026年電器空調影音大展", "29419")
+
+
+class TestCKSMHCanonicalRotation(unittest.TestCase):
+    """Canonical platform #17, exact actId; never ticket Session or publication."""
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = ROOT
+        self.dest = pathlib.Path(self.tmp.name) / "review_lkg_snapshot.json"
+        self.list_url = m.CKSMH_PUBLIC_LIST
+        self.detail_url = m.CKSMH_PUBLIC_DETAIL
+        self.list_html = ('<html><a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=61023">'
+                          '「民主女路」走讀活動</a></html>')
+        self.detail_html = ('<html><h1>「民主女路」走讀活動</h1>'
+                            '<section>場次 2026/11/08 14:00，'
+                            '2026/11/21 13:30；不同集合地點</section></html>')
+    def run_rotation(self, list_html=None, detail_html=None, status=200):
+        from datetime import datetime, timezone
+        payloads = {self.list_url: self.list_html if list_html is None else list_html,
+                    self.detail_url: self.detail_html if detail_html is None else detail_html}
+        def fake(url):
+            return (status, 'text/html; charset=utf-8', payloads[url].encode('utf-8'), url)
+        return m.run_cksmh_actid_review_lkg(
+            self.dest, self.repo, fetcher=fake, now_utc=datetime.now(timezone.utc))
+    def test_existing_canonical_id_to_review_lkg_not_formal(self):
+        out = self.run_rotation()
+        self.assertEqual((out['decision'], out['same_id_review_lkg'],
+                          out['native_get_200_count']), ('REVIEW_ONLY', 1, 0))
+        snap = m.load_isolated_review_lkg(self.dest, self.repo)
+        self.assertEqual(snap['rows'][0]['_candidate']['platform_id'], '17')
+        self.assertEqual(snap['rows'][0]['_candidate']['source_event_id'], '61023')
+        self.assertEqual(snap['rows'][0]['date'], '未確認')
+        self.assertEqual(snap['rows'][0]['location'], '未確認')
+        self.assertEqual(snap['rows'][0]['_candidate']['sessions'], [])
+        self.assertEqual((snap['formal_accepted_fields'], snap['golden_accepted_events'],
+                          snap['published_events']), (0, 0, 0))
+        self.assertEqual(snap['source_receipts']['bounded_acquisition']['transport'],
+                         'TEST_INJECTED_NOT_NATIVE')
+    def test_foreign_actid_duplicate_title_and_wrong_detail_hold_without_write(self):
+        ok = self.run_rotation()
+        self.assertTrue(ok['persisted'])
+        prior = self.dest.read_bytes()
+        bad_cases = [
+            dict(list_html='<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=99999">「民主女路」走讀活動</a>'),
+            dict(list_html=self.list_html + '<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=123">「民主女路」走讀活動</a>'),
+            dict(list_html='<a href="https://example.org/mocweb/reg/CKSMH/Detail.init.ctr?actId=61023">「民主女路」走讀活動</a>'),
+            dict(detail_html='<h1>不同活動</h1>'),
+            dict(status=403),
+        ]
+        for case in bad_cases:
+            with self.subTest(case=case):
+                result = self.run_rotation(**case)
+                self.assertEqual(result['decision'], 'SOURCE_OR_IDENTITY_HOLD_NO_WRITE')
+                self.assertFalse(result['persisted'])
+                self.assertEqual(self.dest.read_bytes(), prior)
+    def test_no_implicit_network_or_checkout(self):
+        with self.assertRaises(ValueError):
+            m.run_cksmh_actid_review_lkg(self.dest, self.repo)
+        with self.assertRaises(ValueError):
+            m.run_cksmh_actid_review_lkg(self.dest, self.repo, fetcher=123)
