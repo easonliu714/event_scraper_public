@@ -6920,3 +6920,29 @@ HARD_HOLD_NO_PUBLICATION; L8 Android 5/5, CKSMH5/TWTC39 PASS
 \`\`\`
 
 Next: independent exact-head job/artifact readback before any native B PASS claim; if B succeeds, adjudicate event-local DATE/HALL with independent conflict/freshness authority. A reconcile existing sealed native receipt with source-owned title and SHOW/HALL field authority, without repeated GET. Formal platform_status.json snapshot is stale; status-only release needs separate Owner authorization, Pages HTTP UNVERIFIED.
+
+---
+
+### P30-L7 2026-11-05 00:55 A/B non-publishing architecture delta (Engineering Draft #236)
+
+```text
+A TMC (existing non-session source)
+  historical native LIST -> exact DETAIL -> 2 REVIEW SHOW/HALL -> isolated LKG 1
+  current new native GET 0; independent authority/freshness HOLD
+  no checkout / no PRODUCT_ID-as-Session / formal FIELD 0
+B Songshan canonical #14 (no new platform)
+  native LIST 1 + DETAIL 1, both HTTP200 this turn
+  H3/nested heading hypothesis + uniqueness guard + positive/negative tests
+  first real HOLD: exact detail title heading count h1=0,h2=0,h3=0
+  native same-UUID REVIEW LKG 0; H3 hypothesis falsified
+  stop repeated identical GET; require new independently evidenced DOM hypothesis
+Core:
+  existing fail-closed atomic/CAS/SHA isolated candidate LKG retained
+  exact-head CI 41872842430 / HEAD 239885a81ef6d8b027e7012b3ed563c02e7a8dd5
+  job 126724320525 SUCCESS 99/99 offline; artifact 13344529590
+  artifact digest sha256:db68ddf831ba425bb202416bb9aeff456d005e5f42eef18091133ef96b24a459
+  native identity 0 / formal accepted FIELD 0 / Golden 0 / Published 0
+  formal data/status/main untouched; HARD_HOLD_NO_PUBLICATION
+```
+
+Existing 19-platform canonical dedup, Android L8 5/5 and CKSMH5/TWTC39 historical PASS retained. Formal status snapshot remains 2026-11-03 18:55; status-only release requires separate Owner approval. Direct Pages runtime and independent artifact ZIP CRC UNVERIFIED.
