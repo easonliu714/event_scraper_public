@@ -6673,3 +6673,40 @@ Existing #236 run_persistent_isolated_review_lkg
 - Native B one-shot [CI #41789331882](https://github.com/easonliu714/event_scraper_public/actions/runs/41789331882) obtained TWTC LIST/DETAIL **2/2 HTTP200** (body hashes `1086f4e2eaab52116ab6da0b6706b973055f67145231c34ada87860dcb30b39c` / `8d7f05517d98cfa15805a00f0f8d117a1c3f1f6667b0aff089bb23e7e40cbae2`), but **first true failure** `LIST_ROW_CONFLICTING_DETAIL_IDS_HOLD`. The source HTML was not stored. Artifact #13302318713 SHA256 `7d62ed035b7e87375049e8ec7322c2667f9057afc8a4fb406890200f45e2043b`, independent ZIP CRC + 3 evidence hashes PASS. No native same-ID candidate or persisted LKG from that run.
 - Root-cause fix in existing Engineering [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD `7ef620152dfec0396429dc558815054d959e89da`, [CI #41789482482](https://github.com/easonliu714/event_scraper_public/actions/runs/41789482482) **SUCCESS 71/71**, artifact #13303030946 digest `sha256:188c679552f109e868770492cd5fd2846b6567a001372aeeefd7a9bdbf31b4b6`. Current fix validated on injected nested responsive HTML only; native re-verification **PENDING**. A mock same-ID 1 / 2 REVIEW, B mock same-ID 1 / 3 REVIEW; native B end-to-end 0; formal FIELD/Golden/Published/PWA feed 0. EN 2025/ZH 2026 and executor-to-id HOLD; KHAM checkout never fetched.
 - Source main `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce`, data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `99cae0571e36e52dac360b6935c0c09f6f6bed3f`, 19 platforms frozen. Pages runtime HTTP UNVERIFIED; historical CKSMH5/TWTC39 and L8 Android 5/5 USER_ATTESTED_PASS retained. HARD_HOLD_NO_PUBLICATION; no Owner action for isolated work.
+
+---
+
+### P30-L7 15:59 bounded source receipts + TWTC real parser HOLD (Draft #8 only)
+
+```text
+Formal scraper.py SOURCE-LIST metadata [READ ONLY; legacy runner NOT EXECUTED]
+  A: TMC LIST → same event DETAIL → SHOW/HALL (2 REVIEW)
+      KHAM direct PRODUCT href = PRODUCT only, NOT ticket Session
+  B: TWTC #16 LIST → exact DETAIL id=29418
+      official HTTP200 2/2 (new one-shot structural hypothesis)
+      └─ first native failure LIST_ROW_CONFLICTING_DETAIL_IDS_HOLD
+         native same-ID candidate 0, persisted LKG 0
+      ↓
+Existing #236 build_non_session_list_detail_candidate
+  → parse_official_non_session_html → field role / source-local identity
+      ↓ only on successful exact source edge
+Existing main p30_candidate_review_pipeline::build_candidate_dataset
+      ↓ REVIEW_WITH_HOLD only, never Golden
+Existing #236 build_source_adapter_review_snapshot
+      ↓
+UPDATED #236 run_bounded_native_source_to_review_lkg
+  ├─ allowlisted two-page native GET, no redirects/retries/checkout
+  ├─ raw HTTP bytes SHA256 + exact URLs + observed UTC + transport receipt
+  ├─ injected fetcher = TEST_INJECTED_NOT_NATIVE, never native proof
+  └─ bind acquisition receipt to checksum-sealed isolated snapshot
+      ↓
+UPDATED #236 _validate_isolated_lkg_snapshot
+  ├─ reject source URL/time rebind, invalid raw hash, false release
+  └─ run_persistent / persist isolated atomic LKG only on valid candidate
+      ╳ no write on native parser HOLD, empty/conflict or tamper
+      ╳ no main/docs/data.json/Golden/Publisher/Scheduler/Notifier
+```
+
+- Existing [Engineering Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD `4d33ff5503cece9ac47a394f0a152cf15ba7b21f` based on unchanged main `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce`; [exact-head CI #41796050944](https://github.com/easonliu714/event_scraper_public/actions/runs/41796050944) SUCCESS **72/72**, [artifact #13305262473](https://github.com/easonliu714/event_scraper_public/actions/runs/41796050944/artifacts/13305262473) GitHub digest `sha256:72b5e46425c0cd23adc7135e9c93450d50904b431ce20249ef00664a14a6b593`. Existing 4 ADD-only engineering paths unchanged.
+- Native B source receipts: LIST `2cb969ada775234503bd06072be64c616d27a0577eb04bade3e51401f09e6b46`, DETAIL `1f886d0b7447064a7a116a34631731f852fc30c9f36ae904ad7f1ac72add672d`, both HTTP200; exact same-row native identity remains HOLD due conflicting IDs in a semantic row. No raw HTML persisted. Native successful same-ID end-to-end 0; A new native 0. Parser repair requires bounded structural diagnosis of exact title cell / `more` href / responsive row, not repeated synthetic negative Gate.
+- Acceptance: A 2 REVIEW, B 3 REVIEW; independent formal FIELD 0, Golden 0, publication 0, formal feed 0. B bilingual title-year and executor identity HOLD; KHAM checkout never fetched. Existing L8 Android 5/5, CKSMH5/TWTC39 PASS preserved. Formal data/status blobs `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` / `99cae0571e36e52dac360b6935c0c09f6f6bed3f` frozen. Pages HTTP UNVERIFIED; `HARD_HOLD_NO_PUBLICATION` locked. Owner action: none for isolated engineering.
