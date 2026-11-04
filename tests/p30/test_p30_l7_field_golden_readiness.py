@@ -1559,18 +1559,24 @@ class TestNativeOfficialLinkEdges(unittest.TestCase):
         self.assertEqual(self.audit(tmc=duplicate)["source_local_native_link_edges"], 2)
 
     def test_cross_event_link_wrong_id_or_false_ticket_anchor_refused(self):
-        cases = [
-            (self.tmc.replace("P1DF32E2", "OTHER"), self.index, self.detail),
-            (self.tmc.replace("<a ", "<span ").replace("</a>", "</span>"), self.index, self.detail),
-            (self.tmc, self.index.replace("id=29418", "id=29417"), self.detail),
-            (self.tmc, self.index.replace("11/06", "11/05"), self.detail),
-            (self.tmc, self.index.replace("2026年電器空調影音大展", "另一個活動"), self.detail),
-            (self.tmc, self.index, self.detail.replace("10:00", "09:00")),
-        ]
-        for tmc, index, detail in cases:
-            with self.subTest(case=(tmc != self.tmc, index != self.index, detail != self.detail)):
+        for tmc in (
+            self.tmc.replace("P1DF32E2", "OTHER"),
+            self.tmc.replace("<a ", "<span ").replace("</a>", "</span>"),
+        ):
+            with self.subTest(line="A"):
                 with self.assertRaises(ValueError):
-                    self.audit(tmc=tmc, index=index, detail=detail)
+                    self.audit(tmc=tmc)
+        for index, detail in (
+            (self.index.replace("id=29418", "id=29417"), self.detail),
+            (self.index.replace("11/06", "11/05"), self.detail),
+            (self.index.replace("2026年電器空調影音大展", "另一個活動"), self.detail),
+            (self.index, self.detail.replace("10:00", "09:00")),
+        ):
+            with self.subTest(line="B"):
+                result = self.audit(index=index, detail=detail)
+                self.assertEqual(result["source_local_native_link_edges"], 1)
+                self.assertEqual(result["B_twtc_index_to_same_id_detail"],
+                                 "HOLD_SAME_ROW_OR_DETAIL_CONTEXT_UNPROVEN")
 
     def test_fresh_native_receipt_is_required(self):
         for key, wrong in [
