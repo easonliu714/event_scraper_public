@@ -2820,3 +2820,67 @@ class TestHuashanFieldAwareReusablePipeline(unittest.TestCase):
                 out = self.run_pipeline(bodies)
                 self.assertEqual(out["same_path_review_lkg"], 0)
                 self.assertFalse(self.destination.exists())
+
+
+class TestTmcFieldAwareReusablePipeline(unittest.TestCase):
+    """A pre-acquired TMC pair uses existing L7 candidate and LKG, not GET."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dest = pathlib.Path(self.tmp.name) / "review_lkg_snapshot.json"
+        self.now = datetime(2026, 11, 5, 0, 0, tzinfo=timezone.utc)
+        self.fixture = TestFixedSourceAdapterToReviewPipeline(
+            "test_a_tmc_exact_detail_and_kham_product_not_session")
+        self.fixture.setUp()
+
+    def pair(self, listing=None, detail=None):
+        c = self.fixture
+        pages = {m.PUBLIC_TMC_LIST: c.alist if listing is None else listing,
+                 m.PUBLIC_TMC_DETAIL: c.adetail if detail is None else detail}
+        return {url: (200, "text/html; charset=utf-8",
+                      html.encode("utf-8"), url) for url, html in pages.items()}
+
+    def run_pair(self, bodies):
+        return m.run_tmc_field_aware_review_lkg(
+            self.dest, ROOT, source_bodies=bodies,
+            expected_title=self.fixture.atitle, now_utc=self.now)
+
+    def test_two_roles_to_atomic_review_without_native_or_publication(self):
+        out = self.run_pair(self.pair())
+        self.assertEqual(out["same_event_review_lkg"], 1)
+        self.assertEqual({x["field"] for x in out["field_matrix"]},
+                         {"venue_showtime", "venue_hall"})
+        self.assertEqual(out["first_failure"], "TMC_TEST_INJECTED_NOT_NATIVE")
+        self.assertEqual(out["native_get_this_call"], 0)
+        self.assertEqual((out["formal_accepted_fields"],
+                          out["golden_accepted_events"],
+                          out["published_events"]), (0, 0, 0))
+        snap = m.load_isolated_review_lkg(self.dest, ROOT)
+        self.assertEqual(out["lkg_sha256"], snap["last_known_good_sha256"])
+        self.assertIn("KHAM_PRODUCT_NOT_CHECKOUT_SESSION",
+                      snap["rows"][0]["_candidate"]["hold_reasons"])
+
+    def test_cross_event_or_missing_hall_preflight_never_writes(self):
+        c = self.fixture
+        for bodies in (
+            self.pair(listing=c.alist.replace(c.atitle, "其他活動")),
+            self.pair(detail=c.adetail.replace("表演廳", "")),
+        ):
+            with self.subTest(case=list(bodies)):
+                self.assertEqual(self.run_pair(bodies)["same_event_review_lkg"], 0)
+                self.assertFalse(self.dest.exists())
+
+    def test_redirect_or_foreign_host_preserves_prior_lkg(self):
+        self.assertEqual(self.run_pair(self.pair())["same_event_review_lkg"], 1)
+        before = self.dest.read_bytes()
+        for bad in (
+            (302, "text/html", b"redirect", m.PUBLIC_TMC_DETAIL),
+            (200, "text/html", b"foreign", "https://example.org/other"),
+        ):
+            bodies = self.pair()
+            bodies[m.PUBLIC_TMC_DETAIL] = bad
+            self.assertEqual(self.run_pair(bodies)["same_event_review_lkg"], 0)
+            self.assertEqual(self.dest.read_bytes(), before)
