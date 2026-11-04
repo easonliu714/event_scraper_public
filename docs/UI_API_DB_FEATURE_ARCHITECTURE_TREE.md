@@ -6882,3 +6882,41 @@ The existing Engineering Draft #236 remains the **single isolated implementation
 - Native exact-head evidence [CI #41852731021](https://github.com/easonliu714/event_scraper_public/actions/runs/41852731021), HEAD c229541c9ac4ac224c439ae1dd5498b0423c0682, Artifact #13336182468 SHA256 0867d6c0617f79659389532430ce72b8a4d251695bceb4507c61d24fb28ddac8 (independent ZIP CRC PASS); final corrected exact-head [CI #41852915753](https://github.com/easonliu714/event_scraper_public/actions/runs/41852915753) SUCCESS, HEAD b2631ff5e7163f6cadbfeaf415f5bd2fbf9274a3, Artifact #13335478032 SHA256 74ec8bd71880832bfce26d7777a76d7f591790482b485cfe4b6a4a5ea2c4c90b (independent ZIP CRC PASS). Final run is no-native-GET regression, not another official source observation.
 - Source main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce, Preview main 03e515d65e827d5ed67fe341d079907a96bf784a, ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad. Formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 and status blob 99cae0571e36e52dac360b6935c0c09f6f6bed3f unchanged; status snapshot 2026-11-03 18:55 remains stale. Pages HTTP UNVERIFIED. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS protected. Owner action none for isolated work; separate authorization required for any formal status-only Merge/Pages or Golden publication.
 - NEXT: A sealed native TMC receipt reconciliation + independent SHOW/HALL conflict matrix without repeated GET; B rotate to existing canonical #14 Songshan official LIST→DETAIL identity (dedup first), or independently adjudicate already observed Huashan multi-hall roles. Never repeat TWTC/CKSMH/Huashan same-root-cause requests or manufacture official numeric IDs.
+
+
+---
+
+### P30-L7 23:55 Songshan #14 fixed source-adapter rotation — 2026-11-04 (Draft #8 only)
+
+\`\`\`text
+A / existing TMC official same-event source
+  prior native LIST -> DETAIL -> sealed REVIEW LKG 1, SHOW/HALL 2 REVIEW
+  this turn new native GET/LIST/DETAIL/IDENTITY/LKG = 0/0/0/0/0
+  public official reader re-observes 2026-11-07 19:30 + 表演廳 (reader-only)
+  assess_tmc_non_session_field_authority -> HOLD independent authority/freshness
+  no KHAM checkout, PRODUCT_ID != ticket Session
+
+B / existing formal #14 Songshan (canonical dedup, no new platform)
+  official web reader LIST https://www.songshanculturalpark.org/exhibition
+    -> DETAIL /exhibition/activity/d44f6cfd-c232-41db-9124-adcc49302f2a
+    -> same exhibition title, 2026-11-14..22, 藝異空間 (REVIEW only)
+  run_songshan_uuid_review_lkg [NEW reusable isolated function]
+    -> bounded exact official host + UUID + local DOM title card
+    -> two GET maximum, no redirects/checkout, SHA256+UTC receipts
+    -> DETAIL exact H1/H2 title -> source-owned UUID REVIEW
+    -> existing build_candidate_dataset
+    -> existing persist_isolated_review_lkg atomic/CAS/checksum
+    -> empty, cross-card UUID, wrong title, redirect, HTTP error HOLD
+    -> no date/hall FIELD accepted, no Session/Golden/PWA publisher
+  one-shot native CI [songshan-source-probe-once] -> PENDING
+  TWTC conflicting title-cell / CKSMH bootstrap / Huashan numeric ID HOLD
+
+Engineering Draft #236 HEAD 68d53b92e26a107e1cce940cb8c7e7950e6c4dc3
+  exact-head CI #41863493025 QUEUED (not PASS)
+  artifact / native GET / parser first failure PENDING
+  only original four ADD-only PR files; main/formal data/status frozen
+Formal FIELD 0 / Golden 0 / Published 0 / formal feed 0
+HARD_HOLD_NO_PUBLICATION; L8 Android 5/5, CKSMH5/TWTC39 PASS
+\`\`\`
+
+Next: independent exact-head job/artifact readback before any native B PASS claim; if B succeeds, adjudicate event-local DATE/HALL with independent conflict/freshness authority. A reconcile existing sealed native receipt with source-owned title and SHOW/HALL field authority, without repeated GET. Formal platform_status.json snapshot is stale; status-only release needs separate Owner authorization, Pages HTTP UNVERIFIED.
