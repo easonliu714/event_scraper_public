@@ -1426,3 +1426,72 @@ class ExecutorSameDayVenueCollisionGuard(unittest.TestCase):
         changed["events"].pop()
         with self.assertRaises(ValueError):
             m.audit_executor_same_day_venue_collision(changed, self.now)
+
+
+class TestTwtcOfficialHostMirrorReader(unittest.TestCase):
+    """A second official TWTC host has the same id, not an independent executor event edge."""
+    def setUp(self):
+        from datetime import datetime, timezone, timedelta
+        self.now = datetime(2026, 11, 4, 10, 55, tzinfo=timezone(timedelta(hours=8)))
+        self.receipt = {
+            "index_url": "https://twtc.org.tw/exhibition.aspx",
+            "mirror_detail_url": "https://twtc.org.tw/exhibition_more.aspx?id=29418&p=home",
+            "primary_detail_url": "https://www.twtc.com.tw/exhibition_more.aspx?id=29418&p=menu1",
+            "organizer_url": "https://www.teca.org.tw/",
+            "organizer_edge_scope": "ORGANIZER_HOMEPAGE_ONLY_NOT_EVENT_ID",
+            "evidence_kind": "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE",
+            "observed_date_taipei": "2026-11-04",
+            "event_title": "2026年電器空調影音大展",
+            "organizer": "台北市電器商業同業公會",
+            "date_start": "2026/11/06",
+            "date_end": "2026/11/09",
+            "hours": "10:00 ~ 18:00",
+            "venue": "世貿一館",
+            "native_official_get": 0,
+            "formal_accepted_fields": 0,
+            "golden_accepted_events": 0,
+            "published_events": 0,
+            "formal_pwa_feed_events": 0,
+        }
+
+    def test_same_id_mirror_is_source_quality_not_formal_field(self):
+        result = m.audit_twtc_official_same_id_host_mirror(self.receipt, self.now)
+        self.assertEqual(result["same_id_official_host_pair"], 2)
+        self.assertEqual(result["source_local_identity"], "REVIEW_CORROBORATED_SAME_TWTC_ID_29418")
+        self.assertEqual(set(result["field_roles"].values()), {"REVIEW"})
+        self.assertFalse(result["organizer_homepage_is_event_identity"])
+        self.assertEqual(result["executor_to_twtc_id_edge"], "HOLD")
+        self.assertEqual(result["english_title_year_conflict"], "HOLD")
+        self.assertEqual(
+            tuple(result[k] for k in ("native_official_get", "independent_formal_accepted_fields",
+              "golden_accepted_events", "published_events", "formal_pwa_feed_events")),
+            (0, 0, 0, 0, 0))
+        self.assertEqual(result["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_refuse_foreign_id_false_authority_stale_and_organizer_identity(self):
+        cases = {
+            "mirror_detail_url": "https://twtc.org.tw/exhibition_more.aspx?id=29417&p=home",
+            "primary_detail_url": "https://www.twtc.com.tw/exhibition_more.aspx?id=29417&p=menu1",
+            "index_url": "https://twtc.org.tw/exhibition_more.aspx?id=29418&p=home",
+            "organizer_url": "https://www.sheng-dong.com.tw/",
+            "organizer_edge_scope": "EVENT_ID_CONFIRMED",
+            "evidence_kind": "NATIVE_HTTP200",
+            "observed_date_taipei": "2026-11-03",
+            "event_title": "2025 ELECTRIC APPLIANCE FAIR",
+            "organizer": "生動國際展覽事業股份有限公司",
+            "date_start": "2026/04/10",
+            "date_end": "2026/11/08",
+            "hours": "09:00 ~ 18:00",
+            "venue": "世貿二館",
+            "native_official_get": 1,
+            "formal_accepted_fields": 1,
+            "golden_accepted_events": 1,
+            "published_events": 1,
+            "formal_pwa_feed_events": 1,
+        }
+        for key, wrong in cases.items():
+            with self.subTest(key=key):
+                altered = copy.deepcopy(self.receipt)
+                altered[key] = wrong
+                with self.assertRaises(ValueError):
+                    m.audit_twtc_official_same_id_host_mirror(altered, self.now)
