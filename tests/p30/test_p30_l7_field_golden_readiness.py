@@ -2327,3 +2327,85 @@ class TestTmcNativeAuthorityExpectedTitleParity(unittest.TestCase):
                 m.PUBLIC_TMC_DETAIL, html, "小宇 宋念宇《不，完美的人》",
                 "P1DF32E2", observed,
                 datetime(2026, 11, 4, 14, 58, tzinfo=timezone.utc))
+
+
+class TestSongshanCanonicalUUIDRotation(unittest.TestCase):
+    """B #14 is an existing platform; LIST-owned UUID is not ticket Session."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dest = pathlib.Path(self.tmp.name) / "review_lkg_snapshot.json"
+        self.now = datetime(2026, 11, 4, 15, 0, tzinfo=timezone.utc)
+        self.uuid = m.SONGSHAN_EVENT_UUID
+        self.title = m.SONGSHAN_EVENT_TITLE
+        self.other = "11111111-2222-3333-4444-555555555555"
+        self.listing = (
+            '<div class="exhibition-card"><h3>' + self.title + '</h3>'
+            '<a href="/exhibition/activity/' + self.uuid + '">看更多</a></div>'
+            '<div class="exhibition-card"><h3>不同活動</h3>'
+            '<a href="/exhibition/activity/' + self.other + '">看更多</a></div>')
+        self.detail = ('<main><h1>' + self.title + '</h1>'
+                       '<p>日期 2026-11-14 - 2026-11-22</p>'
+                       '<p>地點 松山文創園區 藝異空間</p></main>')
+
+    def run_source(self, listing=None, detail=None, status=200,
+                   final_url=None):
+        pages = {
+            m.SONGSHAN_PUBLIC_LIST: self.listing if listing is None else listing,
+            m.SONGSHAN_PUBLIC_DETAIL: self.detail if detail is None else detail}
+        def fake(url):
+            return (status, "text/html; charset=utf-8",
+                    pages[url].encode("utf-8"), final_url or url)
+        return m.run_songshan_uuid_review_lkg(
+            self.dest, ROOT, fetcher=fake, now_utc=self.now)
+
+    def test_exact_uuid_and_local_title_to_atomic_review_lkg(self):
+        result = self.run_source()
+        self.assertEqual(result["decision"], "REVIEW_ONLY")
+        self.assertEqual(result["native_get_200_count"], 0)
+        self.assertEqual(result["same_uuid_review_lkg"], 1)
+        self.assertEqual(result["official_uuid"], self.uuid)
+        snap = m.load_isolated_review_lkg(self.dest, ROOT)
+        self.assertEqual(snap["rows"][0]["_candidate"]["platform_id"], "14")
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"], self.uuid)
+        self.assertEqual(snap["rows"][0]["date"], "未確認")
+        self.assertEqual(snap["source_receipts"]["bounded_acquisition"]["transport"],
+                         "TEST_INJECTED_NOT_NATIVE")
+        self.assertEqual((result["formal_accepted_fields"],
+                          result["golden_accepted_events"],
+                          result["published_events"]), (0, 0, 0))
+
+    def test_unrelated_title_cannot_borrow_another_card_uuid(self):
+        self.assertEqual(self.run_source()["decision"], "REVIEW_ONLY")
+        before = self.dest.read_bytes()
+        cases = [
+            {"listing": '<div><h3>' + self.title + '</h3></div>'
+                        '<div><a href="/exhibition/activity/' + self.uuid +
+                        '">看更多</a></div>'},
+            {"listing": '<div><h3>' + self.title + '</h3>'
+                        '<a href="/exhibition/activity/' + self.other +
+                        '">看更多</a></div>'},
+            {"listing": '<div><h3>' + self.title + '</h3>'
+                        '<a href="/exhibition/activity/' + self.uuid +
+                        '">看更多</a><a href="/exhibition/activity/' +
+                        self.other + '">其他</a></div>'},
+            {"detail": "<h1>另一個活動</h1>"},
+            {"detail": "<h1>" + self.title + "</h1><h2>" +
+                       self.title + "</h2>"},
+            {"status": 403},
+            {"final_url": "https://example.com/redirect"}]
+        for case in cases:
+            with self.subTest(case=case):
+                report = self.run_source(**case)
+                self.assertEqual(report["decision"], "SOURCE_OR_IDENTITY_HOLD_NO_WRITE")
+                self.assertEqual(report["same_uuid_review_lkg"], 0)
+                self.assertEqual(self.dest.read_bytes(), before)
+
+    def test_no_implicit_network_and_foreign_lkg_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "NEW_HYPOTHESIS"):
+            m.run_songshan_uuid_review_lkg(self.dest, ROOT)
+        with self.assertRaisesRegex(ValueError, "FETCHER_NOT_CALLABLE"):
+            m.run_songshan_uuid_review_lkg(self.dest, ROOT, fetcher=123)
