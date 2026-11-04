@@ -3154,3 +3154,88 @@ def run_huashan_exact_path_review_lkg(destination, repo_root, *, fetcher=None,
                 "release_state": "HARD_HOLD_NO_PUBLICATION"}
     except (ValueError, OSError, TimeoutError, UnicodeError, TypeError) as exc:
         return hold(type(exc).__name__ + ":" + str(exc))
+
+
+# B #13 source-local field semantics: pure, fail-closed and non-publishing.
+# Never treat multiple halls or their opening times as a ticket session.
+def adjudicate_huashan_detail_field_roles(html, source_url, observed_at_utc,
+                                         body_sha256, *, now_utc=None):
+    import hashlib, re
+    from html.parser import HTMLParser
+    from datetime import timezone
+    report = {"kind":"P30_L7_HUASHAN_DETAIL_FIELD_ROLE_CONTRACT_V1",
+              "platform_id":"13", "source_url":source_url,
+              "decision":"SOURCE_FIELD_SEMANTICS_HOLD", "first_failure":None,
+              "field_matrix":[], "native_get_count":0, "same_numeric_event_id":0,
+              "formal_accepted_fields":0, "golden_accepted_events":0,
+              "published_events":0, "release_state":"HARD_HOLD_NO_PUBLICATION"}
+    def hold(reason):
+        report["first_failure"]=reason
+        return report
+    if source_url != HUASHAN_PUBLIC_DETAIL:
+        return hold("HUASHAN_FIELD_EXACT_SOURCE_URL_HOLD")
+    if not isinstance(html,str) or not html or len(html.encode("utf-8"))>524288:
+        return hold("HUASHAN_FIELD_EMPTY_OR_OVERSIZE_HOLD")
+    digest=hashlib.sha256(html.encode("utf-8")).hexdigest()
+    if not isinstance(body_sha256,str) or body_sha256 != digest:
+        return hold("HUASHAN_FIELD_RAW_BODY_SHA256_HOLD")
+    try:
+        observed=datetime.fromisoformat(observed_at_utc.replace("Z","+00:00"))
+        now=now_utc or datetime.now(timezone.utc)
+        if observed.utcoffset() is None or now.utcoffset() is None: raise ValueError()
+        if not 0 <= (now-observed).total_seconds() <= 86400:
+            return hold("HUASHAN_FIELD_SOURCE_FRESHNESS_HOLD")
+    except (ValueError,AttributeError,TypeError):
+        return hold("HUASHAN_FIELD_OBSERVATION_CLOCK_HOLD")
+    class Visible(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.skip=0; self.h1=None; self.titles=[]; self.parts=[]
+        def handle_starttag(self,tag,attrs):
+            if tag in ("script","style","noscript"): self.skip+=1
+            if not self.skip and tag=="h1": self.h1=[]
+        def handle_data(self,value):
+            if not self.skip:
+                if value.strip(): self.parts.append(value.strip())
+                if self.h1 is not None: self.h1.append(value)
+        def handle_endtag(self,tag):
+            if tag in ("script","style","noscript"): self.skip=max(0,self.skip-1)
+            if tag=="h1" and self.h1 is not None:
+                self.titles.append("".join(self.h1)); self.h1=None
+    p=Visible()
+    try: p.feed(html)
+    except (ValueError,TypeError): return hold("HUASHAN_FIELD_HTML_PARSER_HOLD")
+    norm=lambda x: re.sub(r"\s+"," ",x).strip()
+    if [norm(x) for x in p.titles].count(norm(HUASHAN_ROTATION_TITLE))!=1:
+        return hold("HUASHAN_FIELD_EXACT_H1_IDENTITY_HOLD")
+    text=norm(" ".join(p.parts))
+    pattern=(r"活動時間\s*[:：]\s*(20\d{2})\s*"
+             r"(\d{1,2}[./]\d{1,2}\([^)]+\))\s*"
+             r"(\d{1,2}[./]\d{1,2}\([^)]+\))\s*"
+             r"(\d{2}:\d{2})\s*[~～]\s*(\d{2}:\d{2})\s*"
+             r"(.*?)\s*地點\s*[:：]")
+    times=re.findall(pattern,text)
+    if len(times)!=1: return hold("HUASHAN_FIELD_EVENT_TIME_HEADING_SCOPE_HOLD")
+    year,first,last,start,end,exception=times[0]
+    if (year!="2026" or first!="11.07(六)" or last!=first
+        or start!="11:00" or end!="16:30"):
+        return hold("HUASHAN_FIELD_EVENT_DATE_OR_HOURS_CONFLICT_HOLD")
+    exception=re.sub(r"\s+","",exception)
+    if exception!="西1館11:30開放/西2館、西5-1館11:00開放":
+        return hold("HUASHAN_FIELD_HALL_OPENING_EXCEPTION_HOLD")
+    venues=re.findall(r"地點\s*[:：]\s*(.*?)\s*(?:收藏活動\s*)?主辦單位\s*[:：]",text)
+    if len(venues)!=1: return hold("HUASHAN_FIELD_VENUE_HEADING_SCOPE_HOLD")
+    halls=[norm(x) for x in venues[0].replace("收藏活動","").split("/")]
+    if halls!=["西5-1館 壓縮兼包裝工場","西2館 第三乾餾場","西1館 第二乾餾場"]:
+        return hold("HUASHAN_FIELD_MULTI_HALL_EXACT_PARITY_HOLD")
+    roles=[("event_date","VENUE_EVENT_DATE_NOT_TICKET_SESSION","2026-11-07"),
+           ("event_public_hours","EVENT_OPEN_HOURS_NOT_SITE_BUSINESS_HOURS","11:00~16:30"),
+           ("event_halls","MULTI_HALL_NO_SINGLE_VENUE_INFERENCE",halls),
+           ("hall_opening_exceptions","PER_HALL_OPENING_NOT_SESSION",exception)]
+    report["field_matrix"]=[{"field":name,"role":role,"value":value,
+        "source_url":source_url,"body_sha256":digest,
+        "observed_at_utc":observed_at_utc,"decision":"REVIEW_SOURCE_ROLE_ONLY",
+        "formal_accepted":False,"independent_counter_source_verified":False}
+        for name,role,value in roles]
+    report["decision"]="REVIEW_FOUR_SOURCE_ROLES_INDEPENDENT_ACCEPTANCE_HOLD"
+    return report

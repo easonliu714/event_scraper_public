@@ -2190,3 +2190,48 @@ class TestTMCAuthorityContractAndHuashanRotation(unittest.TestCase):
     def test_b_no_implicit_network(self):
         with self.assertRaises(ValueError):
             m.run_huashan_exact_path_review_lkg(self.dest, ROOT)
+
+
+class TestHuashanOfficialDetailFieldRoles(unittest.TestCase):
+    def setUp(self):
+        from datetime import datetime,timezone
+        self.observed="2026-11-04T13:59:00+00:00"
+        self.now=datetime(2026,11,4,14,0,tzinfo=timezone.utc)
+        self.html=('<h1>'+m.HUASHAN_ROTATION_TITLE+'</h1>'
+          '<h3>活動時間：</h3>2026 11.07(六) 11.07(六) 11:00 ~ 16:30 '
+          '西1館11:30開放 /西2館、西5-1館11:00開放 '
+          '<h3>地點：</h3>西5-1館 壓縮兼包裝工場 / 西2館 第三乾餾場 / 西1館 第二乾餾場 '
+          '<h3>主辦單位：</h3>測試主辦'
+          '<footer>開放時間：每日09:30 ~ 21:00</footer>')
+    def run_contract(self,html=None,source=None,sha=None,observed=None):
+        import hashlib
+        html=self.html if html is None else html
+        return m.adjudicate_huashan_detail_field_roles(
+            html,m.HUASHAN_PUBLIC_DETAIL if source is None else source,
+            self.observed if observed is None else observed,
+            hashlib.sha256(html.encode()).hexdigest() if sha is None else sha,
+            now_utc=self.now)
+    def test_four_event_local_roles_never_formal_or_numeric_id(self):
+        r=self.run_contract()
+        self.assertEqual(r["decision"],"REVIEW_FOUR_SOURCE_ROLES_INDEPENDENT_ACCEPTANCE_HOLD")
+        self.assertEqual([f["field"] for f in r["field_matrix"]],
+            ["event_date","event_public_hours","event_halls","hall_opening_exceptions"])
+        self.assertEqual(r["field_matrix"][0]["value"],"2026-11-07")
+        self.assertEqual((r["formal_accepted_fields"],r["golden_accepted_events"],
+                          r["published_events"],r["same_numeric_event_id"]),(0,0,0,0))
+    def test_wrong_source_time_hall_identity_sha_and_stale_hold(self):
+        cases=[
+          dict(html=self.html.replace("11.07(六)","11.08(日)",1)),
+          dict(html=self.html.replace("11:00 ~ 16:30","09:30 ~ 21:00",1)),
+          dict(html=self.html.replace("西1館11:30開放","西1館11:00開放",1)),
+          dict(html=self.html.replace("西2館 第三乾餾場","西2館 其他場地",1)),
+          dict(html=self.html.replace(m.HUASHAN_ROTATION_TITLE,"其他活動",1)),
+          dict(source="https://example.org/other"),dict(sha="0"*64),
+          dict(observed="2026-10-30T13:59:00+00:00"),
+          dict(html="<h1>"+m.HUASHAN_ROTATION_TITLE+"</h1><footer>開放時間：每日09:30~21:00</footer>")]
+        for case in cases:
+            with self.subTest(case=case):
+                r=self.run_contract(**case)
+                self.assertEqual(r["decision"],"SOURCE_FIELD_SEMANTICS_HOLD")
+                self.assertEqual(r["field_matrix"],[])
+                self.assertEqual(r["formal_accepted_fields"],0)
