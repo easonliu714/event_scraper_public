@@ -1717,6 +1717,26 @@ class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
             self.b(identity="29417")
 
 
+    def test_composite_responsive_parent_not_a_cross_event_row(self):
+        # Real native failure was a title-bearing composite with other IDs.
+        # A child <tr> must be the exact atomic same-ID authority, never its
+        # ancestor <article> that also wraps unrelated event links.
+        target = self.blist.replace("<table>", "").replace("</table>", "")
+        unrelated = ('<tr><td>另一場活動</td><td><a '
+                     'href="/exhibition_more.aspx?id=29419&amp;p=home">'
+                     '詳情</a></td></tr>')
+        nested = "<article><table>" + target + unrelated + "</table></article>"
+        snap = self.b(index=nested)
+        self.assertEqual(snap["quality"]["previewRows"], 1)
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"], "29418")
+        # A title on an ancestor cannot be paired with an unrelated child link.
+        cross_row = ('<article>' + self.btitle + '<tr><td><a '
+                     'href="/exhibition_more.aspx?id=29418&amp;p=home">'
+                     '詳情</a></td></tr></article>')
+        with self.assertRaisesRegex(ValueError, "AMBIGUOUS"):
+            self.b(index=cross_row)
+
+
 class TestDurableIsolatedReviewLKG(unittest.TestCase):
     """Real tempfile atomic persistence, tamper detection and rollback."""
 
