@@ -6603,3 +6603,37 @@ NEW #236 build_source_adapter_review_snapshot
 - Engineering [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD `68c7f80819db05038722dca70ce137b66c029bc2`; [CI #41775939358](https://github.com/easonliu714/event_scraper_public/actions/runs/41775939358) SUCCESS **60/60**, [artifact #13296558677](https://github.com/easonliu714/event_scraper_public/actions/runs/41775939358/artifacts/13296558677) digest `sha256:e16ea7666a79276f8f81a21724168ec5441cc065ef1de2cc449d1f0b77b6abb5`; downloaded ZIP CRC UNVERIFIED. Four original ADD-only engineering paths; changed code/test only. No new native GET; no change to formal main or deployed Pages.
 - A synthetic end-to-end same-source LIST→DETAIL candidate **1**, SHOW/HALL REVIEW **2**; B synthetic end-to-end same-ID LIST→DETAIL candidate **1**, exhibition dates/daily hours/hall REVIEW **3**. **These are test-injected HTML, not independently observed native 1+1 successes.** TWTC real responsive duplicate same-row edge HOLD; EN title-year conflict HOLD; executor-to-id HOLD; KHAM non-checkout independent identity HOLD. Source freshness requires new lawful native evidence; never infer from caller-supplied timestamp.
 - Formal FIELD **0**, Golden **0**, publication **0**, formal PWA feed **0**. `HARD_HOLD_NO_PUBLICATION`; main formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, `docs/platform_status.json` blob `99cae0571e36e52dac360b6935c0c09f6f6bed3f` unchanged. L8 Android 5/5, CKSMH5/TWTC39 PASS preserved. Next: isolated atomic on-disk LKG + one safe source-acquisition integration; no legacy `save_data_and_notify` reuse.
+
+
+---
+
+### P30-L7 durable nonpublication Core — 2026-11-04 13:55 Asia/Taipei
+
+Engineering Draft #236 HEAD 523303d37c7b2a6039714c82a4e916cc0f4a52f8, [CI #41781924508](https://github.com/easonliu714/event_scraper_public/actions/runs/41781924508) **SUCCESS 66/66**, [artifact #13299826175](https://github.com/easonliu714/event_scraper_public/actions/runs/41781924508/artifacts/13299826175) digest sha256:c778b0875a70fd64e190cb359fe0515090fd10432335d403a53f8cfce586a922 (independent ZIP CRC UNVERIFIED).
+
+~~~text
+Existing scraper.py source-list metadata (NO production scraper invocation)
+  ├─ A TMC official LIST /tw/blog/show
+  └─ B TWTC #16 official LIST /exhibition?p=home
+      ↓ caller-supplied bounded HTML, no native freshness claim
+Existing #236 build_non_session_list_detail_candidate
+  → parse_official_non_session_html → exact same-ID DETAIL → field receipts
+      ↓
+Existing main scripts/p30_candidate_review_pipeline.py::build_candidate_dataset
+  → REVIEW-only normalized candidate + independent HOLD reasons
+      ↓
+Existing #236 build_source_adapter_review_snapshot
+  → source-local candidate ID diff, SHA256, in-memory LKG/rollback
+      ↓
+NEW run_persistent_isolated_review_lkg
+  → load_isolated_review_lkg (checksum + schema + release guard)
+  → persist_isolated_review_lkg (exclusive lock + expected prior SHA)
+  → fsync temporary file → atomic os.replace → directory fsync on POSIX
+  → exact review_lkg_snapshot.json OUTSIDE repository (never docs/)
+  → empty/conflict/cross-ID/tamper/lock conflict => fail closed
+      ╳ no save_data_and_notify, main, Golden, Publisher, Scheduler, Notifier
+~~~
+
+A synthetic same-ID candidate 1 with SHOW/HALL 2 REVIEW; B synthetic same-ID candidate 1 with exhibition date/daily open/hall 3 REVIEW. **No new native GET**, no live disk snapshot, no formal accepted FIELD, Golden, published or formal PWA feed (all zero). TWTC responsive duplicate same-row, bilingual title-year and executor-to-ID unresolved; KHAM PRODUCT is not a Session. Initial CI failed because source_receipts is a mapping, fixed at exact HEAD; 66/66 PASS. Four original ADD-only PR paths preserved, production blobs unchanged, L8 Android 5/5 and historical CKSMH5/TWTC39 preserved. HARD_HOLD_NO_PUBLICATION.
+
+**Next architecture integration:** bounded allowlisted native acquisition with independently attested source hash/timestamp → existing adapter; field-level acceptance remains separate, no formal writer.
