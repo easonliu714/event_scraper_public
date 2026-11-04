@@ -1134,8 +1134,11 @@ def build_non_session_list_detail_candidate(
                 link = (self.active_anchor["href"],
                         " ".join(self.active_anchor["text"]))
                 self.anchors.append(link)
-                for row in self.stack:
-                    row["links"].append(link)
+                # An anchor belongs to its nearest semantic row only.
+                # Assigning it to all ancestors creates false duplicate edges
+                # for responsive <article>/<tr> nesting.
+                if self.stack:
+                    self.stack[-1]["links"].append(link)
                 self.active_anchor = None
             if tag in ("article", "tr", "li") and self.stack:
                 if self.stack[-1]["tag"] != tag:
@@ -1152,10 +1155,16 @@ def build_non_session_list_detail_candidate(
         # Whole title, not a fuzzy substring of another event.
         if expected_title not in text:
             continue
-        for href, label in row["links"]:
-            candidate = urljoin(list_url, href)
-            if candidate == detail_url and line == "B":
-                matched.append((text, candidate))
+        row_detail_links = [urljoin(list_url, href)
+                            for href, label in row["links"]
+                            if urlsplit(urljoin(list_url, href)).path
+                            == "/exhibition_more.aspx"]
+        # A title-bearing row with another event ID is not a safe identity.
+        if line == "B" and row_detail_links:
+            if set(row_detail_links) != {detail_url}:
+                raise ValueError("LIST_ROW_CONFLICTING_DETAIL_IDS_HOLD")
+            matched.extend((text, detail_url) for link in row_detail_links
+                           if link == detail_url)
     # TMC official LIST cards may have no semantic <article>/<tr> wrapper.
     # Bind the complete title and exact URL within the SAME anchor, never
     # across unrelated cards or by a page-wide fuzzy title search.
@@ -1163,8 +1172,13 @@ def build_non_session_list_detail_candidate(
         matched = [(label, urljoin(list_url, href)) for href, label in parser.anchors
                    if urljoin(list_url, href) == detail_url
                    and expected_title in " ".join(label.split())]
-    if len(matched) != 1:
+    # Identical responsive desktop/mobile copies of the SAME exact title/ID
+    # are one identity edge, not two distinct events. Different row text or
+    # conflicting IDs must still fail closed; never fuzzy-merge by title.
+    unique_matches = set(matched)
+    if len(unique_matches) != 1:
         raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
+    matched = [next(iter(unique_matches))]
 
     detail = parse_official_non_session_html(
         detail_url, detail_html, expected_title, expected_identity_id,
