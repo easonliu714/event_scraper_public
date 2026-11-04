@@ -2241,3 +2241,64 @@ class TestHuashanOfficialDetailFieldRoles(unittest.TestCase):
                 self.assertEqual(r["decision"],"SOURCE_FIELD_SEMANTICS_HOLD")
                 self.assertEqual(r["field_matrix"],[])
                 self.assertEqual(r["formal_accepted_fields"],0)
+
+
+class TestHuashanEmbeddedNumericIdentityHypothesis(unittest.TestCase):
+    """New official JSON-LD hypothesis; never infer an ID from path or analytics."""
+
+    def run_identity(self, nodes, url=None):
+        body = '<h1>' + m.HUASHAN_ROTATION_TITLE + '</h1>'
+        if nodes is not None:
+            body += ('<script type="application/ld+json">' +
+                     json.dumps(nodes, ensure_ascii=False) + '</script>')
+        return m.inspect_huashan_embedded_event_identity(
+            body, m.HUASHAN_PUBLIC_DETAIL if url is None else url)
+
+    def test_exact_event_owned_numeric_identifier_is_review_not_same_id(self):
+        report = self.run_identity({
+            "@context": "https://schema.org", "@type": "Event",
+            "url": m.HUASHAN_PUBLIC_DETAIL, "identifier": "12345"})
+        self.assertEqual(report["decision"], "REVIEW_EMBEDDED_ID_NOT_LIST_BOUND")
+        self.assertEqual(report["embedded_numeric_id_review"], "12345")
+        self.assertEqual((report["same_numeric_event_id"],
+                          report["formal_accepted_fields"],
+                          report["golden_accepted_events"],
+                          report["published_events"]), (0, 0, 0, 0))
+
+    def test_unrelated_sitewide_event_and_local_path_hash_are_not_identity(self):
+        unrelated = {"@type": "Event", "url": "https://www.huashan1914.com/other",
+                     "identifier": "12345"}
+        for nodes in (None, unrelated,
+                      {"@type": "Event", "url": m.HUASHAN_PUBLIC_DETAIL,
+                       "identifier": "path-sha256-12345"},
+                      {"@type": "Event", "identifier": "12345"},
+                      {"@type": "Event", "url": m.HUASHAN_PUBLIC_DETAIL,
+                       "identifier": {"value": "12345"}},
+                      {"@type": "Organization", "url": m.HUASHAN_PUBLIC_DETAIL,
+                       "identifier": "12345"}):
+            with self.subTest(nodes=nodes):
+                r = self.run_identity(nodes)
+                self.assertTrue(r["decision"].startswith("HOLD_"))
+                self.assertIsNone(r["embedded_numeric_id_review"])
+
+    def test_conflicting_event_ids_and_wrong_source_fail_closed(self):
+        nodes = {"@graph": [
+            {"@type": "Event", "url": m.HUASHAN_PUBLIC_DETAIL,
+             "identifier": "12345"},
+            {"@type": "Event", "url": m.HUASHAN_PUBLIC_DETAIL,
+             "identifier": "99999"}]}
+        self.assertTrue(self.run_identity(nodes)["decision"].startswith("HOLD_"))
+        self.assertTrue(self.run_identity(
+            {"@type": "Event", "url": m.HUASHAN_PUBLIC_DETAIL,
+             "identifier": "12345"},
+            "https://example.com/other")["decision"].startswith("HOLD_"))
+
+    def test_invalid_json_and_oversize_are_holds(self):
+        bad = m.inspect_huashan_embedded_event_identity(
+            '<script type="application/ld+json">{bad</script>',
+            m.HUASHAN_PUBLIC_DETAIL)
+        self.assertTrue(bad["decision"].startswith("HOLD_"))
+        self.assertTrue(self.run_identity(
+            {"@type": "Event", "url": m.HUASHAN_PUBLIC_DETAIL,
+             "identifier": "12345", "description": "X" * 530000}
+        )["decision"].startswith("HOLD_"))
