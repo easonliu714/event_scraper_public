@@ -2026,8 +2026,10 @@ def audit_native_source_link_edges(tmc_html, twtc_index_html, twtc_detail_html,
     # Independent A/B decisions: a B layout/identity failure must not erase a
     # proven A exact href. B remains HOLD, never promoted by global title/date.
     detail_text = " ".join(twtc_detail_html.split())
-    b_row_valid = (len(rows) == 1 and "11/06" in rows[0]["text"]
-                   and "11/09" in rows[0]["text"])
+    # The official index may duplicate the exact same row for desktop/mobile.
+    # Accept at most two identical source-local ID/title rows; never join by date alone.
+    b_row_valid = (1 <= len(rows) <= 2 and all(
+        "11/06" in row["text"] and "11/09" in row["text"] for row in rows))
     b_detail_valid = all(s in detail_text for s in (
         "2026年電器空調影音大展", "世貿一館", "台北市電器商業同業公會",
         "2026/11/06", "2026/11/09", "10:00", "18:00"))
