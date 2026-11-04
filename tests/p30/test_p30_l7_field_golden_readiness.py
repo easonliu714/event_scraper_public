@@ -941,7 +941,9 @@ class SafeListDetailCandidatePipeline(unittest.TestCase):
             lambda: self.run_a(identity="POTHER123"),
             lambda: self.run_a(detail_html=self.TMC_DETAIL.replace(
                 "2026.11.07 19:30", "2026.11.08 19:30 / 2026.11.07 19:30")),
-            lambda: self.run_b(list_html=self.TWTC_LIST + self.TWTC_LIST),
+            lambda: self.run_b(list_html=self.TWTC_LIST +
+                               self.TWTC_LIST.replace("<td><a",
+                                                      "<td>OTHER EVENT <a")),
             lambda: self.run_b(list_html=(
                 '<tr><td>' + self.TWTC_TITLE + '</td></tr>'
                 '<tr><td>OTHER</td><td><a href="/exhibition_more.aspx?id=29418&amp;p=home">更多</a></td></tr>')),
