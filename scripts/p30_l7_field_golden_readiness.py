@@ -1800,6 +1800,73 @@ def audit_downloaded_native_artifact_zip(zip_bytes, github_digest, expected_head
     outcome['decision'] = 'ARTIFACT_INTEGRITY_PASS_FORMAL_AUTHORITY_HOLD'
     return outcome
 
+
+# 2026-11-04: Independent public executor index shows three different exhibitions
+# sharing the same dates and hall. Date+hall is therefore a NEGATIVE identity
+# discriminator, never an event-ID bridge or independent Golden authority.
+# Caller-transcribed public-reader evidence is not a native HTTP receipt.
+def audit_executor_same_day_venue_collision(index, now_utc):
+    from datetime import datetime, timedelta, timezone
+    expected_titles = {
+        "2026台北電器空調影音大展｜超越雙11家電週年慶",
+        "台北Méng萌寵物用品展",
+        "2026玩轉文具暨手作創意展｜11/6-9世貿一館",
+    }
+    if (not isinstance(index, dict)
+            or index.get("source_url") != "https://www.sheng-dong.com.tw/"
+            or index.get("evidence_kind") != "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE"
+            or index.get("native_official_get") != 0
+            or index.get("formal_accepted_fields") != 0
+            or index.get("golden_accepted_events") != 0
+            or index.get("published_events") != 0):
+        raise ValueError("EXECUTOR_INDEX_PROVENANCE_OR_RELEASE_HOLD")
+    if not isinstance(now_utc, datetime) or now_utc.utcoffset() is None:
+        raise ValueError("EXECUTOR_INDEX_AUDITOR_CLOCK_HOLD")
+    try:
+        observed = datetime.fromisoformat(
+            index["observed_at_utc"].replace("Z", "+00:00"))
+        if observed.utcoffset() is None:
+            raise ValueError()
+    except (KeyError, AttributeError, TypeError, ValueError):
+        raise ValueError("EXECUTOR_INDEX_READER_CLOCK_HOLD")
+    age = now_utc.astimezone(timezone.utc) - observed.astimezone(timezone.utc)
+    if not timedelta(minutes=-5) <= age <= timedelta(hours=24):
+        raise ValueError("EXECUTOR_INDEX_STALE_OR_FUTURE_HOLD")
+    rows = index.get("events")
+    if not isinstance(rows, list) or len(rows) != 3:
+        raise ValueError("EXECUTOR_INDEX_COLLISION_ROW_COUNT_HOLD")
+    titles = set()
+    for row in rows:
+        if (not isinstance(row, dict)
+                or row.get("title") not in expected_titles
+                or row.get("start_date") != "2026/11/06"
+                or row.get("end_date") != "2026/11/09"
+                or row.get("venue") != "台北世貿一館"
+                or row.get("twtc_exhibition_id") is not None
+                or row.get("ticket_session_id") is not None):
+            raise ValueError("EXECUTOR_INDEX_CROSS_EVENT_ID_OR_ROLE_HOLD")
+        if row["title"] in titles:
+            raise ValueError("EXECUTOR_INDEX_DUPLICATE_EVENT_HOLD")
+        titles.add(row["title"])
+    if titles != expected_titles:
+        raise ValueError("EXECUTOR_INDEX_UNEXPECTED_EVENT_SET_HOLD")
+    return {
+        "kind": "P30_L7_EXECUTOR_SAME_DAY_VENUE_COLLISION_V1",
+        "distinct_event_labels": 3,
+        "shared_date_venue_is_unique_event_identity": False,
+        "twtc_id_29418_from_executor_index": None,
+        "identity_decision": "REJECT_DATE_VENUE_ONLY_CROSS_EVENT_MERGE",
+        "A_tmc_non_session_fields": "2_REVIEW_UNCHANGED",
+        "B_twtc_non_session_fields": "3_REVIEW_UNCHANGED",
+        "native_official_get": 0,
+        "independent_formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "formal_pwa_feed_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
