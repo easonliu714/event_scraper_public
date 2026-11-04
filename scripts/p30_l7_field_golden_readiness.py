@@ -3620,3 +3620,120 @@ def _songshan_ancestors(nodes, idx):
             break
         yield idx
         idx = nodes[idx]["parent"]
+
+
+# P30-L7 B canonical #17: reuse existing actId identity and sealed isolated LKG.
+# No new platform, network access, field promotion, Golden, or publisher.
+def assess_cksmh_non_session_field_authority(snapshot, now_utc=None):
+    """Fail-closed independent field-readiness contract for existing CKSMH actId."""
+    import re
+    from datetime import timezone
+    report = {
+        "kind": "P30_L7_CKSMH_CANONICAL_FIELD_AUTHORITY_V1",
+        "platform_id": "17", "source_event_id": "61023",
+        "decision": "HOLD_NO_SEALED_NATIVE_AUTHORITY",
+        "first_failure": "CKSMH_NO_SNAPSHOT",
+        "field_matrix": [],
+        "requirements": [
+            "CANONICAL_PLATFORM_17_ONLY", "EXACT_LIST_ACTID_DETAIL_IDENTITY",
+            "SEALED_NATIVE_SOURCE_BODY_SHA256_AND_UTC_FRESHNESS",
+            "EVENT_LOCAL_DATE_AND_MULTI_SESSION_SCOPE",
+            "VENUE_HALL_NOT_SINGLE_HALL_INFERRED",
+            "INDEPENDENT_FIELD_AUTHORITY_AND_CONFLICT_DECISION",
+        ],
+        "new_native_get": 0, "native_same_id_review_lkg_new": 0,
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+    if snapshot is None:
+        return report
+    _validate_isolated_lkg_snapshot(snapshot)
+    row = snapshot["rows"][0]
+    meta = row["_candidate"]
+    sources = snapshot["source_receipts"]
+    acquisition = sources.get("bounded_acquisition")
+    if (meta.get("platform_id") != "17"
+            or meta.get("source_event_id") != "61023"
+            or meta.get("record_id") != "17:61023"
+            or meta.get("sources") != [CKSMH_PUBLIC_LIST, CKSMH_PUBLIC_DETAIL]
+            or row.get("url") != CKSMH_PUBLIC_DETAIL
+            or row.get("title") != CKSMH_ROTATION_TITLE
+            or sources.get("list_url") != CKSMH_PUBLIC_LIST
+            or sources.get("detail_url") != CKSMH_PUBLIC_DETAIL):
+        raise ValueError("CKSMH_FIELD_CROSS_EVENT_OR_PLATFORM_HOLD")
+    fields = snapshot["field_receipts"]
+    if (len(fields) != 1
+            or fields[0] != {
+                "field": "title", "value": CKSMH_ROTATION_TITLE,
+                "role": "EVENT_TITLE", "source": CKSMH_PUBLIC_DETAIL,
+                "observed_at": row["scraped_at"], "decision": "REVIEW",
+            }):
+        raise ValueError("CKSMH_FIELD_UNSEALED_ROLE_OR_SOURCE_HOLD")
+    if not isinstance(acquisition, dict):
+        raise ValueError("CKSMH_FIELD_ACQUISITION_REQUIRED_HOLD")
+    now = now_utc or datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("CKSMH_FIELD_CLOCK_HOLD")
+    try:
+        observed = datetime.fromisoformat(row["scraped_at"].replace("Z", "+00:00"))
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError("CKSMH_FIELD_OBSERVATION_CLOCK_HOLD") from None
+    if observed.utcoffset() is None:
+        raise ValueError("CKSMH_FIELD_OBSERVATION_CLOCK_HOLD")
+    fresh = 0 <= (now - observed).total_seconds() <= 86400
+    native = acquisition.get("transport") == "BUILTIN_NATIVE_GET"
+    report["field_matrix"] = [
+        {
+            "field": "title", "value": CKSMH_ROTATION_TITLE,
+            "role": "EVENT_TITLE", "source_url": CKSMH_PUBLIC_DETAIL,
+            "observed_at_utc": row["scraped_at"],
+            "list_body_sha256": acquisition["list_body_sha256"],
+            "detail_body_sha256": acquisition["detail_body_sha256"],
+            "native_body_receipt": native, "fresh_within_24h": fresh,
+            "independent_field_authority": False,
+            "decision": "SOURCE_TITLE_REVIEW_ONLY" if native and fresh
+                        else "HOLD_NATIVE_FRESHNESS_OR_AUTHORITY",
+            "formal_accepted": False,
+        },
+        {
+            "field": "event_date_sessions", "role": "MULTI_SESSION_UNRESOLVED",
+            "value": None, "source_url": CKSMH_PUBLIC_DETAIL,
+            "decision": "HOLD_INDEPENDENT_EVENT_LOCAL_DATE_AUTHORITY",
+            "formal_accepted": False,
+        },
+        {
+            "field": "venue_halls", "role": "MULTI_VENUE_UNRESOLVED",
+            "value": None, "source_url": CKSMH_PUBLIC_DETAIL,
+            "decision": "HOLD_INDEPENDENT_HALL_AND_SESSION_AUTHORITY",
+            "formal_accepted": False,
+        },
+    ]
+    report["decision"] = ("REVIEW_TITLE_ONLY_INDEPENDENT_FIELDS_HOLD"
+                          if native and fresh
+                          else "HOLD_NATIVE_FRESHNESS_OR_AUTHORITY")
+    report["first_failure"] = ("CKSMH_DATE_SESSION_HALL_AUTHORITY_PENDING"
+                               if native and fresh
+                               else "CKSMH_NATIVE_OR_FRESHNESS_NOT_VERIFIED")
+    return report
+
+
+def assess_tmc_cksmh_fixed_nonpublishing_field_gate(tmc_snapshot=None,
+                                                    cksmh_snapshot=None,
+                                                    now_utc=None):
+    """Run A and B canonical field gates without GET, persistence, or acceptance."""
+    a = assess_tmc_non_session_field_authority(tmc_snapshot, now_utc)
+    b = assess_cksmh_non_session_field_authority(cksmh_snapshot, now_utc)
+    return {
+        "kind": "P30_L7_FIXED_A_B_CANONICAL_FIELD_GATE_V1",
+        "A": a, "B": b,
+        "source_identity": {
+            "A": "TMC_OFFICIAL:" + PUBLIC_TMC_DETAIL.rsplit("/", 1)[-1],
+            "B": "17:61023",
+            "cross_source_identity_merge": False,
+        },
+        "new_native_get": 0,
+        "native_same_id_review_lkg_new": 0,
+        "decision": "HOLD_INDEPENDENT_FIELD_AUTHORITY",
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
