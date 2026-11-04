@@ -1558,6 +1558,17 @@ class TestNativeOfficialLinkEdges(unittest.TestCase):
             '<img alt="票券"/></a></article>')
         self.assertEqual(self.audit(tmc=duplicate)["source_local_native_link_edges"], 2)
 
+    def test_official_responsive_duplicate_row_not_a_second_event(self):
+        first = self.index.split("</tr>")[0] + "</tr>"
+        doubled = self.index.replace("</table>", first + "</table>")
+        result = self.audit(index=doubled)
+        self.assertEqual(result["source_local_native_link_edges"], 2)
+        tripled = doubled.replace("</table>", first + "</table>")
+        result = self.audit(index=tripled)
+        self.assertEqual(result["source_local_native_link_edges"], 1)
+        self.assertEqual(result["B_twtc_index_to_same_id_detail"],
+                         "HOLD_SAME_ROW_OR_DETAIL_CONTEXT_UNPROVEN")
+
     def test_cross_event_link_wrong_id_or_false_ticket_anchor_refused(self):
         for tmc in (
             self.tmc.replace("P1DF32E2", "OTHER"),
