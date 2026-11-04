@@ -6494,3 +6494,37 @@ Engineering Draft #236 HEAD 764c114311e0daf379aae17dbfed91370b0b3ace
 ```
 
 This is **native source-acquisition and source-role evidence**, not a delegated formal Golden authority. Two source-identity dependencies remain HOLD (A KHAM non-checkout ticket product, B executor-to-TWTC direct id); TWTC same-ID ZH/EN title-year disagreement remains HOLD. Do not infer a ticket Session, admission price, inventory, poster authority or corrected EN title. Next A/B gate should address those independent authorities or rotate an existing canonical P0 source rather than repeat fixture-only micro Gates.
+
+
+---
+
+### P30-L7 09:55 executor collision architecture — 2026-11-04 Asia/Taipei
+
+```text
+Public official reader, not native GET: https://www.sheng-dong.com.tw/
+  ├─ 2026 台北電器空調影音大展       2026/11/06–09  台北世貿一館
+  ├─ 台北Méng萌寵物用品展            2026/11/06–09  台北世貿一館
+  └─ 2026 玩轉文具暨手作創意展       2026/11/06–09  台北世貿一館
+      └─ SAME_DATE_AND_HALL ≠ UNIQUE_EVENT_IDENTITY [NEGATIVE EDGE]
+TWTC ZH id=29418 / EN id=29418
+  ├─ dates + daily open + Hall 1  [3 SOURCE-BOUND REVIEW]
+  ├─ EN title 2025 vs ZH title 2026 [TITLE_YEAR_CONFLICT HOLD]
+  └─ executor homepage no direct id=29418 [IDENTITY_EDGE HOLD]
+TMC official 2026SungNien-Yu
+  ├─ show 2026/11/07 19:30 [REVIEW]
+  ├─ hall 臺北流行音樂中心 表演廳 [REVIEW]
+  └─ KHAM PRODUCT_ID=P1DF32E2 purchase-flow [NO NATIVE AUTOMATED GET]
+Draft #236 original ADD-only script + tests:
+  audit_executor_same_day_venue_collision(index, now_utc)
+    ├─ 3 distinct expected labels, same dates/hall; no event/session IDs
+    ├─ exact official executor URL, offset clock <=24h, public reader only
+    ├─ rejects stale/duplicate/false native/false formal and cross-event join
+    └─ returns NEGATIVE IDENTITY EDGE; FORMAL/GOLDEN/PUBLISHED/PWA_FEED = 0
+HEAD 441e6e8d8356668cbcafb49baaae4e2b69d6001c
+CI #41757407574 SUCCESS 49/49; artifact #13288972044
+native official GET this run 0; historic 08:55 4/4 retained, not replayed
+main/data/status/19-platform/Pages/L8 Android PASS immutable
+HARD_HOLD_NO_PUBLICATION
+```
+
+Next A: safe non-checkout ticket or organizer independent identity. Next B: explicit TWTC bilingual title correction or direct executor `id=29418` authority; otherwise rotate canonical P0 venue. No same-day/hall/organizer fuzzy event merge. Formal acceptance and release remain separate Owner-authorized gates.
