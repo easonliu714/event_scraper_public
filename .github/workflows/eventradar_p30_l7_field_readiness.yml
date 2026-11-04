@@ -699,6 +699,7 @@ jobs:
           # The TMC->KHAM link is parsed only; the KHAM purchase flow is NEVER fetched.
           # Recheck exact href after first native run exposed responsive/image-only label ambiguity.
           # Partial A/B adjudication and TWTC index structure diagnostic; no raw HTML.
+          # Recheck official responsive duplicate rows after native 83-row/2-target diagnostic.
           sources = (
               ('A_TMC_VENUE', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'),
               ('B_TWTC_MIRROR_INDEX', 'https://twtc.org.tw/exhibition.aspx'),
