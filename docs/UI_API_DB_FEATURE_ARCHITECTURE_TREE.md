@@ -6754,3 +6754,31 @@ Existing #236 run_bounded_native_source_to_review_lkg
 - **Source quality vs acceptance:** A native same-ID end-to-end **0→1**; B new structural root-cause class **UNKNOWN→TITLE_CELL_EXACT_ID_EDGE_HYPOTHESIS**, B native same-ID **0**. Existing A 2/B 3 non-session role REVIEW, independent accepted FIELD **0**, Golden **0**, published **0**, formal PWA feed **0**. Historic CKSMH5/TWTC39 and L8 Android 5/5 USER_ATTESTED_PASS retained; Pages direct runtime HTTP **UNVERIFIED**; `HARD_HOLD_NO_PUBLICATION` remains locked.
 - **Next:** B reuse existing parser and the structural receipt to perform one bounded actual LIST→same-ID DETAIL→FIELD→isolated LKG check only on a new verified hypothesis; if it fails, fix actual DOM root cause or rotate to existing P0 canonical source. A independently adjudicate SHOW/HALL provenance/freshness without promoting to formal FIELD or treating PRODUCT as Session. Owner action **not required** for isolated engineering; independent Golden/Publisher release requires separate explicit authority.
 
+
+---
+
+### P30-L7 18:55–19:05 fixed adapter TWTC source-scope refinement — 2026-11-04 (Draft #8 only)
+
+```text
+Formal main scraper.py source LIST metadata [READ ONLY; NOT EXECUTED]
+  A TMC LIST -> DETAIL -> SHOW/HALL 2 REVIEW -> candidate -> CI temporary LKG
+  B canonical TWTC #16 LIST -> DETAIL id=29418 -> 3 REVIEW role hypotheses
+       |
+Existing #236 build_non_session_list_detail_candidate / RowAnchors
+  exact title-bearing td/th cell + canonical p=home exact href
+  secondary p=menu1 allowed ONLY when same exhibition ID, NOT as identity proof
+  foreign ID / foreign host / missing p=home / conflicting dates => HOLD
+  responsive duplicate period must match independent DETAIL period
+       |
+Existing parse_official_non_session_html + per-field provenance
+       |
+Existing main scripts/p30_candidate_review_pipeline.build_candidate_dataset
+       |
+Existing #236 run_bounded_native_source_to_review_lkg
+  2 bounded native public GET max, SHA256/UTC receipts, isolated diff/LKG
+  FAIL CLOSED: no write on conflict; no raw HTML persisted
+       X no legacy save_data_and_notify, docs/data.json, Golden, Publisher
+```
+
+- Engineering [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD `6a3ef1460f0355a5f2aa89da3f4113d8126267f1` remains **CI_PENDING_UNVERIFIED** (no exact-head run observed at governance read). Prior [CI #41818253659](https://github.com/easonliu714/event_scraper_public/actions/runs/41818253659) on prior HEAD `142ea4d123612614f5dae7466a8beaac512e9af9` SUCCESS **78/78**; native B LIST/DETAIL 2/2 HTTP200 but first real parser failure `LIST_TITLE_CELL_CONFLICTING_DETAIL_IDS_HOLD`; artifact #13315124321 ZIP SHA256 `1db320c71f7ffa8b6df24194d4d1fd29a58098a5d8875bbdf3c51099f6a7ef01` independently CRC verified. Initial CI #41818152878 test FAIL was fixed before that run. Latest parser code must not be marked native PASS until its own exact-head CI/Artifact readback.
+- A prior native TMC same-ID REVIEW candidate **1 unchanged**; this cycle new A GET **0**. B native same-ID candidate **0**, independent accepted FIELD/Golden/Published/formal PWA **0/0/0/0**. TWTC EN 2025 vs ZH 2026 conflict and executor-to-id edge remain HOLD. Next: exact-head B validation once, then root cause or rotate canonical P0; A independently assess non-checkout authority, no KHAM GET. Main/data/status/19 platforms unchanged, L8 Android 5/5 and CKSMH5/TWTC39 retained, Pages HTTP UNVERIFIED, `HARD_HOLD_NO_PUBLICATION`.
