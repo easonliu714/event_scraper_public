@@ -6453,3 +6453,44 @@ Official TWTC source-identity graph (public reader, NOT native GET):
 Executable engineering Draft [#236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD df0e3078535ee048423eb2dff6173f40085c578e adds adjudicate_twtc_same_organizer_collision(cn,en,april,now_utc) to existing original ADD-only script and two tests. Guard rejects cross-event ID/date, organizer/phone mismatch, wrong URL, reader-clock stale/future and false source identity; all field results remain REVIEW/HOLD. [Exact-head CI #41743318704](https://github.com/easonliu714/event_scraper_public/actions/runs/41743318704) SUCCESS 47/47, [artifact #13282886349](https://github.com/easonliu714/event_scraper_public/actions/runs/41743318704/artifacts/13282886349) digest sha256:30c6207b60515ee5e3b5cf6cd7ddf708c8cbc7caf5b7d9266ebe586511f459bc (independent ZIP CRC UNVERIFIED). This CI native GET=0, historic 3/3 only; no raw official source-body authority.
 
 **Acceptance matrix:** A SHOW/HALL 2/2 REVIEW, B exhibition dates/open hours/hall 3/3 REVIEW; independent accepted FIELD=0, Golden=0, published=0, formal PWA feed=0. Two source-identity dependencies remain HOLD, bilingual title-year conflict remains HOLD. Next work: independent non-checkout source authority/acceptance for A; exact TWTC source-owner bilingual correction or native independent identity evidence for B; stop adding repeated fixture-only Gate when no quality gain. Status-only #53 MERGED, main/status/data/19-platform baseline untouched, Pages runtime HTTP UNVERIFIED, L8 Android 5/5 preserved, HARD_HOLD_NO_PUBLICATION unchanged.
+
+
+---
+
+### P30-L7 native same-ID bilingual authority & A/B field-role evidence — 2026-11-04 08:55 Asia/Taipei
+
+\`\`\`text
+Source main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [IMMUTABLE]
+Engineering Draft #236 HEAD 764c114311e0daf379aae17dbfed91370b0b3ace
+  .github/workflows/eventradar_p30_l7_field_readiness.yml [ADD-only]
+    └─ one-shot [bilingual-native-once], exact public allowlist, 4 normal GET
+       ├─ no redirects / cookies / login / checkout / retries / raw HTML artifact
+       ├─ <=512 KiB each, 8s timeout, content-type and UTF-8 checks
+       ├─ per-source observed_at_utc / body SHA256 / HTTP status
+       ├─ source-local text/role checks, not generic document-wide dates
+       ├─ A TMC /tw/blog/show/2026SungNien-Yu HTTP200
+       │  ├─ SHOW 2026/11/07 19:30 [native REVIEW]
+       │  ├─ HALL 臺北流行音樂中心 表演廳 [native REVIEW]
+       │  └─ KHAM PRODUCT_ID=P1DF32E2 native identity NOT PROVEN [HOLD]
+       ├─ B TWTC ZH exhibition_more id=29418 HTTP200
+       ├─ B TWTC EN exhibition_More SAME id=29418 HTTP200
+       ├─ B executor /activity/appliances-expo/TECO HTTP200
+       │  ├─ DATES 2026/11/06–09 [3-source native REVIEW]
+       │  ├─ DAILY OPEN 10:00–18:00 [3-source native REVIEW]
+       │  ├─ HALL 世貿一館 / Hall 1 [3-source native REVIEW]
+       │  ├─ ZH TITLE 2026 vs EN TITLE 2025 [NATIVE CONFLICT HOLD]
+       │  └─ executor has no direct TWTC id [IDENTITY EDGE HOLD]
+       ├─ first probe 4/5: hall-label exact-string whitespace false HOLD
+       ├─ corrected bounded ZH/EN hall-label regex → 5/5 native REVIEW
+       └─ formal accepted / Golden / published / PWA feed = 0/0/0/0
+  CI #41750684254 [SUCCESS 47/47, 4/4 native HTTP200]
+  Artifact #13285129545 [ZIP SHA256+CRC+3 packaged member SHA256 PASS]
+  digest db92b8db5ae400e57c78fb0a662ad42a08b85918667d6e0f7a1b56a6f4c63b73
+  native raw source body independent rehash [UNVERIFIED; raw pages not retained]
+  Docs Governance Draft #8 only, serialized compare-HEAD/write/readback
+  Formal docs/data.json, platform_status.json, index.html, scraper.py [UNCHANGED]
+  19 platforms, ibon history, #53 MERGED/Pages SUCCESS, L8 Android 5/5 [PRESERVED]
+  HARD_HOLD_NO_PUBLICATION [LOCKED]
+\`\`\`
+
+This is **native source-acquisition and source-role evidence**, not a delegated formal Golden authority. Two source-identity dependencies remain HOLD (A KHAM non-checkout ticket product, B executor-to-TWTC direct id); TWTC same-ID ZH/EN title-year disagreement remains HOLD. Do not infer a ticket Session, admission price, inventory, poster authority or corrected EN title. Next A/B gate should address those independent authorities or rotate an existing canonical P0 source rather than repeat fixture-only micro Gates.
