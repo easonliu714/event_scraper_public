@@ -1175,6 +1175,10 @@ def build_non_session_list_detail_candidate(
     # Identical responsive desktop/mobile copies of the SAME exact title/ID
     # are one identity edge, not two distinct events. Different row text or
     # conflicting IDs must still fail closed; never fuzzy-merge by title.
+    # TMC has no documented responsive duplicate identity contract: a
+    # repeated A anchor remains ambiguous even if its text is identical.
+    if line == "A" and len(matched) != 1:
+        raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
     unique_matches = set(matched)
     if len(unique_matches) != 1:
         raise ValueError("LIST_EXACT_ROW_DETAIL_EDGE_MISSING_OR_AMBIGUOUS_HOLD")
