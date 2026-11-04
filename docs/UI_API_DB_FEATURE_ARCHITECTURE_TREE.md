@@ -6710,3 +6710,36 @@ UPDATED #236 _validate_isolated_lkg_snapshot
 - Existing [Engineering Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD `4d33ff5503cece9ac47a394f0a152cf15ba7b21f` based on unchanged main `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce`; [exact-head CI #41796050944](https://github.com/easonliu714/event_scraper_public/actions/runs/41796050944) SUCCESS **72/72**, [artifact #13305262473](https://github.com/easonliu714/event_scraper_public/actions/runs/41796050944/artifacts/13305262473) GitHub digest `sha256:72b5e46425c0cd23adc7135e9c93450d50904b431ce20249ef00664a14a6b593`, independently matched whole-ZIP SHA256; ZIP CRC and 3 packaged evidence SHA256 PASS. Existing 4 ADD-only engineering paths unchanged.
 - Native B source receipts: LIST `2cb969ada775234503bd06072be64c616d27a0577eb04bade3e51401f09e6b46`, DETAIL `1f886d0b7447064a7a116a34631731f852fc30c9f36ae904ad7f1ac72add672d`, both HTTP200; exact same-row native identity remains HOLD due conflicting IDs in a semantic row. No raw HTML persisted. Native successful same-ID end-to-end 0; A new native 0. Parser repair requires bounded structural diagnosis of exact title cell / `more` href / responsive row, not repeated synthetic negative Gate.
 - Acceptance: A 2 REVIEW, B 3 REVIEW; independent formal FIELD 0, Golden 0, publication 0, formal feed 0. B bilingual title-year and executor identity HOLD; KHAM checkout never fetched. Existing L8 Android 5/5, CKSMH5/TWTC39 PASS preserved. Formal data/status blobs `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` / `99cae0571e36e52dac360b6935c0c09f6f6bed3f` frozen. Pages HTTP UNVERIFIED; `HARD_HOLD_NO_PUBLICATION` locked. Owner action: none for isolated engineering.
+---
+
+### P30-L7 16:55 exact-title cell-bound TWTC identity parser — 2026-11-04 (Governance Draft #8 ONLY)
+
+```text
+Existing scraper.py source-list metadata [READ ONLY; not production runner]
+  A TMC LIST -> same-ID DETAIL -> SHOW/HALL 2 REVIEW
+      KHAM direct PRODUCT_ID = product link, NOT Session
+  B TWTC canonical #16 LIST -> DETAIL id=29418 -> 3 REVIEW roles
+      previous native HTTP200 2/2; first failure ROW_CONFLICTING_DETAIL_IDS
+       |
+Existing #236 build_non_session_list_detail_candidate
+  UPDATED RowAnchors (same existing function/file)
+    ├─ semantic article/tr/li remains an atomic row boundary
+    ├─ td/th cell tracks own text and DETAIL hrefs
+    ├─ exact-title cell + its own exact-ID href = source-local REVIEW edge
+    ├─ unrelated sibling-cell href cannot contaminate title-cell edge
+    ├─ title-only cell falls back to strict one-ID whole-row binding
+    ├─ conflicting IDs in title cell => HOLD
+    └─ same-ID responsive rows with DIFFERENT dates/context => AMBIGUOUS HOLD
+       |
+Existing parse_official_non_session_html -> field role/provenance
+       |
+Existing main p30_candidate_review_pipeline.build_candidate_dataset
+       |
+Existing #236 run_bounded_native_source_to_review_lkg
+  -> source hashes / transport / UTC / allowlisted URLs
+  -> isolated candidate diff + atomic LKG / rollback outside repository
+       X no legacy save_data_and_notify / formal JSON / Golden / Publisher
+```
+
+- Engineering [Draft #236](https://github.com/easonliu714/event_scraper_public/pull/236) exact HEAD `1a50fee36efb3e178946c2c934352e8bd2fe1bad`, base Source main `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce`; two existing code/test paths changed, total original four ADD-only PR paths. Initial [CI #41803314462](https://github.com/easonliu714/event_scraper_public/actions/runs/41803314462) FAIL exposed date-fingerprint regression; final [CI #41803386990](https://github.com/easonliu714/event_scraper_public/actions/runs/41803386990) SUCCESS **74/74**, artifact #13309111230 GitHub digest `sha256:981697e6ad46310ffd7c6ebf628385c55112459adcc4d651531683184bce4cd0`. CI is offline parser authority, not native same-ID acceptance. Native B same-ID **0**, new native GET **0**, native durable LKG **0**; independent FIELD/Golden/Publication/formal feed **0/0/0/0**.
+- A TMC SHOW/HALL **2 REVIEW**; B TWTC exhibition dates/daily hours/hall **3 REVIEW**. B EN 2025 vs ZH 2026 and executor event-ID edge HOLD. Next B only a hypothesis-gated bounded native test can verify whether title-cell fix matches real DOM; if not, report exact first HOLD and rotate source. Existing 19-platform dedup, main/data/status, CKSMH5/TWTC39, L8 Android 5/5 preserved. Pages HTTP UNVERIFIED; `HARD_HOLD_NO_PUBLICATION`.
