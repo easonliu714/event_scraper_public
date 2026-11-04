@@ -1364,7 +1364,7 @@ def build_non_session_list_detail_candidate(
         def row_period(row_text):
             import re
             tokens = re.findall(
-                r"(?<!\\d)(?:20\\d{2}[/-])?\\d{1,2}[/-]\\d{1,2}(?!\\d)",
+                r"(?<!\d)(?:20\d{2}[/-])?\d{1,2}[/-]\d{1,2}(?!\d)",
                 row_text)
             if len(tokens) != 2:
                 return None
@@ -1384,7 +1384,7 @@ def build_non_session_list_detail_candidate(
 
         periods = {row_period(row_text) for row_text, _ in unique_matches}
         if None in periods or len(periods) != 1:
-            raise ValueError("LIST_RESPONSIVE_PERIOD_CONFLICT_OR_MISSING_HOLD")
+            raise ValueError("LIST_RESPONSIVE_PERIOD_CONFLICT_OR_AMBIGUOUS_HOLD")
         duplicate_period = next(iter(periods))
     # Deterministic representative; never manufacture a source row or identity.
     matched = [min(unique_matches, key=lambda pair: (len(pair[0]), pair[0]))]
