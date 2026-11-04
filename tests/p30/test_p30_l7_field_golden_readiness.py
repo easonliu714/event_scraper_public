@@ -1555,7 +1555,7 @@ class TestNativeOfficialLinkEdges(unittest.TestCase):
     def test_cross_event_link_wrong_id_or_false_ticket_anchor_refused(self):
         cases = [
             (self.tmc.replace("P1DF32E2", "OTHER"), self.index, self.detail),
-            (self.tmc.replace("購票連結", "非購票"), self.index, self.detail),
+            (self.tmc.replace("購票連結", "查看詳情"), self.index, self.detail),
             (self.tmc, self.index.replace("id=29418", "id=29417"), self.detail),
             (self.tmc, self.index.replace("11/06", "11/05"), self.detail),
             (self.tmc, self.index.replace("2026年電器空調影音大展", "另一個活動"), self.detail),
