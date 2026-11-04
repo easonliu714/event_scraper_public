@@ -1195,7 +1195,10 @@ def build_non_session_list_detail_candidate(
         if line == "B" and cell_links:
             if {url for url, _ in cell_links} != {detail_url}:
                 raise ValueError("LIST_TITLE_CELL_CONFLICTING_DETAIL_IDS_HOLD")
-            matched.extend((cell_text, detail_url)
+            # Preserve the complete row's date/context in the duplicate
+            # fingerprint. Same title+ID with different dates is NOT a
+            # responsive duplicate and must remain ambiguous.
+            matched.extend((text, detail_url)
                            for url, cell_text in cell_links
                            if url == detail_url)
             continue
