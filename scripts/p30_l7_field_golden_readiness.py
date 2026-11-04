@@ -2056,3 +2056,118 @@ def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
 if __name__ == "__main__": main()
+
+
+# Fixed source-list entry -> exact same-event DETAIL -> provenance -> existing
+# REVIEW candidate pipeline. No network, checkout, formal feed, or publisher.
+def build_source_adapter_review_snapshot(
+        list_url, list_html, detail_url, detail_html, expected_title,
+        expected_identity_id, observed_at_utc, now_utc=None, previous=None):
+    """Produce a bounded in-memory LKG/diff snapshot; never a formal event."""
+    import hashlib
+    from urllib.parse import urlsplit
+    from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+
+    def digest(rows):
+        payload = json.dumps(rows, ensure_ascii=False, sort_keys=True,
+                             separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+
+    old_rows = []
+    if previous is not None:
+        if (not isinstance(previous, dict)
+                or previous.get("kind") != "P30_L7_ISOLATED_SOURCE_ADAPTER_SNAPSHOT_V1"
+                or previous.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+                or not isinstance(previous.get("rows"), list)
+                or not previous["rows"]
+                or previous.get("last_known_good_sha256") != digest(previous["rows"])):
+            raise ValueError("UNTRUSTED_LAST_KNOWN_GOOD_HOLD")
+        old_rows, old_quality = build_candidate_dataset(previous["rows"])
+        if len(old_rows) != len(previous["rows"]) or old_quality["rejectedRows"]:
+            raise ValueError("LAST_KNOWN_GOOD_SCHEMA_HOLD")
+
+    try:
+        parsed = build_non_session_list_detail_candidate(
+            list_url, list_html, detail_url, detail_html, expected_title,
+            expected_identity_id, observed_at_utc, now_utc)
+        line = parsed["line"]
+        roles = {f["field"]: f for f in parsed["candidate_fields"]}
+        if line == "A":
+            source_id = urlsplit(detail_url).path.rsplit("/", 1)[-1]
+            platform_id, platform, event_type = (
+                "TMC_OFFICIAL", "臺北流行音樂中心", "音樂會/演唱會")
+            date = roles["venue_showtime"]["value"]
+            location = roles["venue_hall"]["value"]
+            holds = ["KHAM_PRODUCT_NOT_CHECKOUT_SESSION"]
+        else:
+            source_id = parsed["identity"]["exhibition_id"]
+            platform_id, platform, event_type = ("16", "台北世貿", "展覽")
+            period = roles["exhibition_dates"]["value"]
+            date = period["start"] + " ~ " + period["end"]
+            location = roles["venue_hall"]["value"]
+            holds = ["TWTC_BILINGUAL_YEAR_CONFLICT_HOLD",
+                     "EXECUTOR_EVENT_ID_EDGE_HOLD"]
+        if not source_id or not date or not location:
+            raise ValueError("SOURCE_FIELD_EMPTY_HOLD")
+        stamp = parsed["observed_at_utc"]
+        candidate = {
+            "title": expected_title, "url": detail_url, "platform": platform,
+            "type": event_type, "scraped_at": stamp,
+            "date": date, "location": location,
+            "_candidate": {
+                "scope": "CANDIDATE_PREVIEW_ONLY",
+                "decision": "REVIEW_WITH_HOLD",
+                "published": False, "golden_accepted": False,
+                "formal_field_pass": False,
+                "record_id": platform_id + ":" + source_id,
+                "platform_id": platform_id, "source_event_id": source_id,
+                "source_class": "OFFICIAL_VENUE_NON_SESSION",
+                "sources": [list_url, detail_url],
+                "hold_reasons": ["CALLER_HTML_NOT_NATIVE_FRESHNESS_PROOF",
+                                 "INDEPENDENT_FIELD_ACCEPTANCE_PENDING"] + holds,
+                "field_evidence": {
+                    "date": {"value": date, "source": detail_url,
+                             "observed_at": stamp, "role": "VENUE_EVENT_DATE",
+                             "decision": "REVIEW"},
+                    "location": {"value": location, "source": detail_url,
+                                 "observed_at": stamp, "role": "EVENT_VENUE",
+                                 "decision": "REVIEW"},
+                },
+            },
+        }
+        rows, quality = build_candidate_dataset([candidate])
+        if len(rows) != 1 or quality["rejectedRows"] != 0:
+            raise ValueError("REVIEW_PIPELINE_REJECTED_SOURCE_CANDIDATE")
+        old_ids = {(r["_candidate"]["platform_id"],
+                    r["_candidate"]["source_event_id"]) for r in old_rows}
+        new_ids = {(r["_candidate"]["platform_id"],
+                    r["_candidate"]["source_event_id"]) for r in rows}
+        if old_ids and not old_ids.issubset(new_ids):
+            raise ValueError("SOURCE_ID_DISAPPEARED_NO_SILENT_REPLACE")
+        return {
+            "kind": "P30_L7_ISOLATED_SOURCE_ADAPTER_SNAPSHOT_V1",
+            "decision": "REVIEW_ONLY_NEW_OR_UPDATED",
+            "rows": rows, "quality": quality,
+            "field_receipts": parsed["candidate_fields"],
+            "source_receipts": parsed["source_receipts"],
+            "incremental_diff": {
+                "added_ids": sorted(new_ids - old_ids),
+                "removed_ids": [],
+                "changed": digest(rows) != digest(old_rows),
+            },
+            "last_known_good_sha256": digest(rows),
+            "native_get_verified": False, "formal_accepted_fields": 0,
+            "golden_accepted_events": 0, "published_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+        }
+    except (ValueError, KeyError, TypeError) as exc:
+        if previous is None:
+            raise
+        # Do not turn an empty, malformed or conflicting new scrape into an
+        # empty publication. Keep the previously validated isolated candidate.
+        return {
+            **previous, "decision": "ROLLBACK_TO_ISOLATED_LAST_KNOWN_GOOD",
+            "rollback_reason": type(exc).__name__ + ":" + str(exc)[:100],
+            "incremental_diff": {"added_ids": [], "removed_ids": [],
+                                 "changed": False},
+        }
