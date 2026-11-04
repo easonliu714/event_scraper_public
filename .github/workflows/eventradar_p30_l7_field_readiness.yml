@@ -1228,6 +1228,77 @@ jobs:
                 'same_uuid_lkg',result['same_uuid_review_lkg'],
                 'first_failure',result.get('reason','NONE'),flush=True)
           PY
+      - name: One-shot CKSMH event-local four-session DETAIL roles (NO PUBLISH)
+        if: github.run_attempt == 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[cksmh-session-roles-once]'; then
+            echo 'CKSMH_SESSION_ROLES_SKIPPED_NO_NEW_HYPOTHESIS'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              CKSMH_PUBLIC_DETAIL, extract_cksmh_event_local_session_roles)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          report = {
+              'kind': 'P30_L7_CKSMH_ONE_SHOT_SESSION_ROLE_NATIVE_V1',
+              'hypothesis': 'Canonical CKSMH actId61023 DETAIL contains four distinct session-local showtime and meeting-point blocks, separate from registration dates',
+              'native_get_attempted': 1, 'native_get_200_count': 0,
+              'same_id_list_detail_new': 0, 'review_session_roles': 0,
+              'decision': 'HOLD_NATIVE_OR_SESSION_SCOPE',
+              'first_failure': None, 'no_raw_html_saved': True,
+              'formal_accepted_fields': 0, 'golden_accepted_events': 0,
+              'published_events': 0,
+              'release_state': 'HARD_HOLD_NO_PUBLICATION',
+          }
+          try:
+              request = urllib.request.Request(
+                  CKSMH_PUBLIC_DETAIL, method='GET',
+                  headers={'User-Agent': 'EventRadarSourceAudit/1.0 (public read-only)',
+                           'Accept': 'text/html', 'Accept-Encoding': 'identity'})
+              with urllib.request.build_opener(NoRedirect).open(
+                      request, timeout=8) as response:
+                  if response.status != 200 or response.geturl() != CKSMH_PUBLIC_DETAIL:
+                      raise ValueError('CKSMH_SESSION_HTTP200_EXACT_URL_HOLD')
+                  raw = response.read(524289)
+                  if not 0 < len(raw) <= 524288:
+                      raise ValueError('CKSMH_SESSION_BODY_BOUNDS_HOLD')
+                  if response.headers.get_content_type() != 'text/html':
+                      raise ValueError('CKSMH_SESSION_HTML_CONTENT_TYPE_HOLD')
+                  charset = (response.headers.get_content_charset() or 'utf-8').lower()
+                  if charset not in ('utf-8', 'big5', 'cp950'):
+                      raise ValueError('CKSMH_SESSION_CHARSET_HOLD')
+                  digest = hashlib.sha256(raw).hexdigest()
+                  report['native_get_200_count'] = 1
+                  report['detail_body_sha256'] = digest
+                  report['body_bytes'] = len(raw)
+                  report['observed_at_utc'] = datetime.datetime.now(
+                      datetime.timezone.utc).isoformat()
+                  parsed = extract_cksmh_event_local_session_roles(
+                      raw.decode(charset, errors='strict'), CKSMH_PUBLIC_DETAIL,
+                      report['observed_at_utc'], digest)
+                  report['decision'] = parsed['decision']
+                  report['review_session_roles'] = parsed['session_count']
+                  report['sessions'] = parsed['sessions']
+                  report['independent_formal_authority'] = False
+          except Exception as exc:
+              report['first_failure'] = type(exc).__name__ + ':' + str(exc)[:140]
+          assert report['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
+          assert report['formal_accepted_fields'] == report['golden_accepted_events'] == report['published_events'] == 0
+          Path('evidence/native_cksmh_session_roles.json').write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8')
+          print('CKSMH_NATIVE_SESSION_ROLES', report['decision'],
+                'http200', report['native_get_200_count'],
+                'event_local_rows', report['review_session_roles'],
+                'first_failure', report['first_failure'], flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1251,6 +1322,7 @@ jobs:
           if [ -f evidence/native_huashan_field_roles.json ]; then sha256sum evidence/native_huashan_field_roles.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_authority_identity_hypothesis.json ]; then sha256sum evidence/native_authority_identity_hypothesis.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_songshan_rotation.json ]; then sha256sum evidence/native_songshan_rotation.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_cksmh_session_roles.json ]; then sha256sum evidence/native_cksmh_session_roles.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4

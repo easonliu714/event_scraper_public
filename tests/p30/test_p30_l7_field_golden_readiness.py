@@ -2514,3 +2514,102 @@ class TestFixedTmcCksmhCanonicalFieldGate(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "CKSMH_FIELD_UNSEALED"):
                     m.assess_cksmh_non_session_field_authority(mutated, self.now)
         self.assertEqual(self.dest.read_bytes(), self.original_bytes)
+
+
+class TestCksmhEventLocalSessionRoles(unittest.TestCase):
+    """Native hypothesis: 4 official session blocks, never registration dates."""
+    def setUp(self):
+        import hashlib
+        self.sha = hashlib.sha256(b"official-fixture").hexdigest()
+        self.observed = "2026-11-04T18:56:00+00:00"
+        events = [
+            ("11/08", "2026/11/08 14:00 ~ 2026/11/08 16:30", "14:00"),
+            ("11/21", "2026/11/21 13:30 ~ 2026/11/21 16:30", "13:30"),
+            ("11/29", "2026/11/29 13:30 ~ 2026/11/29 16:30", "13:30"),
+            ("12/05", "2026/12/05 14:00 ~ 2026/12/05 16:30", "14:00"),
+        ]
+        self.parts = [
+            ('<section><div>〖%02d〗%s 路線</div><p>%s</p>'
+             '<p>NT$100</p><p>Registration Period</p>'
+             '<p>2026/10/08 15:00 ~ 2026/10/31 22:00</p>'
+             '<p>Venue</p><a>%s「她的民主路」展區--堂內三樓集合</a>'
+             '<p>Available Slots: 7</p><p>Note: 其他事項</p></section>')
+            % (i, day, show, clock)
+            for i, (day, show, clock) in enumerate(events, 1)]
+        self.html = ('<h1>' + m.CKSMH_ROTATION_TITLE +
+                     '</h1><h2>Session Information</h2>' +
+                     ''.join(self.parts) + '<h2>Event Details</h2>')
+
+    def parse(self, html=None, url=None, sha=None):
+        return m.extract_cksmh_event_local_session_roles(
+            self.html if html is None else html,
+            m.CKSMH_PUBLIC_DETAIL if url is None else url,
+            self.observed, self.sha if sha is None else sha)
+
+    def test_four_event_local_showtimes_and_meeting_points_are_review_only(self):
+        result = self.parse()
+        self.assertEqual(result["session_count"], 4)
+        self.assertEqual(
+            [x["show_start"] for x in result["sessions"]],
+            ["2026-11-08T14:00", "2026-11-21T13:30",
+             "2026-11-29T13:30", "2026-12-05T14:00"])
+        self.assertTrue(all(x["registration_period_is_showtime"] is False
+                            and x["ticket_session_id"] is None
+                            and x["formal_accepted"] is False
+                            for x in result["sessions"]))
+        self.assertIsNone(result["single_event_hall"])
+        self.assertEqual(result["formal_accepted_fields"], 0)
+
+    def test_session_scope_date_venue_and_identity_conflicts_hold(self):
+        cases = [
+            (self.html.replace("〖02〗", "〖01〗"), "FOUR_DISTINCT"),
+            (self.html.replace("2026/11/21 13:30", "2026/11/22 13:30"),
+             "HEADER_DATE_PARITY"),
+            (self.html.replace("13:30「她的民主路」", "12:00「她的民主路」", 1),
+             "MEETING_CLOCK_CONFLICT"),
+            (self.html.replace("Venue</p>", "Venue</p><p>Venue</p>", 1),
+             "VENUE_LOCAL_UNIQUE"),
+            (self.html.replace("Registration Period", "Registration Missing", 1),
+             "REGISTRATION_BOUNDARY"),
+            (self.html.replace("Session Information", "Other section"),
+             "SECTION_START"),
+        ]
+        for html, reason in cases:
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    self.parse(html=html)
+
+    def test_foreign_detail_sha_and_script_forgery_hold(self):
+        with self.assertRaisesRegex(ValueError, "EXACT_DETAIL_URL"):
+            self.parse(url="https://example.org/other")
+        with self.assertRaisesRegex(ValueError, "BODY_SHA256"):
+            self.parse(sha="not-a-sha")
+        with self.assertRaisesRegex(ValueError, "FOUR_DISTINCT"):
+            self.parse(html=(
+                '<h1>' + m.CKSMH_ROTATION_TITLE + '</h1>'
+                '<h2>Session Information</h2>'
+                '<script>' + ''.join(self.parts) + '</script>'
+                '<h2>Event Details</h2>'))
+
+    def test_receipt_exact_url_clock_and_sha_parity(self):
+        acq = {
+            "kind": "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1",
+            "decision": "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL",
+            "observed_at_utc": self.observed,
+            "list_url": m.CKSMH_PUBLIC_LIST,
+            "detail_url": m.CKSMH_PUBLIC_DETAIL,
+            "transport": "TEST_INJECTED_NOT_NATIVE",
+            "list_body_sha256": self.sha, "detail_body_sha256": self.sha,
+        }
+        self.assertIs(m._validate_nonpublishing_source_receipt(
+            acq, m.CKSMH_PUBLIC_LIST, m.CKSMH_PUBLIC_DETAIL, self.observed), acq)
+        for key, value in [("list_url", "https://example.org/"),
+                           ("observed_at_utc", "2026-01-01T00:00:00Z"),
+                           ("detail_body_sha256", "0" * 63),
+                           ("transport", "UNKNOWN")]:
+            with self.subTest(key=key):
+                bad = dict(acq, **{key: value})
+                with self.assertRaisesRegex(ValueError, "SOURCE_RECEIPT_UNBOUND"):
+                    m._validate_nonpublishing_source_receipt(
+                        bad, m.CKSMH_PUBLIC_LIST, m.CKSMH_PUBLIC_DETAIL,
+                        self.observed)

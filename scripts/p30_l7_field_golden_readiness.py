@@ -2969,6 +2969,10 @@ def assess_tmc_non_session_field_authority(snapshot, now_utc=None):
             f.get("observed_at_utc") != row["scraped_at"] or
             f.get("formal_accepted") is not False for f in fields)):
         raise ValueError("TMC_CONTRACT_ROLE_PROVENANCE_HOLD")
+    # Fail closed on unbound acquisition clock, URL or raw-byte SHA receipts.
+    _validate_nonpublishing_source_receipt(
+        src.get("bounded_acquisition"), PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL,
+        row["scraped_at"])
     now = now_utc or datetime.now(timezone.utc)
     if not isinstance(now, datetime) or now.utcoffset() is None:
         raise ValueError("TMC_CONTRACT_CLOCK_HOLD")
@@ -3671,6 +3675,10 @@ def assess_cksmh_non_session_field_authority(snapshot, now_utc=None):
         raise ValueError("CKSMH_FIELD_UNSEALED_ROLE_OR_SOURCE_HOLD")
     if not isinstance(acquisition, dict):
         raise ValueError("CKSMH_FIELD_ACQUISITION_REQUIRED_HOLD")
+    # The source hash/clock/URL contract must bind to this exact actId.
+    _validate_nonpublishing_source_receipt(
+        acquisition, CKSMH_PUBLIC_LIST, CKSMH_PUBLIC_DETAIL,
+        row["scraped_at"])
     now = now_utc or datetime.now(timezone.utc)
     if not isinstance(now, datetime) or now.utcoffset() is None:
         raise ValueError("CKSMH_FIELD_CLOCK_HOLD")
@@ -3737,3 +3745,154 @@ def assess_tmc_cksmh_fixed_nonpublishing_field_gate(tmc_snapshot=None,
         "formal_accepted_fields": 0, "golden_accepted_events": 0,
         "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
+
+
+# Source-specific B canonical #17: parse four event-local session blocks.
+# The official DETAIL has distinct registration periods, walking routes and
+# meeting points. Neither registration dates nor meeting points are a ticket
+# Session ID, a single event HALL, or a formal accepted field.
+def extract_cksmh_event_local_session_roles(detail_html, source_url,
+                                           observed_at_utc, body_sha256):
+    """Strict bounded DETAIL role extraction; no GET, persistence or publication."""
+    import re
+    from html.parser import HTMLParser
+    from datetime import datetime
+
+    if source_url != CKSMH_PUBLIC_DETAIL:
+        raise ValueError("CKSMH_SESSION_EXACT_DETAIL_URL_HOLD")
+    if not isinstance(detail_html, str) or not detail_html.strip() or len(
+            detail_html.encode("utf-8")) > 524288:
+        raise ValueError("CKSMH_SESSION_BODY_BOUND_HOLD")
+    if not isinstance(body_sha256, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", body_sha256):
+        raise ValueError("CKSMH_SESSION_BODY_SHA256_HOLD")
+    try:
+        observed = datetime.fromisoformat(observed_at_utc.replace("Z", "+00:00"))
+        if observed.utcoffset() is None:
+            raise ValueError()
+    except (ValueError, AttributeError, TypeError):
+        raise ValueError("CKSMH_SESSION_OBSERVATION_CLOCK_HOLD") from None
+
+    class VisibleText(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.skip = 0
+            self.parts = []
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "noscript", "template"):
+                self.skip += 1
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "noscript", "template"):
+                self.skip = max(0, self.skip - 1)
+        def handle_data(self, data):
+            if not self.skip and data.strip():
+                self.parts.append(data)
+
+    parser = VisibleText()
+    parser.feed(detail_html)
+    text = re.sub(r"\s+", " ", " ".join(parser.parts)).strip()
+    if CKSMH_ROTATION_TITLE not in text:
+        raise ValueError("CKSMH_SESSION_DETAIL_EVENT_TITLE_HOLD")
+    start = re.search(r"Session Information|場次資訊|場次資料", text, re.I)
+    if start is None:
+        raise ValueError("CKSMH_SESSION_SECTION_START_HOLD")
+    remainder = text[start.end():]
+    end = re.search(
+        r"Event Details|Registration Information|活動內容|活動詳情|報名資訊",
+        remainder, re.I)
+    if end is None:
+        raise ValueError("CKSMH_SESSION_SECTION_END_HOLD")
+    section = remainder[:end.start()]
+    markers = list(re.finditer(r"〖\s*(\d{1,2})\s*〗", section))
+    if [int(m.group(1)) for m in markers] != [1, 2, 3, 4]:
+        raise ValueError("CKSMH_SESSION_FOUR_DISTINCT_ORDINALS_HOLD")
+    date_pattern = re.compile(
+        r"(20\d{2}/\d{2}/\d{2})\s+(\d{2}:\d{2})\s*[~～]\s*"
+        r"(20\d{2}/\d{2}/\d{2})\s+(\d{2}:\d{2})")
+    rows = []
+    for i, marker in enumerate(markers):
+        block = section[marker.end():markers[i + 1].start()
+                        if i + 1 < len(markers) else len(section)]
+        registration = re.search(r"Registration Period|報名期間", block, re.I)
+        if registration is None:
+            raise ValueError("CKSMH_SESSION_REGISTRATION_BOUNDARY_HOLD")
+        event_local = block[:registration.start()]
+        dates = date_pattern.findall(event_local)
+        if len(dates) != 1:
+            raise ValueError("CKSMH_SESSION_EVENT_TIME_UNIQUE_HOLD")
+        from datetime import datetime as DateTime
+        first_date, first_time, last_date, last_time = dates[0]
+        try:
+            begin = DateTime.strptime(first_date + " " + first_time,
+                                      "%Y/%m/%d %H:%M")
+            finish = DateTime.strptime(last_date + " " + last_time,
+                                       "%Y/%m/%d %H:%M")
+        except ValueError:
+            raise ValueError("CKSMH_SESSION_INVALID_EVENT_CLOCK_HOLD") from None
+        if finish <= begin or (finish - begin).total_seconds() > 12 * 3600:
+            raise ValueError("CKSMH_SESSION_EVENT_TIME_ORDER_HOLD")
+        local_month_day = re.search(r"(?<!\d)(\d{1,2})/(\d{1,2})(?!\d)",
+                                    event_local)
+        if (local_month_day is None or
+                (int(local_month_day.group(1)), int(local_month_day.group(2)))
+                != (begin.month, begin.day)):
+            raise ValueError("CKSMH_SESSION_HEADER_DATE_PARITY_HOLD")
+        venue_labels = list(re.finditer(r"\bVenue\b|活動地點", block, re.I))
+        if len(venue_labels) != 1:
+            raise ValueError("CKSMH_SESSION_VENUE_LOCAL_UNIQUE_HOLD")
+        after_venue = block[venue_labels[0].end():]
+        venue_end = re.search(
+            r"\bNote\s*:|備註|Available Slots|可報名人數|Event Details",
+            after_venue, re.I)
+        if venue_end is None:
+            raise ValueError("CKSMH_SESSION_VENUE_BOUNDARY_HOLD")
+        meeting = after_venue[:venue_end.start()].strip(" \t\r\n:：-")
+        if not 8 <= len(meeting) <= 180:
+            raise ValueError("CKSMH_SESSION_MEETING_POINT_BOUNDS_HOLD")
+        venue_clock = re.match(r"(\d{2}:\d{2})", meeting)
+        if venue_clock and venue_clock.group(1) != first_time:
+            raise ValueError("CKSMH_SESSION_MEETING_CLOCK_CONFLICT_HOLD")
+        rows.append({
+            "local_ordinal_not_session_id": i + 1,
+            "show_start": begin.strftime("%Y-%m-%dT%H:%M"),
+            "show_end": finish.strftime("%Y-%m-%dT%H:%M"),
+            "showtime_role": "OFFICIAL_EVENT_LOCAL_SHOWTIME_REVIEW",
+            "meeting_point": meeting,
+            "meeting_role": "OFFICIAL_SESSION_MEETING_POINT_NOT_HALL",
+            "registration_period_is_showtime": False,
+            "ticket_session_id": None, "formal_accepted": False,
+        })
+    if len({r["show_start"] for r in rows}) != 4:
+        raise ValueError("CKSMH_SESSION_DUPLICATE_EVENT_TIME_HOLD")
+    return {
+        "kind": "P30_L7_CKSMH_FOUR_EVENT_LOCAL_SESSIONS_V1",
+        "platform_id": "17", "source_event_id": "61023",
+        "detail_url": CKSMH_PUBLIC_DETAIL,
+        "observed_at_utc": observed.isoformat(),
+        "detail_body_sha256": body_sha256,
+        "decision": "REVIEW_FOUR_EVENT_LOCAL_SESSIONS_NOT_FORMAL",
+        "session_count": 4, "sessions": rows,
+        "single_event_hall": None, "native_transport_independently_verified": False,
+        "list_detail_identity_this_function": "HISTORICAL_DEPENDENCY_NOT_RECHECKED",
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
+def _validate_nonpublishing_source_receipt(acquisition, list_url,
+                                           detail_url, observed_at):
+    """Bind bounded source hashes, clock and exact URL; not native attestation."""
+    import re
+    if (not isinstance(acquisition, dict) or
+            acquisition.get("kind") != "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1" or
+            acquisition.get("decision") != "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL" or
+            acquisition.get("observed_at_utc") != observed_at or
+            acquisition.get("list_url") != list_url or
+            acquisition.get("detail_url") != detail_url or
+            acquisition.get("transport") not in (
+                "BUILTIN_NATIVE_GET", "TEST_INJECTED_NOT_NATIVE") or
+            any(not isinstance(acquisition.get(k), str) or
+                not re.fullmatch(r"[0-9a-f]{64}", acquisition[k])
+                for k in ("list_body_sha256", "detail_body_sha256"))):
+        raise ValueError("SOURCE_RECEIPT_UNBOUND_URL_CLOCK_OR_SHA_HOLD")
+    return acquisition
