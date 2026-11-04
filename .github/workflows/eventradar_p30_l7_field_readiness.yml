@@ -784,6 +784,73 @@ jobs:
               'verified_edges':report['source_local_verified_link_edges'],
               'decision':decision,'formal':0,'golden':0,'published':0},sort_keys=True),flush=True)
           PY
+      - name: One-shot TWTC responsive same-ID native adapter to isolated LKG (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[twtc-responsive-probe-once]'; then
+            echo 'TWTC_RESPONSIVE_PROBE_SKIPPED_NO_NEW_HYPOTHESIS_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              PUBLIC_TWTC_LIST, PUBLIC_TWTC_DETAIL,
+              run_bounded_native_source_to_review_lkg,
+          )
+          # New hypothesis: nearest semantic row + exact responsive duplicate
+          # dedup resolves same-ID LIST/DETAIL binding. No checkout, retry,
+          # redirect, authentication, raw HTML storage, or formal data write.
+          with tempfile.TemporaryDirectory(prefix="eventradar-isolated-") as tmp:
+              try:
+                  result = run_bounded_native_source_to_review_lkg(
+                      PUBLIC_TWTC_LIST, PUBLIC_TWTC_DETAIL,
+                      "2026年電器空調影音大展", "29418",
+                      Path(tmp) / "review_lkg_snapshot.json",
+                      Path.cwd(), network_authorized=True,
+                      source_hypothesis=(
+                          "Validate exact TWTC responsive same-ID row binding "
+                          "after nearest-row parser correction"))
+                  snapshot = result.get("snapshot", {})
+                  report = {
+                      "kind": "P30_L7_ONE_SHOT_TWTC_NATIVE_ADAPTER_LKG_V1",
+                      "source_receipts": result.get("source_receipts", []),
+                      "native_get_verified": result.get("native_get_verified", False),
+                      "decision": result.get("decision", snapshot.get("decision", "HOLD")),
+                      "persisted_isolated_temp_only": result.get("persisted", False),
+                      "same_id_review_candidates": (
+                          len(snapshot.get("rows", []))
+                          if result.get("persisted") else 0),
+                      "field_role_review_count": len(snapshot.get("field_receipts", [])),
+                      "first_hold_reason": result.get("reason", snapshot.get("rollback_reason")),
+                      "formal_accepted_fields": 0,
+                      "golden": 0, "published": 0, "formal_pwa_feed": 0,
+                      "no_raw_html_saved": True,
+                      "release_state": "HARD_HOLD_NO_PUBLICATION",
+                  }
+              except Exception as exc:
+                  report = {
+                      "kind": "P30_L7_ONE_SHOT_TWTC_NATIVE_ADAPTER_LKG_V1",
+                      "decision": "HOLD_RUNTIME_EXCEPTION",
+                      "first_hold_reason": type(exc).__name__ + ":" + str(exc)[:120],
+                      "native_get_verified": False, "same_id_review_candidates": 0,
+                      "formal_accepted_fields": 0, "golden": 0, "published": 0,
+                      "formal_pwa_feed": 0, "no_raw_html_saved": True,
+                      "release_state": "HARD_HOLD_NO_PUBLICATION",
+                  }
+          Path("evidence/native_twtc_adapter_lkg.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8")
+          print("TWTC_NATIVE_ADAPTER_SUMMARY", json.dumps({
+              "decision": report["decision"],
+              "same_id_review_candidates": report["same_id_review_candidates"],
+              "native_get_verified": report["native_get_verified"],
+              "formal_accepted_fields": 0, "golden": 0, "published": 0
+          }, sort_keys=True), flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -798,6 +865,7 @@ jobs:
           if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_bilingual_authority.json ]; then sha256sum evidence/native_bilingual_authority.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_source_link_edges.json ]; then sha256sum evidence/native_source_link_edges.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_twtc_adapter_lkg.json ]; then sha256sum evidence/native_twtc_adapter_lkg.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
