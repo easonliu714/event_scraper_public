@@ -2328,3 +2328,130 @@ def run_persistent_isolated_review_lkg(
             prior["last_known_good_sha256"] if prior else None))
     return {"snapshot": snapshot, "persisted": True, "receipt": receipt,
             "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+
+# Explicit, bounded source acquisition into the existing REVIEW-only adapter.
+# This is NOT invoked by main(), CI, scheduler, or the production scraper.
+# A test-injected fetcher can validate integration but never establishes native GET.
+def run_bounded_native_source_to_review_lkg(
+        list_url, detail_url, expected_title, expected_identity_id,
+        destination, repo_root, *, network_authorized=False,
+        source_hypothesis="", fetcher=None, now_utc=None):
+    """One-shot two-page official GET -> same-ID adapter -> durable REVIEW LKG.
+
+    No checkout URL, redirect, retry, login, raw-page persistence, formal feed,
+    Golden or publication. A real GET requires explicit authorization and a
+    source-specific new hypothesis; synthetic fetchers are never native proof.
+    """
+    import hashlib
+    import re
+    import urllib.request
+    from datetime import timezone
+
+    pairs = {
+        (PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL): ("A", "TMC_OFFICIAL"),
+        (PUBLIC_TWTC_LIST, PUBLIC_TWTC_DETAIL): ("B", "16"),
+    }
+    if (list_url, detail_url) not in pairs or list_url == detail_url:
+        raise ValueError("NATIVE_SOURCE_EXACT_ALLOWLIST_OR_PAIR_HOLD")
+    if fetcher is None and (network_authorized is not True
+                           or not isinstance(source_hypothesis, str)
+                           or not 8 <= len(source_hypothesis.strip()) <= 200):
+        raise ValueError("NATIVE_GET_REQUIRES_EXPLICIT_NEW_HYPOTHESIS")
+    if fetcher is not None and not callable(fetcher):
+        raise ValueError("NATIVE_FETCHER_NOT_CALLABLE_HOLD")
+    if not isinstance(expected_title, str) or not expected_title.strip():
+        raise ValueError("NATIVE_EXPECTED_TITLE_REQUIRED_HOLD")
+    # Reject unsafe destinations BEFORE making a single network request.
+    _isolated_lkg_path(destination, repo_root)
+    previous = load_isolated_review_lkg(destination, repo_root)
+    native = fetcher is None
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, request, fp, code, msg, headers, newurl):
+            return None
+
+    def public_get(url):
+        request = urllib.request.Request(
+            url, method="GET",
+            headers={"User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                     "Accept": "text/html", "Accept-Encoding": "identity"})
+        with urllib.request.build_opener(NoRedirect).open(
+                request, timeout=8) as response:
+            return (response.status, response.headers.get("Content-Type", ""),
+                    response.read(524289), response.geturl())
+
+    reader = public_get if native else fetcher
+    receipts, pages = [], []
+    try:
+        for url in (list_url, detail_url):
+            # Exactly one request per URL. Never follow a redirect or retry.
+            status, content_type, raw, final_url = reader(url)
+            if type(status) is not int or status != 200 or final_url != url:
+                raise ValueError("NATIVE_HTTP_STATUS_OR_REDIRECT_HOLD")
+            if not isinstance(raw, bytes) or not 0 < len(raw) <= 524288:
+                raise ValueError("NATIVE_EMPTY_OR_OVERSIZE_BODY_HOLD")
+            if not isinstance(content_type, str):
+                raise ValueError("NATIVE_CONTENT_TYPE_HOLD")
+            parts = [part.strip().lower() for part in content_type.split(";")]
+            if parts[0] != "text/html":
+                raise ValueError("NATIVE_NOT_HTML_HOLD")
+            charset = "utf-8"
+            for part in parts[1:]:
+                if part.startswith("charset="):
+                    charset = part.split("=", 1)[1].strip('"')
+            if charset not in ("utf-8", "big5", "cp950"):
+                raise ValueError("NATIVE_CHARSET_UNSUPPORTED_HOLD")
+            try:
+                html = raw.decode(charset, errors="strict")
+            except UnicodeError as exc:
+                raise ValueError("NATIVE_HTML_DECODE_HOLD") from exc
+            if not html.strip():
+                raise ValueError("NATIVE_EMPTY_DECODED_HTML_HOLD")
+            pages.append(html)
+            receipts.append({
+                "url": url, "http_status": status,
+                "content_type": content_type[:100],
+                "bytes": len(raw), "body_sha256": hashlib.sha256(raw).hexdigest(),
+                "transport": ("BUILTIN_NATIVE_GET" if native
+                              else "TEST_INJECTED_NOT_NATIVE"),
+                "decision": "HTTP200_BODY_RECEIPT_REVIEW_ONLY",
+            })
+        observed = (datetime.now(timezone.utc) if native else
+                    (now_utc if now_utc is not None
+                     else datetime.now(timezone.utc)))
+        if not isinstance(observed, datetime) or observed.utcoffset() is None:
+            raise ValueError("NATIVE_OBSERVATION_CLOCK_HOLD")
+        result = run_persistent_isolated_review_lkg(
+            list_url, pages[0], detail_url, pages[1], expected_title,
+            expected_identity_id, observed.isoformat(), destination,
+            repo_root, now_utc=observed)
+        return {
+            "kind": "P30_L7_BOUNDED_NATIVE_TO_REVIEW_LKG_V1",
+            "line": pairs[(list_url, detail_url)][0],
+            "source_receipts": receipts,
+            "observed_at_utc": observed.isoformat(),
+            "native_get_verified": native,
+            "source_identity": "SAME_ID_REVIEW_ONLY",
+            "snapshot": result["snapshot"],
+            "persisted": result["persisted"],
+            "formal_accepted_fields": 0, "golden_accepted_events": 0,
+            "published_events": 0, "formal_pwa_feed_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+        }
+    except (ValueError, OSError, TimeoutError) as exc:
+        # Acquisition failure does not modify an existing durable LKG.
+        # No raw source page is returned, logged, or stored.
+        return {
+            "kind": "P30_L7_BOUNDED_NATIVE_TO_REVIEW_LKG_V1",
+            "decision": "SOURCE_ACQUISITION_HOLD_NO_WRITE",
+            "reason": type(exc).__name__ + ":" + str(exc)[:100],
+            "persisted": False,
+            "prior_lkg_sha256": (previous["last_known_good_sha256"]
+                                 if previous is not None else None),
+            "source_receipts": receipts,
+            "native_get_verified": False,
+            "formal_accepted_fields": 0, "golden_accepted_events": 0,
+            "published_events": 0, "formal_pwa_feed_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+        }
