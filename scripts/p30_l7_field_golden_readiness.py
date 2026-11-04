@@ -1109,7 +1109,12 @@ def build_non_session_list_detail_candidate(
             if self.skip:
                 return
             if tag in ("article", "tr", "li"):
-                self.stack.append({"tag": tag, "text": [], "links": []})
+                # A composite responsive container can wrap MANY event rows.
+                # It is not an atomic title->detail identity authority.
+                if self.stack:
+                    self.stack[-1]["has_nested_semantic"] = True
+                self.stack.append({"tag": tag, "text": [], "links": [],
+                                   "has_nested_semantic": False})
             if tag == "a":
                 self.active_anchor = {"href": dict(attrs).get("href", ""), "text": []}
 
@@ -1151,6 +1156,11 @@ def build_non_session_list_detail_candidate(
         raise ValueError("LIST_HTML_UNCLOSED_ROW_HOLD")
     matched = []
     for row in parser.rows:
+        # Only the innermost semantic row may attest an exact event edge.
+        # Outer article/li/tr containers can include multiple unrelated IDs;
+        # using them caused native TWTC LIST_ROW_CONFLICTING_DETAIL_IDS_HOLD.
+        if row.get("has_nested_semantic"):
+            continue
         text = " ".join(row["text"])
         # Whole title, not a fuzzy substring of another event.
         if expected_title not in text:
