@@ -1495,3 +1495,87 @@ class TestTwtcOfficialHostMirrorReader(unittest.TestCase):
                 altered[key] = wrong
                 with self.assertRaises(ValueError):
                     m.audit_twtc_official_same_id_host_mirror(altered, self.now)
+
+
+class TestNativeOfficialLinkEdges(unittest.TestCase):
+    """Native source-local links are stronger identity evidence, never formal acceptance."""
+
+    def setUp(self):
+        from datetime import datetime, timezone
+        self.now = datetime(2026, 11, 4, 3, 55, tzinfo=timezone.utc)
+        self.urls = (
+            "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+            "https://twtc.org.tw/exhibition.aspx",
+            "https://twtc.org.tw/exhibition_more.aspx?id=29418&p=home",
+        )
+        self.receipts = [
+            {"url": url, "http_status": 200, "decision": "NATIVE_HTTP200_BODY_HASH_ONLY",
+             "body_sha256": "a" * 64, "bytes": 100,
+             "observed_at_utc": "2026-11-04T03:55:00+00:00"}
+            for url in self.urls
+        ]
+        self.tmc = (
+            '<article>小宇 宋念宇 《不，完美的人》 2026.11.07 19:30 '
+            '活動地點 臺北流行音樂中心 表演廳'
+            '<a href="https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2">'
+            '購票連結</a></article>'
+        )
+        self.index = (
+            '<table><tr><td>11/06 ~ 11/09</td>'
+            '<td>2026年電器空調影音大展 '
+            '<a href="/exhibition_more.aspx?id=29418&amp;p=home">more</a></td>'
+            '<td>台北市電器商業同業公會</td></tr>'
+            '<tr><td>11/06 ~ 11/09</td><td>另一個活動 '
+            '<a href="/exhibition_more.aspx?id=29419&amp;p=home">more</a></td></tr></table>'
+        )
+        self.detail = (
+            '<article>2026年電器空調影音大展 展覽館別：世貿一館 '
+            '主辦單位：台北市電器商業同業公會 '
+            '展出日期：2026/11/06 ~ 2026/11/09 '
+            '展出時間：10:00 ~ 18:00</article>'
+        )
+
+    def audit(self, tmc=None, index=None, detail=None, receipts=None):
+        return m.audit_native_source_link_edges(
+            self.tmc if tmc is None else tmc,
+            self.index if index is None else index,
+            self.detail if detail is None else detail,
+            self.receipts if receipts is None else receipts, self.now)
+
+    def test_direct_source_links_not_checkout_or_formal_authority(self):
+        result = self.audit()
+        self.assertEqual(result["source_local_native_link_edges"], 2)
+        self.assertEqual(result["A_venue_to_kham_product"], "REVIEW_DIRECT_ANCHOR_PRODUCT_NOT_SESSION")
+        self.assertEqual(result["B_twtc_index_to_same_id_detail"], "REVIEW_DIRECT_SAME_ROW_ID29418")
+        self.assertEqual(set(result["field_roles"].values()), {"REVIEW"})
+        self.assertEqual(tuple(result[k] for k in
+            ("formal_accepted_fields", "golden", "published", "formal_pwa_feed")), (0, 0, 0, 0))
+        self.assertEqual(result["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_cross_event_link_wrong_id_or_false_ticket_anchor_refused(self):
+        cases = [
+            (self.tmc.replace("P1DF32E2", "OTHER"), self.index, self.detail),
+            (self.tmc.replace("購票連結", "非購票"), self.index, self.detail),
+            (self.tmc, self.index.replace("id=29418", "id=29417"), self.detail),
+            (self.tmc, self.index.replace("11/06", "11/05"), self.detail),
+            (self.tmc, self.index.replace("2026年電器空調影音大展", "另一個活動"), self.detail),
+            (self.tmc, self.index, self.detail.replace("10:00", "09:00")),
+        ]
+        for tmc, index, detail in cases:
+            with self.subTest(case=(tmc != self.tmc, index != self.index, detail != self.detail)):
+                with self.assertRaises(ValueError):
+                    self.audit(tmc=tmc, index=index, detail=detail)
+
+    def test_fresh_native_receipt_is_required(self):
+        for key, wrong in [
+            ("url", "https://twtc.org.tw/exhibition_more.aspx?id=29417&p=home"),
+            ("http_status", 403),
+            ("decision", "PUBLIC_READER_TRANSCRIPTION_NOT_NATIVE"),
+            ("body_sha256", "0" * 63),
+            ("observed_at_utc", "2026-11-02T03:55:00Z"),
+        ]:
+            receipts = copy.deepcopy(self.receipts)
+            receipts[2][key] = wrong
+            with self.subTest(key=key):
+                with self.assertRaises(ValueError):
+                    self.audit(receipts=receipts)
