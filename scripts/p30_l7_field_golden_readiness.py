@@ -2227,7 +2227,7 @@ def _validate_isolated_lkg_snapshot(snapshot):
                "HARD_HOLD_NO_PUBLICATION"):
         raise ValueError("ISOLATED_LKG_QUALITY_HOLD")
     if (not isinstance(snapshot.get("field_receipts"), list)
-            or not isinstance(snapshot.get("source_receipts"), list)
+            or not isinstance(snapshot.get("source_receipts"), dict)
             or not isinstance(snapshot.get("incremental_diff"), dict)):
         raise ValueError("ISOLATED_LKG_RECEIPTS_HOLD")
     return snapshot
