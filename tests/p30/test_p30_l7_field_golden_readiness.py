@@ -1717,6 +1717,34 @@ class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
             self.b(identity="29417")
 
 
+    def test_twtc_title_cell_local_edge_excludes_unrelated_sibling_cell(self):
+        # A responsive row may contain a second unrelated event anchor.
+        # The exact title+ID within ONE cell is authoritative for REVIEW;
+        # no cross-cell or title-only fuzzy joining is permitted.
+        html = ('<table><tr><td>' + self.btitle +
+                '<a href="/exhibition_more.aspx?id=29418&amp;p=home">詳情</a>'
+                '</td><td>另一場活動'
+                '<a href="/exhibition_more.aspx?id=29419&amp;p=home">詳情</a>'
+                '</td></tr></table>')
+        snap = self.b(index=html)
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"], "29418")
+        self.assertEqual(snap["quality"]["previewRows"], 1)
+        self.assertEqual(snap["formal_accepted_fields"], 0)
+
+    def test_twtc_title_cell_conflict_or_cross_cell_ambiguity_holds(self):
+        local_conflict = ('<table><tr><td>' + self.btitle +
+                          '<a href="/exhibition_more.aspx?id=29418&amp;p=home">詳情</a>'
+                          '<a href="/exhibition_more.aspx?id=29419&amp;p=home">另一詳情</a>'
+                          '</td></tr></table>')
+        with self.assertRaisesRegex(ValueError, "TITLE_CELL_CONFLICTING"):
+            self.b(index=local_conflict)
+        cross_cell = ('<table><tr><td>' + self.btitle +
+                      '</td><td><a href="/exhibition_more.aspx?id=29418&amp;p=home">'
+                      '詳情</a><a href="/exhibition_more.aspx?id=29419&amp;p=home">'
+                      '另一詳情</a></td></tr></table>')
+        with self.assertRaisesRegex(ValueError, "ROW_CONFLICTING"):
+            self.b(index=cross_cell)
+
     def test_composite_responsive_parent_not_a_cross_event_row(self):
         # Real native failure was a title-bearing composite with other IDs.
         # A child <tr> must be the exact atomic same-ID authority, never its
