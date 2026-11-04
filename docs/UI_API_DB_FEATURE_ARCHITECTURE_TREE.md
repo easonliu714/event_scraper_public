@@ -7037,3 +7037,27 @@ At Engineering Draft #236 HEAD 0ed7fddbf2f59491d96c4846d4e815bb9df58a3f, existin
 - **B canonical Huashan #13:** new reusable run_huashan_field_aware_review_lkg composes caller-supplied bounded exact official LIST/DETAIL bytes -> four-role event-local semantic preflight -> existing exact-path/H1 identity -> approved L7 REVIEW candidate -> atomic/CAS/SHA LKG -> sealed field authority matrix. Semantic conflict, cross-host/redirect and HTTP errors do not write LKG. Positive CI: one **TEST_INJECTED_NOT_NATIVE** same-path REVIEW LKG and 4/4 roles; new native GET/LIST/DETAIL/numeric ID/LKG 0/0/0/0/0. Source path hash is not an official numeric EVENT_ID. Independent identity/field authority HOLD; no native GET this CI.
 - **First failure and stop-rule:** current CI no failure; prior #41911576599 normalize_record intentionally drops source_identity_kind, fixed at prior HEAD. TWTC title-cell conflicting IDs, Songshan H1/H2/H3 absent and CKSMH native HTML no visible ordinals remain HOLD; no repeated identical GET. Next A: reuse historic sealed native TMC receipt with independent SHOW/HALL conflict decision. Next B: only a new independently evidenced Huashan numeric identity hypothesis may justify limited GET; otherwise rotate to another deduped Taipei P0 source, not repeated synthetic tests.
 - **Formal invariants:** Source/Preview/ShowNews main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce / 03e515d65e827d5ed67fe341d079907a96bf784a / 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad. Formal data/status blobs 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 / 99cae0571e36e52dac360b6935c0c09f6f6bed3f. Accepted FIELD/Golden/Published/feed 0/0/0/0, HARD_HOLD_NO_PUBLICATION. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS preserved. Formal status snapshot 2026-11-03 18:55 stale; status-only Merge/Pages requires separate Owner approval. Pages HTTP UNVERIFIED. Owner action NONE for isolated engineering.
+
+---
+
+### P30-L7 07:55 A fixed TMC field-aware pipeline and B Huashan authority HOLD
+
+Engineering Draft #236 HEAD d22202165c03d06eb8826b304f44fb392e7d4cb4, exact-head CI #41937636675 SUCCESS 120/120 offline, job 126950037120, artifact #13374258441 GitHub sha256:8e2adc6505228d6434ee3192384cb92d83e385362c87804485feb46a8f05a5e5; independent ZIP CRC UNVERIFIED.
+
+A / canonical TMC non-session fixed flow:
+  caller-supplied bounded exact official LIST + DETAIL bytes
+  -> UTF8/HTTP200/no redirect/raw-body SHA256/UTC receipt
+  -> build_non_session_list_detail_candidate exact same-event edge
+  -> two source-owned SHOW/HALL role preflight
+  -> run_bounded_native_source_to_review_lkg approved normalization
+  -> existing atomic/CAS/SHA isolated REVIEW LKG
+  -> assess_tmc_non_session_field_authority
+  -> independent authority HOLD; formal FIELD/Golden/Publisher 0
+
+First true failure CI #41937434507: TMC_CONTRACT_EXACT_SOURCE_ID_HOLD. Adapter source_receipts lacks top-level list_url/detail_url, but bounded_acquisition has exact pair; repaired contract to validate bounded acquisition with existing strict URL/UTC/SHA helper. Interim #41937524646 exposed first_failure. Positive fixture now 1 test-injected REVIEW LKG and 2 role receipts, not new native GET. A this run native GET/LIST/DETAIL/IDENTITY/LKG 0/0/0/0/0; historic native TMC LKG 1 remains prior evidence. KHAM PRODUCT_ID never SESSION; checkout never fetched.
+
+B / canonical Huashan #13: reuse existing run_huashan_field_aware_review_lkg, same-path/H1 identity and four event-local role contract; native GET/LIST/DETAIL/numeric identity/new native LKG 0/0/0/0/0. Existing test-injected positive is not native identity or formal acceptance. TWTC conflicting detail IDs, CKSMH static HTML missing ordinals and Songshan heading ownership HOLD. No duplicate adapter or repeated identical GET.
+
+Formal Source/Preview/ShowNews main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce / 03e515d65e827d5ed67fe341d079907a96bf784a / 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad; formal data/status blobs 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 / 99cae0571e36e52dac360b6935c0c09f6f6bed3f unchanged. Accepted FIELD/Golden/Published/feed 0/0/0/0, HARD_HOLD_NO_PUBLICATION. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS retained; direct Pages HTTP UNVERIFIED. Formal status snapshot 2026-11-03 18:55 stale; status-only Merge/Pages requires Owner approval.
+
+NEXT A: independent fresh native SHOW/HALL conflict/freshness authority on existing fixed TMC pipeline. NEXT B: independently testable Huashan numeric ID hypothesis or rotate to another deduped Taipei P0. No formal publication.
