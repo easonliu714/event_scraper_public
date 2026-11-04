@@ -1233,7 +1233,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! git log -1 --format=%s | grep -Fq '[cksmh-session-roles-once]'; then
+          if ! git log -1 --format=%s | grep -Eq '\[cksmh-(session-roles|dom-boundary)-once\]'; then
             echo 'CKSMH_SESSION_ROLES_SKIPPED_NO_NEW_HYPOTHESIS'
             exit 0
           fi
@@ -1242,13 +1242,14 @@ jobs:
           import datetime, hashlib, json, urllib.request
           from pathlib import Path
           from scripts.p30_l7_field_golden_readiness import (
-              CKSMH_PUBLIC_DETAIL, extract_cksmh_event_local_session_roles)
+              CKSMH_PUBLIC_DETAIL, extract_cksmh_event_local_session_roles,
+              diagnose_cksmh_session_dom_boundary)
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self, req, fp, code, msg, headers, newurl):
                   return None
           report = {
               'kind': 'P30_L7_CKSMH_ONE_SHOT_SESSION_ROLE_NATIVE_V1',
-              'hypothesis': 'Canonical CKSMH actId61023 DETAIL contains four distinct session-local showtime and meeting-point blocks, separate from registration dates',
+              'hypothesis': 'Native server HTML may lack visible ordinals, contain responsive duplicates, or truncate the session section before four rendered-reader sessions',
               'native_get_attempted': 1, 'native_get_200_count': 0,
               'same_id_list_detail_new': 0, 'review_session_roles': 0,
               'decision': 'HOLD_NATIVE_OR_SESSION_SCOPE',
@@ -1280,8 +1281,11 @@ jobs:
                   report['body_bytes'] = len(raw)
                   report['observed_at_utc'] = datetime.datetime.now(
                       datetime.timezone.utc).isoformat()
+                  decoded = raw.decode(charset, errors='strict')
+                  report['dom_boundary_diagnostic'] = diagnose_cksmh_session_dom_boundary(
+                      decoded, CKSMH_PUBLIC_DETAIL, digest)
                   parsed = extract_cksmh_event_local_session_roles(
-                      raw.decode(charset, errors='strict'), CKSMH_PUBLIC_DETAIL,
+                      decoded, CKSMH_PUBLIC_DETAIL,
                       report['observed_at_utc'], digest)
                   report['decision'] = parsed['decision']
                   report['review_session_roles'] = parsed['session_count']

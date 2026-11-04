@@ -2944,6 +2944,7 @@ def assess_tmc_non_session_field_authority(snapshot, now_utc=None):
     from urllib.parse import urlsplit
     report = {"kind": "P30_L7_TMC_FIELD_AUTHORITY_CONTRACT_V1",
               "decision": "HOLD_NO_SEALED_NATIVE_AUTHORITY", "field_matrix": [],
+              "first_failure": "TMC_NO_SNAPSHOT", "source_age_seconds": None,
               "requirements": ["EXACT_SOURCE_EVENT_PATH", "NATIVE_SHA256_FRESH_UTC",
                                "SHOW_NOT_SALE_OR_SESSION", "HALL_NOT_TICKET_ID",
                                "INDEPENDENT_FIELD_CONFLICT_ADJUDICATION"],
@@ -2977,8 +2978,18 @@ def assess_tmc_non_session_field_authority(snapshot, now_utc=None):
     if not isinstance(now, datetime) or now.utcoffset() is None:
         raise ValueError("TMC_CONTRACT_CLOCK_HOLD")
     observed = datetime.fromisoformat(row["scraped_at"].replace("Z", "+00:00"))
-    fresh = 0 <= (now - observed).total_seconds() <= 86400
+    age_seconds = (now - observed).total_seconds()
+    fresh = 0 <= age_seconds <= 86400
     native = src.get("bounded_acquisition", {}).get("transport") == "BUILTIN_NATIVE_GET"
+    # A: deterministic first missing authority; never promotes a REVIEW field.
+    report["source_age_seconds"] = int(age_seconds)
+    report["first_failure"] = (
+        "TMC_TEST_INJECTED_NOT_NATIVE" if not native else
+        "TMC_SOURCE_RECEIPT_STALE_OR_FUTURE_24H" if not fresh else
+        "TMC_INDEPENDENT_SHOW_HALL_AUTHORITY_MISSING")
+    report["next_required_evidence"] = (
+        "Independent same-event official SHOW/HALL observation, conflict decision, "
+        "fresh UTC source-body receipt; never KHAM checkout or ticket Session")
     report["field_matrix"] = [
         {"field": f["field"], "role": f["role"], "value": f["value"],
          "source_url": PUBLIC_TMC_DETAIL, "observed_at_utc": row["scraped_at"],
@@ -3896,3 +3907,88 @@ def _validate_nonpublishing_source_receipt(acquisition, list_url,
                 for k in ("list_body_sha256", "detail_body_sha256"))):
         raise ValueError("SOURCE_RECEIPT_UNBOUND_URL_CLOCK_OR_SHA_HOLD")
     return acquisition
+
+
+def diagnose_cksmh_session_dom_boundary(detail_html, source_url, body_sha256):
+    """Bounded source-owned DOM visibility diagnosis; never a parsing PASS.
+
+    Does not persist raw HTML, fetch pages, infer a session ID or accept fields.
+    A rendered public reader may expose four sessions while native HTML is a
+    JS shell, has early tab boundaries, or duplicates responsive ordinal nodes.
+    """
+    import re
+    from html.parser import HTMLParser
+
+    if source_url != CKSMH_PUBLIC_DETAIL:
+        raise ValueError("CKSMH_DOM_EXACT_DETAIL_URL_HOLD")
+    if not isinstance(detail_html, str) or not detail_html.strip() or len(
+            detail_html.encode("utf-8")) > 524288:
+        raise ValueError("CKSMH_DOM_BODY_BOUND_HOLD")
+    if not isinstance(body_sha256, str) or not re.fullmatch(
+            r"[0-9a-f]{64}", body_sha256):
+        raise ValueError("CKSMH_DOM_BODY_SHA256_HOLD")
+
+    class Visible(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.skip = 0
+            self.parts = []
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "noscript", "template"):
+                self.skip += 1
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "noscript", "template"):
+                self.skip = max(0, self.skip - 1)
+        def handle_data(self, value):
+            if not self.skip and value.strip():
+                self.parts.append(value)
+
+    parser = Visible()
+    parser.feed(detail_html)
+    visible = re.sub(r"\s+", " ", " ".join(parser.parts)).strip()
+    marker = re.compile(r"〖\s*(\d{1,2})\s*〗")
+    start_pattern = re.compile(r"Session Information|場次資訊|場次資料", re.I)
+    end_pattern = re.compile(
+        r"Event Details|Registration Information|活動內容|活動詳情|報名資訊",
+        re.I)
+    starts = list(start_pattern.finditer(visible))
+    all_ordinals = [int(m.group(1)) for m in marker.finditer(visible)]
+    scoped_ordinals = []
+    boundary = "NONE"
+    if starts:
+        after = visible[starts[0].end():]
+        ending = end_pattern.search(after)
+        boundary = "FIRST_END_MARKER" if ending else "MISSING_END_MARKER"
+        section = after[:ending.start()] if ending else after
+        scoped_ordinals = [int(m.group(1)) for m in marker.finditer(section)]
+
+    if not starts:
+        diagnosis = "NO_VISIBLE_SESSION_SECTION_HOLD"
+    elif not all_ordinals:
+        diagnosis = "SERVER_HTML_NO_VISIBLE_ORDINALS_HOLD"
+    elif scoped_ordinals == [1, 2, 3, 4]:
+        diagnosis = "FOUR_SCOPED_ORDINALS_REVIEW_NOT_FIELD_PASS"
+    elif all_ordinals == [1, 2, 3, 4] and scoped_ordinals != all_ordinals:
+        diagnosis = "EARLY_SECTION_BOUNDARY_HOLD"
+    else:
+        diagnosis = "VISIBLE_ORDINAL_SCOPE_OR_DUPLICATE_CONFLICT_HOLD"
+
+    return {
+        "kind": "P30_L7_CKSMH_NATIVE_DOM_BOUNDARY_DIAGNOSTIC_V1",
+        "source_url": CKSMH_PUBLIC_DETAIL,
+        "detail_body_sha256": body_sha256,
+        "visible_title_present": CKSMH_ROTATION_TITLE in visible,
+        "session_section_heading_count": len(starts),
+        "all_visible_ordinal_count": len(all_ordinals),
+        "all_visible_ordinals_bounded": all_ordinals[:16],
+        "first_section_ordinal_count": len(scoped_ordinals),
+        "first_section_ordinals_bounded": scoped_ordinals[:16],
+        "first_section_boundary": boundary,
+        "diagnosis": diagnosis,
+        "raw_html_saved": False,
+        "native_transport_independently_verified": False,
+        "formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }

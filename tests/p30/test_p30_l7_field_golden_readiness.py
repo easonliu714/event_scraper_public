@@ -2613,3 +2613,54 @@ class TestCksmhEventLocalSessionRoles(unittest.TestCase):
                     m._validate_nonpublishing_source_receipt(
                         bad, m.CKSMH_PUBLIC_LIST, m.CKSMH_PUBLIC_DETAIL,
                         self.observed)
+
+
+class TestCKSMHNativeDomBoundaryEvidence(unittest.TestCase):
+    """Rendered reader versus native HTML is an explicit, bounded hypothesis."""
+    def html(self, body):
+        return ("<h1>" + m.CKSMH_ROTATION_TITLE + "</h1>"
+                "<h2>Session Information</h2>" + body)
+
+    def diagnose(self, html):
+        return m.diagnose_cksmh_session_dom_boundary(
+            html, m.CKSMH_PUBLIC_DETAIL, "a" * 64)
+
+    def test_four_scoped_ordinals_are_diagnostic_only(self):
+        body = "".join("<div>〖%02d〗11/08 Venue</div>" % i
+                       for i in range(1, 5)) + "<h2>Event Details</h2>"
+        r = self.diagnose(self.html(body))
+        self.assertEqual(r["first_section_ordinals_bounded"], [1, 2, 3, 4])
+        self.assertEqual(r["diagnosis"],
+                         "FOUR_SCOPED_ORDINALS_REVIEW_NOT_FIELD_PASS")
+        self.assertFalse(r["native_transport_independently_verified"])
+        self.assertFalse(r["raw_html_saved"])
+        self.assertEqual((r["formal_accepted_fields"],
+                          r["golden_accepted_events"], r["published_events"]),
+                         (0, 0, 0))
+
+    def test_js_shell_has_no_visible_ordinal_despite_script_text(self):
+        html = self.html("<div>loading</div><h2>Event Details</h2>"
+                         "<script>〖01〗〖02〗〖03〗〖04〗</script>")
+        r = self.diagnose(html)
+        self.assertEqual(r["all_visible_ordinal_count"], 0)
+        self.assertEqual(r["diagnosis"], "SERVER_HTML_NO_VISIBLE_ORDINALS_HOLD")
+
+    def test_early_tab_boundary_and_responsive_duplicate_are_holds(self):
+        ordinals = "".join("<div>〖%02d〗</div>" % i for i in range(1, 5))
+        early = self.diagnose(self.html("<h2>Event Details</h2>" + ordinals))
+        self.assertEqual(early["diagnosis"], "EARLY_SECTION_BOUNDARY_HOLD")
+        duplicate = self.diagnose(self.html(ordinals + "<div>〖02〗</div>"
+                                           "<h2>Event Details</h2>"))
+        self.assertEqual(duplicate["diagnosis"],
+                         "VISIBLE_ORDINAL_SCOPE_OR_DUPLICATE_CONFLICT_HOLD")
+
+    def test_wrong_url_bad_sha_and_oversize_fail_closed(self):
+        html = self.html("〖01〗")
+        for url, sha, value in [
+            ("https://example.org/other", "a" * 64, html),
+            (m.CKSMH_PUBLIC_DETAIL, "bad", html),
+            (m.CKSMH_PUBLIC_DETAIL, "a" * 64, html + "x" * 524289),
+        ]:
+            with self.subTest(url=url, sha=sha):
+                with self.assertRaises(ValueError):
+                    m.diagnose_cksmh_session_dom_boundary(value, url, sha)
