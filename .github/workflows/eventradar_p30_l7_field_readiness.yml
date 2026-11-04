@@ -1074,6 +1074,86 @@ jobs:
                 report['native_get_count'],len(report['field_matrix']),
                 report['first_failure'],flush=True)
           PY
+      - name: One-shot A TMC authority and B Huashan embedded ID hypothesis (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[authority-identity-probe-once]'; then
+            echo 'AUTHORITY_IDENTITY_NATIVE_SKIPPED_NO_NEW_HYPOTHESIS'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime,hashlib,json,urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              PUBLIC_TMC_DETAIL,HUASHAN_PUBLIC_DETAIL,
+              parse_official_non_session_html,inspect_huashan_embedded_event_identity)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          opener=urllib.request.build_opener(NoRedirect)
+          out={'kind':'P30_L7_A_B_NATIVE_AUTHORITY_IDENTITY_HYPOTHESIS_V1',
+               'hypotheses':{
+                   'A':'TMC same official detail has unique exact H1, SHOW/HALL event-local labels and direct KHAM PRODUCT edge, never checkout Session',
+                   'B':'Huashan exact official detail embeds schema.org Event.identifier numeric value owned by this detail URL, never infer from slug'},
+               'native_get_attempted':0,'native_http200':0,'results':[],
+               'formal_accepted_fields':0,'golden_accepted_events':0,
+               'published_events':0,'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          for line,url in (('A',PUBLIC_TMC_DETAIL),('B',HUASHAN_PUBLIC_DETAIL)):
+              record={'line':line,'url':url,'http_status':None,'body_sha256':None,
+                      'body_bytes':0,'decision':'SOURCE_ACQUISITION_HOLD',
+                      'first_failure':None,'independent_field_authority':False,
+                      'formal_accepted_fields':0}
+              out['native_get_attempted']+=1
+              try:
+                  req=urllib.request.Request(url,method='GET',headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept':'text/html','Accept-Encoding':'identity'})
+                  with opener.open(req,timeout=8) as resp:
+                      record['http_status']=resp.status
+                      if resp.status!=200 or resp.geturl()!=url:
+                          raise ValueError('EXACT_HTTP200_NO_REDIRECT_HOLD')
+                      raw=resp.read(524289)
+                      if not 0<len(raw)<=524288: raise ValueError('BOUNDED_BODY_HOLD')
+                      if resp.headers.get_content_type()!='text/html':
+                          raise ValueError('HTML_CONTENT_TYPE_HOLD')
+                      if resp.headers.get_content_charset() not in (None,'utf-8'):
+                          raise ValueError('UTF8_CHARSET_HOLD')
+                      html=raw.decode('utf-8',errors='strict')
+                      record['body_bytes']=len(raw)
+                      record['body_sha256']=hashlib.sha256(raw).hexdigest()
+                      record['observed_at_utc']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+                      out['native_http200']+=1
+                  if line=='A':
+                      parsed=parse_official_non_session_html(
+                          url,html,'小宇 宋念宇《不，完美的人》',
+                          'P1DF32E2',record['observed_at_utc'])
+                      record['decision']='REVIEW_NATIVE_DETAIL_ROLES_INDEPENDENT_AUTHORITY_HOLD'
+                      record['identity_kind']='KHAM_PRODUCT_NOT_EVENT_SESSION'
+                      record['field_matrix']=[{
+                          'field':f['field'],'role':f['role'],'value':f['value'],
+                          'source_url':url,'body_sha256':record['body_sha256'],
+                          'observed_at_utc':record['observed_at_utc'],
+                          'decision':'REVIEW_NOT_FORMAL'} for f in parsed['candidate_fields']]
+                  else:
+                      result=inspect_huashan_embedded_event_identity(html,url)
+                      record['decision']=result['decision']
+                      record['first_failure']=result['first_failure']
+                      record['embedded_numeric_id_review']=result['embedded_numeric_id_review']
+                      record['same_numeric_event_id']=0
+              except Exception as exc:
+                  record['first_failure']=type(exc).__name__+':'+str(exc)[:140]
+                  if record['decision']=='SOURCE_ACQUISITION_HOLD':
+                      record['decision']='SOURCE_OR_PARSER_HOLD'
+              out['results'].append(record)
+              print('NATIVE_AUTHORITY_IDENTITY',line,record['http_status'],
+                    record['decision'],record['first_failure'],flush=True)
+          assert out['native_get_attempted']==2
+          assert out['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert out['formal_accepted_fields']==out['golden_accepted_events']==out['published_events']==0
+          Path('evidence/native_authority_identity_hypothesis.json').write_text(
+              json.dumps(out,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1094,6 +1174,7 @@ jobs:
           sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
           if [ -f evidence/native_huashan_rotation.json ]; then sha256sum evidence/native_huashan_rotation.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_huashan_field_roles.json ]; then sha256sum evidence/native_huashan_field_roles.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_authority_identity_hypothesis.json ]; then sha256sum evidence/native_authority_identity_hypothesis.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
