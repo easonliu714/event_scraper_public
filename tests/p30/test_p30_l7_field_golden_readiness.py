@@ -1602,3 +1602,96 @@ class TestNativeOfficialLinkEdges(unittest.TestCase):
             with self.subTest(key=key):
                 with self.assertRaises(ValueError):
                     self.audit(receipts=receipts)
+
+
+class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
+    """Executable LIST -> same-ID DETAIL -> five role receipts -> REVIEW LKG."""
+
+    def setUp(self):
+        from datetime import datetime, timezone
+        self.now = datetime(2026, 11, 4, 4, 52, tzinfo=timezone.utc)
+        self.stamp = "2026-11-04T04:50:00+00:00"
+        self.btitle = "2026年電器空調影音大展"
+        self.blist = ('<table><tr><td>11/06 ~ 11/09</td>'
+                      '<td>' + self.btitle +
+                      '<a href="/exhibition_more.aspx?id=29418&amp;p=home">詳情</a>'
+                      '</td></tr></table>')
+        self.bdetail = ('<h1>' + self.btitle + '</h1>'
+                        '<p>展出日期：2026/11/06 ~ 2026/11/09</p>'
+                        '<p>展出時間：10:00 ~ 18:00</p>'
+                        '<p>展覽館別：世貿一館</p>')
+        self.atitle = "小宇 宋念宇《不，完美的人》"
+        self.alist = ('<a href="/tw/blog/show/2026SungNien-Yu">' +
+                      self.atitle + '</a>')
+        self.adetail = (
+            '<h1>' + self.atitle + '</h1>'
+            '<p>2026.11.07 19:30</p>'
+            '<p>活動地點 臺北流行音樂中心 表演廳 主辦單位 小宇</p>'
+            '<a href="https://kham.com.tw/application/UTK02/UTK0201_.aspx'
+            '?PRODUCT_ID=P1DF32E2">購票連結</a>')
+
+    def b(self, index=None, detail=None, previous=None, identity="29418"):
+        return m.build_source_adapter_review_snapshot(
+            m.PUBLIC_TWTC_LIST, self.blist if index is None else index,
+            m.PUBLIC_TWTC_DETAIL, self.bdetail if detail is None else detail,
+            self.btitle, identity, self.stamp, self.now, previous)
+
+    def test_b_twtc_same_id_review_pipeline_with_daily_hours_sidecar(self):
+        snap = self.b()
+        self.assertEqual(snap["quality"]["previewRows"], 1)
+        self.assertEqual(snap["quality"]["rejectedRows"], 0)
+        self.assertEqual(snap["rows"][0]["_candidate"]["platform_id"], "16")
+        self.assertEqual(snap["rows"][0]["date"], "2026/11/06 ~ 2026/11/09")
+        self.assertEqual(snap["rows"][0]["location"], "世貿一館")
+        self.assertEqual(len(snap["field_receipts"]), 3)
+        self.assertEqual({f["field"] for f in snap["field_receipts"]},
+                         {"exhibition_dates", "open_hours", "venue_hall"})
+        self.assertEqual(snap["incremental_diff"]["added_ids"], [["16", "29418"]])
+        self.assertFalse(snap["native_get_verified"])
+        self.assertEqual((snap["formal_accepted_fields"], snap["golden_accepted_events"],
+                          snap["published_events"]), (0, 0, 0))
+        self.assertEqual(snap["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_a_tmc_exact_detail_and_kham_product_not_session(self):
+        snap = m.build_source_adapter_review_snapshot(
+            m.PUBLIC_TMC_LIST, self.alist, m.PUBLIC_TMC_DETAIL,
+            self.adetail, self.atitle, "P1DF32E2", self.stamp, self.now)
+        self.assertEqual(snap["quality"]["previewRows"], 1)
+        self.assertEqual(snap["rows"][0]["_candidate"]["platform_id"], "TMC_OFFICIAL")
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"],
+                         "2026SungNien-Yu")
+        self.assertEqual(snap["rows"][0]["date"], "2026/11/07 19:30")
+        self.assertEqual(len(snap["field_receipts"]), 2)
+        self.assertIn("KHAM_PRODUCT_NOT_CHECKOUT_SESSION",
+                      snap["rows"][0]["_candidate"]["hold_reasons"])
+        self.assertEqual(snap["published_events"], 0)
+
+    def test_empty_and_conflicting_scrape_roll_back_without_empty_feed(self):
+        previous = self.b()
+        for bad_index, bad_detail in (
+            ("", self.bdetail),
+            (self.blist.replace("29418", "29419"), self.bdetail),
+            (self.blist, self.bdetail.replace("世貿一館", "世貿二館")
+             .replace("展覽館別：世貿二館", "")),
+        ):
+            with self.subTest(bad_index=bad_index[:12]):
+                restored = self.b(index=bad_index, detail=bad_detail,
+                                  previous=previous)
+                self.assertEqual(restored["decision"],
+                                 "ROLLBACK_TO_ISOLATED_LAST_KNOWN_GOOD")
+                self.assertEqual(restored["rows"], previous["rows"])
+                self.assertFalse(restored["incremental_diff"]["changed"])
+        with self.assertRaises(ValueError):
+            self.b(index="")
+        tampered = copy.deepcopy(previous)
+        tampered["rows"][0]["title"] = "other event"
+        with self.assertRaises(ValueError):
+            self.b(previous=tampered)
+
+    def test_duplicate_or_cross_event_row_rejected(self):
+        with self.assertRaises(ValueError):
+            self.b(index=self.blist.replace("</table>",
+                                             self.blist.replace("<table>", "")
+                                             .replace("</table>", "") + "</table>"))
+        with self.assertRaises(ValueError):
+            self.b(identity="29417")
