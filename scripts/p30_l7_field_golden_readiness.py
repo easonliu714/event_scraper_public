@@ -1054,6 +1054,131 @@ def parse_official_non_session_html(source_url, html, expected_title,
 
 
 
+
+# Source-specific, non-publishing DOM root-cause audit. This deliberately
+# returns only bounded structural counts/IDs, never source HTML or other titles.
+# It cannot establish an accepted FIELD or a source freshness claim by itself.
+def diagnose_twtc_title_row_structure(html, expected_title, expected_id):
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin, urlsplit, parse_qs
+
+    if expected_title != "2026年電器空調影音大展" or expected_id != "29418":
+        raise ValueError("TWTC_AUDIT_EXACT_SOURCE_ID_REQUIRED")
+    if (not isinstance(html, str) or not html.strip()
+            or len(html.encode("utf-8")) > 524288):
+        raise ValueError("TWTC_AUDIT_BODY_SIZE_HOLD")
+
+    class StructuralProbe(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack, self.rows = [], []
+            self.cell, self.anchor, self.skip = None, None, 0
+
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style", "noscript"):
+                self.skip += 1
+            if self.skip:
+                return
+            if tag in ("article", "tr", "li"):
+                if self.stack:
+                    self.stack[-1]["nested"] = True
+                self.stack.append({"tag": tag, "text": [], "links": [],
+                                   "cells": [], "nested": False})
+            if tag in ("td", "th") and self.stack:
+                if self.cell is not None:
+                    raise ValueError("TWTC_AUDIT_NESTED_CELL_HOLD")
+                self.cell = {"text": [], "links": []}
+                self.stack[-1]["cells"].append(self.cell)
+            if tag == "a":
+                if self.anchor is not None:
+                    raise ValueError("TWTC_AUDIT_NESTED_ANCHOR_HOLD")
+                self.anchor = dict(attrs).get("href", "")
+
+        def handle_data(self, data):
+            if self.skip:
+                return
+            value = " ".join(data.split())
+            if not value:
+                return
+            for row in self.stack:
+                row["text"].append(value)
+            if self.cell is not None:
+                self.cell["text"].append(value)
+
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "noscript"):
+                self.skip = max(0, self.skip - 1)
+                return
+            if self.skip:
+                return
+            if tag == "a" and self.anchor is not None:
+                if self.stack:
+                    self.stack[-1]["links"].append(self.anchor)
+                if self.cell is not None:
+                    self.cell["links"].append(self.anchor)
+                self.anchor = None
+            if tag in ("td", "th") and self.cell is not None:
+                self.cell = None
+            if tag in ("article", "tr", "li") and self.stack:
+                if self.stack[-1]["tag"] != tag:
+                    raise ValueError("TWTC_AUDIT_MISMATCHED_ROW_HOLD")
+                self.rows.append(self.stack.pop())
+
+    def ids(links):
+        values = set()
+        for href in links:
+            url = urlsplit(urljoin(PUBLIC_TWTC_LIST, href))
+            query = parse_qs(url.query)
+            if (url.scheme == "https"
+                    and url.netloc in ("twtc.com.tw", "www.twtc.com.tw")
+                    and url.path == "/exhibition_more.aspx"
+                    and set(query) == {"id", "p"}
+                    and query["p"] == ["home"]
+                    and len(query["id"]) == 1
+                    and query["id"][0].isdigit()):
+                values.add(query["id"][0])
+        return sorted(values)[:12]
+
+    parser = StructuralProbe()
+    parser.feed(html)
+    if parser.stack or parser.cell is not None or parser.anchor is not None:
+        raise ValueError("TWTC_AUDIT_UNCLOSED_MARKUP_HOLD")
+    if len(parser.rows) > 5000:
+        raise ValueError("TWTC_AUDIT_ROW_LIMIT_HOLD")
+    matched = [row for row in parser.rows
+               if expected_title in " ".join(row["text"])]
+    atomic = [row for row in matched if not row["nested"]]
+    title_cells = [cell for row in atomic for cell in row["cells"]
+                   if expected_title in " ".join(cell["text"])]
+    cell_ids = sorted({item for cell in title_cells for item in ids(cell["links"])})
+    row_ids = sorted({item for row in atomic for item in ids(row["links"])})
+    if not atomic:
+        root = "NO_ATOMIC_SEMANTIC_TITLE_ROW"
+    elif len(cell_ids) > 1:
+        root = "TITLE_CELL_MULTIPLE_DETAIL_IDS"
+    elif expected_id in cell_ids:
+        root = "TITLE_CELL_EXACT_ID_EDGE_HYPOTHESIS"
+    elif len(row_ids) > 1:
+        root = "TITLE_ROW_MULTIPLE_IDS_WITHOUT_CELL_EDGE"
+    elif expected_id not in row_ids:
+        root = "EXPECTED_DETAIL_ID_NOT_IN_ATOMIC_TITLE_ROW"
+    else:
+        root = "STRICT_ROW_SINGLE_ID_EDGE_HYPOTHESIS"
+    return {
+        "kind": "P30_L7_TWTC_STRUCTURAL_ROOT_CAUSE_AUDIT_V1",
+        "semantic_rows": len(parser.rows),
+        "title_rows": len(matched),
+        "atomic_title_rows": len(atomic),
+        "title_cells": len(title_cells),
+        "title_cell_detail_ids": cell_ids[:12],
+        "atomic_row_detail_ids": row_ids[:12],
+        "root_cause_class": root,
+        "decision": "STRUCTURAL_DIAGNOSIS_REVIEW_NOT_IDENTITY_PASS",
+        "formal_accepted_fields": 0, "golden": 0, "published": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
 # Fixed LIST -> exact DETAIL -> source-local FIELD candidate integration.
 # This consumes caller-supplied HTML only: no HTTP, formal feed, Golden or publisher.
 # A TMC ticket PRODUCT_ID is a detail-side edge, never a LIST-derived Session ID.

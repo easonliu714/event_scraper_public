@@ -851,6 +851,112 @@ jobs:
               "formal_accepted_fields": 0, "golden": 0, "published": 0
           }, sort_keys=True), flush=True)
           PY
+      - name: One-shot A native adapter and B title-cell structural root cause (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[native-adapter-structural-once]'; then
+            echo 'NEW_HYPOTHESIS_PROBE_SKIPPED'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, socket, ssl, tempfile, urllib.error, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL, PUBLIC_TWTC_LIST,
+              run_bounded_native_source_to_review_lkg,
+              diagnose_twtc_title_row_structure,
+          )
+          # A: first native adapter-to-durable-REVIEW hypothesis, no KHAM GET.
+          # B: exact-title-cell ownership audit, one public LIST GET only.
+          # Neither operation can publish or independently accept a FIELD.
+          report = {
+              "kind": "P30_L7_NATIVE_A_ADAPTER_B_STRUCTURAL_DIAGNOSIS_V1",
+              "observed_at_utc": datetime.datetime.now(
+                  datetime.timezone.utc).isoformat(),
+              "A": {}, "B": {},
+              "formal_accepted_fields": 0, "golden": 0, "published": 0,
+              "no_raw_html_saved": True,
+              "release_state": "HARD_HOLD_NO_PUBLICATION",
+          }
+          with tempfile.TemporaryDirectory(prefix="eventradar-review-") as tmp:
+              try:
+                  result = run_bounded_native_source_to_review_lkg(
+                      PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL,
+                      "小宇 宋念宇 《不，完美的人》 演唱會", "P1DF32E2",
+                      Path(tmp) / "review_lkg_snapshot.json", Path.cwd(),
+                      network_authorized=True,
+                      source_hypothesis=(
+                          "First native TMC LIST to same event DETAIL to "
+                          "two non-session roles to isolated REVIEW LKG"))
+                  snap = result.get("snapshot", {})
+                  report["A"] = {
+                      "decision": result.get("decision", snap.get("decision", "HOLD")),
+                      "first_hold": result.get("reason", snap.get("rollback_reason")),
+                      "native_get_verified": result.get("native_get_verified", False),
+                      "source_receipts": result.get("source_receipts", []),
+                      "same_id_candidate": int(bool(result.get("persisted"))),
+                      "review_fields": len(snap.get("field_receipts", []))
+                          if result.get("persisted") else 0,
+                      "isolated_temp_only": bool(result.get("persisted")),
+                  }
+              except Exception as exc:
+                  report["A"] = {
+                      "decision": "HOLD_NATIVE_ADAPTER_EXCEPTION",
+                      "first_hold": type(exc).__name__ + ":" + str(exc)[:100],
+                      "same_id_candidate": 0, "review_fields": 0,
+                  }
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, url):
+                  return None
+          try:
+              req = urllib.request.Request(
+                  PUBLIC_TWTC_LIST,
+                  headers={
+                      "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                      "Accept": "text/html,application/xhtml+xml",
+                      "Accept-Encoding": "identity",
+                  }, method="GET")
+              with urllib.request.build_opener(NoRedirect).open(
+                      req, timeout=8) as resp:
+                  body = resp.read(524289)
+                  content_type = resp.headers.get("Content-Type", "").lower()
+                  if (resp.status != 200 or len(body) > 524288
+                          or "text/html" not in content_type):
+                      raise ValueError("TWTC_NATIVE_STATUS_SIZE_OR_TYPE_HOLD")
+                  charset = resp.headers.get_content_charset() or "utf-8"
+                  if charset.lower() not in ("utf-8", "big5", "cp950"):
+                      raise ValueError("TWTC_NATIVE_CHARSET_HOLD")
+                  decoded = body.decode(charset, errors="strict")
+                  audit = diagnose_twtc_title_row_structure(
+                      decoded, "2026年電器空調影音大展", "29418")
+                  report["B"] = {
+                      "http_status": 200, "bytes": len(body),
+                      "body_sha256": hashlib.sha256(body).hexdigest(),
+                      "transport": "BUILTIN_NATIVE_GET",
+                      "structural_audit": audit,
+                      "native_same_id_candidate": 0,
+                  }
+          except (urllib.error.URLError, OSError, TimeoutError,
+                  UnicodeError, ValueError, ssl.SSLError) as exc:
+              report["B"] = {
+                  "decision": "TWTC_STRUCTURAL_SOURCE_HOLD",
+                  "first_hold": type(exc).__name__ + ":" + str(exc)[:100],
+                  "native_same_id_candidate": 0,
+              }
+          Path("evidence/native_adapter_structural_audit.json").write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True,
+                         indent=2) + "\n", encoding="utf-8")
+          print("A_NATIVE_ADAPTER_B_STRUCTURAL_AUDIT",
+                json.dumps({
+                    "A": report["A"].get("decision"),
+                    "A_same_id": report["A"].get("same_id_candidate", 0),
+                    "B": report["B"].get("structural_audit", {}).get(
+                        "root_cause_class", report["B"].get("decision")),
+                    "formal_fields": 0, "published": 0,
+                }, sort_keys=True), flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -866,6 +972,7 @@ jobs:
           if [ -f evidence/native_bilingual_authority.json ]; then sha256sum evidence/native_bilingual_authority.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_source_link_edges.json ]; then sha256sum evidence/native_source_link_edges.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_twtc_adapter_lkg.json ]; then sha256sum evidence/native_twtc_adapter_lkg.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_adapter_structural_audit.json ]; then sha256sum evidence/native_adapter_structural_audit.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4

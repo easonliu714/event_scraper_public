@@ -1998,3 +1998,44 @@ class TestBoundedNativeToReviewLKG(unittest.TestCase):
         self.destination.write_text(
             json.dumps(original, ensure_ascii=False), encoding="utf-8")
         self.assertIsNotNone(m.load_isolated_review_lkg(self.destination, ROOT))
+
+
+class TestTWTCNativeStructuralRootCauseAudit(unittest.TestCase):
+    """Structural evidence is never a native same-ID/Golden acceptance."""
+
+    def test_title_cell_exact_id_with_unrelated_sibling(self):
+        html = ('<table><tr><td><a href="/exhibition_more.aspx?id=29418&p=home">'
+                '2026年電器空調影音大展</a></td>'
+                '<td><a href="/exhibition_more.aspx?id=99999&p=home">'
+                'Other event</a></td></tr></table>')
+        out = m.diagnose_twtc_title_row_structure(
+            html, "2026年電器空調影音大展", "29418")
+        self.assertEqual(out["root_cause_class"],
+                         "TITLE_CELL_EXACT_ID_EDGE_HYPOTHESIS")
+        self.assertEqual(out["title_cell_detail_ids"], ["29418"])
+        self.assertEqual(out["atomic_row_detail_ids"], ["29418", "99999"])
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertNotIn("Other event", json.dumps(out, ensure_ascii=False))
+
+    def test_title_only_cell_mixed_ids_is_hold(self):
+        html = ('<table><tr><td>2026年電器空調影音大展</td>'
+                '<td><a href="/exhibition_more.aspx?id=29418&p=home">more</a>'
+                '<a href="/exhibition_more.aspx?id=99999&p=home">'
+                'other</a></td></tr></table>')
+        out = m.diagnose_twtc_title_row_structure(
+            html, "2026年電器空調影音大展", "29418")
+        self.assertEqual(out["root_cause_class"],
+                         "TITLE_ROW_MULTIPLE_IDS_WITHOUT_CELL_EDGE")
+        self.assertEqual(out["title_cell_detail_ids"], [])
+        self.assertEqual(out["formal_accepted_fields"], 0)
+
+    def test_no_atomic_row_and_cross_source_refused(self):
+        out = m.diagnose_twtc_title_row_structure(
+            "<div>2026年電器空調影音大展</div>",
+            "2026年電器空調影音大展", "29418")
+        self.assertEqual(out["root_cause_class"],
+                         "NO_ATOMIC_SEMANTIC_TITLE_ROW")
+        with self.assertRaisesRegex(ValueError, "EXACT_SOURCE_ID_REQUIRED"):
+            m.diagnose_twtc_title_row_structure(
+                "<tr><td>2026年電器空調影音大展</td></tr>",
+                "2026年電器空調影音大展", "29419")
