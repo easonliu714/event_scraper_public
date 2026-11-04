@@ -2008,11 +2008,12 @@ def audit_native_source_link_edges(tmc_html, twtc_index_html, twtc_detail_html,
         parsers.append(parser)
 
     expected_ticket = "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"
+    # Native site can render desktop/mobile duplicate anchors and image-only labels.
+    # Identity is the exact official event-page href, not visible anchor wording.
     tmc_ticket = [a for a in parsers[0].anchors
-                  if urljoin(urls[0], a["href"]) == expected_ticket
-                  and "購票" in a["text"]]
-    if len(tmc_ticket) != 1:
-        raise ValueError("TMC_DIRECT_TICKET_ANCHOR_NOT_UNIQUE_HOLD")
+                  if urljoin(urls[0], a["href"]) == expected_ticket]
+    if not 1 <= len(tmc_ticket) <= 4:
+        raise ValueError("TMC_EXACT_PRODUCT_HREF_ABSENT_OR_EXCESSIVE_HOLD")
     if ("宋念宇" not in tmc_html or "2026" not in tmc_html
             or "11.07" not in tmc_html or "19:30" not in tmc_html
             or "臺北流行音樂中心" not in tmc_html or "表演廳" not in tmc_html):
