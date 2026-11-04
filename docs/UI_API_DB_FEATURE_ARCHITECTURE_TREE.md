@@ -6459,7 +6459,7 @@ Executable engineering Draft [#236](https://github.com/easonliu714/event_scraper
 
 ### P30-L7 native same-ID bilingual authority & A/B field-role evidence — 2026-11-04 08:55 Asia/Taipei
 
-\`\`\`text
+```text
 Source main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [IMMUTABLE]
 Engineering Draft #236 HEAD 764c114311e0daf379aae17dbfed91370b0b3ace
   .github/workflows/eventradar_p30_l7_field_readiness.yml [ADD-only]
@@ -6491,6 +6491,6 @@ Engineering Draft #236 HEAD 764c114311e0daf379aae17dbfed91370b0b3ace
   Formal docs/data.json, platform_status.json, index.html, scraper.py [UNCHANGED]
   19 platforms, ibon history, #53 MERGED/Pages SUCCESS, L8 Android 5/5 [PRESERVED]
   HARD_HOLD_NO_PUBLICATION [LOCKED]
-\`\`\`
+```
 
 This is **native source-acquisition and source-role evidence**, not a delegated formal Golden authority. Two source-identity dependencies remain HOLD (A KHAM non-checkout ticket product, B executor-to-TWTC direct id); TWTC same-ID ZH/EN title-year disagreement remains HOLD. Do not infer a ticket Session, admission price, inventory, poster authority or corrected EN title. Next A/B gate should address those independent authorities or rotate an existing canonical P0 source rather than repeat fixture-only micro Gates.
