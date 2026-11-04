@@ -957,6 +957,34 @@ jobs:
                     "formal_fields": 0, "published": 0,
                 }, sort_keys=True), flush=True)
           PY
+      - name: One-shot canonical CKSMH #17 native LIST to actId DETAIL (REVIEW only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[cksmh-source-probe-once]'; then
+            echo 'CKSMH_ROTATION_NATIVE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json, tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import run_cksmh_actid_review_lkg
+          with tempfile.TemporaryDirectory(prefix='eventradar_cksmh_review_') as tmp:
+              result = run_cksmh_actid_review_lkg(
+                  Path(tmp) / 'review_lkg_snapshot.json', Path.cwd(),
+                  network_authorized=True,
+                  source_hypothesis='CKSMH platform17 actId61023 canonical LIST exact anchor to DETAIL')
+          assert result['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
+          assert result['formal_accepted_fields'] == result['golden_accepted_events'] == result['published_events'] == 0
+          Path('evidence/native_cksmh_rotation.json').write_text(
+              json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8')
+          print('CKSMH_NATIVE_ROTATION', result['decision'],
+                'native_http200', result['native_get_200_count'],
+                'same_id_review_lkg', result['same_id_review_lkg'],
+                'first_hold', result.get('reason', 'NONE'), flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -973,6 +1001,7 @@ jobs:
           if [ -f evidence/native_source_link_edges.json ]; then sha256sum evidence/native_source_link_edges.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_twtc_adapter_lkg.json ]; then sha256sum evidence/native_twtc_adapter_lkg.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_adapter_structural_audit.json ]; then sha256sum evidence/native_adapter_structural_audit.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_cksmh_rotation.json ]; then sha256sum evidence/native_cksmh_rotation.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
