@@ -6540,3 +6540,35 @@ Next A: safe non-checkout ticket or organizer independent identity. Next B: expl
 - **Acceptance matrix:** A SHOW/HALL **2/2 REVIEW**; B dates/daily hours/hall **3/3 REVIEW**; two unresolved cross-source identity dependencies remain (KHAM non-checkout identity, TWTC executor-to-id). Formal independent accepted FIELD **0→0**, Golden **0→0**, published **0→0**, formal PWA feed **0→0**. L8 Android 5/5 USER_ATTESTED_PASS retained. Main, formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, `docs/platform_status.json` blob `99cae0571e36e52dac360b6935c0c09f6f6bed3f`, 19-platform/reportDate/ibon baseline unchanged. Pages runtime HTTP **UNVERIFIED**; **HARD_HOLD_NO_PUBLICATION**.
 - **Stop-rule / next A+B:** A seek a safe, independent non-checkout organizer/ticket identity authority or rotate canonical ticket; B seek source-owner correction of EN title-year and explicit executor-to-`id=29418` event edge, otherwise rotate existing P0 Taipei/New Taipei venue. Do not repeat same-root synthetic micro Gates. No Owner action needed for isolated engineering review; formal Golden/publication still requires separate Gate and authorization.
 
+
+
+---
+
+### P30-L7 12:05 native source-local link authority — 2026-11-04 Asia/Taipei (Draft #8 ONLY)
+
+```text
+Source main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce [IMMUTABLE]
+Engineering Draft #236 HEAD 6e7cd4d2444025183565657e988f79f8b5353b10
+  4 original ADD-only paths; script/test/workflow updated in place
+  exact-head CI #41771087708 SUCCESS 56/56
+  artifact #13295245571 SHA256 c6653d9ec3d1d0f94a36d2f49516c8e7e0915886435a89b0f9479bf1d8c1c126
+  independent artifact ZIP CRC PASS; 3 packaged evidence SHA256 PASS
+Native one-shot allowlisted official GET (no redirects/retry/cookies/login):
+  A TMC detail 200 SHA256 58a18692733fcb1b28d6c9f144007895e39e32ff8983fdf9cd0cc4707b374f31
+    -> exact TMC event page href to KHAM PRODUCT_ID=P1DF32E2 [NATIVE LINK REVIEW]
+    -> KHAM purchase flow NOT fetched; ticket same-event/Session/stock HOLD
+  B TWTC mirror index 200 SHA256 f4f724c996957f2aecdf4e469aaa1c1594564e9a2559d4ffd375c1e56502895a
+  B TWTC mirror detail id=29418 200 SHA256 a91b988ff0717bccaf7b5814332f9b9b0b6116a76608a6eb81f61f8fe1910895
+    -> index has 83 <tr>, target title x2, target id x2
+    -> strict same-row HTML anchor/field binding NOT proven [B IDENTITY HOLD]
+    -> indexed reader link previously observed, but not promoted to native same-row PASS
+    -> executor-to-id HOLD; EN 2025 vs ZH 2026 title conflict HOLD
+Native GET=3/3; new proven native source-local A link edge=1; B=0
+A SHOW/HALL 2 REVIEW; B DATES/DAILY_OPEN/HALL 3 REVIEW
+Independent accepted FIELD=0; GOLDEN=0; PUBLISHED=0; FORMAL PWA FEED=0
+No raw HTML retained; formal data/status/index/scraper/19 platforms immutable
+#53 MERGED/Pages SUCCESS; Pages runtime HTTP UNVERIFIED; L8 Android 5/5 PASS
+HARD_HOLD_NO_PUBLICATION [LOCKED]
+```
+
+Architecture decision: keep A venue-owned show/hall independent from KHAM purchase Session. B's native HTTP200 and exact URL/body hash do not substitute for a proven same-row anchor or correction of the bilingual title-year conflict. Stop-rule: do not repeat this TWTC DOM-layout root cause without a new authoritative observation; rotate B to another canonical P0 Taipei/New Taipei venue with a verifiable LIST→same-ID DETAIL edge, while A seeks safe non-checkout independent identity. No Owner action required for isolated review.
