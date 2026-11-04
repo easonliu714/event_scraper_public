@@ -3209,24 +3209,38 @@ def adjudicate_huashan_detail_field_roles(html, source_url, observed_at_utc,
     if [norm(x) for x in p.titles].count(norm(HUASHAN_ROTATION_TITLE))!=1:
         return hold("HUASHAN_FIELD_EXACT_H1_IDENTITY_HOLD")
     text=norm(" ".join(p.parts))
-    pattern=(r"活動時間\s*[:：]\s*(20\d{2})\s*"
-             r"(\d{1,2}[./]\d{1,2}\([^)]+\))\s*"
-             r"(\d{1,2}[./]\d{1,2}\([^)]+\))\s*"
-             r"(\d{2}:\d{2})\s*[~～]\s*(\d{2}:\d{2})\s*"
-             r"(.*?)\s*地點\s*[:：]")
-    times=re.findall(pattern,text)
-    if len(times)!=1: return hold("HUASHAN_FIELD_EVENT_TIME_HEADING_SCOPE_HOLD")
-    year,first,last,start,end,exception=times[0]
-    if (year!="2026" or first!="11.07(六)" or last!=first
-        or start!="11:00" or end!="16:30"):
+    # Actual first native failure: responsive HTML can split 11.07 and (六)
+    # into separate text nodes. Parse within heading-bounded scopes instead
+    # of requiring one contiguous date/time regex; never use footer hours.
+    time_marks=list(re.finditer(r"活動時間\s*[:：]",text))
+    venue_marks=list(re.finditer(r"地點\s*[:：]",text))
+    organizer_marks=list(re.finditer(r"主辦單位\s*[:：]",text))
+    report["structural_diagnostic"]={
+        "event_time_label_count":len(time_marks),
+        "venue_label_count":len(venue_marks),
+        "organizer_label_count":len(organizer_marks)}
+    if (len(time_marks)!=1 or len(venue_marks)!=1 or len(organizer_marks)!=1
+        or not time_marks[0].end()<venue_marks[0].start()<organizer_marks[0].start()):
+        return hold("HUASHAN_FIELD_EVENT_LABEL_OWNERSHIP_HOLD")
+    time_scope=re.sub(r"\s+","",text[time_marks[0].end():venue_marks[0].start()])
+    venue_scope=norm(text[venue_marks[0].end():organizer_marks[0].start()])
+    dates=re.findall(r"\d{1,2}[./]\d{1,2}\([^)]+\)",time_scope)
+    hours=re.findall(r"\d{1,2}:\d{2}",time_scope)
+    report["structural_diagnostic"].update({
+        "year_token_count":len(re.findall(r"20\d{2}",time_scope)),
+        "date_token_count":len(dates),"clock_token_count":len(hours)})
+    if (re.findall(r"20\d{2}",time_scope)!=["2026"]
+        or dates!=["11.07(六)","11.07(六)"]
+        or hours!=["11:00","16:30","11:30","11:00"]):
         return hold("HUASHAN_FIELD_EVENT_DATE_OR_HOURS_CONFLICT_HOLD")
-    exception=re.sub(r"\s+","",exception)
-    if exception!="西1館11:30開放/西2館、西5-1館11:00開放":
+    exception="西1館11:30開放/西2館、西5-1館11:00開放"
+    if time_scope.count(exception)!=1:
         return hold("HUASHAN_FIELD_HALL_OPENING_EXCEPTION_HOLD")
-    venues=re.findall(r"地點\s*[:：]\s*(.*?)\s*(?:收藏活動\s*)?主辦單位\s*[:：]",text)
-    if len(venues)!=1: return hold("HUASHAN_FIELD_VENUE_HEADING_SCOPE_HOLD")
-    halls=[norm(x) for x in venues[0].replace("收藏活動","").split("/")]
-    if halls!=["西5-1館 壓縮兼包裝工場","西2館 第三乾餾場","西1館 第二乾餾場"]:
+    expected_halls=["西5-1館 壓縮兼包裝工場","西2館 第三乾餾場","西1館 第二乾餾場"]
+    halls=[norm(x) for x in re.findall(
+        r"西(?:5-1|2|1)館\s*(?:壓縮兼包裝工場|第三乾餾場|第二乾餾場)",
+        venue_scope)]
+    if halls!=expected_halls or len(re.findall(r"西(?:5-1|2|1)館",venue_scope))!=3:
         return hold("HUASHAN_FIELD_MULTI_HALL_EXACT_PARITY_HOLD")
     roles=[("event_date","VENUE_EVENT_DATE_NOT_TICKET_SESSION","2026-11-07"),
            ("event_public_hours","EVENT_OPEN_HOURS_NOT_SITE_BUSINESS_HOURS","11:00~16:30"),

@@ -2219,6 +2219,12 @@ class TestHuashanOfficialDetailFieldRoles(unittest.TestCase):
         self.assertEqual(r["field_matrix"][0]["value"],"2026-11-07")
         self.assertEqual((r["formal_accepted_fields"],r["golden_accepted_events"],
                           r["published_events"],r["same_numeric_event_id"]),(0,0,0,0))
+    def test_split_date_weekday_nodes_still_bounded_and_review_only(self):
+        # New DOM hypothesis: date and weekday are split across inline nodes.
+        html=self.html.replace("11.07(六)","11.07 <span>(六)</span>")
+        r=self.run_contract(html=html)
+        self.assertEqual(r["decision"],"REVIEW_FOUR_SOURCE_ROLES_INDEPENDENT_ACCEPTANCE_HOLD")
+        self.assertEqual(len(r["field_matrix"]),4)
     def test_wrong_source_time_hall_identity_sha_and_stale_hold(self):
         cases=[
           dict(html=self.html.replace("11.07(六)","11.08(日)",1)),

@@ -1022,7 +1022,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! git log -1 --format=%s | grep -Fq '[huashan-field-role-once]'; then
+          if ! git log -1 --format=%s | grep -Fq '[huashan-date-token-hypothesis-once]'; then
             echo 'HUASHAN_FIELD_ROLE_NATIVE_SKIPPED_NO_NEW_HYPOTHESIS'
             exit 0
           fi
