@@ -1922,6 +1922,131 @@ def audit_twtc_official_same_id_host_mirror(receipt, now_taipei):
     }
 
 
+
+def audit_native_source_link_edges(tmc_html, twtc_index_html, twtc_detail_html,
+                                   receipts, now_utc):
+    """Native public-page link edges; no checkout request, formal acceptance or fuzzy join.
+
+    A: TMC event detail -> exact KHAM product URL (not a ticket Session).
+    B: TWTC index SAME ROW -> exact id=29418 detail -> same-event field labels.
+    """
+    import re
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin
+    from datetime import timezone, timedelta
+
+    urls = (
+        "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+        "https://twtc.org.tw/exhibition.aspx",
+        "https://twtc.org.tw/exhibition_more.aspx?id=29418&p=home",
+    )
+    if not isinstance(now_utc, datetime) or now_utc.utcoffset() is None:
+        raise ValueError("NATIVE_LINK_AUDITOR_CLOCK_HOLD")
+    if not isinstance(receipts, list) or len(receipts) != 3:
+        raise ValueError("NATIVE_LINK_RECEIPT_COUNT_HOLD")
+    for receipt, url in zip(receipts, urls):
+        if not isinstance(receipt, dict) or receipt.get("url") != url:
+            raise ValueError("NATIVE_LINK_SOURCE_URL_HOLD")
+        if receipt.get("http_status") != 200 or receipt.get("decision") != "NATIVE_HTTP200_BODY_HASH_ONLY":
+            raise ValueError("NATIVE_LINK_HTTP_AUTHORITY_HOLD")
+        if (not isinstance(receipt.get("body_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", receipt["body_sha256"])
+                or type(receipt.get("bytes")) is not int
+                or not 0 < receipt["bytes"] <= 524288):
+            raise ValueError("NATIVE_LINK_BODY_RECEIPT_HOLD")
+        try:
+            observed = datetime.fromisoformat(receipt["observed_at_utc"].replace("Z", "+00:00"))
+            age = now_utc.astimezone(timezone.utc) - observed.astimezone(timezone.utc)
+            if observed.utcoffset() is None or not timedelta(minutes=-5) <= age <= timedelta(hours=24):
+                raise ValueError()
+        except (KeyError, TypeError, AttributeError, ValueError):
+            raise ValueError("NATIVE_LINK_FRESHNESS_HOLD")
+
+    class AnchorsAndRows(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.anchors, self.rows, self.current_anchor, self.current_row = [], [], None, None
+            self.hidden = 0
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style"):
+                self.hidden += 1
+            if tag == "tr":
+                if self.current_row is not None:
+                    raise ValueError("NESTED_ROW_HOLD")
+                self.current_row = {"text": [], "hrefs": []}
+            if tag == "a":
+                if self.current_anchor is not None:
+                    raise ValueError("NESTED_ANCHOR_HOLD")
+                self.current_anchor = {"href": dict(attrs).get("href", ""), "text": []}
+                if self.current_row is not None:
+                    self.current_row["hrefs"].append(self.current_anchor["href"])
+        def handle_data(self, data):
+            if self.hidden:
+                return
+            if self.current_anchor is not None:
+                self.current_anchor["text"].append(data)
+            if self.current_row is not None:
+                self.current_row["text"].append(data)
+        def handle_endtag(self, tag):
+            if tag in ("script", "style"):
+                self.hidden = max(0, self.hidden - 1)
+            if tag == "a" and self.current_anchor is not None:
+                self.current_anchor["text"] = " ".join(" ".join(self.current_anchor["text"]).split())
+                self.anchors.append(self.current_anchor)
+                self.current_anchor = None
+            if tag == "tr" and self.current_row is not None:
+                self.current_row["text"] = " ".join(" ".join(self.current_row["text"]).split())
+                self.rows.append(self.current_row)
+                self.current_row = None
+
+    parsers = []
+    for body in (tmc_html, twtc_index_html, twtc_detail_html):
+        if not isinstance(body, str) or not body or len(body) > 524288:
+            raise ValueError("NATIVE_LINK_HTML_INPUT_HOLD")
+        parser = AnchorsAndRows()
+        parser.feed(body)
+        parsers.append(parser)
+
+    expected_ticket = "https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2"
+    tmc_ticket = [a for a in parsers[0].anchors
+                  if urljoin(urls[0], a["href"]) == expected_ticket
+                  and "購票" in a["text"]]
+    if len(tmc_ticket) != 1:
+        raise ValueError("TMC_DIRECT_TICKET_ANCHOR_NOT_UNIQUE_HOLD")
+    if ("宋念宇" not in tmc_html or "2026" not in tmc_html
+            or "11.07" not in tmc_html or "19:30" not in tmc_html
+            or "臺北流行音樂中心" not in tmc_html or "表演廳" not in tmc_html):
+        raise ValueError("TMC_EVENT_CONTEXT_HOLD")
+
+    expected_detail = urls[2]
+    rows = [row for row in parsers[1].rows
+            if "2026年電器空調影音大展" in row["text"]
+            and any(urljoin(urls[1], href) == expected_detail for href in row["hrefs"])]
+    if len(rows) != 1:
+        raise ValueError("TWTC_SAME_ROW_SAME_ID_EDGE_HOLD")
+    if "11/06" not in rows[0]["text"] or "11/09" not in rows[0]["text"]:
+        raise ValueError("TWTC_ROW_DATE_CONTEXT_HOLD")
+    detail_text = " ".join(twtc_detail_html.split())
+    if not all(s in detail_text for s in (
+        "2026年電器空調影音大展", "世貿一館", "台北市電器商業同業公會",
+        "2026/11/06", "2026/11/09", "10:00", "18:00")):
+        raise ValueError("TWTC_DETAIL_FIELD_CONTEXT_HOLD")
+
+    return {
+        "kind": "P30_L7_NATIVE_OFFICIAL_SOURCE_LINK_EDGES_V1",
+        "source_local_native_link_edges": 2,
+        "A_venue_to_kham_product": "REVIEW_DIRECT_ANCHOR_PRODUCT_NOT_SESSION",
+        "A_kham_product_same_event_native": "HOLD_NO_KHAM_GET",
+        "B_twtc_index_to_same_id_detail": "REVIEW_DIRECT_SAME_ROW_ID29418",
+        "B_executor_to_twtc_id": "HOLD_NO_EXECUTOR_ID_EDGE",
+        "B_bilingual_title_year": "HOLD_2025_VS_2026",
+        "field_roles": {"A_show": "REVIEW", "A_hall": "REVIEW",
+                        "B_dates": "REVIEW", "B_daily_hours": "REVIEW", "B_hall": "REVIEW"},
+        "formal_accepted_fields": 0, "golden": 0, "published": 0,
+        "formal_pwa_feed": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "tests/p30/fixtures/p30_l7_prince_field_readiness.json"
     print(json.dumps(validate(json.loads(path.read_text(encoding="utf-8"))),sort_keys=True))
