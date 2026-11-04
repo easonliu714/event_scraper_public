@@ -4122,3 +4122,98 @@ def assess_tmc_huashan_fixed_nonpublishing_gate(tmc_snapshot=None,
         "formal_accepted_fields": 0, "golden_accepted_events": 0,
         "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
+
+
+# B canonical #13: a reusable field-aware, non-publishing pipeline.
+# Pre-acquired bytes only: no implicit GET, no checkout, no synthetic-native claim.
+# Parse and verify event-local field semantics BEFORE touching the sealed LKG.
+def run_huashan_field_aware_review_lkg(destination, repo_root, *,
+                                       source_bodies, now_utc=None):
+    """LIST -> exact DETAIL -> four source-owned roles -> atomic REVIEW LKG.
+
+    source_bodies maps exactly the two allowlisted URLs to
+    (HTTP status, Content-Type, raw bytes, final URL). A caller must acquire
+    and attest transport separately; this function never claims native GET.
+    """
+    import hashlib
+    from datetime import timezone
+
+    result = {
+        "kind": "P30_L7_HUASHAN_FIELD_AWARE_LKG_V1",
+        "line": "B", "platform_id": "13",
+        "decision": "HOLD_PREACQUIRED_SOURCE_OR_FIELD",
+        "first_failure": "HUASHAN_SOURCE_BODIES_MISSING",
+        "source_receipts": [], "field_matrix": [],
+        "same_path_review_lkg": 0, "native_same_numeric_id": 0,
+        "native_get_this_call": 0, "formal_accepted_fields": 0,
+        "golden_accepted_events": 0, "published_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+    if not isinstance(source_bodies, dict) or set(source_bodies) != {
+            HUASHAN_PUBLIC_LIST, HUASHAN_PUBLIC_DETAIL}:
+        return result
+    now = now_utc or datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        result["first_failure"] = "HUASHAN_FIELD_PIPELINE_CLOCK_HOLD"
+        return result
+    try:
+        decoded = {}
+        for url in (HUASHAN_PUBLIC_LIST, HUASHAN_PUBLIC_DETAIL):
+            payload = source_bodies[url]
+            if not isinstance(payload, tuple) or len(payload) != 4:
+                raise ValueError("HUASHAN_SOURCE_RESPONSE_SHAPE_HOLD")
+            status, content_type, raw, final_url = payload
+            if (type(status) is not int or status != 200 or final_url != url
+                    or not isinstance(content_type, str)
+                    or content_type.split(";", 1)[0].strip().lower() != "text/html"
+                    or not isinstance(raw, bytes) or not 0 < len(raw) <= 524288):
+                raise ValueError("HUASHAN_SOURCE_RESPONSE_AUTHORITY_HOLD")
+            charset = "utf-8"
+            if ";" in content_type:
+                params = content_type.split(";")[1:]
+                for param in params:
+                    if param.strip().lower().startswith("charset="):
+                        charset = param.split("=", 1)[1].strip().strip('"').lower()
+            if charset != "utf-8":
+                raise ValueError("HUASHAN_FIELD_PIPELINE_UTF8_ONLY_HOLD")
+            decoded[url] = raw.decode("utf-8", errors="strict")
+            result["source_receipts"].append({
+                "url": url, "http_status": status,
+                "body_sha256": hashlib.sha256(raw).hexdigest(),
+                "body_bytes": len(raw),
+                "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
+            })
+        detail = decoded[HUASHAN_PUBLIC_DETAIL]
+        observed = now.astimezone(timezone.utc).isoformat()
+        field = adjudicate_huashan_detail_field_roles(
+            detail, HUASHAN_PUBLIC_DETAIL, observed,
+            result["source_receipts"][1]["body_sha256"], now_utc=now)
+        if field["decision"] != (
+                "REVIEW_FOUR_SOURCE_ROLES_INDEPENDENT_ACCEPTANCE_HOLD"):
+            result["first_failure"] = field.get("first_failure") or "HUASHAN_FIELD_HOLD"
+            return result
+        # The existing parser validates the exact LIST card -> DETAIL path/H1
+        # and commits via checksum/CAS/atomic only after both pages validate.
+        existing = run_huashan_exact_path_review_lkg(
+            destination, repo_root, fetcher=lambda url: source_bodies[url],
+            now_utc=now)
+        if existing.get("persisted") is not True:
+            result["first_failure"] = existing.get("reason", "HUASHAN_LIST_IDENTITY_HOLD")
+            return result
+        snapshot = load_isolated_review_lkg(destination, repo_root)
+        authority = assess_huashan_sealed_nonpublishing_field_gate(
+            snapshot, detail_html=detail, now_utc=now)
+        if len(authority.get("field_matrix", [])) != 4:
+            result["first_failure"] = authority.get(
+                "first_failure", "HUASHAN_SEALED_FIELD_CONFLICT_HOLD")
+            return result
+        result["same_path_review_lkg"] = 1
+        result["field_matrix"] = authority["field_matrix"]
+        result["lkg_sha256"] = existing["lkg_sha256"]
+        result["decision"] = "REVIEW_FOUR_ROLES_PATH_ONLY_NUMERIC_ID_HOLD"
+        result["first_failure"] = (
+            "HUASHAN_NUMERIC_EVENT_ID_AND_INDEPENDENT_AUTHORITY_MISSING")
+        return result
+    except (ValueError, UnicodeError, TypeError, OSError, TimeoutError) as exc:
+        result["first_failure"] = type(exc).__name__ + ":" + str(exc)[:120]
+        return result

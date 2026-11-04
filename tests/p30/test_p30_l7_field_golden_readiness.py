@@ -2746,3 +2746,77 @@ class TestCanonicalHuashanSealedFieldGate(unittest.TestCase):
                          "HUASHAN_FIELD_MULTI_HALL_EXACT_PARITY_HOLD")
         self.assertEqual(out["field_matrix"], [])
         self.assertEqual(out["formal_accepted_fields"], 0)
+
+
+class TestHuashanFieldAwareReusablePipeline(unittest.TestCase):
+    """One bounded LIST/DETAIL pair, semantic preflight, isolated LKG only."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.destination = pathlib.Path(self.temp.name) / "review_lkg_snapshot.json"
+        self.now = datetime(2026, 11, 5, 0, 0, tzinfo=timezone.utc)
+        self.detail = (
+            "<h1>" + m.HUASHAN_ROTATION_TITLE + "</h1>"
+            "<h3>活動時間：</h3>2026 11.07(六) 11.07(六) 11:00 ~ 16:30 "
+            "西1館11:30開放 /西2館、西5-1館11:00開放 "
+            "<h3>地點：</h3>西5-1館 壓縮兼包裝工場 / 西2館 第三乾餾場 / 西1館 第二乾餾場 "
+            "<h3>主辦單位：</h3>測試主辦"
+            "<footer>開放時間：每日09:30 ~ 21:00</footer>")
+        self.listing = ('<a href="' + m.HUASHAN_PUBLIC_DETAIL + '">' +
+                        m.HUASHAN_ROTATION_TITLE + '</a>')
+
+    def bodies(self, detail=None, listing=None):
+        pages = {m.HUASHAN_PUBLIC_LIST: self.listing if listing is None else listing,
+                 m.HUASHAN_PUBLIC_DETAIL: self.detail if detail is None else detail}
+        return {url: (200, "text/html; charset=utf-8", body.encode("utf-8"), url)
+                for url, body in pages.items()}
+
+    def run_pipeline(self, bodies):
+        return m.run_huashan_field_aware_review_lkg(
+            self.destination, ROOT, source_bodies=bodies, now_utc=self.now)
+
+    def test_four_roles_to_sealed_review_lkg_not_numeric_identity(self):
+        out = self.run_pipeline(self.bodies())
+        self.assertEqual(out["same_path_review_lkg"], 1)
+        self.assertEqual(len(out["field_matrix"]), 4)
+        self.assertEqual(out["native_get_this_call"], 0)
+        self.assertEqual(out["native_same_numeric_id"], 0)
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertEqual(out["golden_accepted_events"], 0)
+        self.assertEqual(out["published_events"], 0)
+        self.assertIn("NUMERIC_ID_HOLD", out["decision"])
+        self.assertEqual(out["lkg_sha256"],
+                         m.load_isolated_review_lkg(self.destination, ROOT)[
+                             "last_known_good_sha256"])
+        self.assertTrue(all(not x["formal_accepted"]
+                            for x in out["field_matrix"]))
+
+    def test_semantic_or_identity_conflict_never_writes_lkg(self):
+        for detail, listing in [
+            (self.detail.replace("地點：", "不明："), self.listing),
+            (self.detail.replace(m.HUASHAN_ROTATION_TITLE, "不同活動"),
+             self.listing),
+            (self.detail, self.listing.replace(m.HUASHAN_ROTATION_TITLE, "另一活動")),
+        ]:
+            with self.subTest(detail=detail[:25], listing=listing[:25]):
+                out = self.run_pipeline(self.bodies(detail, listing))
+                self.assertEqual(out["same_path_review_lkg"], 0)
+                self.assertFalse(self.destination.exists())
+
+    def test_source_receipt_cross_host_and_http_hold_before_write(self):
+        for key, bad in [
+            (m.HUASHAN_PUBLIC_LIST,
+             (302, "text/html", b"redirect", m.HUASHAN_PUBLIC_LIST)),
+            (m.HUASHAN_PUBLIC_DETAIL,
+             (200, "text/html", self.detail.encode("utf-8"),
+              "https://example.org/foreign")),
+        ]:
+            with self.subTest(key=key):
+                bodies = self.bodies()
+                bodies[key] = bad
+                out = self.run_pipeline(bodies)
+                self.assertEqual(out["same_path_review_lkg"], 0)
+                self.assertFalse(self.destination.exists())
