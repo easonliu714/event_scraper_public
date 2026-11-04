@@ -1688,11 +1688,29 @@ class TestFixedSourceAdapterToReviewPipeline(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.b(previous=tampered)
 
-    def test_duplicate_or_cross_event_row_rejected(self):
-        with self.assertRaises(ValueError):
-            self.b(index=self.blist.replace("</table>",
-                                             self.blist.replace("<table>", "")
-                                             .replace("</table>", "") + "</table>"))
+    def test_exact_responsive_duplicate_collapses_but_cross_event_holds(self):
+        # Two byte-equivalent mobile/desktop rows are ONE same-ID edge.
+        same_row = self.blist.replace("<table>", "").replace("</table>", "")
+        duplicated = "<table>" + same_row + same_row + "</table>"
+        snap = self.b(index=duplicated)
+        self.assertEqual(snap["quality"]["previewRows"], 1)
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"], "29418")
+        # Nested semantic ancestors must not duplicate a child <tr> anchor.
+        self.assertEqual(self.b(index="<article>" + self.blist +
+                                "</article>")["quality"]["previewRows"], 1)
+        # A different title-bearing row with the same ID is NOT a copy.
+        conflict = duplicated.replace(
+            same_row + "</table>",
+            same_row.replace("11/06 ~ 11/09", "11/07 ~ 11/10") + "</table>")
+        with self.assertRaisesRegex(ValueError, "AMBIGUOUS"):
+            self.b(index=conflict)
+        # Two distinct detail IDs inside a title-bearing row must fail closed.
+        two_ids = self.blist.replace(
+            "</td></tr>",
+            '<a href="/exhibition_more.aspx?id=29419&amp;p=home">'
+            'other</a></td></tr>')
+        with self.assertRaisesRegex(ValueError, "CONFLICTING_DETAIL_IDS"):
+            self.b(index=two_ids)
         with self.assertRaises(ValueError):
             self.b(identity="29417")
 
