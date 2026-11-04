@@ -2563,7 +2563,7 @@ class TestCksmhEventLocalSessionRoles(unittest.TestCase):
     def test_session_scope_date_venue_and_identity_conflicts_hold(self):
         cases = [
             (self.html.replace("〖02〗", "〖01〗"), "FOUR_DISTINCT"),
-            (self.html.replace("2026/11/21 13:30", "2026/11/22 13:30"),
+            (self.html.replace("2026/11/21", "2026/11/22"),
              "HEADER_DATE_PARITY"),
             (self.html.replace("13:30「她的民主路」", "12:00「她的民主路」", 1),
              "MEETING_CLOCK_CONFLICT"),
