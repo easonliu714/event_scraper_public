@@ -4027,8 +4027,10 @@ def assess_huashan_sealed_nonpublishing_field_gate(snapshot, detail_html=None,
         expected_path.encode("utf-8")).hexdigest()[:24]
     if (meta.get("platform_id") != "13"
             or meta.get("source_event_id") != expected_id
-            or meta.get("source_identity_kind")
-               != "OFFICIAL_PATH_HASH_NOT_NUMERIC_ID"
+            # normalize_record intentionally drops unapproved metadata,
+            # including source_identity_kind. Bind the canonical path hash,
+            # record ID and exact URL pair instead; never demand a field
+            # absent from the approved L7 candidate schema.
             or meta.get("record_id") != "13:" + expected_id
             or meta.get("sources") != [HUASHAN_PUBLIC_LIST, HUASHAN_PUBLIC_DETAIL]
             or row.get("url") != HUASHAN_PUBLIC_DETAIL
