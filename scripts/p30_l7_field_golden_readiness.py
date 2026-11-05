@@ -3395,7 +3395,8 @@ SONGSHAN_EVENT_TITLE = "2026 紙上躍躍然．典美插畫大賞"
 
 def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                                 network_authorized=False, source_hypothesis="",
-                                now_utc=None):
+                                now_utc=None, *, event_uuid=SONGSHAN_EVENT_UUID,
+                                event_title=SONGSHAN_EVENT_TITLE, event_type="展覽"):
     """Bounded official two-GET UUID edge -> existing isolated REVIEW LKG."""
     import hashlib, re, urllib.request
     from html.parser import HTMLParser
@@ -3403,6 +3404,17 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
     from datetime import timezone
     from scripts.p30_candidate_review_pipeline import build_candidate_dataset
 
+    # Reuse canonical #14 across exact official UUIDs; no cross-event LKG merge.
+    if (not isinstance(event_uuid, str) or not re.fullmatch(
+            r"[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}", event_uuid)):
+        raise ValueError("SONGSHAN_TARGET_UUID_INVALID_HOLD")
+    if (not isinstance(event_title, str) or
+            not 4 <= len(event_title.strip()) <= 180 or
+            event_title != event_title.strip()):
+        raise ValueError("SONGSHAN_TARGET_TITLE_INVALID_HOLD")
+    if event_type not in ("展覽", "活動"):
+        raise ValueError("SONGSHAN_TARGET_ROLE_INVALID_HOLD")
+    detail_url = SONGSHAN_PUBLIC_LIST + "/activity/" + event_uuid
     _isolated_lkg_path(destination, repo_root)
     previous = load_isolated_review_lkg(destination, repo_root)
     if fetcher is None and (network_authorized is not True or
@@ -3503,7 +3515,7 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                 "release_state": "HARD_HOLD_NO_PUBLICATION"}
     try:
         pages = []
-        for url in (SONGSHAN_PUBLIC_LIST, SONGSHAN_PUBLIC_DETAIL):
+        for url in (SONGSHAN_PUBLIC_LIST, detail_url):
             status, content_type, raw, final_url = (public_get if native else fetcher)(url)
             if type(status) is not int or status != 200 or final_url != url:
                 raise ValueError("SONGSHAN_HTTP_STATUS_OR_REDIRECT_HOLD")
@@ -3528,17 +3540,17 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
         detail.feed(pages[1])
         list_text, list_ids = listing.scopes()
         detail_text, _ = detail.scopes()
-        expected_title = norm(SONGSHAN_EVENT_TITLE)
+        expected_title = norm(event_title)
         if not listing.anchors or not any(
-                uid == SONGSHAN_EVENT_UUID and
+                uid == event_uuid and
                 any(expected_title in norm(list_text[parent]) and
-                    list_ids[parent] == {SONGSHAN_EVENT_UUID} and
+                    list_ids[parent] == {event_uuid} and
                     len(list_text[parent]) <= 2500 and
                     listing.nodes[parent]["tag"] not in ("body", "html", "root")
                     for parent in _songshan_ancestors(listing.nodes, idx))
                 for idx, uid in listing.anchors):
             raise ValueError("SONGSHAN_LIST_TITLE_UUID_LOCAL_EDGE_HOLD")
-        if any(uid != SONGSHAN_EVENT_UUID and
+        if any(uid != event_uuid and
                expected_title in norm(list_text[idx]) and
                len(list_text[idx]) <= 500
                for idx, uid in listing.anchors):
@@ -3557,7 +3569,7 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                       for tag in ("h1", "h2", "h3")}
             raise ValueError("SONGSHAN_DETAIL_EXACT_HEADING_HOLD:" +
                              ",".join(f"{tag}={count}" for tag, count in by_tag.items()))
-        if activity_uuid(SONGSHAN_PUBLIC_DETAIL) != SONGSHAN_EVENT_UUID:
+        if activity_uuid(detail_url) != event_uuid:
             raise ValueError("SONGSHAN_DETAIL_UUID_IDENTITY_HOLD")
         observed = datetime.now(timezone.utc) if native else (
             now_utc or datetime.now(timezone.utc))
@@ -3565,20 +3577,20 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
             raise ValueError("SONGSHAN_OBSERVATION_CLOCK_HOLD")
         if previous and (previous["rows"][0]["_candidate"].get("platform_id") != "14" or
                          previous["rows"][0]["_candidate"].get("source_event_id") !=
-                         SONGSHAN_EVENT_UUID):
+                         event_uuid):
             raise ValueError("SONGSHAN_PREVIOUS_LKG_OTHER_SOURCE_HOLD")
         stamp = observed.isoformat()
         candidate = {
-            "title": SONGSHAN_EVENT_TITLE, "url": SONGSHAN_PUBLIC_DETAIL,
-            "platform": "松山文創", "type": "展覽", "scraped_at": stamp,
+            "title": event_title, "url": detail_url,
+            "platform": "松山文創", "type": event_type, "scraped_at": stamp,
             "_candidate": {
                 "scope": "CANDIDATE_PREVIEW_ONLY", "decision": "REVIEW_WITH_HOLD",
                 "published": False, "golden_accepted": False,
-                "formal_field_pass": False, "record_id": "14:" + SONGSHAN_EVENT_UUID,
-                "platform_id": "14", "source_event_id": SONGSHAN_EVENT_UUID,
+                "formal_field_pass": False, "record_id": "14:" + event_uuid,
+                "platform_id": "14", "source_event_id": event_uuid,
                 "source_identity_kind": "OFFICIAL_LIST_DETAIL_UUID_REVIEW",
                 "source_class": "OFFICIAL_VENUE_NON_SESSION",
-                "sources": [SONGSHAN_PUBLIC_LIST, SONGSHAN_PUBLIC_DETAIL],
+                "sources": [SONGSHAN_PUBLIC_LIST, detail_url],
                 "hold_reasons": ["DATE_VENUE_FIELD_INDEPENDENT_AUTHORITY_PENDING",
                                  "REVIEW_ONLY_NOT_FORMAL"]}}
         rows, quality = build_candidate_dataset([candidate])
@@ -3591,11 +3603,11 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
             "quality": quality,
             "field_receipts": [{
                 "field": "title", "role": "EVENT_TITLE",
-                "value": SONGSHAN_EVENT_TITLE, "source": SONGSHAN_PUBLIC_DETAIL,
+                "value": event_title, "source": detail_url,
                 "observed_at": stamp, "decision": "REVIEW"}],
             "source_receipts": {
                 "list_url": SONGSHAN_PUBLIC_LIST,
-                "detail_url": SONGSHAN_PUBLIC_DETAIL,
+                "detail_url": detail_url,
                 "bounded_acquisition": {
                     "kind": "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1",
                     "observed_at_utc": stamp,
@@ -3604,10 +3616,10 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                     "list_body_sha256": receipts[0]["body_sha256"],
                     "detail_body_sha256": receipts[1]["body_sha256"],
                     "list_url": SONGSHAN_PUBLIC_LIST,
-                    "detail_url": SONGSHAN_PUBLIC_DETAIL,
+                    "detail_url": detail_url,
                     "decision": "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL"}},
             "incremental_diff": {
-                "added_ids": ["14:" + SONGSHAN_EVENT_UUID] if not previous else [],
+                "added_ids": ["14:" + event_uuid] if not previous else [],
                 "removed_ids": [],
                 "changed": not previous or digest != previous["last_known_good_sha256"]},
             "last_known_good_sha256": digest, "native_get_verified": False,
@@ -3622,7 +3634,7 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                 "source_receipts": receipts,
                 "native_get_200_count": 2 if native else 0,
                 "same_uuid_review_lkg": 1, "persisted": True,
-                "official_uuid": SONGSHAN_EVENT_UUID,
+                "official_uuid": event_uuid,
                 "lkg_sha256": digest, "formal_accepted_fields": 0,
                 "golden_accepted_events": 0, "published_events": 0,
                 "release_state": "HARD_HOLD_NO_PUBLICATION"}

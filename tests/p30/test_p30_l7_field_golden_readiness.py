@@ -2429,6 +2429,62 @@ class TestSongshanCanonicalUUIDRotation(unittest.TestCase):
             m.run_songshan_uuid_review_lkg(self.dest, ROOT, fetcher=123)
 
 
+    def test_second_official_uuid_same_adapter_isolated_review(self):
+        # Indexed official #14 LIST and DETAIL expose the same UUID/title.
+        # Injected bytes prove code path only, never a new native GET.
+        uuid = "3b2101fd-cbb3-48ec-b23c-496880df5626"
+        title = "STAR ON THE MOVE 2026 臺北採購媒合與展售會"
+        detail_url = m.SONGSHAN_PUBLIC_LIST + "/activity/" + uuid
+        listing = ('<article><h3>' + title + '</h3>'
+                   '<a href="/exhibition/activity/' + uuid +
+                   '">看更多</a></article>')
+        detail = ('<main><h1>' + title + '</h1>'
+                  '<p>日期 2026-11-06 - 2026-11-08</p>'
+                  '<p>11/6 僅專業買家；11/7-11/8 一般民眾入場</p>'
+                  '<p>地點 松山文創園區 北向製菸工廠</p></main>')
+        def fake(url):
+            self.assertIn(url, (m.SONGSHAN_PUBLIC_LIST, detail_url))
+            return (200, "text/html; charset=utf-8",
+                    (listing if url == m.SONGSHAN_PUBLIC_LIST else detail).encode("utf-8"),
+                    url)
+        result = m.run_songshan_uuid_review_lkg(
+            self.dest, ROOT, fetcher=fake, now_utc=self.now,
+            event_uuid=uuid, event_title=title, event_type="活動")
+        self.assertEqual(result["decision"], "REVIEW_ONLY", result)
+        self.assertEqual(result["native_get_200_count"], 0)
+        self.assertEqual(result["same_uuid_review_lkg"], 1)
+        snap = m.load_isolated_review_lkg(self.dest, ROOT)
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"], uuid)
+        self.assertEqual(snap["rows"][0]["_candidate"]["platform_id"], "14")
+        self.assertEqual(snap["rows"][0]["url"], detail_url)
+        self.assertEqual(snap["rows"][0]["type"], "活動")
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        before = self.dest.read_bytes()
+        conflict = self.run_source()
+        self.assertEqual(conflict["decision"], "SOURCE_OR_IDENTITY_HOLD_NO_WRITE")
+        self.assertIn("SONGSHAN_PREVIOUS_LKG_OTHER_SOURCE_HOLD", conflict["reason"])
+        self.assertEqual(self.dest.read_bytes(), before)
+
+    def test_second_uuid_rejects_cross_event_title_and_bad_id(self):
+        uuid = "3b2101fd-cbb3-48ec-b23c-496880df5626"
+        title = "STAR ON THE MOVE 2026 臺北採購媒合與展售會"
+        def fake(url):
+            html = ('<article><h3>' + title + '</h3><a href="/exhibition/activity/' +
+                    uuid + '">看更多</a></article>') if url == m.SONGSHAN_PUBLIC_LIST else (
+                    '<main><h1>另一個活動</h1></main>')
+            return (200, "text/html", html.encode(), url)
+        out = m.run_songshan_uuid_review_lkg(
+            self.dest, ROOT, fetcher=fake, now_utc=self.now,
+            event_uuid=uuid, event_title=title, event_type="活動")
+        self.assertEqual(out["same_uuid_review_lkg"], 0)
+        self.assertFalse(self.dest.exists())
+        for bad in ("../outside", uuid.upper(), "00000000-0000-0000-0000-00000000000g"):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "UUID_INVALID"):
+                m.run_songshan_uuid_review_lkg(
+                    self.dest, ROOT, fetcher=fake, now_utc=self.now,
+                    event_uuid=bad, event_title=title, event_type="活動")
+
+
 class TestFixedTmcCksmhCanonicalFieldGate(unittest.TestCase):
     """A and B field authority contract, no native GET or formal promotion."""
 
