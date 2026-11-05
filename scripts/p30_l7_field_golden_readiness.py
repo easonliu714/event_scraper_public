@@ -3464,10 +3464,20 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
             self.stack = [0]
             self.anchors = []
             self.headings = []
+            self.meta_titles = []
+            self.canonical_urls = []
         def handle_starttag(self, tag, attrs):
             if len(self.nodes) >= 16000 or len(self.stack) > 80:
                 raise ValueError("SONGSHAN_DOM_BOUNDS_HOLD")
             attributes = dict(attrs)
+            # Native headingless pages may use SEO title+canonical identity.
+            # Require one exact pair; never trust a body/footer title alone.
+            if tag == "meta" and attributes.get("property") == "og:title":
+                self.meta_titles.append(attributes.get("content", ""))
+            if tag == "meta" and attributes.get("property") == "og:url":
+                self.canonical_urls.append(attributes.get("content", ""))
+            if tag == "link" and "canonical" in attributes.get("rel", "").split():
+                self.canonical_urls.append(attributes.get("href", ""))
             idx = len(self.nodes)
             uid = activity_uuid(attributes.get("href", "")) if tag == "a" else None
             self.nodes.append({"tag": tag, "parent": self.stack[-1],
@@ -3563,12 +3573,24 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                          if detail.nodes[idx]["tag"] in ("h1", "h2", "h3")]
         exact_matches = [(tag, value) for tag, value in heading_roles
                          if value == expected_title]
-        if len(exact_matches) != 1:
+        # Native evidence was 2/2 HTTP200 but no exact H1/H2/H3.
+        # Unique OG title plus exact canonical URL is a strict alternate
+        # identity proof, never independent field authority or Golden.
+        metadata_titles = [norm(v) for v in detail.meta_titles]
+        metadata_urls = detail.canonical_urls
+        seo_exact = (not heading_roles and metadata_titles == [expected_title]
+                     and metadata_urls == [detail_url])
+        heading_exact = len(exact_matches) == 1
+        if not heading_exact and not seo_exact:
             by_tag = {tag: sum(1 for kind, value in heading_roles
                                if kind == tag and value == expected_title)
                       for tag in ("h1", "h2", "h3")}
             raise ValueError("SONGSHAN_DETAIL_EXACT_HEADING_HOLD:" +
-                             ",".join(f"{tag}={count}" for tag, count in by_tag.items()))
+                             ",".join(f"{tag}={count}" for tag, count in by_tag.items()) +
+                             ",seo=" + str(int(seo_exact)))
+        if heading_exact and ((metadata_titles and metadata_titles != [expected_title])
+                              or (metadata_urls and metadata_urls != [detail_url])):
+            raise ValueError("SONGSHAN_DETAIL_HEADING_SEO_CONFLICT_HOLD")
         if activity_uuid(detail_url) != event_uuid:
             raise ValueError("SONGSHAN_DETAIL_UUID_IDENTITY_HOLD")
         observed = datetime.now(timezone.utc) if native else (
