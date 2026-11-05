@@ -231,12 +231,18 @@ class TestSourceStreamGate(unittest.TestCase):
             def open(self, req, timeout):
                 self.urls.append(req.full_url)
                 assert timeout == 8
-                return Response((listing, detail)[len(self.urls)-1],
+                if req.full_url.endswith("/robots.txt"):
+                    import urllib.error
+                    raise urllib.error.HTTPError(req.full_url, 404,
+                                                 "not found", {}, None)
+                return Response((listing, detail)[len(self.urls)-2],
                                 req.full_url)
         opener = Opener()
         with patch("urllib.request.build_opener", return_value=opener):
             result = m.probe_zepp_newtaipei_native_once()
-        self.assertEqual(opener.urls, [m.ZEPP_LIST, m.ZEPP_DETAIL])
+        self.assertEqual(opener.urls, ["https://www.zepp.co.jp/robots.txt",
+                                       m.ZEPP_LIST, m.ZEPP_DETAIL])
+        self.assertEqual(result["policy_decision"], "ALLOW_ROBOTS_404")
         self.assertEqual(result["native_http200"], 2)
         self.assertEqual(result["native_same_id_review"], 1)
         self.assertEqual(result["same_id_review_lkg"], 0)
@@ -274,10 +280,11 @@ class TestSourceStreamGate(unittest.TestCase):
         with patch("urllib.request.build_opener", return_value=opener):
             result = m.probe_zepp_newtaipei_native_once()
         self.assertEqual(opener.calls, 1)
-        self.assertEqual(result["native_get_attempted"], 1)
+        self.assertEqual(result["native_get_attempted"], 0)
+        self.assertEqual(result["policy_get_attempted"], 1)
         self.assertEqual(result["native_http200"], 0)
-        self.assertEqual(result["first_failure"], "ZEPP_REDIRECT_BLOCKED_HOLD")
-        self.assertEqual(result["source_receipts"][0]["body_sha256"], None)
+        self.assertIn("ZEPP_SITE_POLICY_HOLD", result["first_failure"])
+        self.assertEqual(result["source_receipts"], [])
 
 
 if __name__ == "__main__":
