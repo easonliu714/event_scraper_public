@@ -438,7 +438,9 @@ def replay_preacquired_ab_to_review_lkg(line, manifest, destination, repo_root,
 # B source rotation: one new canonical venue in New Taipei, not a 20th
 # production platform. This bounded native receipt never infers a ticket
 # session, never visits the linked KKTIX checkout, and never writes LKG.
-ZEPP_LIST = "https://www.zepp.co.jp/hall/newtaipei/"
+# Official schedule is the LIST authority; venue HOME is not a LIST receipt.
+# Indexed official schedule -> exact rid=166457; native bytes still HOLD.
+ZEPP_LIST = "https://www.zepp.co.jp/hall/newtaipei/schedule/"
 ZEPP_DETAIL = "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457"
 ZEPP_TITLE = "Jony J 2026「本命」TOUR IN TAIPEI"
 ZEPP_SOURCE_KEY = "venue:zepp-newtaipei"
