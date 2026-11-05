@@ -156,5 +156,60 @@ class TestSourceStreamGate(unittest.TestCase):
 
 
 
+    def test_a_b_manifest_replay_exact_id_and_checksum(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        from scripts.p30_l7_field_golden_readiness import (
+            OPENTIX_ROTATION_LIST, OPENTIX_ROTATION_DETAIL, OPENTIX_ROTATION_TITLE,
+            load_isolated_review_lkg)
+        cases = (
+            ("A", (OPENTIX_ROTATION_LIST, OPENTIX_ROTATION_DETAIL),
+             OPENTIX_ROTATION_TITLE, "05:2072516129034670080"),
+            ("B", (m.SONGSHAN_LIST, m.SONGSHAN_DETAIL),
+             "STAR ON THE MOVE 2026 臺北採購媒合與展售會",
+             "14:" + m.SONGSHAN_UUID),
+        )
+        for line, urls, title, identity in cases:
+            with self.subTest(line=line), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                list_html = '<main><div><a href="' + urls[1] + '">' + title + '</a></div></main>'
+                detail_html = '<main><h1>' + title + '</h1>' + (
+                    '<p data-role="venue">臺北表演藝術中心 藍盒子</p>' if line == "A" else ""
+                ) + '</main>'
+                stamp = datetime.now(timezone.utc).replace(microsecond=0)
+                sources = []
+                for i, (url, html) in enumerate(zip(urls, (list_html, detail_html))):
+                    path = root / (str(i) + ".html")
+                    raw = html.encode()
+                    path.write_bytes(raw)
+                    sources.append(dict(url=url, path=str(path),
+                                        sha256=hashlib.sha256(raw).hexdigest(),
+                                        observed_at_utc=stamp.isoformat()))
+                manifest = root / "manifest.json"
+                manifest.write_text(json.dumps(dict(
+                    kind="P30_PREACQUIRED_OFFICIAL_HTML_V1",
+                    transport="CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
+                    sources=sources)), encoding="utf-8")
+                output = root / "review_lkg_snapshot.json"
+                result = m.replay_preacquired_ab_to_review_lkg(
+                    line, manifest, output, Path.cwd(), now_utc=stamp)
+                self.assertEqual(result["decision"], "REVIEW_ONLY_NONPUBLISHING", result)
+                self.assertEqual(result["native_get_this_call"], 0)
+                snap = load_isolated_review_lkg(output, Path.cwd())
+                self.assertEqual(snap["rows"][0]["_candidate"]["record_id"], identity)
+                self.assertEqual(snap["rows"][0]["scraped_at"], stamp.isoformat())
+                before = output.read_bytes()
+                sources[1]["sha256"] = "0" * 64
+                manifest.write_text(json.dumps(dict(
+                    kind="P30_PREACQUIRED_OFFICIAL_HTML_V1",
+                    transport="CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
+                    sources=sources)), encoding="utf-8")
+                self.assertEqual(m.replay_preacquired_ab_to_review_lkg(
+                    line, manifest, output, Path.cwd(), now_utc=stamp)["decision"], "HOLD")
+                self.assertEqual(output.read_bytes(), before)
+
+
+
 if __name__ == "__main__":
     unittest.main()
