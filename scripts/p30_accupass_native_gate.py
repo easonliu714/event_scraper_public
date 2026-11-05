@@ -134,7 +134,7 @@ def public_get(opener, url, cap):
 
 def run_native_once():
     result = {"kind": "P30_A_ACCUPASS_DISTINCT_NATIVE_LIST_DETAIL_V1",
-              "platform_id": "06", "source_event_id": EVENT_ID,
+              "platform_id": "02", "source_event_id": EVENT_ID,
               "native_get_attempted": 0, "native_http200": 0,
               "native_list": 0, "native_detail": 0,
               "native_same_id_review": 0, "native_same_id_lkg": 0,
