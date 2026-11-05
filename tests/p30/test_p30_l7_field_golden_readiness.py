@@ -3142,3 +3142,39 @@ class TestOpentixCanonicalTicketRotation(unittest.TestCase):
                     self.dest, ROOT, source_bodies=bodies, now_utc=self.now)
                 self.assertEqual(out["same_id_review_lkg"], 0)
                 self.assertEqual(self.dest.read_bytes(), before)
+
+    def test_full_envelope_cas_rejects_stale_provenance_with_same_rows(self):
+        # Row digest is unchanged when only source provenance changes.
+        # A stale writer must never overwrite newer receipts under the same LKG.
+        import copy
+        first = m.run_opentix_existing_id_review_lkg(
+            self.dest, ROOT, source_bodies=self.bodies(), now_utc=self.now)
+        self.assertEqual(first["same_id_review_lkg"], 1, first)
+        old = m.load_isolated_review_lkg(self.dest, ROOT)
+        old_envelope_sha = m._isolated_lkg_digest(old)
+        new = copy.deepcopy(old)
+        new["source_receipts"]["bounded_acquisition"]["transport"] = (
+            "CALLER_SUPPLIED_UPDATED_PROVENANCE_NOT_NATIVE")
+        self.assertEqual(new["last_known_good_sha256"],
+                         old["last_known_good_sha256"])
+        m.persist_isolated_review_lkg(
+            new, self.dest, ROOT,
+            expected_previous_sha256=old["last_known_good_sha256"],
+            expected_previous_envelope_sha256=old_envelope_sha)
+        protected_bytes = self.dest.read_bytes()
+        stale = copy.deepcopy(old)
+        stale["source_receipts"]["bounded_acquisition"]["transport"] = (
+            "STALE_CALLER_PROVENANCE_NOT_NATIVE")
+        with self.assertRaisesRegex(
+                ValueError, "ISOLATED_LKG_FULL_ENVELOPE_COMPARE_AND_SWAP_HOLD"):
+            m.persist_isolated_review_lkg(
+                stale, self.dest, ROOT,
+                expected_previous_sha256=old["last_known_good_sha256"],
+                expected_previous_envelope_sha256=old_envelope_sha)
+        self.assertEqual(self.dest.read_bytes(), protected_bytes)
+        with self.assertRaisesRegex(
+                ValueError, "ISOLATED_LKG_FULL_ENVELOPE_COMPARE_AND_SWAP_HOLD"):
+            m.persist_isolated_review_lkg(
+                stale, self.dest, ROOT,
+                expected_previous_sha256=old["last_known_good_sha256"])
+        self.assertEqual(self.dest.read_bytes(), protected_bytes)
