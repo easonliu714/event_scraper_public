@@ -4502,6 +4502,11 @@ def run_opentix_existing_id_review_lkg(destination, repo_root, *,
 
     class Scoped(HTMLParser):
         # Only event-local text inside a main subtree; never body/footer.
+        # Real official HTML contains void elements without closing tags.
+        VOID = frozenset(("area", "base", "br", "col", "embed", "hr",
+                          "img", "input", "link", "meta", "param",
+                          "source", "track", "wbr"))
+
         def __init__(self):
             super().__init__(convert_charrefs=True)
             self.stack = []
@@ -4514,14 +4519,20 @@ def run_opentix_existing_id_review_lkg(destination, repo_root, *,
             if self.node_count > 16000 or len(self.stack) >= 80:
                 raise ValueError("OPENTIX_DOM_BOUNDS_HOLD")
             attrs = dict(attrs)
-            self.stack.append(tag)
+            if tag not in self.VOID:
+                self.stack.append(tag)
             if "main" not in self.stack:
+                return
+            if tag in self.VOID:
                 return
             kind = ("anchors" if tag == "a" else
                     "headings" if tag == "h1" else
                     "venues" if attrs.get("data-role") == "venue" else None)
             if kind:
                 self.active.append([len(self.stack), kind, attrs, ""])
+
+        def handle_startendtag(self, tag, attrs):
+            self.handle_starttag(tag, attrs)
 
         def handle_data(self, value):
             for cap in self.active:
