@@ -4578,11 +4578,12 @@ def run_opentix_existing_id_review_lkg(destination, repo_root, *,
         if not isinstance(now, datetime) or now.utcoffset() is None:
             raise ValueError("OPENTIX_OBSERVATION_CLOCK_HOLD")
         pages = []
+        observed_times = []
         for url in urls:
             response = source_bodies[url]
-            if not isinstance(response, tuple) or len(response) != 4:
+            if not isinstance(response, tuple) or len(response) != 5:
                 raise ValueError("OPENTIX_SOURCE_RESPONSE_SHAPE_HOLD")
-            status, mime, raw, final = response
+            status, mime, raw, final, observed_raw = response
             if (type(status) is not int or status != 200 or final != url
                     or not isinstance(mime, str)
                     or mime.split(";", 1)[0].strip().lower() != "text/html"
@@ -4592,11 +4593,23 @@ def run_opentix_existing_id_review_lkg(destination, repo_root, *,
                    part.strip().lower().split("=", 1)[1].strip('"') != "utf-8"
                    for part in mime.split(";")[1:]):
                 raise ValueError("OPENTIX_SOURCE_CHARSET_HOLD")
+            # Caller-supplied indexed/fixture bytes must retain original
+            # observation time, never be stamped with this invocation time.
+            if not isinstance(observed_raw, str):
+                raise ValueError("OPENTIX_SOURCE_OBSERVED_AT_MISSING_HOLD")
+            observed = datetime.fromisoformat(observed_raw.replace("Z", "+00:00"))
+            if (observed.utcoffset() is None or
+                    not 0 <= (now - observed).total_seconds() <= 86400):
+                raise ValueError("OPENTIX_SOURCE_FRESHNESS_HOLD")
+            observed_times.append(observed)
             pages.append(raw.decode("utf-8", errors="strict"))
             out["source_receipts"].append({
                 "url": url, "http_status": 200, "bytes": len(raw),
                 "body_sha256": hashlib.sha256(raw).hexdigest(),
-                "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED"})
+                "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
+                "observed_at_utc": observed.isoformat()})
+        if (max(observed_times) - min(observed_times)).total_seconds() > 600:
+            raise ValueError("OPENTIX_LIST_DETAIL_OBSERVATION_SKEW_HOLD")
         listing, detail = Scoped(), Scoped()
         listing.feed(pages[0])
         detail.feed(pages[1])
@@ -4614,7 +4627,7 @@ def run_opentix_existing_id_review_lkg(destination, repo_root, *,
                       prior["rows"][0]["_candidate"].get("source_event_id") !=
                       "2072516129034670080"):
             raise ValueError("OPENTIX_OTHER_EVENT_LKG_CAS_HOLD")
-        stamp = now.isoformat()
+        stamp = max(observed_times).isoformat()
         candidate = {
             "title": OPENTIX_ROTATION_TITLE, "url": OPENTIX_ROTATION_DETAIL,
             "platform": "OPENTIX", "type": "戲劇", "scraped_at": stamp,
