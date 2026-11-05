@@ -1507,6 +1507,48 @@ jobs:
                 report['same_event_direct_edge_review'],
                 report['first_failure'], flush=True)
           PY
+      - name: One-shot TPAC complete-stream native source (new 4 MiB hypothesis; NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One new root-cause hypothesis after the historic 512 KiB prefix HOLD.
+          # First attempt of exactly this commit only; never repeat on rerun or
+          # later commits. No second URL, redirect, retry, login or checkout.
+          if [ "${{ github.run_attempt }}" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tpac-stream-native-once]'; then
+            echo 'TPAC_STREAM_NATIVE_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          set +e
+          python scripts/p30_source_stream_gate.py --tpac-native-once > evidence/tpac_native_stream_once.json
+          gate_rc=$?
+          set -e
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 49 ]; then
+            echo "TPAC_STREAM_NATIVE_UNEXPECTED_EXIT=$gate_rc"
+            exit "$gate_rc"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/tpac_native_stream_once.json').read_text(encoding='utf-8'))
+          assert d['kind']=='P30_TPAC_NATIVE_COMPLETE_STREAM_ONESHOT_V1'
+          assert d['native_get_this_call']==1 and d['native_detail_get_attempted']==1
+          assert d['native_list_get_this_call']==0 and d['native_same_id_lkg']==0
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          assert d['release_state']=='HARD_HOLD_NO_PUBLICATION' and d['raw_html_saved'] is False
+          assert d['source_url']=='https://tpac.org.taipei/program/2088'
+          if 'body_sha256' in d:
+              assert d.get('body_truncated') is False
+              assert 0 < d['body_bytes'] <= 4*1024*1024
+          if d.get('body_truncated'):
+              assert 'body_sha256' not in d and 'prefix_sha256' in d
+          print('TPAC_NATIVE_ONESHOT',json.dumps({
+              'http200':d['native_http200_this_call'],
+              'full_body':bool(d.get('body_sha256')),
+              'decision':d['decision'],
+              'first_failure':d['first_failure'],
+              'native_same_id_lkg':0,'formal_field':0,'golden':0,'published':0}))
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
