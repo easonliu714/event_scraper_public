@@ -7207,3 +7207,35 @@ Engineering Draft #236 HEAD b8cf3757598be1d43e38bcb493d16ec89f3b9c3d
 **Architecture limitation:** The new stream parser is a bounded replay component for a new size/DOM hypothesis; it has not observed a complete native TPAC page. Historical capped 524289-byte prefix is not a full-body hash. The Songshan prior-receipt audit does not reconstruct discarded HTML, prove SEO metadata, or promote an official field. Next work must verify actual event-local DOM with a lawful fresh hypothesis or rotate source; never repeat consumed one-shot probes. Formal PWA HTTP runtime remains UNVERIFIED; Owner authorization required only for separate status-only release.
 
 **2026-11-05 17:58 exact-head architecture addendum:** Engineering Draft #236 HEAD `ae4bb6018ed956cee291d8446abcb4bcb4887f76`; exact-head CI #42006727733 SUCCESS, artifact #13405156466 digest `sha256:28b7cb3588b87a0b3f2055e7cf5e5da27c5cf0380085e60aea16dbcfb8e26c16`. `EventLocalHTML` now binds title + exact OPENTIX Event href + room to one shared MAIN-local SECTION/ARTICLE; `audit_songshan_prior_native_receipt` pins exact historical native byte counts/hash/transport. This closes cross-card mixing in offline replay, **not** source freshness or native identity. 133 existing + 5 new tests PASS; this commit's new native GET/identity/LKG/formal FIELD/Golden/Published remain 0. No formal source/Publisher/main changes.
+
+---
+
+### P30-L7 2026-11-05 19:00 — native TPAC full-body bounded stream and dual-line provenance (NO PUBLISH)
+
+Architecture increment on Engineering Draft [#236](https://github.com/easonliu714/event_scraper_public/pull/236), exact HEAD 39cb716a2e293f65c061b2a46eecacf3ea4d0375, base main unchanged:
+
+```text
+scripts/p30_source_stream_gate.py  (existing ADD-only PR file)
+  acquire_tpac_native_once()
+    -> one public GET https://tpac.org.taipei/program/2088
+    -> 8s timeout, no redirect/retry/checkout, no raw HTML storage
+    -> inspect_tpac_complete_stream(response, 4 MiB max)
+    -> only full EOF body SHA256, exact URL, UTC observation, MIME
+    -> MAIN-local title + direct OPENTIX event href + room role
+    -> REVIEW only if all three in same SECTION/ARTICLE
+    -> HOLD if cross-section/room conflict; never formal FIELD
+  main(--tpac-native-once) -> JSON receipt, exit 0 REVIEW or 49 HOLD
+tests/p30/test_p30_source_stream_gate.py
+  + mocked exact one GET, full SHA, no redirect and no checkout
+.github/workflows/eventradar_p30_l7_field_readiness.yml
+  + first-attempt, exact commit marker [tpac-stream-native-once]
+  + no duplicate native GET on rerun or future commit
+  + immutable formal release guard, evidence SHA manifest and ZIP artifact
+```
+
+**Real CI #42015281702:** SUCCESS, job 127204207615, artifact #13409036942 ZIP 5348 bytes / SHA256 2eef37bc60239ab1358e293e4139e5dfe75bda31d04b12abcbd9d96370000dba / CRC PASS independently. A native TPAC DETAIL +1 HTTP200; complete 639783-byte body SHA256 ab257b2b3c5fa1faf5e288174f2417ffc6ac98a069a9f690ba6763480c6de0c5 at 2026-11-05T11:00:06.221650Z. Exact heading=1 and OPENTIX href=1 but same-section=false and room-in-section=false: first source failure TPAC_EVENT_LOCAL_TITLE_LINK_ROOM_HOLD. Native identity/LKG/accepted FIELD=0/0/0. No OPENTIX GET or checkout. Historic 512 KiB size blocker resolved for this one complete acquisition; **do not** infer DOM identity or HALL acceptance.
+
+**B:** Songshan #14 prior second-UUID native two HTTP200 receipts are historical only, new GET=0, exact H1/H2/H3 root HOLD preserved; no re-fetch. Shared TPAC response may inform B venue role but is not a second B GET and does not prove HALL. Next B rotate to a deduplicated Taipei/New Taipei canonical source with a genuinely unconsumed same-ID hypothesis, not another synthetic fixture. Keep 11/06 buyer and 11/07–08 public opening distinct.
+
+Formal docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4, docs/platform_status.json blob 99cae0571e36e52dac360b6935c0c09f6f6bed3f, 19-platform baseline and L8 Android 5/5 / CKSMH5 / TWTC39 PASS preserved. Accepted FIELD/Golden/Published=0/0/0, HARD_HOLD_NO_PUBLICATION. Existing status-only Draft #237, no duplicate. Pages HTTP UNVERIFIED; Owner must separately authorize status-only release, not isolated engineering.
+
