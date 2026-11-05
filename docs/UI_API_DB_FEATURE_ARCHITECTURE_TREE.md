@@ -7292,3 +7292,38 @@ Formal release state
 
 
 **2026-11-05 23:08 A field-role cross-source indexed readback:** [TPAC official program/2088](https://tpac.org.taipei/program/2088) renders exact title/direct OPENTIX event link, twelve performance timestamps, a `場地` label without adjacent value and recommended age 6+. [OPENTIX official event 2072516129034670080](https://www.opentix.life/event/2072516129034670080) independently renders exact title, `臺北表演藝術中心 藍盒子` as its own ticket event venue, and age 7+. Preserve `TPAC_HALL_MISSING`, `CROSS_SOURCE_VENUE_PROVENANCE_SEPARATE`, `AGE_ROLE_CONFLICT_HOLD`, `MULTI_SESSION_NOT_FLATTENED`. Indexed web reads are **not** native byte receipts; no formal FIELD, LKG, Golden or Published promotion.
+
+### 2026-11-05 23:57 — B Zepp parser reuse and exact native-vs-indexed boundary
+
+```text
+Engineering Draft #236 HEAD b7ffed139dc2eab36e03e90b425022c77a97ce7d
+  scripts/p30_source_stream_gate.py
+    ZeppLocalHTML.handle_starttag/handle_endtag
+      -> MAIN-local detail heading only; global footer/header title cannot attest event
+    inspect_zepp_same_id_pages(list_body, detail_body, *, detail_url, expected_title)
+      -> reusable exact official HTTPS host/path + ONE numeric rid query
+      -> exact LIST href + same-anchor title, exact DETAIL MAIN heading
+      -> source-local REVIEW identity only, date/start not Session
+      -> rejects foreign host, duplicate rid, tracking query, footer heading
+    probe_zepp_newtaipei_native_once
+      -> robots 200 policy body size + SHA256 + observed_at receipt
+      -> 404 policy recorded; unknown/blocked policy fails closed
+      -> no raw HTML, no checkout, no formal LKG/Golden
+  tests/p30/test_p30_source_stream_gate.py
+    +3 tests: second rid reuse, query/host negatives, global heading negative
+  CI #42060036370 SUCCESS job 127358814365
+  134 field + 16 stream = 150 offline PASS
+  artifact #13431556129 SHA256 66c1b7ab9f4ec8edf58f7c8a213ff728822ffa5cdf6700888da20125f0cccace
+  no zepp-native-once marker; B new native GET/LIST/DETAIL/IDENTITY/LKG 0
+  container robots preflight DNS socket.gaierror Errno -3; site policy UNKNOWN
+A indexed TPAC vs OPENTIX venue source split and 6+/7+ conflict -> HOLD
+  no new A native GET or LKG, no reuse of consumed TPAC full-body probe
+Formal Source main b7e04a8501f12df56677c833166e7038c4a6702b
+  data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 unchanged
+  status blob 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd
+  status-only #237 MERGED, Pages #42046958164 SUCCESS
+  new formal Pages HTTP/Android readback UNVERIFIED
+  accepted FIELD/Golden/Published 0/0/0, HARD_HOLD_NO_PUBLICATION
+```
+
+**Next architecture gate:** independent Zepp robots policy and one unconsumed, lawful native LIST→same-rid DETAIL body receipt; only then consider isolated venue REVIEW candidate, never a new formal platform. A must resolve source-local venue/age authority or rotate another existing canonical non-checkout ticket source. Preserve L8 Android 5/5 and CKSMH5/TWTC39 PASS.
