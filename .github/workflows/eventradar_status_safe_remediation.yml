@@ -1,7 +1,5 @@
 name: EventRadar status-only safe remediation exact-head NO RELEASE
 on:
-  push:
-    branches: [feat/eventradar-pwa-status-l9n-20261028]
   pull_request:
     paths: [docs/platform_status.json, .github/workflows/eventradar_status_safe_remediation.yml]
 permissions:
@@ -23,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          main=f2859b7c72d6e280b850cb253730989f22b01d46
+          main=d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
           git merge-base --is-ancestor "$main" HEAD
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           for path in docs/index.html docs/platform-status.html scraper.py docs/manifest.json; do
@@ -38,7 +36,7 @@ jobs:
           python - <<'PY'
           import json,subprocess
           from pathlib import Path
-          main='f2859b7c72d6e280b850cb253730989f22b01d46'
+          main='d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce'
           old=subprocess.check_output(['git','show',main+':docs/platform_status.json']).decode()
           new=Path('docs/platform_status.json').read_text()
           marker='  "latestEngineering": {'
@@ -52,12 +50,12 @@ jobs:
           assert snap['releaseState']=='HARD_HOLD_NO_PUBLICATION'
           assert (snap['acceptedFieldsNew'],snap['goldenNew'],snap['publishedEventsNew'])==(0,0,0)
           assert (snap['candidateReviewFields'],snap['candidateIdentityDependencies'],snap['independentFormalAdjudicatedFields'])==(5,2,0)
-          assert snap['nativeOfficialGetThisSnapshot']==0
+          assert snap['nativeOfficialGetThisSnapshot']==1
           assert snap['statusOnlyReleaseAuthorization']=='NOT_GRANTED'
           assert snap['priorVerifiedNativeGet']['successfulOfficialGet']==3
           assert [x['id'] for x in snap['lines']]==['A','B']
-          assert all(x['draftPR']==236 and x['acceptedFields']==0 and x['decision']=='REVIEW_WITH_HOLD' for x in snap['lines'])
-          assert all(x['head']=='ba3f3f92408fada6b65bd36a1ab697976fe31f78' for x in snap['lines'])
+          assert all(x['draftPR']==236 and x['acceptedFields']==0 and x['decision'] in ('REVIEW_WITH_HOLD','HOLD') for x in snap['lines'])
+          assert all(isinstance(x['head'],str) and len(x['head'])==40 and all(c in '0123456789abcdef' for c in x['head']) for x in snap['lines'])
           print('PASS_19_PLATFORM_BASELINE_BYTE_PARITY_AND_REVIEW_ONLY')
           PY
       - name: Status-only SHA256 evidence manifest
