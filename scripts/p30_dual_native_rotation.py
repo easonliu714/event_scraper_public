@@ -173,9 +173,9 @@ def run_native_once(line):
         robots, receipt = read_public(opener, origin + "/robots.txt", "text/plain")
         out["robots_receipt"] = receipt
         # Explicit user-agent directive is mandatory: empty/HTML fallback fails closed.
-        if not re.search(r"(?im)^\\s*user-agent\\s*:\\s*[^\\s#]+", robots):
+        if not re.search(r"(?im)^\s*user-agent\s*:\s*[^\s#]+", robots):
             raise ValueError("ROTATION_ROBOTS_NO_USER_AGENT_HOLD")
-        if re.search(r"(?i)<(?:!doctype\\s+html|html|head|body)(?:\\s|>)", robots[:2048]):
+        if re.search(r"(?i)<(?:!doctype\s+html|html|head|body)(?:\s|>)", robots[:2048]):
             raise ValueError("ROTATION_ROBOTS_HTML_FALLBACK_HOLD")
         policy = urllib.robotparser.RobotFileParser()
         policy.parse(robots.splitlines())

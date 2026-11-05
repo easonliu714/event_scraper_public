@@ -84,7 +84,7 @@ def inspect_pair(list_html, detail_html):
         return {"decision":"HOLD","first_failure":"CLOUDGATE_DETAIL_MAIN_LOCAL_TITLE_HOLD",
                 "same_id_review":0,"postponement_review":0}
     local = norm(" ".join(detail.local_text))
-    if not (re.search(r"原\\s*11/14.*?延期至\\s*12/19", local)
+    if not (re.search(r"原\s*11/14.*?延期至\s*12/19", local)
             and "12月19日" in local):
         return {"decision":"HOLD","first_failure":"CLOUDGATE_POSTPONEMENT_LOCAL_AUTHORITY_HOLD",
                 "same_id_review":1,"postponement_review":0}
@@ -110,7 +110,7 @@ def run_native_once():
         robots, rr = read_public(opener,
             "https://www.cloudgate.org.tw/robots.txt","text/plain")
         out["robots_receipt"] = rr
-        if not re.search(r"(?im)^\\s*user-agent\\s*:\\s*[^\\s#]+",robots):
+        if not re.search(r"(?im)^\s*user-agent\s*:\s*[^\s#]+",robots):
             raise ValueError("CLOUDGATE_ROBOTS_MISSING_DIRECTIVE_HOLD")
         policy = urllib.robotparser.RobotFileParser()
         policy.parse(robots.splitlines())
