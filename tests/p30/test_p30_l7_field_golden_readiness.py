@@ -3025,3 +3025,77 @@ class TestTmcFieldAwareReusablePipeline(unittest.TestCase):
             bodies[m.PUBLIC_TMC_DETAIL] = bad
             self.assertEqual(self.run_pair(bodies)["same_event_review_lkg"], 0)
             self.assertEqual(self.dest.read_bytes(), before)
+
+
+
+class TestOpentixCanonicalTicketRotation(unittest.TestCase):
+    """A #05 exact official event ID; source-injected CI is never native GET."""
+
+    def setUp(self):
+        import tempfile
+        from datetime import datetime, timezone
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.dest = pathlib.Path(self.temp.name) / "review_lkg_snapshot.json"
+        self.now = datetime(2026, 11, 5, 4, 0, tzinfo=timezone.utc)
+        self.listing = ('<main><a href="' + m.OPENTIX_ROTATION_DETAIL + '">' +
+                        m.OPENTIX_ROTATION_TITLE + '</a></main>')
+        self.detail = ('<main><h1>' + m.OPENTIX_ROTATION_TITLE +
+                       '</h1><section><span data-role="venue">' +
+                       '臺北表演藝術中心 藍盒子</span></section></main>')
+
+    def bodies(self, listing=None, detail=None):
+        pages = {
+            m.OPENTIX_ROTATION_LIST: self.listing if listing is None else listing,
+            m.OPENTIX_ROTATION_DETAIL: self.detail if detail is None else detail}
+        return {url: (200, "text/html; charset=utf-8",
+                      html.encode("utf-8"), url) for url, html in pages.items()}
+
+    def test_exact_list_detail_event_and_venue_to_sealed_review(self):
+        out = m.run_opentix_existing_id_review_lkg(
+            self.dest, ROOT, source_bodies=self.bodies(), now_utc=self.now)
+        self.assertEqual(out["same_id_review_lkg"], 1, out)
+        self.assertEqual(out["native_get_this_call"], 0)
+        self.assertEqual((out["formal_accepted_fields"],
+                          out["golden_accepted_events"],
+                          out["published_events"]), (0, 0, 0))
+        snap = m.load_isolated_review_lkg(self.dest, ROOT)
+        self.assertEqual(snap["rows"][0]["_candidate"]["platform_id"], "05")
+        self.assertEqual(snap["rows"][0]["_candidate"]["source_event_id"],
+                         "2072516129034670080")
+        self.assertEqual(snap["last_known_good_sha256"], out["lkg_sha256"])
+        self.assertEqual({x["field"] for x in snap["field_receipts"]},
+                         {"title", "venue"})
+
+    def test_wrong_id_title_or_missing_event_local_venue_fail_closed(self):
+        for bodies in (
+            self.bodies(listing=self.listing.replace(
+                "2072516129034670080", "2072516129034670081")),
+            self.bodies(detail=self.detail.replace(
+                m.OPENTIX_ROTATION_TITLE, "另一齣戲")),
+            self.bodies(detail=self.detail.replace(
+                'data-role="venue"', 'data-role="other"')),
+        ):
+            with self.subTest(bodies=list(bodies)):
+                out = m.run_opentix_existing_id_review_lkg(
+                    self.dest, ROOT, source_bodies=bodies, now_utc=self.now)
+                self.assertEqual(out["same_id_review_lkg"], 0)
+                self.assertFalse(self.dest.exists())
+
+    def test_http_redirect_and_conflict_preserve_sealed_lkg(self):
+        first = m.run_opentix_existing_id_review_lkg(
+            self.dest, ROOT, source_bodies=self.bodies(), now_utc=self.now)
+        self.assertEqual(first["same_id_review_lkg"], 1)
+        before = self.dest.read_bytes()
+        for bad in (
+            (302, "text/html", b"redirect", m.OPENTIX_ROTATION_DETAIL),
+            (200, "text/html", b"foreign", "https://example.org/other"),
+            (200, "text/html", b"", m.OPENTIX_ROTATION_DETAIL),
+        ):
+            with self.subTest(bad=bad[0]):
+                bodies = self.bodies()
+                bodies[m.OPENTIX_ROTATION_DETAIL] = bad
+                out = m.run_opentix_existing_id_review_lkg(
+                    self.dest, ROOT, source_bodies=bodies, now_utc=self.now)
+                self.assertEqual(out["same_id_review_lkg"], 0)
+                self.assertEqual(self.dest.read_bytes(), before)
