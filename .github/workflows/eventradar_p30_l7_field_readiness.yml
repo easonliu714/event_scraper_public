@@ -1647,7 +1647,7 @@ jobs:
           import json
           from pathlib import Path
           d=json.loads(Path('evidence/accupass_native_once.json').read_text(encoding='utf-8'))
-          assert d['platform_id']=='06' and d['source_event_id']=='2606282259461938560271'
+          assert d['platform_id']=='02' and d['source_event_id']=='2606282259461938560271'
           assert d['formal_accepted_fields']==d['golden']==d['published']==0
           assert d['native_same_id_lkg']==0 and d['raw_html_saved'] is False
           assert d['release_state']=='HARD_HOLD_NO_PUBLICATION'
