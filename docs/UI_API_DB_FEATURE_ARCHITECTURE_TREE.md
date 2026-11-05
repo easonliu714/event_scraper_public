@@ -7289,3 +7289,6 @@ Formal release state
 ```
 
 **Architecture decision:** Zepp is a distinct New Taipei venue discovery source, not a duplicate formal 19-platform record. The source-local `rid=166457` is a venue schedule identity, not a KKTIX ticket event ID or Session. The first native Gate remains pending, and robots-policy uncertainty must fail closed. Preserve existing TMC/TPAC/Songshan HOLD without retrying consumed probes. Do not promote public indexed observations, offline tests, or CI success to independently accepted FIELD or Golden.
+
+
+**2026-11-05 23:08 A field-role cross-source indexed readback:** [TPAC official program/2088](https://tpac.org.taipei/program/2088) renders exact title/direct OPENTIX event link, twelve performance timestamps, a `場地` label without adjacent value and recommended age 6+. [OPENTIX official event 2072516129034670080](https://www.opentix.life/event/2072516129034670080) independently renders exact title, `臺北表演藝術中心 藍盒子` as its own ticket event venue, and age 7+. Preserve `TPAC_HALL_MISSING`, `CROSS_SOURCE_VENUE_PROVENANCE_SEPARATE`, `AGE_ROLE_CONFLICT_HOLD`, `MULTI_SESSION_NOT_FLATTENED`. Indexed web reads are **not** native byte receipts; no formal FIELD, LKG, Golden or Published promotion.
