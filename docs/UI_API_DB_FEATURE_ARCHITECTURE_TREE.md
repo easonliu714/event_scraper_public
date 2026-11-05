@@ -7169,3 +7169,39 @@ NEXT A independent source ownership/freshness and SHOW/HALL conflict contract; N
 - **Metrics correctness repair:** same existing Draft #236 exact HEAD `3d225a5154a175e184addf7d0b9aa514a91b9d7d` records native HTTP200 separately from accepted bounded body, uses `prefix_sha256` for oversized/truncated data, and preserves exact root cause. [CI #41997936719](https://github.com/easonliu714/event_scraper_public/actions/runs/41997936719) SUCCESS, job `127145642107`, artifact `13401052396` digest `sha256:bf3344403854b0717a2fa180f90ab2b64b60bc645225f5d3b24469fe7038c2e3`. This correction CI did **not** reissue native GET; latest commit native new GET=0. A actual first probe HTTP200 +1, bounded valid body 0, identity 0, LKG 0, formal FIELD 0.
 - **B:** canonical Songshan #14 second UUID `3b2101fd-cbb3-48ec-b23c-496880df5626` previous native LIST/DETAIL HTTP200 **2/2**, first `SONGSHAN_DETAIL_EXACT_HEADING_HOLD:h1=0,h2=0,h3=0`, native identity/LKG 0; prior native one-shot consumed. Existing unique OG-title+canonical parser alternative remains **offline-only** until genuine source bytes support it; no reGET. Buyer-only 11/06 and public 11/07–08 remain separate roles. B current new GET=0, identity=0, LKG=0.
 - **Release invariants:** accepted FIELD/Golden/Published/feed **0/0/0/0**; `HARD_HOLD_NO_PUBLICATION`, 19-platform baseline, L8 Android 5/5 and CKSMH5/TWTC39 historical PASS preserved. Formal Pages HTTP runtime UNVERIFIED. Next A: investigate source-size/streaming event-local DOM under a separately authorized new hypothesis, not a blind repeat; B: rotate to another deduplicated Taipei/New Taipei canonical source or inspect pre-existing lawful Songshan source bytes. Owner action **none** for isolated engineering; independent status-only Merge/Pages requires explicit Owner approval.
+
+---
+
+### P30-L7 A/B reusable source receipt and size root-cause integration — 2026-11-05 17:56 (NO PUBLISH)
+
+```text
+Engineering Draft #236 HEAD b8cf3757598be1d43e38bcb493d16ec89f3b9c3d
+  scripts/p30_l7_field_golden_readiness.py (existing REVIEW / CAS / LKG core)
+    + scripts/p30_source_stream_gate.py (NEW; offline CLI, no HTTP)
+      inspect_tpac_complete_stream(caller_stream, source receipt)
+        -> exact TPAC program/2088 / OPENTIX event 2072516129034670080
+        -> <=4 MiB streaming UTF-8, full SHA only after EOF
+        -> title / direct event href / venue room MAIN-local role REVIEW
+        -> missing/oversize/redirect/conflict => HOLD; never formal field
+      audit_songshan_prior_native_receipt(historical_report)
+        -> canonical #14 second UUID, prior LIST/DETAIL 2x HTTP200 receipts
+        -> preserve first DETAIL heading HOLD, native identity/LKG=0
+        -> replay native GET=0; no new acquisition, no publication
+    + tests/p30/test_p30_source_stream_gate.py (5 offline tests)
+    + .github/workflows/eventradar_p30_l7_field_readiness.yml
+      -> six exact changed files; 19-platform/formal data/status/UI immutable
+      -> 133 old + 5 new tests; SHA manifest artifact
+      -> one-shot GET markers NOT set / native requests skipped
+  CI #42006499468 SUCCESS
+  artifact #13404089432 sha256:33f41e5dffc86deccfce8b6ef47a2204bc64cebe14f706e6305c14312c76d19a
+  A new native GET/identity/LKG/accepted FIELD = 0/0/0/0
+  B new native GET/identity/LKG/accepted FIELD = 0/0/0/0
+  historical B native GET=2 HTTP200; identity heading failure still HOLD
+  formal Golden/Published=0/0, HARD_HOLD_NO_PUBLICATION
+  Source main data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+  Source main status blob 99cae0571e36e52dac360b6935c0c09f6f6bed3f
+  Existing status-only Draft #237 prepared, NOT MERGED
+  L8 Android 5/5 + CKSMH5/TWTC39 historic PASS preserved
+```
+
+**Architecture limitation:** The new stream parser is a bounded replay component for a new size/DOM hypothesis; it has not observed a complete native TPAC page. Historical capped 524289-byte prefix is not a full-body hash. The Songshan prior-receipt audit does not reconstruct discarded HTML, prove SEO metadata, or promote an official field. Next work must verify actual event-local DOM with a lawful fresh hypothesis or rotate source; never repeat consumed one-shot probes. Formal PWA HTTP runtime remains UNVERIFIED; Owner authorization required only for separate status-only release.
