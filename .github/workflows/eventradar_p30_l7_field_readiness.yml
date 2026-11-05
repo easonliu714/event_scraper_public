@@ -1692,7 +1692,7 @@ jobs:
             exit 0
           fi
           mkdir -p evidence
-          python scripts/p30_cloudgate_native_gate.py > evidence/cloudgate_native_once.json
+          python -m scripts.p30_cloudgate_native_gate > evidence/cloudgate_native_once.json
           python - <<'PY'
           import json
           from pathlib import Path
