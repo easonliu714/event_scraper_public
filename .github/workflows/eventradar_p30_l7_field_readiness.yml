@@ -1549,6 +1549,48 @@ jobs:
               'first_failure':d['first_failure'],
               'native_same_id_lkg':0,'formal_field':0,'golden':0,'published':0}))
           PY
+      - name: One-shot B Zepp New Taipei exact rid native source rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New canonical New Taipei venue, NOT a formal platform.
+          # Single-use commit marker, first CI attempt only.
+          if [ "${{ github.run_attempt }}" != "1" ] || ! git log -1 --format=%s | grep -Fq '[zepp-native-once]'; then
+            echo 'ZEPP_NATIVE_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          set +e
+          python scripts/p30_source_stream_gate.py --zepp-native-once > evidence/zepp_newtaipei_native_once.json
+          gate_rc=$?
+          set -e
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 49 ]; then
+            echo "ZEPP_NATIVE_UNEXPECTED_EXIT=$gate_rc"
+            exit "$gate_rc"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/zepp_newtaipei_native_once.json').read_text(encoding='utf-8'))
+          assert d['kind']=='P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1'
+          assert d['line']=='B' and d['source_key']=='venue:zepp-newtaipei'
+          assert d['source_event_id']=='166457'
+          assert 1 <= d['native_get_attempted'] <= 2
+          assert d['native_list_get_attempted']==1
+          assert d['native_detail_get_attempted'] <= 1
+          assert d['native_http200'] <= d['native_get_attempted']
+          assert d['same_id_review_lkg']==0
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert all(r['url'] in (
+              'https://www.zepp.co.jp/hall/newtaipei/',
+              'https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457'
+          ) for r in d['source_receipts'])
+          print('ZEPP_NATIVE_ONESHOT',json.dumps({
+              'attempted':d['native_get_attempted'],'http200':d['native_http200'],
+              'same_id_review':d['native_same_id_review'],
+              'same_id_lkg':0,'first_failure':d['first_failure']}))
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1558,6 +1600,7 @@ jobs:
           printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce > evidence/readiness.txt
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/zepp_newtaipei_native_once.json ]; then sha256sum evidence/zepp_newtaipei_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi
