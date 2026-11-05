@@ -1200,30 +1200,59 @@ jobs:
           Path('evidence/native_authority_identity_hypothesis.json').write_text(
               json.dumps(out,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           PY
-      - name: One-shot canonical Songshan UUID LIST to DETAIL review LKG (NO PUBLISH)
+      - name: One-shot B Songshan SECOND official UUID bounded LIST DETAIL (NO PUBLISH)
+        if: github.run_attempt == 1
         shell: bash
         run: |
           set -euo pipefail
-          if ! git log -1 --format=%s | grep -Fq '[songshan-source-probe-once]'; then
-            echo 'SONGSHAN_NATIVE_SKIPPED_NO_ONE_SHOT_MARKER'
+          # Only this exact commit authorizes one normal GET per two public URLs.
+          # A rerun or later unrelated commit must never repeat this probe.
+          if ! git log -1 --format=%s | grep -Fq '[songshan-second-uuid-once]'; then
+            echo 'SONGSHAN_SECOND_UUID_SKIPPED_NO_ONE_SHOT_MARKER'
             exit 0
           fi
           mkdir -p evidence
           python - <<'PY'
-          import json,tempfile
+          import datetime, hashlib, json, shutil, tempfile
           from pathlib import Path
           from scripts.p30_l7_field_golden_readiness import run_songshan_uuid_review_lkg
-          with tempfile.TemporaryDirectory(prefix='eventradar_songshan_review_') as tmp:
+          uuid = '3b2101fd-cbb3-48ec-b23c-496880df5626'
+          title = 'STAR ON THE MOVE 2026 臺北採購媒合與展售會'
+          with tempfile.TemporaryDirectory(prefix='eventradar_songshan_second_uuid_') as tmp:
+              isolated = Path(tmp) / 'review_lkg_snapshot.json'
               result = run_songshan_uuid_review_lkg(
-                  Path(tmp) / 'review_lkg_snapshot.json', Path.cwd(),
-                  network_authorized=True,
-                  source_hypothesis='Canonical Songshan platform14 LIST card exact UUID to DETAIL H1')
+                  isolated, Path.cwd(), network_authorized=True,
+                  source_hypothesis='New indexed official Songshan second UUID exact LIST card and DETAIL title ownership',
+                  event_uuid=uuid, event_title=title, event_type='展覽')
+              if result.get('persisted') is True:
+                  assert result.get('official_uuid') == uuid
+                  sealed = json.loads(isolated.read_text(encoding='utf-8'))
+                  assert sealed['rows'][0]['_candidate']['source_event_id'] == uuid
+                  assert sealed['rows'][0]['title'] == title
+                  assert sealed['rows'][0]['_candidate']['formal_field_pass'] is False
+                  assert sealed['rows'][0]['_candidate']['published'] is False
+                  assert sealed['last_known_good_sha256'] == result['lkg_sha256']
+                  shutil.copyfile(isolated, 'evidence/songshan_second_uuid_isolated_review_lkg.json')
+                  result['isolated_artifact_sha256'] = hashlib.sha256(
+                      Path('evidence/songshan_second_uuid_isolated_review_lkg.json').read_bytes()
+                  ).hexdigest()
+          result['target_uuid'] = uuid
+          result['expected_event_title'] = title
+          result['audit_recorded_at_utc'] = datetime.datetime.now(
+              datetime.timezone.utc).isoformat()
+          result['source_role_policy'] = {
+              'event_period': '2026-11-06..2026-11-08:INDEXED_REVIEW_ONLY',
+              'buyer_only_day': '2026-11-06:INVITATION_ONLY_NOT_PUBLIC_SESSION',
+              'public_hours': '2026-11-07..08 11:00-20:00:INDEXED_REVIEW_ONLY',
+              'venue': '北向製菸工廠:INDEXED_REVIEW_ONLY',
+              'native_independent_field_authority': False,
+          }
           assert result['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
           assert result['formal_accepted_fields'] == result['golden_accepted_events'] == result['published_events'] == 0
-          Path('evidence/native_songshan_rotation.json').write_text(
+          Path('evidence/native_songshan_second_uuid.json').write_text(
               json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
               encoding='utf-8')
-          print('SONGSHAN_NATIVE_ROTATION',result['decision'],
+          print('SONGSHAN_SECOND_UUID_NATIVE',result['decision'],
                 'http200',result['native_get_200_count'],
                 'same_uuid_lkg',result['same_uuid_review_lkg'],
                 'first_failure',result.get('reason','NONE'),flush=True)
@@ -1373,7 +1402,8 @@ jobs:
           if [ -f evidence/native_huashan_rotation.json ]; then sha256sum evidence/native_huashan_rotation.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_huashan_field_roles.json ]; then sha256sum evidence/native_huashan_field_roles.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_authority_identity_hypothesis.json ]; then sha256sum evidence/native_authority_identity_hypothesis.json >> evidence/SHA256SUMS.txt; fi
-          if [ -f evidence/native_songshan_rotation.json ]; then sha256sum evidence/native_songshan_rotation.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_songshan_second_uuid.json ]; then sha256sum evidence/native_songshan_second_uuid.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/songshan_second_uuid_isolated_review_lkg.json ]; then sha256sum evidence/songshan_second_uuid_isolated_review_lkg.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_cksmh_session_roles.json ]; then sha256sum evidence/native_cksmh_session_roles.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_huashan_home_date.json ]; then sha256sum evidence/native_huashan_home_date.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
