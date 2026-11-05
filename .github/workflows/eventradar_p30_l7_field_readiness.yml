@@ -26,7 +26,7 @@ jobs:
           base=d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'scripts/p30_source_stream_gate.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_source_stream_gate.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'scripts/p30_source_stream_gate.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_source_stream_gate.py' 'scripts/p30_accupass_native_gate.py' 'tests/p30/test_p30_accupass_native_gate.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
           git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
@@ -42,9 +42,10 @@ jobs:
           PY
       - name: Source-bound acceptance contract and negative tests
         run: |
-          python -m py_compile scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py
+          python -m py_compile scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py tests/p30/test_p30_accupass_native_gate.py
           python -m unittest discover -s tests/p30 -p 'test_p30_l7_field_golden_readiness.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_source_stream_gate.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_accupass_native_gate.py' -v
           python scripts/p30_l7_field_golden_readiness.py
       - name: One-shot bounded official native GET acquisition diagnosis (not Golden)
         shell: bash
@@ -1631,17 +1632,44 @@ jobs:
               'http200':d['native_http200'],'decision':d['decision'],
               'first_failure':d['first_failure'],'same_id_lkg':0}))
           PY
+      - name: One-shot A ACCUPASS distinct public LIST same-ID DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New event selected from public ACCUPASS search; only once on exact marker.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[accupass-native-once]'; then
+            echo 'ACCUPASS_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python scripts/p30_accupass_native_gate.py > evidence/accupass_native_once.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/accupass_native_once.json').read_text(encoding='utf-8'))
+          assert d['platform_id']=='06' and d['source_event_id']=='2606282259461938560271'
+          assert d['formal_accepted_fields']==d['golden']==d['published']==0
+          assert d['native_same_id_lkg']==0 and d['raw_html_saved'] is False
+          assert d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert len(d['source_receipts']) <= 2
+          print('ACCUPASS_NATIVE',json.dumps({
+              'attempted':d['native_get_attempted'],'http200':d['native_http200'],
+              'list':d['native_list'],'detail':d['native_detail'],
+              'same_id_review':d['native_same_id_review'],
+              'first_failure':d['first_failure']}))
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p evidence
-          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
+          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_accupass_native_gate.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
           printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce > evidence/readiness.txt
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/zepp_newtaipei_native_once.json ]; then sha256sum evidence/zepp_newtaipei_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/opentix_fresh_detail_native_once.json ]; then sha256sum evidence/opentix_fresh_detail_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/accupass_native_once.json ]; then sha256sum evidence/accupass_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi
