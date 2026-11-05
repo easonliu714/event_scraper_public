@@ -87,5 +87,51 @@ class TestSourceStreamGate(unittest.TestCase):
                          "HOLD")
 
 
+    def test_native_single_get_complete_body_and_no_checkout(self):
+        from unittest.mock import patch
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/html; charset=utf-8"}
+            def geturl(self):
+                return m.TPAC_URL
+        class Opener:
+            calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                self.url = req.full_url
+                self.timeout = timeout
+                return Response(self_payload)
+        self_payload = self.large
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.acquire_tpac_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(opener.url, m.TPAC_URL)
+        self.assertEqual(opener.timeout, 8)
+        self.assertEqual(result["native_http200_this_call"], 1)
+        self.assertEqual(result["body_sha256"], hashlib.sha256(self.large).hexdigest())
+        self.assertEqual(result["decision"], "REVIEW_DIRECT_EDGE_ONLY")
+        self.assertEqual(result["native_same_id_lkg"], 0)
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["published_events"], 0)
+
+    def test_native_one_shot_http_redirect_is_not_followed(self):
+        import urllib.error
+        from unittest.mock import patch
+        class Opener:
+            calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                raise urllib.error.HTTPError(req.full_url, 302, "redirect", {}, None)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.acquire_tpac_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(result["first_failure"], "TPAC_REDIRECT_BLOCKED_HOLD")
+        self.assertEqual(result["native_http200_this_call"], 0)
+        self.assertNotIn("body_sha256", result)
+
+
+
 if __name__ == "__main__":
     unittest.main()
