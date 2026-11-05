@@ -2388,6 +2388,29 @@ class TestSongshanCanonicalUUIDRotation(unittest.TestCase):
         self.assertEqual(result["same_uuid_review_lkg"], 1)
         self.assertEqual(result["formal_accepted_fields"], 0)
 
+    def test_headingless_exact_seo_title_canonical_uuid_review_only(self):
+        # A strict alternate native-detail identity hypothesis; REVIEW only.
+        detail = ('<head><meta property="og:title" content="' + self.title +
+                  '"><link rel="canonical" href="' +
+                  m.SONGSHAN_PUBLIC_DETAIL + '"></head><main><p>活動資訊</p></main>')
+        out = self.run_source(detail=detail)
+        self.assertEqual(out["same_uuid_review_lkg"], 1, out)
+        self.assertEqual(out["native_get_200_count"], 0)
+        self.assertEqual(out["formal_accepted_fields"], 0)
+
+    def test_headingless_seo_wrong_uuid_or_duplicate_title_fail_closed(self):
+        valid = ('<head><meta property="og:title" content="' + self.title +
+                 '"><link rel="canonical" href="' +
+                 m.SONGSHAN_PUBLIC_DETAIL + '"></head><main>活動資訊</main>')
+        for bad in (valid.replace(m.SONGSHAN_EVENT_UUID, self.other),
+                    valid.replace('<meta property="og:title"',
+                                  '<meta property="og:title" content="其他活動"><meta property="og:title"'),
+                    '<main><p>' + self.title + '</p></main>'):
+            with self.subTest(detail=bad):
+                out = self.run_source(detail=bad)
+                self.assertEqual(out["same_uuid_review_lkg"], 0)
+                self.assertFalse(self.dest.exists())
+
     def test_duplicate_h3_heading_remains_fail_closed(self):
         detail = ('<main><h2>' + self.title + '</h2><h3>' +
                   self.title + '</h3></main>')
@@ -3049,7 +3072,7 @@ class TestOpentixCanonicalTicketRotation(unittest.TestCase):
             m.OPENTIX_ROTATION_LIST: self.listing if listing is None else listing,
             m.OPENTIX_ROTATION_DETAIL: self.detail if detail is None else detail}
         return {url: (200, "text/html; charset=utf-8",
-                      html.encode("utf-8"), url) for url, html in pages.items()}
+                      html.encode("utf-8"), url, self.now.isoformat()) for url, html in pages.items()}
 
     def test_exact_list_detail_event_and_venue_to_sealed_review(self):
         out = m.run_opentix_existing_id_review_lkg(
@@ -3079,6 +3102,26 @@ class TestOpentixCanonicalTicketRotation(unittest.TestCase):
             with self.subTest(bodies=list(bodies)):
                 out = m.run_opentix_existing_id_review_lkg(
                     self.dest, ROOT, source_bodies=bodies, now_utc=self.now)
+                self.assertEqual(out["same_id_review_lkg"], 0)
+                self.assertFalse(self.dest.exists())
+
+    def test_original_observation_time_prevents_freshness_laundering(self):
+        from datetime import timedelta
+        good = self.bodies()
+        cases = []
+        url = m.OPENTIX_ROTATION_DETAIL
+        for offset in (timedelta(days=2), -timedelta(seconds=1),
+                       timedelta(minutes=11)):
+            pages = dict(good)
+            pages[url] = (*good[url][:4], (self.now - offset).isoformat())
+            cases.append(pages)
+        missing = dict(good)
+        missing[url] = good[url][:4]
+        cases.append(missing)
+        for pages in cases:
+            with self.subTest(observed=pages[url][-1]):
+                out = m.run_opentix_existing_id_review_lkg(
+                    self.dest, ROOT, source_bodies=pages, now_utc=self.now)
                 self.assertEqual(out["same_id_review_lkg"], 0)
                 self.assertFalse(self.dest.exists())
 
