@@ -827,6 +827,210 @@ def probe_opentix_fresh_detail_native_once():
     return out
 
 
+
+# A sealed GitHub CI artifact authenticates a PRIOR native observation; it is
+# NOT the original HTML, a new GET, a body-reparsed event, or a formal field.
+ZEPP_PRIOR_ARTIFACT_SHA256 = "6dc82ab41c1599a841c950d7416f27c310439b5360a69d758ebca52ae51cc58e"
+ZEPP_PRIOR_RECEIPT_SHA256 = "d00bd5a0c1e87dd9c141f7ae69d8c8b9f167c0207f4c11d0f4c6e3a8fbfb6656"
+
+
+def audit_zepp_sealed_receipt_archive(archive_bytes, expected_artifact_sha256):
+    """Validate all packaged evidence and exact native receipt, without HTTP.
+
+    expected_artifact_sha256 is an explicit trust root. Only the durable
+    handoff below is permitted to use the pinned, independently read-back
+    production artifact digest. This audit function is also unit-testable.
+    """
+    import io
+    import zipfile
+    if (not isinstance(archive_bytes, bytes) or
+            not 0 < len(archive_bytes) <= 131072 or
+            not isinstance(expected_artifact_sha256, str) or
+            re.fullmatch(r"[0-9a-f]{64}", expected_artifact_sha256) is None or
+            hashlib.sha256(archive_bytes).hexdigest() != expected_artifact_sha256):
+        raise ValueError("ZEPP_ARTIFACT_EXACT_SHA_HOLD")
+    evidence = {
+        "readiness.txt", "field_subset_review_proposal.json",
+        "tmc_field_authority_contract.json",
+        "canonical_field_authority_contract.json",
+        "zepp_newtaipei_native_once.json"}
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as z:
+        names = z.namelist()
+        if (len(names) != 6 or len(set(names)) != 6 or
+                set(names) != evidence | {"SHA256SUMS.txt"} or
+                any(z.getinfo(name).file_size > 16384 for name in names) or
+                z.testzip() is not None):
+            raise ValueError("ZEPP_ARTIFACT_MEMBERS_CRC_HOLD")
+        manifest = z.read("SHA256SUMS.txt").decode("ascii", errors="strict")
+        lines = [line.split("  ", 1) for line in manifest.splitlines()]
+        if (len(lines) != 11 or any(len(pair) != 2 for pair in lines)
+                or len({pair[1] for pair in lines}) != 11):
+            raise ValueError("ZEPP_ARTIFACT_MANIFEST_SHAPE_HOLD")
+        packaged = {}
+        for digest, name in lines:
+            if re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise ValueError("ZEPP_ARTIFACT_MANIFEST_SHA_HOLD")
+            if name.startswith("evidence/"):
+                flat = name.removeprefix("evidence/")
+                if flat not in evidence:
+                    raise ValueError("ZEPP_ARTIFACT_UNKNOWN_EVIDENCE_HOLD")
+                packaged[flat] = digest
+        if set(packaged) != evidence or any(
+                hashlib.sha256(z.read(name)).hexdigest() != packaged[name]
+                for name in evidence):
+            raise ValueError("ZEPP_ARTIFACT_EVIDENCE_SHA_HOLD")
+        raw = z.read("zepp_newtaipei_native_once.json")
+    receipt_sha = hashlib.sha256(raw).hexdigest()
+    if receipt_sha != ZEPP_PRIOR_RECEIPT_SHA256 and (
+            expected_artifact_sha256 == ZEPP_PRIOR_ARTIFACT_SHA256):
+        raise ValueError("ZEPP_PINNED_RECEIPT_SHA_HOLD")
+    receipt = json.loads(raw)
+    if (not isinstance(receipt, dict)
+            or receipt.get("kind") != "P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1"
+            or receipt.get("line") != "B"
+            or receipt.get("source_key") != ZEPP_SOURCE_KEY
+            or receipt.get("source_event_id") != "166457"
+            or receipt.get("policy_decision") != "ALLOW_ROBOTS_200"
+            or receipt.get("native_get_attempted") != 2
+            or receipt.get("native_http200") != 2
+            or receipt.get("native_list_get_attempted") != 1
+            or receipt.get("native_detail_get_attempted") != 1
+            or receipt.get("native_same_id_review") != 1
+            or receipt.get("same_id_review_lkg") != 0
+            or receipt.get("decision") != "REVIEW_NATIVE_SAME_ID_ONLY"
+            or receipt.get("raw_html_saved") is not False
+            or receipt.get("formal_accepted_fields") != 0
+            or receipt.get("golden_accepted_events") != 0
+            or receipt.get("published_events") != 0
+            or receipt.get("release_state") != "HARD_HOLD_NO_PUBLICATION"):
+        raise ValueError("ZEPP_NATIVE_RECEIPT_AUTHORITY_HOLD")
+    checks = receipt.get("identity_checks")
+    if (not isinstance(checks, dict)
+            or checks.get("exact_rid") != "166457"
+            or checks.get("title") != ZEPP_TITLE
+            or checks.get("source_key") != ZEPP_SOURCE_KEY
+            or checks.get("list_exact_edge_count") != 1
+            or checks.get("detail_exact_heading_count") != 1
+            or checks.get("date_role") != "UNVERIFIED_NOT_SESSION"
+            or checks.get("start_role") != "UNVERIFIED_NOT_SESSION"):
+        raise ValueError("ZEPP_NATIVE_SAME_RID_IDENTITY_HOLD")
+    sources = receipt.get("source_receipts")
+    if not isinstance(sources, list) or len(sources) != 2:
+        raise ValueError("ZEPP_NATIVE_RECEIPT_PAIR_HOLD")
+    expected = (
+        (ZEPP_LIST, 343607, "1632f6235bc4a9365c2569697e50f2612e4165dfabee16bc4134f6fddbd497bf"),
+        (ZEPP_DETAIL, 310512, "66750b7e3f39e7ec84c4de2b630517b9c39d4171bc305d7c0f7ca72e732aa67d"))
+    from datetime import datetime, timezone
+    for item, (url, count, sha) in zip(sources, expected):
+        if (not isinstance(item, dict) or item.get("url") != url
+                or item.get("body_bytes_read") != count
+                or item.get("body_sha256") != sha
+                or item.get("http_status") != 200
+                or item.get("transport") != "BUILTIN_NATIVE_GET_NO_REDIRECT_NO_RETRY"):
+            raise ValueError("ZEPP_NATIVE_SOURCE_RECEIPT_HOLD")
+        try:
+            stamp = datetime.fromisoformat(item["observed_at_utc"].replace("Z", "+00:00"))
+        except (TypeError, KeyError, ValueError, AttributeError) as exc:
+            raise ValueError("ZEPP_NATIVE_OBSERVATION_CLOCK_HOLD") from exc
+        if stamp.utcoffset() is None or stamp.astimezone(timezone.utc).year != 2026:
+            raise ValueError("ZEPP_NATIVE_OBSERVATION_CLOCK_HOLD")
+    return {
+        "kind": "P30_B_ZEPP_RECEIPT_IDENTITY_LKG_V1",
+        "decision": "RECEIPT_ONLY_IDENTITY_REVIEW_NOT_BODY_REPLAY",
+        "source_key": ZEPP_SOURCE_KEY,
+        "source_event_id": "166457",
+        "title": ZEPP_TITLE,
+        "source_receipts": sources,
+        "source_receipt_sha256": receipt_sha,
+        "artifact_sha256": expected_artifact_sha256,
+        "historical_native_http200": 2,
+        "historical_native_same_id_review": 1,
+        "native_get_this_call": 0,
+        "native_same_id_review_this_call": 0,
+        "receipt_only_identity_lkg": 1,
+        "same_id_review_lkg": 0,
+        "formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "raw_html_saved": False,
+        "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+
+def persist_zepp_receipt_identity_lkg(archive_bytes, destination, repo_root,
+                                      expected_previous_sha256=None):
+    """Pinned prior-artifact handoff; separate from the body-based REVIEW LKG.
+
+    Exact isolated path, full-envelope CAS, exclusive lock and atomic fsync.
+    Never creates a formal event row or upgrades prior native observations.
+    """
+    import os
+    import tempfile
+    target = Path(destination)
+    root = Path(repo_root).resolve(strict=True)
+    if (target.name != "zepp_receipt_identity_lkg.json"
+            or any(part.is_symlink() for part in (target, *target.parents))
+            or not target.parent.is_dir()):
+        raise ValueError("ZEPP_RECEIPT_ISOLATED_PATH_HOLD")
+    parent = target.parent.resolve(strict=True)
+    if parent == root or root in parent.parents:
+        raise ValueError("ZEPP_RECEIPT_REPOSITORY_PATH_HOLD")
+    snapshot = audit_zepp_sealed_receipt_archive(
+        archive_bytes, ZEPP_PRIOR_ARTIFACT_SHA256)
+    digest = hashlib.sha256(json.dumps(
+        snapshot, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+        allow_nan=False).encode("utf-8")).hexdigest()
+    lock = target.with_name(target.name + ".lock")
+    lock_fd, temp_path = None, None
+    try:
+        lock_fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        if target.exists():
+            prior_bytes = target.read_bytes()
+            if len(prior_bytes) > 32768:
+                raise ValueError("ZEPP_RECEIPT_PRIOR_SIZE_HOLD")
+            prior = json.loads(prior_bytes)
+            if (set(prior) != {"kind", "snapshot", "sha256"}
+                    or prior["kind"] != "P30_B_ZEPP_DURABLE_RECEIPT_LKG_V1"
+                    or prior["sha256"] != hashlib.sha256(json.dumps(
+                        prior["snapshot"], sort_keys=True, ensure_ascii=False,
+                        separators=(",", ":"), allow_nan=False
+                    ).encode("utf-8")).hexdigest()):
+                raise ValueError("ZEPP_RECEIPT_PRIOR_ENVELOPE_HOLD")
+            if prior["sha256"] == digest:
+                return {"persisted": False, "idempotent": True,
+                        "snapshot_sha256": digest, "receipt_only_identity_lkg": 1}
+            if prior["sha256"] != expected_previous_sha256:
+                raise ValueError("ZEPP_RECEIPT_FULL_ENVELOPE_CAS_HOLD")
+        elif expected_previous_sha256 is not None:
+            raise ValueError("ZEPP_RECEIPT_MISSING_PRIOR_CAS_HOLD")
+        envelope = {"kind": "P30_B_ZEPP_DURABLE_RECEIPT_LKG_V1",
+                    "snapshot": snapshot, "sha256": digest}
+        data = (json.dumps(envelope, ensure_ascii=False, sort_keys=True,
+                           separators=(",", ":"), allow_nan=False) + "\n").encode()
+        fd, temp_path = tempfile.mkstemp(prefix=".zepp_receipt.", suffix=".tmp",
+                                         dir=str(parent))
+        with os.fdopen(fd, "wb") as output:
+            output.write(data)
+            output.flush()
+            os.fsync(output.fileno())
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, target)
+        temp_path = None
+        if os.name == "posix":
+            directory_fd = os.open(parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        return {"persisted": True, "idempotent": False,
+                "snapshot_sha256": digest, "receipt_only_identity_lkg": 1}
+    finally:
+        if temp_path is not None:
+            os.unlink(temp_path)
+        if lock_fd is not None:
+            os.close(lock_fd)
+            os.unlink(lock)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
