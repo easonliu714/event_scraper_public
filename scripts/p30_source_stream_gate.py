@@ -549,6 +549,8 @@ def probe_zepp_newtaipei_native_once():
                     "Accept-Encoding": "identity"})
             with opener.open(request, timeout=8) as response:
                 receipt["http_status"] = response.status
+                if response.status == 200:
+                    result["native_http200"] += 1
                 if response.status != 200 or response.geturl() != url:
                     raise ValueError("ZEPP_STATUS_OR_REDIRECT_HOLD")
                 mime = response.headers.get("Content-Type", "")
@@ -564,7 +566,6 @@ def probe_zepp_newtaipei_native_once():
                 if not 0 < len(body) <= ZEPP_MAX_BYTES:
                     raise ValueError("ZEPP_EMPTY_OR_TRUNCATED_BODY_HOLD")
                 receipt["body_sha256"] = hashlib.sha256(body).hexdigest()
-                result["native_http200"] += 1
                 bodies.append(body)
         except urllib.error.HTTPError as exc:
             receipt["http_status"] = exc.code
