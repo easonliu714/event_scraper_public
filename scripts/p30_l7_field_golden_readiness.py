@@ -4130,7 +4130,7 @@ def assess_tmc_huashan_fixed_nonpublishing_gate(tmc_snapshot=None,
 # Pre-acquired bytes only: no implicit GET, no checkout, no synthetic-native claim.
 # Parse and verify event-local field semantics BEFORE touching the sealed LKG.
 def run_huashan_field_aware_review_lkg(destination, repo_root, *,
-                                       source_bodies, now_utc=None):
+                                       source_bodies, now_utc=None, homepage_response=None):
     """LIST -> exact DETAIL -> four source-owned roles -> atomic REVIEW LKG.
 
     source_bodies maps exactly the two allowlisted URLs to
@@ -4185,6 +4185,16 @@ def run_huashan_field_aware_review_lkg(destination, repo_root, *,
                 "body_bytes": len(raw),
                 "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
             })
+        # Optional independent official HOME card date authority is evaluated
+        # BEFORE atomic LKG. A conflict never replaces a previous good snapshot.
+        if homepage_response is not None:
+            home = inspect_huashan_homepage_same_path_date(
+                homepage_response, now.astimezone(timezone.utc).isoformat(),
+                now_utc=now)
+            result["home_date_authority"] = home
+            if home["decision"] != "REVIEW_SAME_DATE_NOT_FORMAL":
+                result["first_failure"] = home["first_failure"]
+                return result
         detail = decoded[HUASHAN_PUBLIC_DETAIL]
         observed = now.astimezone(timezone.utc).isoformat()
         field = adjudicate_huashan_detail_field_roles(
@@ -4293,3 +4303,127 @@ def run_tmc_field_aware_review_lkg(destination, repo_root, *,
     except (ValueError, TypeError, UnicodeError, OSError, TimeoutError) as exc:
         out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:120]
     return out
+
+
+# B / canonical Huashan #13: a previously untested official HOME surface can
+# disagree with the event LIST/DETAIL date. Check exact same-path card before
+# any optional isolated LKG update. Caller-supplied bytes are NEVER native proof.
+HUASHAN_PUBLIC_HOME = "https://www.huashan1914.com/"
+
+
+def inspect_huashan_homepage_same_path_date(home_response, observed_at_utc,
+                                            *, now_utc=None):
+    """Bounded exact official HOME card -> DETAIL URL date conflict; no GET/write."""
+    import hashlib
+    import re
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin
+    from datetime import timezone
+
+    out = {"kind": "P30_L7_HUASHAN_HOME_DETAIL_DATE_CONFLICT_V1",
+           "platform_id": "13", "home_url": HUASHAN_PUBLIC_HOME,
+           "detail_url": HUASHAN_PUBLIC_DETAIL, "decision": "HOLD_SOURCE",
+           "first_failure": "HUASHAN_HOME_RESPONSE_MISSING",
+           "home_event_date": None, "detail_event_date": "2026-11-07",
+           "native_get_this_call": 0, "formal_accepted_fields": 0,
+           "golden_accepted_events": 0, "published_events": 0,
+           "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    def hold(reason):
+        out["first_failure"] = reason
+        return out
+    if not isinstance(home_response, tuple) or len(home_response) != 4:
+        return hold("HUASHAN_HOME_RESPONSE_SHAPE_HOLD")
+    status, content_type, raw, final_url = home_response
+    if (type(status) is not int or status != 200
+            or final_url != HUASHAN_PUBLIC_HOME
+            or not isinstance(content_type, str)
+            or content_type.split(";", 1)[0].strip().lower() != "text/html"
+            or not isinstance(raw, bytes) or not 0 < len(raw) <= 524288):
+        return hold("HUASHAN_HOME_EXACT_HTTP_OR_BODY_HOLD")
+    params = [p.strip().lower() for p in content_type.split(";")[1:]]
+    if any(p.startswith("charset=") and
+           p.split("=", 1)[1].strip('"') != "utf-8" for p in params):
+        return hold("HUASHAN_HOME_CHARSET_HOLD")
+    try:
+        observed = datetime.fromisoformat(observed_at_utc.replace("Z", "+00:00"))
+        now = now_utc or datetime.now(timezone.utc)
+        if (observed.utcoffset() is None or now.utcoffset() is None or
+                not 0 <= (now - observed).total_seconds() <= 86400):
+            return hold("HUASHAN_HOME_FRESHNESS_HOLD")
+        html = raw.decode("utf-8", errors="strict")
+    except (ValueError, AttributeError, TypeError, UnicodeError):
+        return hold("HUASHAN_HOME_CLOCK_OR_UTF8_HOLD")
+    out["body_sha256"] = hashlib.sha256(raw).hexdigest()
+    out["body_bytes"] = len(raw)
+    out["observed_at_utc"] = observed_at_utc
+
+    class LocalCard(HTMLParser):
+        VOID = frozenset(("area", "base", "br", "col", "embed", "hr",
+                          "img", "input", "link", "meta", "param",
+                          "source", "track", "wbr"))
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.nodes = [{"tag": "root", "parent": None, "text": "",
+                           "href": None}]
+            self.stack = [0]
+        def handle_starttag(self, tag, attrs):
+            if len(self.nodes) > 16000 or len(self.stack) > 80:
+                raise ValueError("HUASHAN_HOME_DOM_BOUNDS_HOLD")
+            a = dict(attrs)
+            self.nodes.append({"tag": tag, "parent": self.stack[-1],
+                               "text": "", "href": a.get("href") if tag == "a" else None})
+            if tag not in self.VOID:
+                self.stack.append(len(self.nodes) - 1)
+        def handle_startendtag(self, tag, attrs):
+            self.handle_starttag(tag, attrs)
+            if tag not in self.VOID:
+                self.handle_endtag(tag)
+        def handle_data(self, value):
+            if self.nodes[self.stack[-1]]["tag"] not in ("script", "style", "noscript"):
+                self.nodes[self.stack[-1]]["text"] += value
+        def handle_endtag(self, tag):
+            for i in range(len(self.stack) - 1, 0, -1):
+                if self.nodes[self.stack[i]]["tag"] == tag:
+                    del self.stack[i:]
+                    return
+
+    parser = LocalCard()
+    try:
+        parser.feed(html)
+        texts = [node["text"] for node in parser.nodes]
+        for i in range(len(texts) - 1, 0, -1):
+            texts[parser.nodes[i]["parent"]] += " " + texts[i]
+        norm = lambda value: re.sub(r"\s+", " ", value).strip()
+        target = norm(HUASHAN_ROTATION_TITLE)
+        anchors = [i for i, node in enumerate(parser.nodes)
+                   if node["tag"] == "a" and node["href"] is not None
+                   and urljoin(HUASHAN_PUBLIC_HOME, node["href"]) == HUASHAN_PUBLIC_DETAIL
+                   and norm(texts[i]) == target]
+        out["exact_detail_anchor_count"] = len(anchors)
+        if len(anchors) != 1:
+            return hold("HUASHAN_HOME_EXACT_CARD_ANCHOR_IDENTITY_HOLD")
+        node = parser.nodes[anchors[0]]["parent"]
+        dates = None
+        for _ in range(5):
+            if node is None:
+                break
+            scope = norm(texts[node])
+            found = re.findall(r"(?<!\d)20\d{2}\.\d{2}\.\d{2}(?!\d)", scope)
+            if target in scope and len(found) == 2:
+                dates = found
+                break
+            node = parser.nodes[node]["parent"]
+        if dates is None:
+            return hold("HUASHAN_HOME_LOCAL_CARD_DATE_SCOPE_HOLD")
+        parsed = [datetime.strptime(x, "%Y.%m.%d").date().isoformat() for x in dates]
+        if parsed[0] != parsed[1]:
+            return hold("HUASHAN_HOME_MULTIDAY_CARD_NEEDS_RANGE_AUTHORITY_HOLD")
+        out["home_event_date"] = parsed[0]
+        if parsed[0] != out["detail_event_date"]:
+            out["decision"] = "HOLD_OFFICIAL_HOME_DETAIL_DATE_CONFLICT"
+            return hold("HUASHAN_OFFICIAL_HOME_LIST_DETAIL_DATE_CONFLICT")
+        out["decision"] = "REVIEW_SAME_DATE_NOT_FORMAL"
+        out["first_failure"] = "HUASHAN_INDEPENDENT_ID_AND_FIELD_AUTHORITY_STILL_HOLD"
+        return out
+    except (ValueError, TypeError, OverflowError) as exc:
+        return hold("HUASHAN_HOME_DOM_OR_DATE_HOLD:" + type(exc).__name__)

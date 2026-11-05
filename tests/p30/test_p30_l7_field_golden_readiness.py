@@ -2822,6 +2822,43 @@ class TestHuashanFieldAwareReusablePipeline(unittest.TestCase):
                 self.assertFalse(self.destination.exists())
 
 
+    def home(self, day="07", *, foreign=False):
+        href = "https://example.org/foreign" if foreign else m.HUASHAN_PUBLIC_DETAIL
+        html = ('<article><div>2026.11.' + day + ' - 2026.11.' + day +
+                '</div><a href="' + href + '">' +
+                m.HUASHAN_ROTATION_TITLE + '</a></article>')
+        return (200, "text/html; charset=utf-8", html.encode("utf-8"),
+                m.HUASHAN_PUBLIC_HOME)
+
+    def test_official_homepage_date_conflict_blocks_atomic_lkg(self):
+        before = self.run_pipeline(self.bodies())
+        self.assertEqual(before["same_path_review_lkg"], 1)
+        sealed = self.destination.read_bytes()
+        out = m.run_huashan_field_aware_review_lkg(
+            self.destination, ROOT, source_bodies=self.bodies(),
+            homepage_response=self.home("06"), now_utc=self.now)
+        self.assertEqual(out["same_path_review_lkg"], 0)
+        self.assertEqual(out["first_failure"],
+                         "HUASHAN_OFFICIAL_HOME_LIST_DETAIL_DATE_CONFLICT")
+        self.assertEqual(out["home_date_authority"]["home_event_date"],
+                         "2026-11-06")
+        self.assertEqual(self.destination.read_bytes(), sealed)
+        self.assertEqual(out["formal_accepted_fields"], 0)
+
+    def test_homepage_same_date_review_and_wrong_identity_hold(self):
+        good = m.inspect_huashan_homepage_same_path_date(
+            self.home("07"), self.now.isoformat(), now_utc=self.now)
+        self.assertEqual(good["decision"], "REVIEW_SAME_DATE_NOT_FORMAL")
+        self.assertEqual(good["formal_accepted_fields"], 0)
+        bad = m.run_huashan_field_aware_review_lkg(
+            self.destination, ROOT, source_bodies=self.bodies(),
+            homepage_response=self.home("07", foreign=True), now_utc=self.now)
+        self.assertEqual(bad["same_path_review_lkg"], 0)
+        self.assertEqual(bad["first_failure"],
+                         "HUASHAN_HOME_EXACT_CARD_ANCHOR_IDENTITY_HOLD")
+        self.assertFalse(self.destination.exists())
+
+
 class TestTmcFieldAwareReusablePipeline(unittest.TestCase):
     """A pre-acquired TMC pair uses existing L7 candidate and LKG, not GET."""
 

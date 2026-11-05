@@ -1303,6 +1303,54 @@ jobs:
                 'event_local_rows', report['review_session_roles'],
                 'first_failure', report['first_failure'], flush=True)
           PY
+      - name: One-shot B Huashan official HOME card vs sealed DETAIL date (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[huashan-home-conflict-once]'; then
+            echo 'HUASHAN_HOME_PROBE_SKIPPED_NO_NEW_HYPOTHESIS'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, json, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              HUASHAN_PUBLIC_HOME, inspect_huashan_homepage_same_path_date)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          out = {'kind': 'P30_L7_HUASHAN_ONE_SHOT_HOME_DATE_AUTHORITY_V1',
+                 'native_get_attempted': 1, 'native_http200': 0,
+                 'first_failure': 'HUASHAN_HOME_GET_NOT_COMPLETED',
+                 'decision': 'HOLD', 'formal_accepted_fields': 0,
+                 'golden_accepted_events': 0, 'published_events': 0,
+                 'release_state': 'HARD_HOLD_NO_PUBLICATION',
+                 'no_raw_html_saved': True}
+          try:
+              req = urllib.request.Request(
+                  HUASHAN_PUBLIC_HOME, method='GET',
+                  headers={'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                           'Accept':'text/html','Accept-Encoding':'identity'})
+              with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as res:
+                  raw = res.read(524289)
+                  payload = (res.status, res.headers.get('Content-Type',''),
+                             raw, res.geturl())
+              out['native_http200'] = int(payload[0] == 200)
+              parsed = inspect_huashan_homepage_same_path_date(
+                  payload, datetime.datetime.now(datetime.timezone.utc).isoformat())
+              out['home_date_gate'] = parsed
+              out['decision'] = parsed['decision']
+              out['first_failure'] = parsed['first_failure']
+          except Exception as exc:
+              out['first_failure'] = type(exc).__name__ + ':' + str(exc)[:140]
+          assert out['formal_accepted_fields'] == out['golden_accepted_events'] == out['published_events'] == 0
+          Path('evidence/native_huashan_home_date.json').write_text(
+              json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2)+'\n',
+              encoding='utf-8')
+          print('HUASHAN_HOME_DATE', out['native_http200'], out['decision'],
+                out['first_failure'], flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1327,6 +1375,7 @@ jobs:
           if [ -f evidence/native_authority_identity_hypothesis.json ]; then sha256sum evidence/native_authority_identity_hypothesis.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_songshan_rotation.json ]; then sha256sum evidence/native_songshan_rotation.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_cksmh_session_roles.json ]; then sha256sum evidence/native_cksmh_session_roles.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_huashan_home_date.json ]; then sha256sum evidence/native_huashan_home_date.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
