@@ -454,12 +454,17 @@ class ZeppLocalHTML(HTMLParser):
         self._anchor = None
         self._heading = None
         self._nodes = 0
+        # DETAIL heading must belong to the exact rid page's MAIN region;
+        # a matching global navigation/footer heading is not event identity.
+        self._main_level = 0
 
     def handle_starttag(self, tag, attrs):
         self._nodes += 1
         if self._nodes > 20000:
             raise ValueError("ZEPP_DOM_NODE_LIMIT_HOLD")
         attributes = dict(attrs)
+        if tag == "main":
+            self._main_level += 1
         if tag == "a":
             if self._anchor is not None:
                 raise ValueError("ZEPP_NESTED_ANCHOR_HOLD")
@@ -467,7 +472,7 @@ class ZeppLocalHTML(HTMLParser):
         if tag in ("h1", "h2", "h3"):
             if self._heading is not None:
                 raise ValueError("ZEPP_NESTED_HEADING_HOLD")
-            self._heading = [tag, []]
+            self._heading = [tag, [], self._main_level > 0]
 
     def handle_data(self, data):
         for current in (self._anchor, self._heading):
@@ -484,12 +489,37 @@ class ZeppLocalHTML(HTMLParser):
         if tag in ("h1", "h2", "h3") and self._heading is not None:
             if self._heading[0] != tag:
                 raise ValueError("ZEPP_HEADING_STRUCTURE_HOLD")
-            self.headings.append(" ".join("".join(self._heading[1]).split()))
+            if self._heading[2]:
+                self.headings.append(" ".join("".join(self._heading[1]).split()))
             self._heading = None
+        if tag == "main":
+            if self._main_level == 0:
+                raise ValueError("ZEPP_UNBALANCED_MAIN_HOLD")
+            self._main_level -= 1
 
 
-def inspect_zepp_same_id_pages(list_body, detail_body):
-    """Only source-owned exact rid+title identity; date/time are not accepted."""
+def inspect_zepp_same_id_pages(list_body, detail_body, *,
+                               detail_url=ZEPP_DETAIL, expected_title=ZEPP_TITLE):
+    """Reusable official venue same-rid LIST->DETAIL parser, REVIEW only.
+
+    No cross-event title joins, checkout, Session or accepted fields. Caller
+    must separately attest native transport and original body SHA/time.
+    """
+    from urllib.parse import parse_qsl
+    if (not isinstance(detail_url, str) or
+            not isinstance(expected_title, str) or
+            not 4 <= len(expected_title) <= 180 or
+            expected_title != expected_title.strip()):
+        raise ValueError("ZEPP_TARGET_IDENTITY_INPUT_HOLD")
+    parts = urlsplit(detail_url)
+    if (parts.scheme != "https" or parts.netloc != "www.zepp.co.jp" or
+            parts.path != "/hall/newtaipei/schedule/single/" or
+            parts.fragment or parts.username or parts.password):
+        raise ValueError("ZEPP_TARGET_EXACT_OFFICIAL_URL_HOLD")
+    params = parse_qsl(parts.query, keep_blank_values=True)
+    if (len(params) != 1 or params[0][0] != "rid" or
+            re.fullmatch(r"[1-9][0-9]{0,8}", params[0][1]) is None):
+        raise ValueError("ZEPP_TARGET_RID_QUERY_HOLD")
     if any(not isinstance(raw, bytes) or not 0 < len(raw) <= ZEPP_MAX_BYTES
            for raw in (list_body, detail_body)):
         raise ValueError("ZEPP_BODY_BOUND_HOLD")
@@ -497,15 +527,18 @@ def inspect_zepp_same_id_pages(list_body, detail_body):
     listing.feed(list_body.decode("utf-8", errors="strict"))
     detail.feed(detail_body.decode("utf-8", errors="strict"))
     exact_edges = [(href, title) for href, title in listing.anchors
-                   if urljoin(ZEPP_LIST, href) == ZEPP_DETAIL]
-    if len(exact_edges) != 1 or ZEPP_TITLE not in exact_edges[0][1]:
+                   if urljoin(ZEPP_LIST, href) == detail_url]
+    if (len(exact_edges) != 1 or
+            exact_edges[0][1].count(expected_title) != 1):
         raise ValueError("ZEPP_LIST_EXACT_RID_TITLE_EDGE_HOLD")
-    if detail.headings.count(ZEPP_TITLE) != 1:
+    if detail.headings.count(expected_title) != 1:
         raise ValueError("ZEPP_DETAIL_EVENT_LOCAL_HEADING_HOLD")
-    return {"exact_rid": "166457", "list_exact_edge_count": 1,
-            "detail_exact_heading_count": 1, "title": ZEPP_TITLE,
+    return {"exact_rid": params[0][1], "list_exact_edge_count": 1,
+            "detail_exact_heading_count": 1, "title": expected_title,
+            "source_key": ZEPP_SOURCE_KEY,
             "date_role": "UNVERIFIED_NOT_SESSION",
-            "start_role": "UNVERIFIED_NOT_SESSION"}
+            "start_role": "UNVERIFIED_NOT_SESSION",
+            "formal_accepted_fields": 0}
 
 
 def probe_zepp_newtaipei_native_once():
@@ -553,6 +586,11 @@ def probe_zepp_newtaipei_native_once():
                 raw_policy = response.read(65537)
                 if len(raw_policy) > 65536:
                     raise ValueError("ZEPP_ROBOTS_SIZE_HOLD")
+                # A policy verdict without the policy bytes' SHA cannot be
+                # independently audited; no raw robots file is persisted.
+                result["policy_observed_at_utc"] = datetime.now(timezone.utc).isoformat()
+                result["policy_body_bytes"] = len(raw_policy)
+                result["policy_body_sha256"] = hashlib.sha256(raw_policy).hexdigest()
                 parser = urllib.robotparser.RobotFileParser()
                 parser.parse(raw_policy.decode("utf-8", errors="strict").splitlines())
                 if not all(parser.can_fetch("EventRadarSourceAudit", url)
