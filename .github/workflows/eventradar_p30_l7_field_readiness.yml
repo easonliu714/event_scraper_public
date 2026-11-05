@@ -1575,8 +1575,10 @@ jobs:
           assert d['kind']=='P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1'
           assert d['line']=='B' and d['source_key']=='venue:zepp-newtaipei'
           assert d['source_event_id']=='166457'
-          assert 1 <= d['native_get_attempted'] <= 2
-          assert d['native_list_get_attempted']==1
+          assert d['policy_get_attempted']==1
+          assert d['policy_decision'] in ('UNKNOWN','ALLOW_ROBOTS_200','ALLOW_ROBOTS_404')
+          assert 0 <= d['native_get_attempted'] <= 2
+          assert d['native_list_get_attempted'] <= 1
           assert d['native_detail_get_attempted'] <= 1
           assert d['native_http200'] <= d['native_get_attempted']
           assert d['same_id_review_lkg']==0
