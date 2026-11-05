@@ -2522,7 +2522,8 @@ def load_isolated_review_lkg(destination, repo_root):
 
 
 def persist_isolated_review_lkg(snapshot, destination, repo_root,
-                                expected_previous_sha256=None):
+                                expected_previous_sha256=None,
+                                expected_previous_envelope_sha256=None):
     """Single-file fsync+replace with exclusive writer lock and LKG CAS guard."""
     import os
     import tempfile
@@ -2540,6 +2541,12 @@ def persist_isolated_review_lkg(snapshot, destination, repo_root,
                       if prior is not None else None)
         if actual_sha != expected_previous_sha256:
             raise ValueError("ISOLATED_LKG_COMPARE_AND_SWAP_HOLD")
+        # Row-only hashes cannot detect changed provenance or source receipts.
+        # Require a CAS lease on the COMPLETE prior sealed envelope as well.
+        actual_envelope_sha = (_isolated_lkg_digest(prior)
+                               if prior is not None else None)
+        if actual_envelope_sha != expected_previous_envelope_sha256:
+            raise ValueError("ISOLATED_LKG_FULL_ENVELOPE_COMPARE_AND_SWAP_HOLD")
         envelope = {"kind": "P30_L7_ISOLATED_DURABLE_LKG_V1",
                     "snapshot": snapshot,
                     "sha256": _isolated_lkg_digest(snapshot)}
@@ -2592,7 +2599,9 @@ def run_persistent_isolated_review_lkg(
     receipt = persist_isolated_review_lkg(
         snapshot, destination, repo_root,
         expected_previous_sha256=(
-            prior["last_known_good_sha256"] if prior else None))
+            prior["last_known_good_sha256"] if prior else None),
+            expected_previous_envelope_sha256=(
+                _isolated_lkg_digest(prior) if prior else None))
     return {"snapshot": snapshot, "persisted": True, "receipt": receipt,
             "release_state": "HARD_HOLD_NO_PUBLICATION"}
 
@@ -2711,7 +2720,9 @@ def run_bounded_native_source_to_review_lkg(
             persist_isolated_review_lkg(
                 snapshot, destination, repo_root,
                 expected_previous_sha256=(
-                    previous["last_known_good_sha256"] if previous else None))
+                    previous["last_known_good_sha256"] if previous else None),
+            expected_previous_envelope_sha256=(
+                _isolated_lkg_digest(previous) if previous else None))
             result = {"snapshot": snapshot, "persisted": True}
         return {
             "kind": "P30_L7_BOUNDED_NATIVE_TO_REVIEW_LKG_V1",
@@ -2925,7 +2936,9 @@ def run_cksmh_actid_review_lkg(destination, repo_root, *, fetcher=None,
             "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
         persist_isolated_review_lkg(snapshot, destination, repo_root,
                                     expected_previous_sha256=(
-                                        previous["last_known_good_sha256"] if previous else None))
+                                        previous["last_known_good_sha256"] if previous else None),
+            expected_previous_envelope_sha256=(
+                _isolated_lkg_digest(previous) if previous else None))
         return {"kind": "P30_L7_CKSMH_ROTATION_REVIEW_V1", "decision": "REVIEW_ONLY",
                 "line": "B", "platform_id": "17", "source_event_id": "61023",
                 "source_receipts": receipts, "native_get_200_count": 2 if native else 0,
@@ -3161,7 +3174,9 @@ def run_huashan_exact_path_review_lkg(destination, repo_root, *, fetcher=None,
                     "formal_accepted_fields": 0, "golden_accepted_events": 0,
                     "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION"}
         persist_isolated_review_lkg(snapshot, destination, repo_root,
-                                    expected_previous_sha256=previous["last_known_good_sha256"] if previous else None)
+                                    expected_previous_sha256=previous["last_known_good_sha256"] if previous else None,
+            expected_previous_envelope_sha256=(
+                _isolated_lkg_digest(previous) if previous else None))
         return {"kind": "P30_L7_HUASHAN_ROTATION_REVIEW_V1", "decision": "REVIEW_ONLY",
                 "platform_id": "13", "source_receipts": receipts,
                 "native_get_200_count": 2 if native else 0, "same_path_review_lkg": 1,
@@ -3650,7 +3665,9 @@ def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
         persist_isolated_review_lkg(
             snapshot, destination, repo_root,
             expected_previous_sha256=(previous["last_known_good_sha256"]
-                                      if previous else None))
+                                      if previous else None),
+            expected_previous_envelope_sha256=(
+                _isolated_lkg_digest(previous) if previous else None))
         return {"kind": "P30_L7_SONGSHAN_CANONICAL_ROTATION_V1",
                 "platform_id": "14", "decision": "REVIEW_ONLY",
                 "source_receipts": receipts,
@@ -4678,7 +4695,9 @@ def run_opentix_existing_id_review_lkg(destination, repo_root, *,
         persist_isolated_review_lkg(
             snap, destination, repo_root,
             expected_previous_sha256=(
-                prior["last_known_good_sha256"] if prior else None))
+                prior["last_known_good_sha256"] if prior else None),
+            expected_previous_envelope_sha256=(
+                _isolated_lkg_digest(prior) if prior else None))
         out.update(decision="REVIEW_NON_SESSION_ONLY",
                    first_failure="OPENTIX_NATIVE_FRESHNESS_AND_FIELD_AUTHORITY_HOLD",
                    same_id_review_lkg=1, lkg_sha256=digest)
