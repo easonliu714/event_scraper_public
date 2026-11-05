@@ -1,5 +1,6 @@
 """A/B source rotation: no network in unit tests, no publication."""
 import unittest
+from unittest.mock import Mock
 from scripts import p30_dual_native_rotation as m
 from scripts import p30_ntpc_artcenter_source as b
 
@@ -43,6 +44,33 @@ class TestRotation(unittest.TestCase):
         self.assertEqual(m.inspect_pair("B", listing, detail.replace(b.VENUE, "其他展覽室"))["same_id_review"], 0)
         self.assertEqual(m.inspect_pair("B", listing.replace(b.SID, "bad"), detail)["same_id_review"], 0)
         self.assertEqual(m.inspect_pair("B", listing, "<header><h3>" + b.TITLE + "</h3></header>")["same_id_review"], 0)
+
+    def test_robots_html_home_fallback_is_not_allow(self):
+        # Prior native FamiTicket robots.txt and HOME had the same 193376-byte SHA.
+        class FakeResponse:
+            status = 200
+            headers = {"Content-Type": "text/html; charset=utf-8"}
+            def geturl(self): return "https://www.famiticket.com.tw/robots.txt"
+            def read(self, n): return b"<html><head></head><body>HOME</body></html>"
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+        opener = Mock()
+        opener.open.return_value = FakeResponse()
+        with self.assertRaisesRegex(ValueError, "ROTATION_ROBOTS_MIME_HOLD"):
+            m.read_public(opener, "https://www.famiticket.com.tw/robots.txt", "text/plain")
+
+    def test_html_media_is_not_robots_and_vice_versa(self):
+        class FakeResponse:
+            status = 200
+            headers = {"Content-Type": "text/plain"}
+            def geturl(self): return m.FAMI_LIST
+            def read(self, n): return b"User-agent: *\\nDisallow: /checkout\\n"
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+        opener = Mock()
+        opener.open.return_value = FakeResponse()
+        with self.assertRaisesRegex(ValueError, "ROTATION_HTML_MIME_HOLD"):
+            m.read_public(opener, m.FAMI_LIST, "text/html")
 
     def test_no_unsupported_line(self):
         with self.assertRaises(ValueError):

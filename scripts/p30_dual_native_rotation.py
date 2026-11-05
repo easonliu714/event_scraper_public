@@ -133,12 +133,18 @@ def read_public(opener, url, content_type):
         raise ValueError("ROTATION_STATUS_REDIRECT_HOLD")
     if not 0 < len(raw) <= CAP:
         raise ValueError("ROTATION_EMPTY_OR_BODY_CAP_HOLD")
-    if ctype.split(";", 1)[0].strip().lower() not in (
-            "text/html", "text/plain"):
-        raise ValueError("ROTATION_CONTENT_TYPE_HOLD")
+    # A robots.txt request returning the HTML HOME body is NOT policy authority.
+    # Enforce the requested media role before treating robots as an allow.
+    media = ctype.split(";", 1)[0].strip().lower()
+    expected = ("text/plain",) if content_type == "text/plain" else (
+        "text/html", "application/xhtml+xml")
+    if media not in expected:
+        raise ValueError("ROTATION_ROBOTS_MIME_HOLD" if content_type == "text/plain"
+                         else "ROTATION_HTML_MIME_HOLD")
     stamp = datetime.now(timezone.utc).isoformat()
     receipt = {"url": url, "http_status": status, "body_bytes": len(raw),
                "body_sha256": hashlib.sha256(raw).hexdigest(),
+               "content_type": media,
                "observed_at_utc": stamp, "transport": "NATIVE_NO_REDIRECT_NO_RETRY"}
     return raw.decode("utf-8", "strict"), receipt
 
@@ -166,6 +172,11 @@ def run_native_once(line):
         out["native_get_attempted"] += 1
         robots, receipt = read_public(opener, origin + "/robots.txt", "text/plain")
         out["robots_receipt"] = receipt
+        # Explicit user-agent directive is mandatory: empty/HTML fallback fails closed.
+        if not re.search(r"(?im)^\\s*user-agent\\s*:\\s*[^\\s#]+", robots):
+            raise ValueError("ROTATION_ROBOTS_NO_USER_AGENT_HOLD")
+        if re.search(r"(?i)<(?:!doctype\\s+html|html|head|body)(?:\\s|>)", robots[:2048]):
+            raise ValueError("ROTATION_ROBOTS_HTML_FALLBACK_HOLD")
         policy = urllib.robotparser.RobotFileParser()
         policy.parse(robots.splitlines())
         if not policy.can_fetch(UA, listing) or not policy.can_fetch(UA, detail):
@@ -173,6 +184,8 @@ def run_native_once(line):
         out["policy_decision"] = "ROBOTS_ALLOW"
         out["native_get_attempted"] += 1
         list_html, lr = read_public(opener, listing, "text/html")
+        if receipt["body_sha256"] == lr["body_sha256"]:
+            raise ValueError("ROTATION_ROBOTS_LIST_IDENTICAL_BODY_HOLD")
         out["source_receipts"].append(lr)
         out["native_http200"] += 1
         out["native_list"] = 1
