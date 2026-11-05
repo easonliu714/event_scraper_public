@@ -3395,7 +3395,7 @@ SONGSHAN_EVENT_TITLE = "2026 紙上躍躍然．典美插畫大賞"
 
 def run_songshan_uuid_review_lkg(destination, repo_root, *, fetcher=None,
                                 network_authorized=False, source_hypothesis="",
-                                now_utc=None, *, event_uuid=SONGSHAN_EVENT_UUID,
+                                now_utc=None, event_uuid=SONGSHAN_EVENT_UUID,
                                 event_title=SONGSHAN_EVENT_TITLE, event_type="展覽"):
     """Bounded official two-GET UUID edge -> existing isolated REVIEW LKG."""
     import hashlib, re, urllib.request
