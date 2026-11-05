@@ -7061,3 +7061,39 @@ B / canonical Huashan #13: reuse existing run_huashan_field_aware_review_lkg, sa
 Formal Source/Preview/ShowNews main d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce / 03e515d65e827d5ed67fe341d079907a96bf784a / 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad; formal data/status blobs 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 / 99cae0571e36e52dac360b6935c0c09f6f6bed3f unchanged. Accepted FIELD/Golden/Published/feed 0/0/0/0, HARD_HOLD_NO_PUBLICATION. L8 Android 5/5 and CKSMH5/TWTC39 historical PASS retained; direct Pages HTTP UNVERIFIED. Formal status snapshot 2026-11-03 18:55 stale; status-only Merge/Pages requires Owner approval.
 
 NEXT A: independent fresh native SHOW/HALL conflict/freshness authority on existing fixed TMC pipeline. NEXT B: independently testable Huashan numeric ID hypothesis or rotate to another deduped Taipei P0. No formal publication.
+
+
+---
+
+### P30-L7 2026-11-05 08:53 read-only source authority / artifact audit
+
+```text
+A fixed non-publishing TMC pipeline (Engineering Draft #236)
+  native historical official LIST -> exact DETAIL -> SHOW/HALL 2 REVIEW -> isolated LKG 1
+  -> run_tmc_field_aware_review_lkg -> assess_tmc_non_session_field_authority
+  -> latest CI artifact has TMC_NO_SNAPSHOT (historic native LKG not mounted)
+  -> candidate independent organizer authority: 寬宏藝術KHAM YouTube official-channel-claimed
+     https://www.youtube.com/watch?v=Ok_rS2A9RTo (2026-08-19)
+     event SHOW 2026-11-07 19:30 / HALL 臺北流行音樂中心 表演廳
+  -> independent channel ownership, fresh native receipt and conflict gate STILL HOLD
+  -> no KHAM checkout, PRODUCT_ID != EVENT_SESSION, formal FIELD 0
+
+B canonical #17 CKSMH actId=61023
+  official DETAIL indexed reader four sessions
+  official Query.init.ctr and Query.list.ctr indexed text no exact actId=61023
+  -> no native LIST same-actId authority; server-static DOM no ordinal HOLD
+  -> #13 Huashan native same-path LKG 1 / 4 REVIEW roles remains prior evidence
+  -> #13 official numeric ID absent, no field acceptance; #14 Songshan heading HOLD
+  -> no duplicate adapter, no repeated frozen-source GET
+
+Independent exact-head CI #41937636675 / artifact #13374258441
+  ZIP 4495 bytes, SHA256 8e2adc6505228d6434ee3192384cb92d83e385362c87804485feb46a8f05a5e5
+  independent ZIP CRC PASS; 5 members / four packaged evidence SHA256 PASS
+  120/120 offline; this audit A/B new native GET/LIST/DETAIL/IDENTITY/LKG all zero
+  artifact B first_failure=CKSMH_NATIVE_OR_FRESHNESS_NOT_VERIFIED
+  Engineering HEAD d22202165c03d06eb8826b304f44fb392e7d4cb4
+  formal FIELD/Golden/new Published = 0/0/0
+  HARD_HOLD_NO_PUBLICATION, L8 Android 5/5, CKSMH5/TWTC39 PASS
+```
+
+Next A: deterministic independent organizer source-title/SHOW/HALL provenance and conflict adjudication without checkout; B: canonical #13 path role authority or independently verifiable next Taipei P0, preserve all first failures. No main/data/status/Publisher/Golden changes, no new Writer.
