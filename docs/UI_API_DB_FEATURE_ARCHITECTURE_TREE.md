@@ -7243,3 +7243,49 @@ Formal docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4, docs/platfo
 **2026-11-05 19:04 status-only architecture readback:** Existing Draft [#237](https://github.com/easonliu714/event_scraper_public/pull/237) exact HEAD 4745030850d1cd833d08b1e2d776fe66e2d74a6f, two changed paths only (docs/platform_status.json and isolated read-only status CI workflow). [CI #42015842759](https://github.com/easonliu714/event_scraper_public/actions/runs/42015842759) SUCCESS, [artifact #13408344705](https://github.com/easonliu714/event_scraper_public/actions/runs/42015842759/artifacts/13408344705) ZIP SHA256 9fedc1a22f3b1d238725406a0e6808b0e41d748230a9b4555edef6f8c40f4466 / CRC PASS. 19-platform baseline exact-byte parity PASS; candidate status blob 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd. Main status blob 99cae0571e36e52dac360b6935c0c09f6f6bed3f and formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 unchanged. Status is still Draft/NO RELEASE; Owner authorization required for status-only Merge/Pages, formal HTTP runtime UNVERIFIED.
 
 **2026-11-05 19:52 isolated source adapter ancestry guard (not formal pipeline):** Engineering Draft #236 HEAD `967eddc18c3ed74ddaa4c5394c224efaca4eebaa` refines `scripts/p30_source_stream_gate.py::EventLocalHTML` with section/article ancestor-path identity: exact TPAC title + direct OPENTIX event href + room must share an event-local section/article, sibling event articles and MAIN-only matches HOLD. Tests include sibling sections within one article and negative cross-article identity. Existing 19:00 native TPAC HTTP200 complete 639783-byte SHA256 receipt first failed on same-section=false, room=false; current code correction is CI-tested but NOT independently native re-attested, REVIEW-only. A this round new native GET/LIST/DETAIL/IDENTITY/LKG=0/0/0/0/0. B Songshan #14 second UUID earlier native GET 2/2 LIST/DETAIL but exact-heading first failure, LKG 0; current B new native=0, avoid repeated GET, rotate canonical double-Taipei source. Exact-head [CI #42022372271](https://github.com/easonliu714/event_scraper_public/actions/runs/42022372271) SUCCESS, [Artifact #13412222116](https://github.com/easonliu714/event_scraper_public/actions/runs/42022372271/artifacts/13412222116) SHA256 `656a831f8e5c867147876db18455947044b045f224465f5c863e3d2639405e91` independent ZIP CRC PASS. Formal FIELD/Golden/Published=0/0/0, HARD_HOLD_NO_PUBLICATION. Status-only Draft #237 still NO RELEASE, Pages HTTP UNVERIFIED, historical L8 Android 5/5 and CKSMH5/TWTC39 PASS preserved.
+
+---
+
+### P30-L7 2026-11-05 23:05 — A/B fixed source architecture and B Zepp New Taipei rotation (NO PUBLISH)
+
+```text
+A ticket canonical #05 OPENTIX
+  existing run_opentix_existing_id_review_lkg + replay_preacquired_ab_to_review_lkg
+    -> exact official event ID + event-local title/venue -> source SHA/time
+    -> REVIEW candidate -> isolated full-envelope CAS/LKG
+    -> caller-supplied source != native attestation; accepted FIELD 0
+  TPAC program/2088 historical full native HTML 639783 bytes, HTTP200
+    -> exact title/direct OPENTIX href but event-local room/ancestor HOLD
+    -> no repeat GET, native same-ID/LKG 0, independent FIELD 0
+
+B official venue source rotation: Zepp New Taipei (New Taipei City)
+  indexed LIST https://www.zepp.co.jp/hall/newtaipei/
+  indexed DETAIL https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457
+  public indexed reader exact event Jony J 2026「本命」TOUR IN TAIPEI
+  schedule START 2026-11-06 20:00 is a source role, NOT a verified ticket Session
+  scripts/p30_source_stream_gate.py
+    ZeppLocalHTML -> inspect_zepp_same_id_pages
+      -> exact LIST anchor rid+title and DETAIL local heading or HOLD
+    probe_zepp_newtaipei_native_once
+      -> robots.txt policy preflight, fail-closed
+      -> <=2 official LIST/DETAIL GET, 8s each, no redirect/retry
+      -> <=1 MiB/body, full-body SHA only after complete read
+      -> isolated evidence receipt; no raw HTML, checkout, formal platform or LKG
+  CI one-shot gate exists but native marker NOT consumed; native B GET=0
+  exact-head Engineering Draft #236 7c98b1a023080ec0538d5c414fdd294895808da2
+  CI #42050998493 SUCCESS, artifact #13427371232
+  artifact digest sha256:4d0ef2c7bced0fa6c338d3d5c8d1b95f57ec0674a9b70f47678ed9ad269adc81
+  native marker commit blocked by tool safety checks; never claim native PASS
+
+Formal release state
+  Source main b7e04a8501f12df56677c833166e7038c4a6702b
+  status-only #237 MERGED, Pages #42046958164 SUCCESS
+  formal platform_status blob 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd
+  snapshotAtTaipei 2026-11-05 19:00, 19 platforms
+  formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+  accepted FIELD / Golden / Published / formal feed = 0 / 0 / 0 / 0
+  HARD_HOLD_NO_PUBLICATION; Pages HTTP/new Android readback UNVERIFIED
+  historical CKSMH5 / TWTC39 / L8 Android 5/5 PASS preserved
+```
+
+**Architecture decision:** Zepp is a distinct New Taipei venue discovery source, not a duplicate formal 19-platform record. The source-local `rid=166457` is a venue schedule identity, not a KKTIX ticket event ID or Session. The first native Gate remains pending, and robots-policy uncertainty must fail closed. Preserve existing TMC/TPAC/Songshan HOLD without retrying consumed probes. Do not promote public indexed observations, offline tests, or CI success to independently accepted FIELD or Golden.
