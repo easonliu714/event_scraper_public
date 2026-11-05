@@ -518,11 +518,11 @@
     "publication": "工程狀態頁可公開展示；活動卡片/Golden/Writer/即時庫存仍 LOCKED"
   },
   "latestEngineering": {
-    "snapshotAtTaipei": "2026-11-05 14:02",
-    "verifiedAtUTC": "2026-11-05T06:02:25Z",
+    "snapshotAtTaipei": "2026-11-05 16:00",
+    "verifiedAtUTC": "2026-11-05T08:00:43.298Z",
     "scope": "僅隔離 A/B 工程來源品質與第一失敗；非正式活動欄位或活動發布",
     "governanceDraftPR": 8,
-    "governanceHead": "3001b6afcec7e8d0e302f738c5d6b263f8b4be42",
+    "governanceHead": "44152e71356a3434744c0c987e23b5adcd7ee13f",
     "sourceMainAtSnapshot": "d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce",
     "existing19PlatformBaselineDate": "2026-10-28",
     "releaseState": "HARD_HOLD_NO_PUBLICATION",
@@ -531,9 +531,9 @@
     "publishedEventsNew": 0,
     "hourlyWriter": {
       "taskId": "6ae1e6147e548191881f20e730ab0f11",
-      "lastScheduledTaipei": "2026-11-05 13:55",
-      "lastRun": "A_OPENTIX_SOURCE_ROTATION_AND_B_SONGSHAN_SECOND_UUID_NATIVE_HEADING_HOLD",
-      "sourceEvidenceRecent3Rounds": "B new official native LIST+DETAIL 2/2 HTTP200; DETAIL heading 0/3; A new native GET 0; all formal fields 0",
+      "lastScheduledTaipei": "2026-11-05 15:55",
+      "lastRun": "A_OPENTIX_OBSERVED_AT_HARDENING_AND_B_SONGSHAN_HEADINGLESS_SEO_FALLBACK_NO_REGET",
+      "sourceEvidenceRecent3Rounds": "B prior native LIST/DETAIL 2/2 HTTP200 (CI #41977716279), native exact heading 0; this engineering run new native GET 0; A new native GET 0; formal accepted FIELD 0",
       "isSingleWriter": true
     },
     "lines": [
@@ -542,14 +542,14 @@
         "label": "售票平台（既有 19 來源）",
         "gate": "P30-L7-OPENTIX-EXACT-EVENT-ID-REVIEW-LKG",
         "draftPR": 236,
-        "head": "94dbf650ad574fd71a3f5cb95488487b9c59397e",
-        "ciRun": 41977716279,
-        "tests": "130/130 offline PASS",
-        "artifact": 13391954721,
+        "head": "cc5001558d83d47c4cd4ce4f06b50ad865839223",
+        "ciRun": 41990978243,
+        "tests": "133/133 offline PASS",
+        "artifact": 13398675834,
         "source": "OPENTIX #05 exact event 2072516129034670080",
-        "evidence": "已輪轉至 OPENTIX《小王子》同 ID DETAIL；LIST→DETAIL→場館 REVIEW LKG 1 僅 test-injected；本輪新增 native GET/LIST/DETAIL/IDENTITY/LKG 0/0/0/0/0",
+        "evidence": "已輪轉 OPENTIX #05 exact event ID，synthetic LIST→same DETAIL→event-local title/venue→隔離 REVIEW LKG 1；新增原始觀測 UTC 時效 24h／雙頁偏差 10min／hash receipt 防陳舊資料洗新，實際新 native GET 0",
         "decision": "REVIEW_WITH_HOLD",
-        "blocker": "正式原生 LIST exact anchor、DETAIL event-local venue DOM、獨立 FIELD authority 未證；TMC SHOW/HALL 獨立主辦權威 HOLD；KHAM PRODUCT_ID 非 Session",
+        "blocker": "原生官方 LIST/DETAIL/獨立 FIELD authority 仍未成立；TMC SHOW/HALL 獨立主辦來源 HOLD；KHAM PRODUCT_ID 不是 Session",
         "acceptedFields": 0
       },
       {
@@ -557,20 +557,20 @@
         "label": "官方場館（臺北／新北優先）",
         "gate": "P30-VENUE-SONGSHAN-SECOND-UUID-NATIVE-DOM-ROOT",
         "draftPR": 236,
-        "head": "94dbf650ad574fd71a3f5cb95488487b9c59397e",
-        "ciRun": 41977716279,
-        "tests": "130/130 offline PASS",
-        "artifact": 13391954721,
+        "head": "cc5001558d83d47c4cd4ce4f06b50ad865839223",
+        "ciRun": 41990978243,
+        "tests": "133/133 offline PASS",
+        "artifact": 13398675834,
         "source": "松山文創 #14 STAR ON THE MOVE 2026 UUID 3b2101fd-cbb3-48ec-b23c-496880df5626",
-        "evidence": "官方 native LIST/DETAIL 2/2 HTTP200；LIST 同 UUID/title local edge 成立；DETAIL h1/h2/h3 exact title 0/0/0；新 native LKG 0",
+        "evidence": "前輪 native 松山 LIST/DETAIL 2/2 HTTP200（bytes/hash 已封存）；DETAIL H1/H2/H3 exact 0，native LKG 0；本輪新增 headingless exact OG title + exact canonical UUID 嚴格替代解析，僅離線驗證 133/133，無重複 native GET",
         "decision": "HOLD",
-        "blocker": "SONGSHAN_DETAIL_EXACT_HEADING_HOLD:h1=0,h2=0,h3=0；不得重打相同 native GET；11/06 邀請日與 11/07–08 公眾開放時間分角色",
+        "blocker": "SONGSHAN_DETAIL_EXACT_HEADING_HOLD:h1=0,h2=0,h3=0；真實 OG/canonical metadata 尚未驗證，原生 identity/LKG 仍 HOLD；11/06 買家日不等於 11/07–08 公眾時段",
         "acceptedFields": 0
       }
     ],
     "ownerDecision": {
       "requiredNow": true,
-      "reason": "此 status-only Draft PR 只供審查；正式 status Merge/Pages 必須 Owner 另行明示授權；活動發布仍 HARD HOLD"
+      "reason": "既有 status-only Draft PR #237 已準備，正式 status Merge/Pages 仍須 Owner 另行明示授權；活動發布維持 HARD HOLD"
     },
     "candidateReviewFields": 5,
     "candidateIdentityDependencies": 2,
