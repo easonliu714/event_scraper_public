@@ -44,6 +44,7 @@ class EventLocalHTML(HTMLParser):
         self.visible_text_size = 0
         self.section_stack = []
         self.section_text = {}
+        self.section_tags = {}
         self.next_section_id = 0
 
     def handle_starttag(self, tag, attrs):
@@ -61,11 +62,12 @@ class EventLocalHTML(HTMLParser):
             self.next_section_id += 1
             self.section_stack.append((len(self.stack), self.next_section_id))
             self.section_text[self.next_section_id] = ""
+            self.section_tags[self.next_section_id] = tag
         kind = "heading" if tag in ("h1", "h2", "h3") else (
             "anchor" if tag == "a" else None)
         if kind:
             self.capture.append([len(self.stack), kind, attrs, "",
-                                 self.section_stack[-1][1] if self.section_stack else None])
+                                 tuple(section_id for _, section_id in self.section_stack)])
 
     def handle_startendtag(self, tag, attrs):
         self.handle_starttag(tag, attrs)
@@ -166,19 +168,35 @@ def inspect_tpac_complete_stream(stream, *, status, content_type, final_url,
             raise ValueError("TPAC_EMPTY_COMPLETE_BODY_HOLD")
         report.update(body_bytes=size, body_sha256=digest.hexdigest(),
                       body_truncated=False, observed_at_utc=stamp.isoformat())
-        headings = [scope for _, text, scope in parser.headings if text == TITLE]
-        anchors = [scope for attrs, _, scope in parser.anchors
+        # Source DOM can place a unique title and direct ticket edge in sibling
+        # sections of ONE event article. Compare full ancestor paths instead of
+        # requiring identical innermost section IDs. Never fall back to MAIN:
+        # distinct event articles or sibling root sections remain HOLD.
+        headings = [path for _, text, path in parser.headings if text == TITLE]
+        anchors = [path for attrs, _, path in parser.anchors
                    if urljoin(TPAC_URL, attrs.get("href", "")) == TICKET_URL]
-        shared_section = (len(headings) == len(anchors) == 1
-                          and headings[0] is not None
-                          and headings[0] == anchors[0])
+        shared_scope = None
+        article_identity = False
+        if len(headings) == len(anchors) == 1:
+            title_articles = tuple(x for x in headings[0]
+                                   if parser.section_tags[x] == "article")
+            ticket_articles = tuple(x for x in anchors[0]
+                                    if parser.section_tags[x] == "article")
+            article_identity = title_articles == ticket_articles
+            if article_identity:
+                shared_scope = next((x for x in reversed(headings[0])
+                                     if x in anchors[0]), None)
+        shared_section = shared_scope is not None
         room_in_shared_section = bool(shared_section and "藍盒子" in
-                                      " ".join(parser.section_text[headings[0]].split()))
+                                      " ".join(parser.section_text[shared_scope].split()))
         report["event_local_checks"] = {
             "exact_title_heading_count": len(headings),
             "direct_ticket_href_count": len(anchors),
             "same_section_identity": bool(shared_section),
             "room_in_same_section": room_in_shared_section,
+            "article_ancestor_parity": article_identity,
+            "shared_event_ancestor_kind": parser.section_tags.get(shared_scope),
+            "cross_article_fallback_used": False,
             "event_id": "2072516129034670080",
         }
         if not shared_section or not room_in_shared_section:
