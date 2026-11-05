@@ -7327,3 +7327,52 @@ Formal Source main b7e04a8501f12df56677c833166e7038c4a6702b
 ```
 
 **Next architecture gate:** independent Zepp robots policy and one unconsumed, lawful native LIST→same-rid DETAIL body receipt; only then consider isolated venue REVIEW candidate, never a new formal platform. A must resolve source-local venue/age authority or rotate another existing canonical non-checkout ticket source. Preserve L8 Android 5/5 and CKSMH5/TWTC39 PASS.
+
+
+### 2026-11-06 01:00 — Zepp official SCHEDULE LIST correction (indexed-only; NO PUBLISH)
+
+```text
+Public indexed official Zepp New Taipei SCHEDULE
+  https://www.zepp.co.jp/hall/newtaipei/schedule/
+  -> exact source-local rid=166457 DETAIL
+     https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457
+  -> event Jony J 2026「本命」TOUR IN TAIPEI
+  -> indexed show date 2026-11-06, START 20:00, venue Zepp New Taipei
+  -> NOT native GET, NOT ticket Session, NOT formal FIELD
+
+Engineering Draft #236:
+  scripts/p30_source_stream_gate.py
+    ZEPP_LIST: /hall/newtaipei/ (HOME; wrong LIST authority)
+            -> /hall/newtaipei/schedule/ (actual indexed LIST)
+    probe_zepp_newtaipei_native_once:
+      robots-policy fail-closed -> schedule LIST -> exact rid DETAIL
+      bounded/no redirect/no retry; only on unused one-shot marker
+    inspect_zepp_same_id_pages:
+      exact rid href + local title + MAIN-local DETAIL heading
+      -> REVIEW source identity only; never formal Golden or 20th platform
+  tests/p30/test_p30_source_stream_gate.py
+    test_zepp_official_schedule_is_list_authority_not_home
+  exact-head bf034050bc4bcbbe75989c49f6075bac2a8eec98
+  CI #42070135737 SUCCESS, job 127395498475
+  134 field + 17 stream = 151 offline PASS
+  artifact #13435496833 digest sha256:925b11ef75980f4b65f4aa4c6fda189a438376897a6f697803f656cf0fa02c46
+  ZEPP_NATIVE_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER
+  B native HTTP/LIST/DETAIL/IDENTITY/LKG new 0/0/0/0/0
+  local robots DNS blocked, policy UNKNOWN; no unsafe probe
+
+A canonical #03 tixCraft indexed LIST -> detail 26_youngk:
+  event Young K YOUNGEST; Nov 28 and 29 distinct SHOW roles
+  VIP package vs general ticket vs NT$200 fee distinct
+  indexed-only, not native body receipt; A new native GET/LKG=0
+  TPAC room/title/link local HOLD and age 6+/7+ conflict retained
+
+Source main b7e04a8501f12df56677c833166e7038c4a6702b
+  formal data blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+  formal status blob 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd
+  19 platforms; #237 MERGED, Pages #42046958164 SUCCESS
+  Pages HTTP / new Android readback UNVERIFIED
+  accepted FIELD/Golden/Published = 0/0/0
+  HARD_HOLD_NO_PUBLICATION; historical L8 Android 5/5 PASS
+```
+
+**Next Gate:** B requires independent Zepp robots policy and lawful fresh LIST/DETAIL native bytes before any native same-ID REVIEW; otherwise rotate to another Taipei/New Taipei canonical venue. A requires genuinely new lawful source-owned ticket event bytes and independent field adjudication; indexed role corroboration cannot be promoted. No formal data/Publisher/main/status change.
