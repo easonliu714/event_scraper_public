@@ -4466,3 +4466,176 @@ def inspect_huashan_homepage_same_path_date(home_response, observed_at_utc,
         return out
     except (ValueError, TypeError, OverflowError) as exc:
         return hold("HUASHAN_HOME_DOM_OR_DATE_HOLD:" + type(exc).__name__)
+
+
+# A rotation / canonical ticket platform #05 OPENTIX. A strict reusable
+# LIST->same official event-ID DETAIL->event-local roles->sealed REVIEW LKG.
+# The source HTML is caller-supplied: it is NEVER native GET evidence. No
+# checkout/session/inventory access, no PWA, no formal promotion.
+OPENTIX_ROTATION_LIST = "https://www.opentix.life/"
+OPENTIX_ROTATION_DETAIL = "https://www.opentix.life/event/2072516129034670080"
+OPENTIX_ROTATION_TITLE = "C MUSICAL 音樂劇《小王子》"
+
+
+def run_opentix_existing_id_review_lkg(destination, repo_root, *,
+                                       source_bodies, now_utc=None):
+    """Exact #05 event anchor, detail H1 and one venue role; REVIEW only."""
+    import hashlib
+    import re
+    from datetime import timezone
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin
+    from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+
+    urls = (OPENTIX_ROTATION_LIST, OPENTIX_ROTATION_DETAIL)
+    _isolated_lkg_path(destination, repo_root)
+    prior = load_isolated_review_lkg(destination, repo_root)
+    out = {"kind": "P30_L7_OPENTIX_CANONICAL_TICKET_ROTATION_V1",
+           "platform_id": "05", "same_id_review_lkg": 0,
+           "native_get_this_call": 0, "formal_accepted_fields": 0,
+           "golden_accepted_events": 0, "published_events": 0,
+           "release_state": "HARD_HOLD_NO_PUBLICATION",
+           "decision": "HOLD", "first_failure": "OPENTIX_SOURCE_MISSING",
+           "source_receipts": []}
+    if not isinstance(source_bodies, dict) or set(source_bodies) != set(urls):
+        return out
+
+    class Scoped(HTMLParser):
+        # Only event-local text inside a main subtree; never body/footer.
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.stack = []
+            self.active = []
+            self.anchors, self.headings, self.venues = [], [], []
+            self.node_count = 0
+
+        def handle_starttag(self, tag, attrs):
+            self.node_count += 1
+            if self.node_count > 16000 or len(self.stack) >= 80:
+                raise ValueError("OPENTIX_DOM_BOUNDS_HOLD")
+            attrs = dict(attrs)
+            self.stack.append(tag)
+            if "main" not in self.stack:
+                return
+            kind = ("anchors" if tag == "a" else
+                    "headings" if tag == "h1" else
+                    "venues" if attrs.get("data-role") == "venue" else None)
+            if kind:
+                self.active.append([len(self.stack), kind, attrs, ""])
+
+        def handle_data(self, value):
+            for cap in self.active:
+                cap[3] += value
+                if len(cap[3]) > 2500:
+                    raise ValueError("OPENTIX_EVENT_LOCAL_TEXT_BOUNDS_HOLD")
+
+        def handle_endtag(self, tag):
+            if not self.stack:
+                return
+            if self.stack[-1] != tag:
+                raise ValueError("OPENTIX_UNBALANCED_EVENT_DOM_HOLD")
+            for cap in list(self.active):
+                if cap[0] == len(self.stack):
+                    getattr(self, cap[1]).append((cap[2], " ".join(cap[3].split())))
+                    self.active.remove(cap)
+            self.stack.pop()
+
+    try:
+        now = now_utc or datetime.now(timezone.utc)
+        if not isinstance(now, datetime) or now.utcoffset() is None:
+            raise ValueError("OPENTIX_OBSERVATION_CLOCK_HOLD")
+        pages = []
+        for url in urls:
+            response = source_bodies[url]
+            if not isinstance(response, tuple) or len(response) != 4:
+                raise ValueError("OPENTIX_SOURCE_RESPONSE_SHAPE_HOLD")
+            status, mime, raw, final = response
+            if (type(status) is not int or status != 200 or final != url
+                    or not isinstance(mime, str)
+                    or mime.split(";", 1)[0].strip().lower() != "text/html"
+                    or not isinstance(raw, bytes) or not 0 < len(raw) <= 524288):
+                raise ValueError("OPENTIX_SOURCE_HTTP_BODY_OR_REDIRECT_HOLD")
+            if any(part.strip().lower().startswith("charset=") and
+                   part.strip().lower().split("=", 1)[1].strip('"') != "utf-8"
+                   for part in mime.split(";")[1:]):
+                raise ValueError("OPENTIX_SOURCE_CHARSET_HOLD")
+            pages.append(raw.decode("utf-8", errors="strict"))
+            out["source_receipts"].append({
+                "url": url, "http_status": 200, "bytes": len(raw),
+                "body_sha256": hashlib.sha256(raw).hexdigest(),
+                "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED"})
+        listing, detail = Scoped(), Scoped()
+        listing.feed(pages[0])
+        detail.feed(pages[1])
+        anchors = [(attrs, text) for attrs, text in listing.anchors
+                   if urljoin(OPENTIX_ROTATION_LIST, attrs.get("href", "")) ==
+                   OPENTIX_ROTATION_DETAIL]
+        if len(anchors) != 1 or anchors[0][1] != OPENTIX_ROTATION_TITLE:
+            raise ValueError("OPENTIX_LIST_EXACT_ID_TITLE_EDGE_HOLD")
+        if ([text for _, text in detail.headings] != [OPENTIX_ROTATION_TITLE]):
+            raise ValueError("OPENTIX_DETAIL_EXACT_H1_HOLD")
+        venues = [text for _, text in detail.venues if text]
+        if len(venues) != 1 or venues[0] != "臺北表演藝術中心 藍盒子":
+            raise ValueError("OPENTIX_DETAIL_EVENT_LOCAL_VENUE_HOLD")
+        if prior and (prior["rows"][0]["_candidate"].get("platform_id") != "05" or
+                      prior["rows"][0]["_candidate"].get("source_event_id") !=
+                      "2072516129034670080"):
+            raise ValueError("OPENTIX_OTHER_EVENT_LKG_CAS_HOLD")
+        stamp = now.isoformat()
+        candidate = {
+            "title": OPENTIX_ROTATION_TITLE, "url": OPENTIX_ROTATION_DETAIL,
+            "platform": "OPENTIX", "type": "戲劇", "scraped_at": stamp,
+            "location": venues[0],
+            "_candidate": {
+                "scope": "CANDIDATE_PREVIEW_ONLY", "decision": "REVIEW_WITH_HOLD",
+                "published": False, "golden_accepted": False,
+                "formal_field_pass": False,
+                "record_id": "05:2072516129034670080",
+                "platform_id": "05", "source_event_id": "2072516129034670080",
+                "source_class": "OFFICIAL_TICKET_NON_SESSION",
+                "sources": list(urls),
+                "hold_reasons": ["CALLER_HTML_NOT_NATIVE_FRESHNESS_PROOF",
+                                 "MULTI_SHOW_SESSIONS_NOT_FLATTENED",
+                                 "INDEPENDENT_FIELD_ACCEPTANCE_PENDING"]}}
+        rows, quality = build_candidate_dataset([candidate])
+        if len(rows) != 1 or quality["rejectedRows"]:
+            raise ValueError("OPENTIX_REVIEW_PIPELINE_HOLD")
+        digest = _isolated_lkg_digest(rows)
+        snap = {
+            "kind": "P30_L7_ISOLATED_SOURCE_ADAPTER_SNAPSHOT_V1",
+            "decision": "REVIEW_ONLY_NEW_OR_UPDATED", "rows": rows,
+            "quality": quality,
+            "field_receipts": [
+                {"field": "title", "role": "TICKET_EVENT_TITLE",
+                 "value": OPENTIX_ROTATION_TITLE, "source_url": urls[1],
+                 "observed_at_utc": stamp, "formal_accepted": False},
+                {"field": "venue", "role": "TICKET_EVENT_VENUE",
+                 "value": venues[0], "source_url": urls[1],
+                 "observed_at_utc": stamp, "formal_accepted": False}],
+            "source_receipts": {"list_url": urls[0], "detail_url": urls[1],
+                "bounded_acquisition": {
+                    "kind": "P30_L7_BOUNDED_SOURCE_RECEIPTS_V1",
+                    "observed_at_utc": stamp,
+                    "transport": "TEST_INJECTED_NOT_NATIVE",
+                    "list_url": urls[0], "detail_url": urls[1],
+                    "list_body_sha256": out["source_receipts"][0]["body_sha256"],
+                    "detail_body_sha256": out["source_receipts"][1]["body_sha256"],
+                    "decision": "SOURCE_BODY_REVIEW_ONLY_NOT_FORMAL"}},
+            "incremental_diff": {
+                "added_ids": [] if prior else ["05:2072516129034670080"],
+                "removed_ids": [],
+                "changed": not prior or digest != prior["last_known_good_sha256"]},
+            "last_known_good_sha256": digest, "native_get_verified": False,
+            "formal_accepted_fields": 0, "golden_accepted_events": 0,
+            "published_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION"}
+        persist_isolated_review_lkg(
+            snap, destination, repo_root,
+            expected_previous_sha256=(
+                prior["last_known_good_sha256"] if prior else None))
+        out.update(decision="REVIEW_NON_SESSION_ONLY",
+                   first_failure="OPENTIX_NATIVE_FRESHNESS_AND_FIELD_AUTHORITY_HOLD",
+                   same_id_review_lkg=1, lkg_sha256=digest)
+    except (ValueError, TypeError, UnicodeError, OSError, TimeoutError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:140]
+    return out
