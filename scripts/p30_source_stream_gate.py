@@ -42,6 +42,9 @@ class EventLocalHTML(HTMLParser):
         self.anchors = []
         self.room_text = []
         self.visible_text_size = 0
+        self.section_stack = []
+        self.section_text = {}
+        self.next_section_id = 0
 
     def handle_starttag(self, tag, attrs):
         self.node_count += 1
@@ -54,10 +57,15 @@ class EventLocalHTML(HTMLParser):
             self.main_depth = len(self.stack)
         if self.main_depth is None or tag in self.VOID:
             return
+        if tag in ("section", "article"):
+            self.next_section_id += 1
+            self.section_stack.append((len(self.stack), self.next_section_id))
+            self.section_text[self.next_section_id] = ""
         kind = "heading" if tag in ("h1", "h2", "h3") else (
             "anchor" if tag == "a" else None)
         if kind:
-            self.capture.append([len(self.stack), kind, attrs, ""])
+            self.capture.append([len(self.stack), kind, attrs, "",
+                                 self.section_stack[-1][1] if self.section_stack else None])
 
     def handle_startendtag(self, tag, attrs):
         self.handle_starttag(tag, attrs)
@@ -73,6 +81,10 @@ class EventLocalHTML(HTMLParser):
         if self.visible_text_size > 400000:
             raise ValueError("TPAC_STREAM_VISIBLE_TEXT_BOUNDS_HOLD")
         self.room_text.append(value)
+        for _, section_id in self.section_stack:
+            self.section_text[section_id] += value
+            if len(self.section_text[section_id]) > 100000:
+                raise ValueError("TPAC_STREAM_SECTION_TEXT_BOUNDS_HOLD")
         for item in self.capture:
             item[3] += value
             if len(item[3]) > 4000:
@@ -88,10 +100,12 @@ class EventLocalHTML(HTMLParser):
             current = self.stack.pop()
             for item in list(self.capture):
                 if item[0] == depth:
-                    record = (item[2], " ".join(item[3].split()))
+                    record = (item[2], " ".join(item[3].split()), item[4])
                     (self.headings if item[1] == "heading"
                      else self.anchors).append(record)
                     self.capture.remove(item)
+            if self.section_stack and self.section_stack[-1][0] == depth:
+                self.section_stack.pop()
             if self.main_depth == depth and current == "main":
                 self.main_depth = None
             if current == tag:
@@ -152,17 +166,22 @@ def inspect_tpac_complete_stream(stream, *, status, content_type, final_url,
             raise ValueError("TPAC_EMPTY_COMPLETE_BODY_HOLD")
         report.update(body_bytes=size, body_sha256=digest.hexdigest(),
                       body_truncated=False, observed_at_utc=stamp.isoformat())
-        headings = [text for _, text in parser.headings if text == TITLE]
-        anchors = [text for attrs, text in parser.anchors
+        headings = [scope for _, text, scope in parser.headings if text == TITLE]
+        anchors = [scope for attrs, _, scope in parser.anchors
                    if urljoin(TPAC_URL, attrs.get("href", "")) == TICKET_URL]
-        room = " ".join(" ".join(parser.room_text).split())
+        shared_section = (len(headings) == len(anchors) == 1
+                          and headings[0] is not None
+                          and headings[0] == anchors[0])
+        room_in_shared_section = bool(shared_section and "藍盒子" in
+                                      " ".join(parser.section_text[headings[0]].split()))
         report["event_local_checks"] = {
             "exact_title_heading_count": len(headings),
             "direct_ticket_href_count": len(anchors),
-            "room_token_present": "藍盒子" in room,
+            "same_section_identity": bool(shared_section),
+            "room_in_same_section": room_in_shared_section,
             "event_id": "2072516129034670080",
         }
-        if len(headings) != 1 or len(anchors) != 1 or "藍盒子" not in room:
+        if not shared_section or not room_in_shared_section:
             raise ValueError("TPAC_EVENT_LOCAL_TITLE_LINK_ROOM_HOLD")
         report.update(decision="REVIEW_DIRECT_EDGE_ONLY",
                       first_failure="INDEPENDENT_FIELD_AUTHORITY_AND_TICKET_SESSION_HOLD")
@@ -192,10 +211,15 @@ def audit_songshan_prior_native_receipt(report):
         receipts = report.get("source_receipts")
         if not isinstance(receipts, list) or len(receipts) != 2:
             raise ValueError("SONGSHAN_PRIOR_RECEIPT_COUNT_HOLD")
-        for receipt, expected in zip(receipts, (SONGSHAN_LIST, SONGSHAN_DETAIL)):
+        sealed = ((SONGSHAN_LIST, 34242,
+                   "de3df20bcd78e264c7f0eff8bafedbeb39aa580d7892e738bb2eb792c68e33cb"),
+                  (SONGSHAN_DETAIL, 26506,
+                   "1226b2f61dd328c08a2ff456e4f36dcc20dd23ce9d18219e377bafa4d404e02d"))
+        for receipt, (expected, size, digest) in zip(receipts, sealed):
             if (receipt.get("url") != expected or receipt.get("http_status") != 200
-                or not re.fullmatch(r"[0-9a-f]{64}", receipt.get("body_sha256", ""))
-                or not 0 < receipt.get("bytes", 0) <= 524288):
+                or receipt.get("bytes") != size
+                or receipt.get("body_sha256") != digest
+                or receipt.get("transport") != "BUILTIN_NATIVE_GET"):
                 raise ValueError("SONGSHAN_PRIOR_RECEIPT_URL_SHA_BODY_HOLD")
         failure = report.get("reason", "")
         if not isinstance(failure, str) or not failure.startswith(
