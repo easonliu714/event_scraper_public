@@ -211,5 +211,74 @@ class TestSourceStreamGate(unittest.TestCase):
 
 
 
+    def test_zepp_exact_rid_same_anchor_and_detail_heading(self):
+        from unittest.mock import patch
+        listing = ('<main><a href="/hall/newtaipei/schedule/single/?rid=166457">'
+                   'Jony J 2026「本命」TOUR IN TAIPEI</a></main>').encode()
+        detail = ('<main><h2>Jony J 2026「本命」TOUR IN TAIPEI</h2>'
+                  '<p>2026/11/6 START 20:00</p></main>').encode()
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/html; charset=UTF-8"}
+            def __init__(self, raw, url):
+                super().__init__(raw)
+                self.url = url
+            def geturl(self):
+                return self.url
+        class Opener:
+            def __init__(self):
+                self.urls = []
+            def open(self, req, timeout):
+                self.urls.append(req.full_url)
+                assert timeout == 8
+                return Response((listing, detail)[len(self.urls)-1],
+                                req.full_url)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.probe_zepp_newtaipei_native_once()
+        self.assertEqual(opener.urls, [m.ZEPP_LIST, m.ZEPP_DETAIL])
+        self.assertEqual(result["native_http200"], 2)
+        self.assertEqual(result["native_same_id_review"], 1)
+        self.assertEqual(result["same_id_review_lkg"], 0)
+        self.assertEqual(result["decision"], "REVIEW_NATIVE_SAME_ID_ONLY")
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["published_events"], 0)
+        self.assertFalse(result["raw_html_saved"])
+        self.assertEqual(result["source_receipts"][1]["body_sha256"],
+                         hashlib.sha256(detail).hexdigest())
+
+    def test_zepp_cross_card_or_unscoped_title_does_not_make_identity(self):
+        listing = ('<main><a href="/hall/newtaipei/schedule/single/?rid=166457">'
+                   'READ MORE</a><h2>Jony J 2026「本命」TOUR IN TAIPEI'
+                   '</h2></main>').encode()
+        detail = ('<main><h2>Jony J 2026「本命」TOUR IN TAIPEI'
+                  '</h2></main>').encode()
+        with self.assertRaisesRegex(ValueError, "ZEPP_LIST_EXACT_RID_TITLE_EDGE_HOLD"):
+            m.inspect_zepp_same_id_pages(listing, detail)
+        good_list = ('<a href="/hall/newtaipei/schedule/single/?rid=166457">'
+                     'Jony J 2026「本命」TOUR IN TAIPEI</a>').encode()
+        with self.assertRaisesRegex(ValueError, "ZEPP_DETAIL_EVENT_LOCAL_HEADING_HOLD"):
+            m.inspect_zepp_same_id_pages(good_list, b"<p>unrelated event</p>")
+
+    def test_zepp_redirect_stops_before_detail(self):
+        import urllib.error
+        from unittest.mock import patch
+        class Opener:
+            def __init__(self):
+                self.calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                raise urllib.error.HTTPError(req.full_url, 302,
+                                             "redirect", {}, None)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.probe_zepp_newtaipei_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(result["native_get_attempted"], 1)
+        self.assertEqual(result["native_http200"], 0)
+        self.assertEqual(result["first_failure"], "ZEPP_REDIRECT_BLOCKED_HOLD")
+        self.assertEqual(result["source_receipts"][0]["body_sha256"], None)
+
+
 if __name__ == "__main__":
     unittest.main()
