@@ -43,6 +43,8 @@ class TestSourceStreamGate(unittest.TestCase):
             self.html.replace(m.TITLE, "其他活動"),
             self.html.replace(m.TICKET_URL, "https://www.opentix.life/event/0"),
             self.html.replace("藍盒子", "其他場館"),
+            self.html.replace("<p>臺北表演藝術中心 藍盒子</p>",
+                              "</section><section><p>臺北表演藝術中心 藍盒子</p>"),
             '<header><h1>' + m.TITLE + '</h1><a href="' + m.TICKET_URL +
             '">票</a></header><main><p>藍盒子</p></main>',
         ]
@@ -67,9 +69,11 @@ class TestSourceStreamGate(unittest.TestCase):
             "reason": "SONGSHAN_DETAIL_EXACT_HEADING_HOLD:h1=0,h2=0,h3=0",
             "source_receipts": [
                 {"url": m.SONGSHAN_LIST, "http_status": 200, "bytes": 34242,
-                 "body_sha256": "de3df20bcd78e264c7f0eff8bafedbeb39aa580d7892e738bb2eb792c68e33cb"},
+                 "body_sha256": "de3df20bcd78e264c7f0eff8bafedbeb39aa580d7892e738bb2eb792c68e33cb",
+                 "transport": "BUILTIN_NATIVE_GET"},
                 {"url": m.SONGSHAN_DETAIL, "http_status": 200, "bytes": 26506,
-                 "body_sha256": "1226b2f61dd328c08a2ff456e4f36dcc20dd23ce9d18219e377bafa4d404e02d"},
+                 "body_sha256": "1226b2f61dd328c08a2ff456e4f36dcc20dd23ce9d18219e377bafa4d404e02d",
+                 "transport": "BUILTIN_NATIVE_GET"},
             ],
         }
         out = m.audit_songshan_prior_native_receipt(evidence)
