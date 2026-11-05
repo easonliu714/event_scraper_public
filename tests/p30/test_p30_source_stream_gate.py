@@ -287,5 +287,53 @@ class TestSourceStreamGate(unittest.TestCase):
         self.assertEqual(result["source_receipts"], [])
 
 
+    def test_zepp_parser_reuses_same_adapter_for_new_exact_rid(self):
+        # A second official venue schedule ID must not require another adapter.
+        # These are synthetic bytes; no native provenance is implied.
+        title = "Another source-owned venue event"
+        detail_url = ("https://www.zepp.co.jp/hall/newtaipei/"
+                      "schedule/single/?rid=166458")
+        listing = ('<main><a href="' + detail_url + '">2026 11.7 ' +
+                   title + ' READ MORE</a></main>').encode()
+        detail = ('<main><h2>' + title + '</h2></main>').encode()
+        checks = m.inspect_zepp_same_id_pages(
+            listing, detail, detail_url=detail_url, expected_title=title)
+        self.assertEqual(checks["exact_rid"], "166458")
+        self.assertEqual(checks["source_key"], m.ZEPP_SOURCE_KEY)
+        self.assertEqual(checks["formal_accepted_fields"], 0)
+        self.assertEqual(checks["date_role"], "UNVERIFIED_NOT_SESSION")
+        with self.assertRaisesRegex(ValueError, "ZEPP_LIST_EXACT_RID_TITLE_EDGE_HOLD"):
+            m.inspect_zepp_same_id_pages(
+                listing, detail, detail_url=m.ZEPP_DETAIL, expected_title=title)
+
+    def test_zepp_exact_url_rejects_query_duplicates_and_foreign_host(self):
+        listing = ('<main><a href="' + m.ZEPP_DETAIL + '">' +
+                   m.ZEPP_TITLE + '</a></main>').encode()
+        detail = ('<main><h2>' + m.ZEPP_TITLE + '</h2></main>').encode()
+        invalid = (
+            m.ZEPP_DETAIL + '&rid=166458',
+            m.ZEPP_DETAIL + '&tracking=1',
+            m.ZEPP_DETAIL.replace("www.zepp.co.jp", "example.org"),
+            m.ZEPP_DETAIL.replace("rid=166457", "rid=0"),
+            m.ZEPP_DETAIL + '#fragment',
+        )
+        for url in invalid:
+            with self.subTest(url=url), self.assertRaisesRegex(
+                    ValueError, "ZEPP_TARGET_"):
+                m.inspect_zepp_same_id_pages(
+                    listing, detail, detail_url=url)
+
+    def test_zepp_global_footer_heading_never_attests_detail_identity(self):
+        listing = ('<main><a href="' + m.ZEPP_DETAIL + '">' +
+                   m.ZEPP_TITLE + '</a></main>').encode()
+        # Matching heading outside MAIN is not source-local event identity.
+        detail = ('<main><p>Unrelated activity</p></main>'
+                  '<footer><h2>' + m.ZEPP_TITLE + '</h2></footer>').encode()
+        with self.assertRaisesRegex(ValueError, "ZEPP_DETAIL_EVENT_LOCAL_HEADING_HOLD"):
+            m.inspect_zepp_same_id_pages(listing, detail)
+
+
+
+
 if __name__ == "__main__":
     unittest.main()
