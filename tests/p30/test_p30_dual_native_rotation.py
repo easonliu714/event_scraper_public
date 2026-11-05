@@ -79,5 +79,40 @@ class TestRotation(unittest.TestCase):
             m.run_native_once("C")
 
 
+
+class TestDistinctNext(unittest.TestCase):
+    def pair(self,line):
+        c=m.NEXT[line]
+        return ('<main><article><a href="'+c["detail"]+'">'+c["title"]+'</a></article></main>',
+                '<main><article><h1>'+c["title"]+'</h1><p>'+c["venue"]+'</p></article></main>')
+
+    def test_exact_a_b_identity_and_review_only(self):
+        for line in "AB":
+            l,d=self.pair(line)
+            result=m.inspect_next_pair(line,l,d)
+            self.assertEqual(result["identity"],1)
+            self.assertEqual(result["fields"],2)
+            self.assertEqual(result["decision"],"REVIEW_NON_SESSION_ONLY")
+
+    def test_wrong_host_query_fragment_checkout(self):
+        for line in "AB":
+            u=m.NEXT[line]["detail"]
+            self.assertEqual(m.exact_next_href(line,u),u)
+            for bad in (u+"#x",u+"?checkout=1" if line=="A" else u+"&checkout=1",
+                        u.replace("https://","http://"),u.replace("https://","https://evil.example@")):
+                self.assertIsNone(m.exact_next_href(line,bad))
+
+    def test_title_venue_and_heading_scope_hold(self):
+        for line in "AB":
+            l,d=self.pair(line)
+            c=m.NEXT[line]
+            self.assertEqual(m.inspect_next_pair(line,l.replace(c["title"],"WRONG"),d)["identity"],0)
+            self.assertEqual(m.inspect_next_pair(line,l,d.replace("<main><article>","<header>").replace("</article></main>","</header>"))["identity"],0)
+            self.assertEqual(m.inspect_next_pair(line,l,d.replace("<p>"+c["venue"]+"</p>",""))["fields"],1)
+
+    def test_invalid_line(self):
+        with self.assertRaises(ValueError): m.run_next_native_once("C")
+        with self.assertRaises(ValueError): m.inspect_next_pair("C","","")
+
 if __name__ == "__main__":
     unittest.main()

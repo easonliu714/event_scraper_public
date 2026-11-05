@@ -211,6 +211,129 @@ def run_native_once(line):
     return out
 
 
+
+# Distinct native rotation: indexed public discovery only, not prior native PASS.
+# Existing Fami/Cloud Gate probes remain immutable and are never repeated here.
+NEXT = {
+ "A":dict(id="26_minhyun",source="03",origin="https://tixcraft.com",
+          listing="https://tixcraft.com/activity",
+          detail="https://tixcraft.com/activity/detail/26_minhyun",
+          title="2026 HWANG MIN HYUN FANMEETING [PEACH-BLOSSOM] - TAIPEI",
+          venue="Legacy TERA"),
+ "B":dict(id="167511",source="ZEPP_NEWTAIPEI_OFFICIAL",
+          origin="https://www.zepp.co.jp",
+          listing="https://www.zepp.co.jp/hall/newtaipei/schedule/",
+          detail="https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=167511",
+          title="Karencici The Loser Concert 2026",venue="Zepp New Taipei"),
+}
+
+class NextScoped(LocalHTML):
+    def __init__(self):
+        super().__init__()
+        self.local_text, self.local_size = [], 0
+
+    def handle_data(self, value):
+        super().handle_data(value)
+        if any(t in ("main", "article") for t in self.stack) and not any(
+                t in ("script", "style", "noscript", "template") for t in self.stack):
+            self.local_size += len(value)
+            if self.local_size > 200000:
+                raise ValueError("NEXT_LOCAL_TEXT_CAP_HOLD")
+            self.local_text.append(value)
+
+def exact_next_href(line, href):
+    from urllib.parse import parse_qsl
+    if line not in NEXT or not isinstance(href, str) or not href:
+        return None
+    cfg = NEXT[line]
+    try:
+        url = urljoin(cfg["listing"], href)
+        p, e = urlsplit(url), urlsplit(cfg["detail"])
+        if (p.scheme != "https" or p.netloc != e.netloc or p.path != e.path
+                or p.username or p.password or p.fragment or p.port is not None):
+            return None
+        if line == "A" and p.query:
+            return None
+        if line == "B" and parse_qsl(p.query, keep_blank_values=True) != [("rid","167511")]:
+            return None
+        return url
+    except (TypeError, ValueError):
+        return None
+
+def inspect_next_pair(line, listing_html, detail_html):
+    """Caller HTML cannot claim native provenance; event-local only."""
+    if line not in NEXT:
+        raise ValueError("NEXT_LINE_HOLD")
+    cfg = NEXT[line]
+    lp, dp = NextScoped(), NextScoped()
+    lp.feed(listing_html)
+    dp.feed(detail_html)
+    edges = [(exact_next_href(line,h),norm(t)) for h,t in lp.anchors if exact_next_href(line,h)]
+    if len(edges) != 1 or norm(cfg["title"]) not in edges[0][1]:
+        return dict(decision="HOLD",reason="NEXT_LIST_EXACT_ID_TITLE_HOLD",identity=0,fields=0)
+    if dp.headings.count(norm(cfg["title"])) != 1:
+        return dict(decision="HOLD",reason="NEXT_DETAIL_MAIN_TITLE_HOLD",identity=0,fields=0)
+    if norm(cfg["venue"]).casefold() not in norm(" ".join(dp.local_text)).casefold():
+        return dict(decision="HOLD",reason="NEXT_EVENT_LOCAL_VENUE_HOLD",identity=1,fields=1)
+    return dict(decision="REVIEW_NON_SESSION_ONLY",reason="INDEPENDENT_ACCEPTANCE_AND_LKG_HOLD",
+                identity=1,fields=2,roles=["SOURCE_EVENT_TITLE_REVIEW","SOURCE_VENUE_REVIEW"])
+
+def run_next_native_once(line):
+    """One robots+LIST+conditional DETAIL, bounded, no redirect/retry/checkout."""
+    if line not in NEXT:
+        raise ValueError("NEXT_LINE_HOLD")
+    cfg=NEXT[line]
+    out=dict(kind="P30_AB_DISTINCT_NATIVE_ONESHOT_V1",line=line,
+             source_id=cfg["source"],event_id=cfg["id"],attempted=0,
+             http200=0,native_list=0,native_detail=0,native_identity=0,
+             review_fields=0,field_receipts=[],source_receipts=[],native_lkg=0,
+             formal_fields=0,golden=0,published=0,raw_html_saved=False,
+             release_state="HARD_HOLD_NO_PUBLICATION",decision="HOLD",
+             first_failure="NOT_STARTED")
+    opener=urllib.request.build_opener(NoRedirect())
+    try:
+        out["attempted"]+=1
+        robots,rr=read_public(opener,cfg["origin"]+"/robots.txt","text/plain")
+        out["robots_receipt"]=rr
+        if not re.search(r"(?im)^\s*user-agent\s*:\s*[^\s#]+",robots):
+            raise ValueError("NEXT_ROBOTS_NO_DIRECTIVE_HOLD")
+        if re.search(r"(?i)<(?:!doctype\s+html|html|head|body)(?:\s|>)",robots[:2048]):
+            raise ValueError("NEXT_ROBOTS_HTML_FALLBACK_HOLD")
+        policy=urllib.robotparser.RobotFileParser()
+        policy.parse(robots.splitlines())
+        if not all(policy.can_fetch(UA,url) for url in (cfg["listing"],cfg["detail"])):
+            raise ValueError("NEXT_ROBOTS_DISALLOW_HOLD")
+        out["policy"]="ROBOTS_ALLOW"
+        out["attempted"]+=1
+        listing,lr=read_public(opener,cfg["listing"],"text/html")
+        if rr["body_sha256"]==lr["body_sha256"]:
+            raise ValueError("NEXT_ROBOTS_LIST_SAME_BODY_HOLD")
+        out["source_receipts"].append(lr)
+        out["http200"]+=1
+        out["native_list"]=1
+        parsed=NextScoped()
+        parsed.feed(listing)
+        edges=[(exact_next_href(line,h),norm(t)) for h,t in parsed.anchors
+               if exact_next_href(line,h)]
+        if len(edges)!=1 or norm(cfg["title"]) not in edges[0][1]:
+            raise ValueError("NEXT_NATIVE_LIST_EXACT_EDGE_HOLD")
+        out["attempted"]+=1
+        detail,dr=read_public(opener,edges[0][0],"text/html")
+        out["source_receipts"].append(dr)
+        out["http200"]+=1
+        out["native_detail"]=1
+        parsed=inspect_next_pair(line,listing,detail)
+        out["decision"],out["first_failure"]=parsed["decision"],parsed["reason"]
+        out["native_identity"],out["review_fields"]=parsed["identity"],parsed["fields"]
+        if parsed["decision"]=="REVIEW_NON_SESSION_ONLY":
+            out["field_receipts"]=[dict(source_url=dr["url"],event_id=cfg["id"],
+                body_sha256=dr["body_sha256"],observed_at_utc=dr["observed_at_utc"],
+                role=role,decision="REVIEW",formal_accepted=False)
+                for role in parsed["roles"]]
+    except (ValueError,UnicodeError,OSError,TimeoutError,urllib.error.URLError) as exc:
+        out["first_failure"]=type(exc).__name__+":"+str(exc)[:180]
+    return out
+
 if __name__ == "__main__":
     for line in ("A", "B"):
         print(json.dumps(run_native_once(line), ensure_ascii=False, sort_keys=True))
