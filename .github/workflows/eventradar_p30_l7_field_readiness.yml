@@ -1585,7 +1585,7 @@ jobs:
           assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
           assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
           assert all(r['url'] in (
-              'https://www.zepp.co.jp/hall/newtaipei/',
+              'https://www.zepp.co.jp/hall/newtaipei/schedule/',
               'https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457'
           ) for r in d['source_receipts'])
           print('ZEPP_NATIVE_ONESHOT',json.dumps({
