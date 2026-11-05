@@ -55,7 +55,7 @@ jobs:
           assert snap['priorVerifiedNativeGet']['successfulOfficialGet']==3
           assert [x['id'] for x in snap['lines']]==['A','B']
           assert all(x['draftPR']==236 and x['acceptedFields']==0 and x['decision'] in ('REVIEW_WITH_HOLD','HOLD') for x in snap['lines'])
-          assert all(x['head']=='94dbf650ad574fd71a3f5cb95488487b9c59397e' for x in snap['lines'])
+          assert all(x['head']=='cc5001558d83d47c4cd4ce4f06b50ad865839223' for x in snap['lines'])
           print('PASS_19_PLATFORM_BASELINE_BYTE_PARITY_AND_REVIEW_ONLY')
           PY
       - name: Status-only SHA256 evidence manifest
