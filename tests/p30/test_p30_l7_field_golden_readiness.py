@@ -3153,8 +3153,7 @@ class TestOpentixCanonicalTicketRotation(unittest.TestCase):
         old = m.load_isolated_review_lkg(self.dest, ROOT)
         old_envelope_sha = m._isolated_lkg_digest(old)
         new = copy.deepcopy(old)
-        new["source_receipts"]["bounded_acquisition"]["transport"] = (
-            "CALLER_SUPPLIED_UPDATED_PROVENANCE_NOT_NATIVE")
+        new["field_receipts"][0]["role"] = "TICKET_EVENT_TITLE_RECHECKED_REVIEW"
         self.assertEqual(new["last_known_good_sha256"],
                          old["last_known_good_sha256"])
         m.persist_isolated_review_lkg(
@@ -3163,8 +3162,7 @@ class TestOpentixCanonicalTicketRotation(unittest.TestCase):
             expected_previous_envelope_sha256=old_envelope_sha)
         protected_bytes = self.dest.read_bytes()
         stale = copy.deepcopy(old)
-        stale["source_receipts"]["bounded_acquisition"]["transport"] = (
-            "STALE_CALLER_PROVENANCE_NOT_NATIVE")
+        stale["field_receipts"][0]["role"] = "TICKET_EVENT_TITLE_STALE_REVIEW"
         with self.assertRaisesRegex(
                 ValueError, "ISOLATED_LKG_FULL_ENVELOPE_COMPARE_AND_SWAP_HOLD"):
             m.persist_isolated_review_lkg(
