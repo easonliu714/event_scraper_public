@@ -211,6 +211,16 @@ class TestSourceStreamGate(unittest.TestCase):
 
 
 
+    def test_zepp_official_schedule_is_list_authority_not_home(self):
+        # Indexed official schedule carries the exact rid event card.
+        # Venue home is discovery only; this is NOT a native GET receipt.
+        self.assertEqual(m.ZEPP_LIST,
+                         "https://www.zepp.co.jp/hall/newtaipei/schedule/")
+        self.assertNotEqual(m.ZEPP_LIST,
+                            "https://www.zepp.co.jp/hall/newtaipei/")
+        self.assertEqual(m.ZEPP_DETAIL,
+                         "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457")
+
     def test_zepp_exact_rid_same_anchor_and_detail_heading(self):
         from unittest.mock import patch
         listing = ('<main><a href="/hall/newtaipei/schedule/single/?rid=166457">'
