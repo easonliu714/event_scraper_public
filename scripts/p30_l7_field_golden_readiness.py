@@ -4185,16 +4185,6 @@ def run_huashan_field_aware_review_lkg(destination, repo_root, *,
                 "body_bytes": len(raw),
                 "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
             })
-        # Optional independent official HOME card date authority is evaluated
-        # BEFORE atomic LKG. A conflict never replaces a previous good snapshot.
-        if homepage_response is not None:
-            home = inspect_huashan_homepage_same_path_date(
-                homepage_response, now.astimezone(timezone.utc).isoformat(),
-                now_utc=now)
-            result["home_date_authority"] = home
-            if home["decision"] != "REVIEW_SAME_DATE_NOT_FORMAL":
-                result["first_failure"] = home["first_failure"]
-                return result
         detail = decoded[HUASHAN_PUBLIC_DETAIL]
         observed = now.astimezone(timezone.utc).isoformat()
         field = adjudicate_huashan_detail_field_roles(
@@ -4204,6 +4194,27 @@ def run_huashan_field_aware_review_lkg(destination, repo_root, *,
                 "REVIEW_FOUR_SOURCE_ROLES_INDEPENDENT_ACCEPTANCE_HOLD"):
             result["first_failure"] = field.get("first_failure") or "HUASHAN_FIELD_HOLD"
             return result
+        # Exact DETAIL date-role provenance precedes HOME conflict judgment.
+        # A mismatch must block the existing atomic/CAS LKG before any write.
+        if homepage_response is not None:
+            dates = [r for r in field["field_matrix"]
+                     if (r.get("field") == "event_date"
+                         and r.get("role") == "VENUE_EVENT_DATE_NOT_TICKET_SESSION"
+                         and r.get("source_url") == HUASHAN_PUBLIC_DETAIL
+                         and r.get("body_sha256") ==
+                             result["source_receipts"][1]["body_sha256"]
+                         and r.get("observed_at_utc") == observed
+                         and r.get("decision") == "REVIEW_SOURCE_ROLE_ONLY")]
+            if len(dates) != 1:
+                result["first_failure"] = "HUASHAN_DETAIL_DATE_ROLE_UNBOUND_HOLD"
+                return result
+            home = inspect_huashan_homepage_same_path_date(
+                homepage_response, observed, detail_event_date=dates[0]["value"],
+                now_utc=now)
+            result["home_date_authority"] = home
+            if home["decision"] != "REVIEW_SAME_DATE_NOT_FORMAL":
+                result["first_failure"] = home["first_failure"]
+                return result
         # The existing parser validates the exact LIST card -> DETAIL path/H1
         # and commits via checksum/CAS/atomic only after both pages validate.
         existing = run_huashan_exact_path_review_lkg(
@@ -4312,7 +4323,7 @@ HUASHAN_PUBLIC_HOME = "https://www.huashan1914.com/"
 
 
 def inspect_huashan_homepage_same_path_date(home_response, observed_at_utc,
-                                            *, now_utc=None):
+                                            *, detail_event_date, now_utc=None):
     """Bounded exact official HOME card -> DETAIL URL date conflict; no GET/write."""
     import hashlib
     import re
@@ -4324,22 +4335,38 @@ def inspect_huashan_homepage_same_path_date(home_response, observed_at_utc,
            "platform_id": "13", "home_url": HUASHAN_PUBLIC_HOME,
            "detail_url": HUASHAN_PUBLIC_DETAIL, "decision": "HOLD_SOURCE",
            "first_failure": "HUASHAN_HOME_RESPONSE_MISSING",
-           "home_event_date": None, "detail_event_date": "2026-11-07",
+           "home_event_date": None, "detail_event_date": detail_event_date,
            "native_get_this_call": 0, "formal_accepted_fields": 0,
            "golden_accepted_events": 0, "published_events": 0,
            "release_state": "HARD_HOLD_NO_PUBLICATION"}
     def hold(reason):
         out["first_failure"] = reason
         return out
+    # Bind HOME comparison to a parsed exact DETAIL field, not a fixture date.
+    try:
+        if (not isinstance(detail_event_date, str) or
+                len(detail_event_date) != 10 or
+                datetime.strptime(detail_event_date, "%Y-%m-%d").date().isoformat()
+                != detail_event_date):
+            return hold("HUASHAN_DETAIL_DATE_AUTHORITY_UNBOUND_HOLD")
+    except ValueError:
+        return hold("HUASHAN_DETAIL_DATE_AUTHORITY_UNBOUND_HOLD")
     if not isinstance(home_response, tuple) or len(home_response) != 4:
         return hold("HUASHAN_HOME_RESPONSE_SHAPE_HOLD")
     status, content_type, raw, final_url = home_response
-    if (type(status) is not int or status != 200
-            or final_url != HUASHAN_PUBLIC_HOME
-            or not isinstance(content_type, str)
-            or content_type.split(";", 1)[0].strip().lower() != "text/html"
-            or not isinstance(raw, bytes) or not 0 < len(raw) <= 524288):
-        return hold("HUASHAN_HOME_EXACT_HTTP_OR_BODY_HOLD")
+    # Distinguish the first real HTTP200 failure without storing raw HTML.
+    # This pure parser never triggers a repeat GET.
+    if type(status) is not int or status != 200:
+        return hold("HUASHAN_HOME_HTTP_STATUS_HOLD")
+    if final_url != HUASHAN_PUBLIC_HOME:
+        return hold("HUASHAN_HOME_FINAL_URL_OR_REDIRECT_HOLD")
+    if (not isinstance(content_type, str) or
+            content_type.split(";", 1)[0].strip().lower() != "text/html"):
+        return hold("HUASHAN_HOME_CONTENT_TYPE_HOLD")
+    if not isinstance(raw, bytes) or not raw:
+        return hold("HUASHAN_HOME_EMPTY_BODY_HOLD")
+    if len(raw) > 524288:
+        return hold("HUASHAN_HOME_BODY_BOUNDS_HOLD")
     params = [p.strip().lower() for p in content_type.split(";")[1:]]
     if any(p.startswith("charset=") and
            p.split("=", 1)[1].strip('"') != "utf-8" for p in params):

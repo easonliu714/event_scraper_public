@@ -2847,7 +2847,8 @@ class TestHuashanFieldAwareReusablePipeline(unittest.TestCase):
 
     def test_homepage_same_date_review_and_wrong_identity_hold(self):
         good = m.inspect_huashan_homepage_same_path_date(
-            self.home("07"), self.now.isoformat(), now_utc=self.now)
+            self.home("07"), self.now.isoformat(),
+            detail_event_date="2026-11-07", now_utc=self.now)
         self.assertEqual(good["decision"], "REVIEW_SAME_DATE_NOT_FORMAL")
         self.assertEqual(good["formal_accepted_fields"], 0)
         bad = m.run_huashan_field_aware_review_lkg(
@@ -2858,6 +2859,53 @@ class TestHuashanFieldAwareReusablePipeline(unittest.TestCase):
                          "HUASHAN_HOME_EXACT_CARD_ANCHOR_IDENTITY_HOLD")
         self.assertFalse(self.destination.exists())
 
+
+    def test_home_date_bound_to_detail_role_not_hardcoded_event(self):
+        same = m.inspect_huashan_homepage_same_path_date(
+            self.home("06"), self.now.isoformat(),
+            detail_event_date="2026-11-06", now_utc=self.now)
+        self.assertEqual(same["decision"], "REVIEW_SAME_DATE_NOT_FORMAL")
+        self.assertEqual(same["detail_event_date"], "2026-11-06")
+        for bad in ("2026-11-31", "2026-1-7", None):
+            with self.subTest(detail_event_date=bad):
+                hold = m.inspect_huashan_homepage_same_path_date(
+                    self.home("07"), self.now.isoformat(),
+                    detail_event_date=bad, now_utc=self.now)
+                self.assertEqual(
+                    hold["first_failure"],
+                    "HUASHAN_DETAIL_DATE_AUTHORITY_UNBOUND_HOLD")
+
+    def test_home_transport_root_cause_separation_without_get(self):
+        good = self.home("07")
+        cases = [
+            ((302, good[1], good[2], good[3]),
+             "HUASHAN_HOME_HTTP_STATUS_HOLD"),
+            ((200, good[1], good[2], "https://example.org/"),
+             "HUASHAN_HOME_FINAL_URL_OR_REDIRECT_HOLD"),
+            ((200, "application/json", good[2], good[3]),
+             "HUASHAN_HOME_CONTENT_TYPE_HOLD"),
+            ((200, good[1], b"", good[3]),
+             "HUASHAN_HOME_EMPTY_BODY_HOLD"),
+            ((200, good[1], b"x" * 524289, good[3]),
+             "HUASHAN_HOME_BODY_BOUNDS_HOLD"),
+        ]
+        for payload, reason in cases:
+            with self.subTest(reason=reason):
+                out = m.inspect_huashan_homepage_same_path_date(
+                    payload, self.now.isoformat(),
+                    detail_event_date="2026-11-07", now_utc=self.now)
+                self.assertEqual(out["first_failure"], reason)
+                self.assertEqual(out["formal_accepted_fields"], 0)
+
+    def test_matching_home_detail_date_still_review_only(self):
+        out = m.run_huashan_field_aware_review_lkg(
+            self.destination, ROOT, source_bodies=self.bodies(),
+            homepage_response=self.home("07"), now_utc=self.now)
+        self.assertEqual(out["same_path_review_lkg"], 1, out)
+        self.assertEqual(out["home_date_authority"]["detail_event_date"],
+                         "2026-11-07")
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertEqual(out["golden_accepted_events"], 0)
 
 class TestTmcFieldAwareReusablePipeline(unittest.TestCase):
     """A pre-acquired TMC pair uses existing L7 candidate and LKG, not GET."""
