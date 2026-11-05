@@ -26,7 +26,7 @@ jobs:
           base=d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'scripts/p30_source_stream_gate.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_source_stream_gate.py' 'scripts/p30_accupass_native_gate.py' 'tests/p30/test_p30_accupass_native_gate.py' 'scripts/p30_ntpc_artcenter_source.py' 'tests/p30/test_p30_ntpc_artcenter_source.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'scripts/p30_source_stream_gate.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_source_stream_gate.py' 'scripts/p30_accupass_native_gate.py' 'tests/p30/test_p30_accupass_native_gate.py' 'scripts/p30_ntpc_artcenter_source.py' 'tests/p30/test_p30_ntpc_artcenter_source.py' 'scripts/p30_dual_native_rotation.py' 'tests/p30/test_p30_dual_native_rotation.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
           git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
@@ -42,11 +42,12 @@ jobs:
           PY
       - name: Source-bound acceptance contract and negative tests
         run: |
-          python -m py_compile scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py
+          python -m py_compile scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py
           python -m unittest discover -s tests/p30 -p 'test_p30_l7_field_golden_readiness.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_source_stream_gate.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_accupass_native_gate.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_ntpc_artcenter_source.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_dual_native_rotation.py' -v
           python scripts/p30_l7_field_golden_readiness.py
       - name: One-shot bounded official native GET acquisition diagnosis (not Golden)
         shell: bash
@@ -1658,6 +1659,28 @@ jobs:
               'list':d['native_list'],'detail':d['native_detail'],
               'same_id_review':d['native_same_id_review'],
               'first_failure':d['first_failure']}))
+          PY
+      - name: One-shot A FamiTicket and B NTPC native source rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.run_attempt }}" != "1" ] || ! git log -1 --format=%s | grep -Fq '[dual-rotation-once]'; then
+            echo 'DUAL_ROTATION_NATIVE_SKIPPED_EXACT_HEAD_ONE_SHOT_GUARD'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_dual_native_rotation import run_native_once
+          for line in ('A','B'):
+              result=run_native_once(line)
+              Path('evidence/native_rotation_'+line+'.json').write_text(
+                  json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\\n',
+                  encoding='utf-8')
+              print('NATIVE_ROTATION',line,result['native_http200'],
+                    result['native_list'],result['native_detail'],
+                    result['native_same_id_review'],result['first_failure'],flush=True)
           PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
