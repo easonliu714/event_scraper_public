@@ -323,15 +323,136 @@ def acquire_tpac_native_once():
     return out
 
 
+
+# Reuse the two existing A/B canonical adapters as one repeatable, non-network
+# CLI. This is an executable integration, NOT a new source/native observation.
+# Original caller observation timestamps and SHA256 must bind both complete
+# source bodies. Invalid or stale source cannot overwrite the sealed LKG.
+def read_preacquired_ab_manifest(manifest_path, repo_root, line, now_utc=None):
+    from scripts.p30_l7_field_golden_readiness import (
+        OPENTIX_ROTATION_LIST, OPENTIX_ROTATION_DETAIL, SONGSHAN_PUBLIC_LIST)
+    root = Path(repo_root).resolve(strict=True)
+    def source_file(value):
+        path = Path(value)
+        if not path.is_absolute() or any(p.is_symlink() for p in (path, *path.parents)):
+            raise ValueError("REPLAY_INPUT_ABSOLUTE_NON_SYMLINK_REQUIRED")
+        resolved = path.resolve(strict=True)
+        if resolved == root or resolved.is_relative_to(root):
+            raise ValueError("REPLAY_RAW_SOURCE_INSIDE_REPO_HOLD")
+        if not resolved.is_file() or not 0 < resolved.stat().st_size <= 524288:
+            raise ValueError("REPLAY_INPUT_FILE_SIZE_OR_TYPE_HOLD")
+        return resolved
+    manifest = json.loads(source_file(manifest_path).read_text(encoding="utf-8"))
+    if (not isinstance(manifest, dict)
+            or set(manifest) != {"kind", "transport", "sources"}
+            or manifest["kind"] != "P30_PREACQUIRED_OFFICIAL_HTML_V1"
+            or manifest["transport"] != "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED"
+            or not isinstance(manifest["sources"], list)
+            or len(manifest["sources"]) != 2):
+        raise ValueError("REPLAY_MANIFEST_SHAPE_OR_TRANSPORT_HOLD")
+    urls = ((OPENTIX_ROTATION_LIST, OPENTIX_ROTATION_DETAIL) if line == "A"
+            else (SONGSHAN_PUBLIC_LIST, SONGSHAN_DETAIL))
+    now = now_utc or datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("REPLAY_CLOCK_HOLD")
+    result, stamps, receipts = {}, [], []
+    for item, url in zip(manifest["sources"], urls):
+        if (not isinstance(item, dict)
+                or set(item) != {"url", "path", "sha256", "observed_at_utc"}
+                or item["url"] != url or not isinstance(item["sha256"], str)
+                or re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) is None):
+            raise ValueError("REPLAY_EXACT_URL_OR_SHA_MANIFEST_HOLD")
+        stamp_raw = item["observed_at_utc"]
+        if not isinstance(stamp_raw, str):
+            raise ValueError("REPLAY_OBSERVATION_TIME_HOLD")
+        stamp = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00"))
+        if stamp.utcoffset() is None or not 0 <= (now - stamp).total_seconds() <= 86400:
+            raise ValueError("REPLAY_STALE_FUTURE_OR_NAIVE_TIME_HOLD")
+        raw = source_file(item["path"]).read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != item["sha256"]:
+            raise ValueError("REPLAY_SOURCE_BYTES_SHA256_MISMATCH_HOLD")
+        stamps.append(stamp)
+        receipts.append({"url": url, "body_sha256": digest,
+                         "body_bytes": len(raw), "observed_at_utc": stamp.isoformat(),
+                         "transport": "CALLER_SUPPLIED_NOT_NATIVE_ATTESTED"})
+        result[url] = (200, "text/html; charset=utf-8", raw, url, stamp.isoformat())
+    if (max(stamps) - min(stamps)).total_seconds() > 600:
+        raise ValueError("REPLAY_LIST_DETAIL_OBSERVATION_SKEW_HOLD")
+    return result, receipts, max(stamps)
+
+
+def replay_preacquired_ab_to_review_lkg(line, manifest, destination, repo_root,
+                                        now_utc=None):
+    """Source Adapter -> same ID DETAIL -> role -> provenance -> atomic LKG."""
+    from scripts.p30_l7_field_golden_readiness import (
+        run_opentix_existing_id_review_lkg, run_songshan_uuid_review_lkg,
+        load_isolated_review_lkg)
+    out = {"kind": "P30_A_B_OFFLINE_SOURCE_REPLAY_V1", "line": line,
+           "native_get_this_call": 0, "native_get_attested": False,
+           "same_id_review_lkg": 0, "formal_accepted_fields": 0,
+           "golden_accepted_events": 0, "published_events": 0,
+           "release_state": "HARD_HOLD_NO_PUBLICATION",
+           "decision": "HOLD", "first_failure": "REPLAY_NOT_VALIDATED",
+           "source_receipts": []}
+    try:
+        if line not in ("A", "B"):
+            raise ValueError("REPLAY_LINE_HOLD")
+        bodies, receipts, stamp = read_preacquired_ab_manifest(
+            manifest, repo_root, line, now_utc=now_utc)
+        out["source_receipts"] = receipts
+        if line == "A":
+            result = run_opentix_existing_id_review_lkg(
+                destination, repo_root, source_bodies=bodies,
+                now_utc=now_utc or datetime.now(timezone.utc))
+            success = result.get("same_id_review_lkg") == 1
+        else:
+            result = run_songshan_uuid_review_lkg(
+                destination, repo_root,
+                fetcher=lambda url: bodies[url][:4], now_utc=stamp,
+                event_uuid=SONGSHAN_UUID,
+                event_title="STAR ON THE MOVE 2026 臺北採購媒合與展售會",
+                event_type="展覽")
+            success = result.get("same_uuid_review_lkg") == 1 and result.get("persisted") is True
+        out["first_failure"] = result.get("first_failure", result.get("reason", "UNKNOWN"))
+        if not success:
+            return out
+        snapshot = load_isolated_review_lkg(destination, repo_root)
+        if snapshot is None or snapshot["rows"][0]["_candidate"]["platform_id"] != (
+                "05" if line == "A" else "14"):
+            raise ValueError("REPLAY_LKG_IDENTITY_READBACK_HOLD")
+        if snapshot["rows"][0]["scraped_at"] != stamp.isoformat():
+            raise ValueError("REPLAY_LKG_ORIGINAL_TIMESTAMP_HOLD")
+        out.update(decision="REVIEW_ONLY_NONPUBLISHING",
+                   first_failure="INDEPENDENT_NATIVE_FIELD_AUTHORITY_HOLD",
+                   same_id_review_lkg=1,
+                   last_known_good_sha256=snapshot["last_known_good_sha256"],
+                   lkg_envelope_readback=True)
+    except (ValueError, TypeError, KeyError, OSError, UnicodeError,
+            json.JSONDecodeError, AttributeError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:140]
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
     parser.add_argument("--songshan-evidence", type=Path)
     parser.add_argument("--tpac-native-once", action="store_true")
+    parser.add_argument("--ab-replay-manifest", type=Path)
+    parser.add_argument("--ab-line", choices=("A", "B"))
+    parser.add_argument("--ab-isolated-output", type=Path)
+    parser.add_argument("--ab-repo-root", type=Path)
     args = parser.parse_args()
-    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once)) != 1:
+    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once, bool(args.ab_replay_manifest))) != 1:
         parser.error("supply exactly one input; native is a CI one-shot only")
-    if args.tpac_native_once:
+    if args.ab_replay_manifest:
+        if not all((args.ab_line, args.ab_isolated_output, args.ab_repo_root)):
+            parser.error("A/B replay requires --ab-line, --ab-isolated-output and --ab-repo-root")
+        result = replay_preacquired_ab_to_review_lkg(
+            args.ab_line, args.ab_replay_manifest, args.ab_isolated_output,
+            args.ab_repo_root)
+    elif args.tpac_native_once:
         result = acquire_tpac_native_once()
     elif args.tpac_html:
         with args.tpac_html.open("rb") as stream:
