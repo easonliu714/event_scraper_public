@@ -669,18 +669,177 @@ def probe_zepp_newtaipei_native_once():
     return result
 
 
+
+# A new canonical #05 OPENTIX public DETAIL (distinct from prior consumed
+# TPAC/OPENTIX ID). No checkout, Session, LIST edge, or formal publication.
+OPENTIX_FRESH_DETAIL = "https://www.opentix.life/event/2054505084713033728"
+OPENTIX_FRESH_TITLE = "《神隱少女》舞台劇"
+OPENTIX_FRESH_MAX_BYTES = 4 * 1024 * 1024
+
+
+class OpentixDetailLocalHTML(HTMLParser):
+    """Exact MAIN-local heading only, never global SEO/header/footer."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.main_depth = 0
+        self.heading = None
+        self.headings = []
+        self.nodes = 0
+
+    def handle_starttag(self, tag, attrs):
+        self.nodes += 1
+        if self.nodes > 120000:
+            raise ValueError("OPENTIX_FRESH_DOM_NODE_BOUND_HOLD")
+        if tag == "main":
+            self.main_depth += 1
+        if tag in ("h1", "h2", "h3") and self.main_depth:
+            if self.heading is not None:
+                raise ValueError("OPENTIX_FRESH_NESTED_HEADING_HOLD")
+            self.heading = [tag, ""]
+
+    def handle_data(self, value):
+        if self.heading is not None:
+            self.heading[1] += value
+            if len(self.heading[1]) > 1000:
+                raise ValueError("OPENTIX_FRESH_HEADING_BOUND_HOLD")
+
+    def handle_endtag(self, tag):
+        if self.heading is not None and tag == self.heading[0]:
+            self.headings.append(" ".join(self.heading[1].split()))
+            self.heading = None
+        if tag == "main" and self.main_depth:
+            self.main_depth -= 1
+
+
+def inspect_opentix_fresh_detail_body(raw):
+    """Offline body parser; no claim of native provenance."""
+    if not isinstance(raw, bytes) or not 0 < len(raw) <= OPENTIX_FRESH_MAX_BYTES:
+        raise ValueError("OPENTIX_FRESH_BODY_BOUND_HOLD")
+    parser = OpentixDetailLocalHTML()
+    parser.feed(raw.decode("utf-8", errors="strict"))
+    parser.close()
+    count = parser.headings.count(OPENTIX_FRESH_TITLE)
+    return {"exact_main_heading_count": count,
+            "event_local_title_review": count == 1,
+            "source_event_id": "2054505084713033728",
+            "list_same_id_edge_attested": False,
+            "formal_accepted_fields": 0}
+
+
+def probe_opentix_fresh_detail_native_once():
+    """Robots-checked, one GET, no redirect/retry/raw HTML persistence."""
+    import socket
+    import urllib.error
+    import urllib.request
+    import urllib.robotparser
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    out = {
+        "kind": "P30_A_OPENTIX_DISTINCT_DETAIL_NATIVE_ONESHOT_V1",
+        "line": "A", "platform_id": "05",
+        "source_event_id": "2054505084713033728",
+        "source_url": OPENTIX_FRESH_DETAIL,
+        "policy_get_attempted": 1, "policy_decision": "UNKNOWN",
+        "native_get_attempted": 0, "native_http200": 0,
+        "native_list_get_attempted": 0, "native_detail_get_attempted": 0,
+        "native_same_id_review_lkg": 0, "formal_accepted_fields": 0,
+        "golden_accepted_events": 0, "published_events": 0,
+        "raw_html_saved": False, "decision": "HOLD",
+        "first_failure": "OPENTIX_NEW_SOURCE_NOT_ACQUIRED",
+        "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    opener = urllib.request.build_opener(NoRedirect)
+    robots_url = "https://www.opentix.life/robots.txt"
+    try:
+        request = urllib.request.Request(robots_url, method="GET",
+            headers={"User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                     "Accept": "text/plain", "Accept-Encoding": "identity"})
+        try:
+            with opener.open(request, timeout=8) as response:
+                out["policy_http_status"] = response.status
+                if response.status != 200 or response.geturl() != robots_url:
+                    raise ValueError("OPENTIX_ROBOTS_STATUS_REDIRECT_HOLD")
+                policy = response.read(65537)
+                if len(policy) > 65536:
+                    raise ValueError("OPENTIX_ROBOTS_SIZE_HOLD")
+                out["policy_observed_at_utc"] = datetime.now(timezone.utc).isoformat()
+                out["policy_body_sha256"] = hashlib.sha256(policy).hexdigest()
+                out["policy_body_bytes"] = len(policy)
+                parser = urllib.robotparser.RobotFileParser()
+                parser.parse(policy.decode("utf-8", errors="strict").splitlines())
+                if not parser.can_fetch("EventRadarSourceAudit", OPENTIX_FRESH_DETAIL):
+                    raise ValueError("OPENTIX_ROBOTS_DISALLOW_HOLD")
+                out["policy_decision"] = "ALLOW_ROBOTS_200"
+        except urllib.error.HTTPError as exc:
+            out["policy_http_status"] = exc.code
+            if exc.code != 404:
+                raise ValueError("OPENTIX_ROBOTS_HTTP_HOLD_" + str(exc.code))
+            out["policy_decision"] = "ALLOW_ROBOTS_404"
+    except (ValueError, UnicodeError, OSError, TimeoutError,
+            urllib.error.URLError) as exc:
+        out["first_failure"] = "OPENTIX_SITE_POLICY_HOLD:" + type(exc).__name__ + ":" + str(exc)[:100]
+        return out
+
+    out["native_get_attempted"] = 1
+    out["native_detail_get_attempted"] = 1
+    out["observed_at_utc"] = datetime.now(timezone.utc).isoformat()
+    try:
+        request = urllib.request.Request(OPENTIX_FRESH_DETAIL, method="GET",
+            headers={"User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                     "Accept": "text/html,application/xhtml+xml",
+                     "Accept-Encoding": "identity"})
+        with opener.open(request, timeout=8) as response:
+            out["http_status"] = response.status
+            out["native_http200"] = int(response.status == 200)
+            if response.status != 200 or response.geturl() != OPENTIX_FRESH_DETAIL:
+                raise ValueError("OPENTIX_DETAIL_STATUS_REDIRECT_HOLD")
+            mime = response.headers.get("Content-Type", "")
+            if mime.split(";", 1)[0].strip().lower() != "text/html":
+                raise ValueError("OPENTIX_DETAIL_MIME_HOLD")
+            charsets = [p.split("=", 1)[1].strip().strip('"').lower()
+                        for p in mime.split(";")[1:]
+                        if p.strip().lower().startswith("charset=")]
+            if charsets and charsets != ["utf-8"]:
+                raise ValueError("OPENTIX_DETAIL_CHARSET_HOLD")
+            raw = response.read(OPENTIX_FRESH_MAX_BYTES + 1)
+            out["body_bytes_read"] = len(raw)
+            if not 0 < len(raw) <= OPENTIX_FRESH_MAX_BYTES:
+                raise ValueError("OPENTIX_DETAIL_TRUNCATED_OR_EMPTY_HOLD")
+            out["body_sha256"] = hashlib.sha256(raw).hexdigest()
+            out["detail_checks"] = inspect_opentix_fresh_detail_body(raw)
+            if not out["detail_checks"]["event_local_title_review"]:
+                raise ValueError("OPENTIX_DETAIL_EXACT_MAIN_TITLE_HOLD")
+            out["decision"] = "REVIEW_NATIVE_DETAIL_ONLY"
+            out["first_failure"] = "LIST_SAME_ID_AND_INDEPENDENT_FIELD_AUTHORITY_HOLD"
+    except urllib.error.HTTPError as exc:
+        out["http_status"] = exc.code
+        out["first_failure"] = ("OPENTIX_DETAIL_REDIRECT_HOLD" if 300 <= exc.code < 400
+                                else "OPENTIX_DETAIL_HTTP_ERROR_HOLD")
+    except urllib.error.URLError as exc:
+        out["network_error_type"] = type(exc.reason).__name__
+        out["first_failure"] = ("OPENTIX_DETAIL_DNS_EGRESS_HOLD"
+                                if isinstance(exc.reason, socket.gaierror)
+                                else "OPENTIX_DETAIL_NETWORK_HOLD")
+    except (ValueError, UnicodeError, OSError, TimeoutError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:120]
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
     parser.add_argument("--songshan-evidence", type=Path)
     parser.add_argument("--tpac-native-once", action="store_true")
     parser.add_argument("--zepp-native-once", action="store_true")
+    parser.add_argument("--opentix-native-once", action="store_true")
     parser.add_argument("--ab-replay-manifest", type=Path)
     parser.add_argument("--ab-line", choices=("A", "B"))
     parser.add_argument("--ab-isolated-output", type=Path)
     parser.add_argument("--ab-repo-root", type=Path)
     args = parser.parse_args()
-    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once, args.zepp_native_once, bool(args.ab_replay_manifest))) != 1:
+    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once, args.zepp_native_once, args.opentix_native_once, bool(args.ab_replay_manifest))) != 1:
         parser.error("supply exactly one input; native is a CI one-shot only")
     if args.ab_replay_manifest:
         if not all((args.ab_line, args.ab_isolated_output, args.ab_repo_root)):
@@ -692,6 +851,8 @@ def main():
         result = acquire_tpac_native_once()
     elif args.zepp_native_once:
         result = probe_zepp_newtaipei_native_once()
+    elif args.opentix_native_once:
+        result = probe_opentix_fresh_detail_native_once()
     elif args.tpac_html:
         with args.tpac_html.open("rb") as stream:
             result = inspect_tpac_complete_stream(

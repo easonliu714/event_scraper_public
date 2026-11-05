@@ -1593,6 +1593,44 @@ jobs:
               'same_id_review':d['native_same_id_review'],
               'same_id_lkg':0,'first_failure':d['first_failure']}))
           PY
+      - name: One-shot A OPENTIX distinct public DETAIL native source rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New event; no checkout or ticket Session, no repeated probe.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[opentix-native-once]'; then
+            echo 'OPENTIX_FRESH_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          set +e
+          python scripts/p30_source_stream_gate.py --opentix-native-once > evidence/opentix_fresh_detail_native_once.json
+          gate_rc=$?
+          set -e
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 49 ]; then
+            echo "OPENTIX_FRESH_NATIVE_UNEXPECTED_EXIT=$gate_rc"
+            exit "$gate_rc"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/opentix_fresh_detail_native_once.json').read_text(encoding='utf-8'))
+          assert d['kind']=='P30_A_OPENTIX_DISTINCT_DETAIL_NATIVE_ONESHOT_V1'
+          assert d['line']=='A' and d['platform_id']=='05'
+          assert d['source_event_id']=='2054505084713033728'
+          assert d['source_url']=='https://www.opentix.life/event/2054505084713033728'
+          assert d['policy_get_attempted']==1
+          assert d['native_get_attempted']<=1 and d['native_detail_get_attempted']<=1
+          assert d['native_list_get_attempted']==0
+          assert d['native_http200']<=d['native_get_attempted']
+          assert d['native_same_id_review_lkg']==0
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          print('OPENTIX_DISTINCT_NATIVE',json.dumps({
+              'policy':d['policy_decision'],'attempted':d['native_get_attempted'],
+              'http200':d['native_http200'],'decision':d['decision'],
+              'first_failure':d['first_failure'],'same_id_lkg':0}))
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1603,6 +1641,7 @@ jobs:
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/zepp_newtaipei_native_once.json ]; then sha256sum evidence/zepp_newtaipei_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/opentix_fresh_detail_native_once.json ]; then sha256sum evidence/opentix_fresh_detail_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi

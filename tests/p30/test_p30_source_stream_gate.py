@@ -345,5 +345,74 @@ class TestSourceStreamGate(unittest.TestCase):
 
 
 
+    def test_opentix_new_native_detail_only_no_list_or_formal(self):
+        import urllib.error
+        from unittest.mock import patch
+        html = ('<header><h1>' + m.OPENTIX_FRESH_TITLE + '</h1></header>'
+                '<main><h1>' + m.OPENTIX_FRESH_TITLE + '</h1></main>').encode()
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/html; charset=utf-8"}
+            def __init__(self, url, raw):
+                super().__init__(raw)
+                self.url = url
+            def geturl(self):
+                return self.url
+        class Opener:
+            def __init__(self):
+                self.urls = []
+            def open(self, req, timeout):
+                self.urls.append(req.full_url)
+                assert timeout == 8
+                if req.full_url.endswith("/robots.txt"):
+                    raise urllib.error.HTTPError(req.full_url, 404, "not found", {}, None)
+                return Response(req.full_url, html)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            out = m.probe_opentix_fresh_detail_native_once()
+        self.assertEqual(opener.urls, ["https://www.opentix.life/robots.txt",
+                                       m.OPENTIX_FRESH_DETAIL])
+        self.assertEqual(out["native_http200"], 1)
+        self.assertEqual(out["decision"], "REVIEW_NATIVE_DETAIL_ONLY")
+        self.assertEqual(out["body_sha256"], hashlib.sha256(html).hexdigest())
+        self.assertEqual(out["detail_checks"]["exact_main_heading_count"], 1)
+        self.assertFalse(out["detail_checks"]["list_same_id_edge_attested"])
+        self.assertEqual(out["native_same_id_review_lkg"], 0)
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertEqual(out["golden_accepted_events"], 0)
+        self.assertEqual(out["published_events"], 0)
+        self.assertFalse(out["raw_html_saved"])
+
+    def test_opentix_global_heading_and_robots_disallow_hold(self):
+        from unittest.mock import patch
+        global_only = ('<header><h1>' + m.OPENTIX_FRESH_TITLE +
+                       '</h1></header><main><p>other event</p></main>').encode()
+        self.assertFalse(m.inspect_opentix_fresh_detail_body(
+            global_only)["event_local_title_review"])
+        with self.assertRaisesRegex(ValueError, "OPENTIX_FRESH_BODY_BOUND_HOLD"):
+            m.inspect_opentix_fresh_detail_body(b"")
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/plain"}
+            def geturl(self):
+                return "https://www.opentix.life/robots.txt"
+        class Opener:
+            calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                return Response(b"User-agent: *\nDisallow: /event/\n")
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            out = m.probe_opentix_fresh_detail_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(out["native_get_attempted"], 0)
+        self.assertEqual(out["decision"], "HOLD")
+        self.assertIn("OPENTIX_ROBOTS_DISALLOW_HOLD", out["first_failure"])
+
+    def test_zepp_prior_native_receipt_not_raw_html_replay(self):
+        # Historical 2/2 receipt has SHA/time but no replayable body.
+        self.assertEqual(m.ZEPP_SOURCE_KEY, "venue:zepp-newtaipei")
+        self.assertEqual(m.ZEPP_DETAIL.split("rid=")[1], "166457")
+
 if __name__ == "__main__":
     unittest.main()
