@@ -414,5 +414,105 @@ class TestSourceStreamGate(unittest.TestCase):
         self.assertEqual(m.ZEPP_SOURCE_KEY, "venue:zepp-newtaipei")
         self.assertEqual(m.ZEPP_DETAIL.split("rid=")[1], "166457")
 
+
+    def _zepp_synthetic_archive(self, *, source_event_id="166457",
+                                include_receipt=True):
+        # Synthetic archive is NOT the pinned historical CI artifact.
+        import zipfile
+        receipt = {
+            "kind": "P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1",
+            "line": "B", "source_key": m.ZEPP_SOURCE_KEY,
+            "source_event_id": source_event_id,
+            "policy_decision": "ALLOW_ROBOTS_200",
+            "native_get_attempted": 2, "native_http200": 2,
+            "native_list_get_attempted": 1,
+            "native_detail_get_attempted": 1,
+            "native_same_id_review": 1, "same_id_review_lkg": 0,
+            "decision": "REVIEW_NATIVE_SAME_ID_ONLY",
+            "raw_html_saved": False, "formal_accepted_fields": 0,
+            "golden_accepted_events": 0, "published_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "identity_checks": {
+                "exact_rid": "166457", "title": m.ZEPP_TITLE,
+                "source_key": m.ZEPP_SOURCE_KEY,
+                "list_exact_edge_count": 1,
+                "detail_exact_heading_count": 1,
+                "date_role": "UNVERIFIED_NOT_SESSION",
+                "start_role": "UNVERIFIED_NOT_SESSION"},
+            "source_receipts": [
+                {"url": m.ZEPP_LIST, "body_bytes_read": 343607,
+                 "body_sha256": "1632f6235bc4a9365c2569697e50f2612e4165dfabee16bc4134f6fddbd497bf",
+                 "http_status": 200, "observed_at_utc": "2026-11-05T18:00:18.824848Z",
+                 "transport": "BUILTIN_NATIVE_GET_NO_REDIRECT_NO_RETRY"},
+                {"url": m.ZEPP_DETAIL, "body_bytes_read": 310512,
+                 "body_sha256": "66750b7e3f39e7ec84c4de2b630517b9c39d4171bc305d7c0f7ca72e732aa67d",
+                 "http_status": 200, "observed_at_utc": "2026-11-05T18:00:20.983747Z",
+                 "transport": "BUILTIN_NATIVE_GET_NO_REDIRECT_NO_RETRY"}]}
+        payload = {
+            "readiness.txt": b"offline only",
+            "field_subset_review_proposal.json": b"{}",
+            "tmc_field_authority_contract.json": b"{}",
+            "canonical_field_authority_contract.json": b"{}"}
+        if include_receipt:
+            payload["zepp_newtaipei_native_once.json"] = json.dumps(
+                receipt, ensure_ascii=False).encode()
+        entries = [
+            hashlib.sha256(b).hexdigest() + "  evidence/" + name
+            for name, b in payload.items()]
+        entries += [
+            "0" * 64 + "  " + name for name in (
+                ".github/workflows/eventradar_p30_l7_field_readiness.yml",
+                "scripts/p30_l7_field_golden_readiness.py",
+                "scripts/p30_source_stream_gate.py",
+                "tests/p30/test_p30_l7_field_golden_readiness.py",
+                "tests/p30/test_p30_source_stream_gate.py",
+                "tests/p30/fixtures/p30_l7_prince_field_readiness.json")]
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, body in payload.items():
+                z.writestr(name, body)
+            z.writestr("SHA256SUMS.txt", "\n".join(entries) + "\n")
+        return stream.getvalue()
+
+    def test_zepp_receipt_archive_sealed_identity_not_body_lkg(self):
+        archive = self._zepp_synthetic_archive()
+        snapshot = m.audit_zepp_sealed_receipt_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        self.assertEqual(snapshot["receipt_only_identity_lkg"], 1)
+        self.assertEqual(snapshot["same_id_review_lkg"], 0)
+        self.assertEqual(snapshot["native_get_this_call"], 0)
+        self.assertEqual(snapshot["historical_native_http200"], 2)
+        self.assertEqual(snapshot["formal_accepted_fields"], 0)
+        self.assertFalse(snapshot["raw_html_saved"])
+        self.assertEqual(snapshot["release_state"], "HARD_HOLD_NO_PUBLICATION")
+        with self.assertRaisesRegex(ValueError, "ZEPP_ARTIFACT_EXACT_SHA_HOLD"):
+            m.audit_zepp_sealed_receipt_archive(archive, "0" * 64)
+
+    def test_zepp_receipt_archive_rejects_wrong_identity_and_missing_member(self):
+        for archive in (self._zepp_synthetic_archive(source_event_id="166458"),
+                        self._zepp_synthetic_archive(include_receipt=False)):
+            with self.subTest(archive_size=len(archive)):
+                with self.assertRaisesRegex(ValueError, "ZEPP_"):
+                    m.audit_zepp_sealed_receipt_archive(
+                        archive, hashlib.sha256(archive).hexdigest())
+
+    def test_zepp_receipt_durable_handoff_requires_pinned_real_artifact(self):
+        import tempfile
+        from pathlib import Path
+        archive = self._zepp_synthetic_archive()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            isolated = Path(td) / "isolated"
+            isolated.mkdir()
+            target = isolated / "zepp_receipt_identity_lkg.json"
+            with self.assertRaisesRegex(ValueError, "ZEPP_ARTIFACT_EXACT_SHA_HOLD"):
+                m.persist_zepp_receipt_identity_lkg(archive, target, root)
+            self.assertFalse(target.exists())
+            with self.assertRaisesRegex(ValueError, "ZEPP_RECEIPT_REPOSITORY_PATH_HOLD"):
+                m.persist_zepp_receipt_identity_lkg(
+                    archive, root / "zepp_receipt_identity_lkg.json", root)
+
+
 if __name__ == "__main__":
     unittest.main()
