@@ -52,6 +52,29 @@ class TestSourceStreamGate(unittest.TestCase):
             with self.subTest(html=html[:30]):
                 self.assertEqual(self.replay(html.encode())["decision"], "HOLD")
 
+    def test_same_article_sibling_sections_are_event_local_review_only(self):
+        # Actual source-root-cause hypothesis: title, ticket and room may be
+        # separate child sections of one event article, not separate events.
+        html = ('<main><article><section><h1>' + m.TITLE + '</h1></section>'
+                '<section><a href="' + m.TICKET_URL + '">官方售票</a></section>'
+                '<section><p>臺北表演藝術中心 藍盒子</p></section>'
+                '</article></main>')
+        result = self.replay(html.encode())
+        self.assertEqual(result["decision"], "REVIEW_DIRECT_EDGE_ONLY", result)
+        self.assertEqual(result["event_local_checks"]["shared_event_ancestor_kind"],
+                         "article")
+        self.assertEqual(result["native_get_this_call"], 0)
+        self.assertEqual(result["formal_accepted_fields"], 0)
+
+    def test_distinct_articles_never_share_identity_through_parent_section(self):
+        html = ('<main><section><article><h1>' + m.TITLE + '</h1></article>'
+                '<article><a href="' + m.TICKET_URL + '">票</a>'
+                '<p>藍盒子</p></article></section></main>')
+        result = self.replay(html.encode())
+        self.assertEqual(result["decision"], "HOLD")
+        self.assertFalse(result["event_local_checks"]["article_ancestor_parity"])
+        self.assertFalse(result["event_local_checks"]["same_section_identity"])
+
     def test_transport_and_encoding_fail_closed(self):
         for options in ({"status": 302},
                         {"final_url": "https://example.org/"},
