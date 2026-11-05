@@ -7097,3 +7097,27 @@ Independent exact-head CI #41937636675 / artifact #13374258441
 ```
 
 Next A: deterministic independent organizer source-title/SHOW/HALL provenance and conflict adjudication without checkout; B: canonical #13 path role authority or independently verifiable next Taipei P0, preserve all first failures. No main/data/status/Publisher/Golden changes, no new Writer.
+
+
+---
+
+### P30-L7 09:55 A/B non-publishing source authority topology
+
+A / TMC fixed Source -> exact LIST/DETAIL -> SHOW/HALL -> REVIEW LKG
+  run_tmc_field_aware_review_lkg -> assess_tmc_non_session_field_authority
+  this round native GET/LIST/DETAIL/IDENTITY/LKG 0/0/0/0/0
+  historical native LKG 1, not mounted; KHAM indexed public product date/hall
+  only corroboration, not native/checkout/Session/independent formal authority
+B / canonical Huashan #13, NOT a new source
+  indexed official HOME 2026-11-06 vs LIST+DETAIL 2026-11-07
+  -> inspect_huashan_homepage_same_path_date (NEW bounded exact anchor/card)
+  -> optional pre-CAS gate in run_huashan_field_aware_review_lkg
+  -> mismatch blocks LKG overwrite, sealed previous bytes preserved
+  new native HOME GET 1 HTTP200, but exact source/body guard HOLD
+  first_failure HUASHAN_HOME_EXACT_HTTP_OR_BODY_HOLD
+  native HOME date UNKNOWN, indexed discrepancy NOT native confirmed
+  new LIST/DETAIL/IDENTITY/LKG 0/0/0/0; official numeric ID still HOLD
+
+Engineering Draft #236 HEAD e8e88e87b45177f812ae92ffbd57baa86ea632d8; exact-head CI #41951925433 SUCCESS 122/122 offline, job #126997637891 artifact #13381013351 ZIP CRC + SHA manifest PASS. Formal accepted FIELD/Golden/Published/feed 0/0/0/0. Source main / docs/data.json / docs/platform_status.json / Publisher frozen. HARD_HOLD_NO_PUBLICATION; L8 Android 5/5, CKSMH5/TWTC39 PASS.
+
+NEXT A independent source ownership/freshness and SHOW/HALL conflict contract; NEXT B only new evidence for HOME exact source/body failure or rotate Taipei P0; never repeat same GET without hypothesis. Status-only Merge/Pages requires Owner approval. Pages HTTP UNVERIFIED.
