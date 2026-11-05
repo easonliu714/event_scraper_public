@@ -514,6 +514,7 @@ def probe_zepp_newtaipei_native_once():
     import ssl
     import urllib.error
     import urllib.request
+    import urllib.robotparser
 
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -523,6 +524,7 @@ def probe_zepp_newtaipei_native_once():
         "kind": "P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1",
         "line": "B", "source_key": ZEPP_SOURCE_KEY,
         "source_event_id": "166457",
+        "policy_get_attempted": 0, "policy_decision": "UNKNOWN",
         "native_get_attempted": 0, "native_http200": 0,
         "native_list_get_attempted": 0, "native_detail_get_attempted": 0,
         "native_same_id_review": 0, "same_id_review_lkg": 0,
@@ -533,6 +535,39 @@ def probe_zepp_newtaipei_native_once():
         "release_state": "HARD_HOLD_NO_PUBLICATION"}
     bodies = []
     opener = urllib.request.build_opener(NoRedirect)
+    # Fail closed when site policy cannot be checked. 404 means no robots
+    # restrictions per REP; all other policy/network failures stop the probe.
+    # This single robots request is counted separately from LIST/DETAIL.
+    robots_url = "https://www.zepp.co.jp/robots.txt"
+    result["policy_get_attempted"] = 1
+    try:
+        request = urllib.request.Request(
+            robots_url, method="GET", headers={
+                "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                "Accept": "text/plain", "Accept-Encoding": "identity"})
+        try:
+            with opener.open(request, timeout=8) as response:
+                result["policy_http_status"] = response.status
+                if response.status != 200 or response.geturl() != robots_url:
+                    raise ValueError("ZEPP_ROBOTS_STATUS_OR_REDIRECT_HOLD")
+                raw_policy = response.read(65537)
+                if len(raw_policy) > 65536:
+                    raise ValueError("ZEPP_ROBOTS_SIZE_HOLD")
+                parser = urllib.robotparser.RobotFileParser()
+                parser.parse(raw_policy.decode("utf-8", errors="strict").splitlines())
+                if not all(parser.can_fetch("EventRadarSourceAudit", url)
+                           for url in (ZEPP_LIST, ZEPP_DETAIL)):
+                    raise ValueError("ZEPP_ROBOTS_DISALLOW_HOLD")
+                result["policy_decision"] = "ALLOW_ROBOTS_200"
+        except urllib.error.HTTPError as exc:
+            result["policy_http_status"] = exc.code
+            if exc.code != 404:
+                raise ValueError("ZEPP_ROBOTS_HTTP_HOLD_" + str(exc.code))
+            result["policy_decision"] = "ALLOW_ROBOTS_404"
+    except (ValueError, UnicodeError, OSError, TimeoutError,
+            urllib.error.URLError) as exc:
+        result["first_failure"] = "ZEPP_SITE_POLICY_HOLD:" + type(exc).__name__ + ":" + str(exc)[:90]
+        return result
     for index, url in enumerate((ZEPP_LIST, ZEPP_DETAIL)):
         result["native_get_attempted"] += 1
         result["native_list_get_attempted" if index == 0
