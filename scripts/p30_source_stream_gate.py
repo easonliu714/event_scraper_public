@@ -434,17 +434,177 @@ def replay_preacquired_ab_to_review_lkg(line, manifest, destination, repo_root,
     return out
 
 
+
+# B source rotation: one new canonical venue in New Taipei, not a 20th
+# production platform. This bounded native receipt never infers a ticket
+# session, never visits the linked KKTIX checkout, and never writes LKG.
+ZEPP_LIST = "https://www.zepp.co.jp/hall/newtaipei/"
+ZEPP_DETAIL = "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457"
+ZEPP_TITLE = "Jony J 2026「本命」TOUR IN TAIPEI"
+ZEPP_SOURCE_KEY = "venue:zepp-newtaipei"
+ZEPP_MAX_BYTES = 1048576
+
+
+class ZeppLocalHTML(HTMLParser):
+    """Bounded same-anchor title and DETAIL heading, never cross-card joins."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.anchors = []
+        self.headings = []
+        self._anchor = None
+        self._heading = None
+        self._nodes = 0
+
+    def handle_starttag(self, tag, attrs):
+        self._nodes += 1
+        if self._nodes > 20000:
+            raise ValueError("ZEPP_DOM_NODE_LIMIT_HOLD")
+        attributes = dict(attrs)
+        if tag == "a":
+            if self._anchor is not None:
+                raise ValueError("ZEPP_NESTED_ANCHOR_HOLD")
+            self._anchor = [attributes.get("href", ""), []]
+        if tag in ("h1", "h2", "h3"):
+            if self._heading is not None:
+                raise ValueError("ZEPP_NESTED_HEADING_HOLD")
+            self._heading = [tag, []]
+
+    def handle_data(self, data):
+        for current in (self._anchor, self._heading):
+            if current is not None:
+                current[1].append(data)
+                if sum(map(len, current[1])) > 4000:
+                    raise ValueError("ZEPP_LOCAL_TEXT_LIMIT_HOLD")
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self._anchor is not None:
+            self.anchors.append((self._anchor[0], " ".join(
+                "".join(self._anchor[1]).split())))
+            self._anchor = None
+        if tag in ("h1", "h2", "h3") and self._heading is not None:
+            if self._heading[0] != tag:
+                raise ValueError("ZEPP_HEADING_STRUCTURE_HOLD")
+            self.headings.append(" ".join("".join(self._heading[1]).split()))
+            self._heading = None
+
+
+def inspect_zepp_same_id_pages(list_body, detail_body):
+    """Only source-owned exact rid+title identity; date/time are not accepted."""
+    if any(not isinstance(raw, bytes) or not 0 < len(raw) <= ZEPP_MAX_BYTES
+           for raw in (list_body, detail_body)):
+        raise ValueError("ZEPP_BODY_BOUND_HOLD")
+    listing, detail = ZeppLocalHTML(), ZeppLocalHTML()
+    listing.feed(list_body.decode("utf-8", errors="strict"))
+    detail.feed(detail_body.decode("utf-8", errors="strict"))
+    exact_edges = [(href, title) for href, title in listing.anchors
+                   if urljoin(ZEPP_LIST, href) == ZEPP_DETAIL]
+    if len(exact_edges) != 1 or ZEPP_TITLE not in exact_edges[0][1]:
+        raise ValueError("ZEPP_LIST_EXACT_RID_TITLE_EDGE_HOLD")
+    if detail.headings.count(ZEPP_TITLE) != 1:
+        raise ValueError("ZEPP_DETAIL_EVENT_LOCAL_HEADING_HOLD")
+    return {"exact_rid": "166457", "list_exact_edge_count": 1,
+            "detail_exact_heading_count": 1, "title": ZEPP_TITLE,
+            "date_role": "UNVERIFIED_NOT_SESSION",
+            "start_role": "UNVERIFIED_NOT_SESSION"}
+
+
+def probe_zepp_newtaipei_native_once():
+    """At most two official public GETs, 8s each, no redirect/retry/login."""
+    import socket
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    result = {
+        "kind": "P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1",
+        "line": "B", "source_key": ZEPP_SOURCE_KEY,
+        "source_event_id": "166457",
+        "native_get_attempted": 0, "native_http200": 0,
+        "native_list_get_attempted": 0, "native_detail_get_attempted": 0,
+        "native_same_id_review": 0, "same_id_review_lkg": 0,
+        "source_receipts": [], "decision": "HOLD",
+        "first_failure": "ZEPP_SOURCE_NOT_ACQUIRED",
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "raw_html_saved": False,
+        "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    bodies = []
+    opener = urllib.request.build_opener(NoRedirect)
+    for index, url in enumerate((ZEPP_LIST, ZEPP_DETAIL)):
+        result["native_get_attempted"] += 1
+        result["native_list_get_attempted" if index == 0
+               else "native_detail_get_attempted"] += 1
+        stamp = datetime.now(timezone.utc).isoformat()
+        receipt = {"url": url, "observed_at_utc": stamp,
+                   "http_status": None, "body_sha256": None,
+                   "transport": "BUILTIN_NATIVE_GET_NO_REDIRECT_NO_RETRY"}
+        try:
+            request = urllib.request.Request(
+                url, method="GET", headers={
+                    "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                    "Accept": "text/html,application/xhtml+xml",
+                    "Accept-Encoding": "identity"})
+            with opener.open(request, timeout=8) as response:
+                receipt["http_status"] = response.status
+                if response.status != 200 or response.geturl() != url:
+                    raise ValueError("ZEPP_STATUS_OR_REDIRECT_HOLD")
+                mime = response.headers.get("Content-Type", "")
+                if mime.split(";", 1)[0].strip().lower() != "text/html":
+                    raise ValueError("ZEPP_CONTENT_TYPE_HOLD")
+                charset = [v.split("=", 1)[1].strip().strip('"').lower()
+                           for v in mime.split(";")[1:]
+                           if v.strip().lower().startswith("charset=")]
+                if charset and charset != ["utf-8"]:
+                    raise ValueError("ZEPP_CHARSET_HOLD")
+                body = response.read(ZEPP_MAX_BYTES + 1)
+                receipt["body_bytes_read"] = len(body)
+                if not 0 < len(body) <= ZEPP_MAX_BYTES:
+                    raise ValueError("ZEPP_EMPTY_OR_TRUNCATED_BODY_HOLD")
+                receipt["body_sha256"] = hashlib.sha256(body).hexdigest()
+                result["native_http200"] += 1
+                bodies.append(body)
+        except urllib.error.HTTPError as exc:
+            receipt["http_status"] = exc.code
+            result["first_failure"] = ("ZEPP_REDIRECT_BLOCKED_HOLD"
+                                       if 300 <= exc.code < 400
+                                       else "ZEPP_HTTP_ERROR_HOLD")
+        except urllib.error.URLError as exc:
+            result["network_error_type"] = type(exc.reason).__name__
+            result["first_failure"] = ("ZEPP_DNS_EGRESS_HOLD"
+                                       if isinstance(exc.reason, socket.gaierror)
+                                       else "ZEPP_NETWORK_HOLD")
+        except (ValueError, UnicodeError, OSError, TimeoutError,
+                ssl.SSLError) as exc:
+            result["first_failure"] = type(exc).__name__ + ":" + str(exc)[:100]
+        result["source_receipts"].append(receipt)
+        if receipt["body_sha256"] is None:
+            break
+    if len(bodies) == 2:
+        try:
+            result["identity_checks"] = inspect_zepp_same_id_pages(*bodies)
+            result["native_same_id_review"] = 1
+            result["decision"] = "REVIEW_NATIVE_SAME_ID_ONLY"
+            result["first_failure"] = "INDEPENDENT_FIELD_AUTHORITY_AND_LKG_HOLD"
+        except (ValueError, UnicodeError) as exc:
+            result["first_failure"] = type(exc).__name__ + ":" + str(exc)[:100]
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
     parser.add_argument("--songshan-evidence", type=Path)
     parser.add_argument("--tpac-native-once", action="store_true")
+    parser.add_argument("--zepp-native-once", action="store_true")
     parser.add_argument("--ab-replay-manifest", type=Path)
     parser.add_argument("--ab-line", choices=("A", "B"))
     parser.add_argument("--ab-isolated-output", type=Path)
     parser.add_argument("--ab-repo-root", type=Path)
     args = parser.parse_args()
-    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once, bool(args.ab_replay_manifest))) != 1:
+    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once, args.zepp_native_once, bool(args.ab_replay_manifest))) != 1:
         parser.error("supply exactly one input; native is a CI one-shot only")
     if args.ab_replay_manifest:
         if not all((args.ab_line, args.ab_isolated_output, args.ab_repo_root)):
@@ -454,6 +614,8 @@ def main():
             args.ab_repo_root)
     elif args.tpac_native_once:
         result = acquire_tpac_native_once()
+    elif args.zepp_native_once:
+        result = probe_zepp_newtaipei_native_once()
     elif args.tpac_html:
         with args.tpac_html.open("rb") as stream:
             result = inspect_tpac_complete_stream(
