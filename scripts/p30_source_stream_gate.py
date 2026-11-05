@@ -233,14 +233,89 @@ def audit_songshan_prior_native_receipt(report):
     return out
 
 
+
+def acquire_tpac_native_once():
+    """One explicitly gated public TPAC DETAIL GET; never retry/redirect/publish.
+
+    A new, separately testable 4 MiB complete-stream hypothesis after the
+    historic 524289-byte capped-prefix HOLD. CI calls this only for a unique
+    exact-head one-shot marker and first run attempt. No OPENTIX/checkout GET.
+    """
+    import socket
+    import ssl
+    import urllib.error
+    import urllib.request
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    out = {
+        "kind": "P30_TPAC_NATIVE_COMPLETE_STREAM_ONESHOT_V1",
+        "source_url": TPAC_URL,
+        "ticket_event_url": TICKET_URL,
+        "native_get_this_call": 1,
+        "native_detail_get_attempted": 1,
+        "native_list_get_this_call": 0,
+        "native_http200_this_call": 0,
+        "native_same_id_lkg": 0,
+        "transport": "BUILTIN_NATIVE_GET_NO_REDIRECT_NO_RETRY",
+        "timeout_seconds": 8,
+        "max_body_bytes": MAX_BODY,
+        "decision": "HOLD",
+        "first_failure": "NATIVE_SOURCE_UNAVAILABLE",
+        "formal_accepted_fields": 0,
+        "golden_accepted_events": 0,
+        "published_events": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+        "raw_html_saved": False,
+    }
+    request = urllib.request.Request(
+        TPAC_URL, method="GET",
+        headers={"User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                 "Accept": "text/html,application/xhtml+xml",
+                 "Accept-Encoding": "identity"})
+    try:
+        with urllib.request.build_opener(NoRedirect).open(request, timeout=8) as response:
+            stamp = datetime.now(timezone.utc).isoformat()
+            out["observed_at_utc"] = stamp
+            out["native_http_status"] = response.status
+            out["native_http200_this_call"] = int(response.status == 200)
+            result = inspect_tpac_complete_stream(
+                response, status=response.status,
+                content_type=response.headers.get("Content-Type", ""),
+                final_url=response.geturl(), observed_at_utc=stamp)
+            for key in ("body_bytes", "body_sha256", "body_truncated",
+                        "bytes_read_capped", "prefix_sha256", "event_local_checks"):
+                if key in result:
+                    out[key] = result[key]
+            out["decision"] = result["decision"]
+            out["first_failure"] = result["first_failure"]
+    except urllib.error.HTTPError as exc:
+        out["native_http_status"] = exc.code
+        out["first_failure"] = ("TPAC_REDIRECT_BLOCKED_HOLD" if 300 <= exc.code < 400
+                                else "TPAC_NATIVE_HTTP_ERROR_HOLD")
+    except urllib.error.URLError as exc:
+        out["network_error_type"] = type(exc.reason).__name__
+        out["first_failure"] = ("TPAC_DNS_EGRESS_HOLD" if isinstance(exc.reason, socket.gaierror)
+                                else "TPAC_NATIVE_NETWORK_HOLD")
+    except (OSError, TimeoutError, ssl.SSLError, UnicodeError, ValueError) as exc:
+        out["network_error_type"] = type(exc).__name__
+        out["first_failure"] = "TPAC_NATIVE_STREAM_TRANSPORT_OR_PARSE_HOLD"
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
     parser.add_argument("--songshan-evidence", type=Path)
+    parser.add_argument("--tpac-native-once", action="store_true")
     args = parser.parse_args()
-    if bool(args.tpac_html) == bool(args.songshan_evidence):
-        parser.error("supply exactly one offline input")
-    if args.tpac_html:
+    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once)) != 1:
+        parser.error("supply exactly one input; native is a CI one-shot only")
+    if args.tpac_native_once:
+        result = acquire_tpac_native_once()
+    elif args.tpac_html:
         with args.tpac_html.open("rb") as stream:
             result = inspect_tpac_complete_stream(
                 stream, status=200, content_type="text/html; charset=utf-8",
