@@ -334,6 +334,195 @@ def run_next_native_once(line):
         out["first_failure"]=type(exc).__name__+":"+str(exc)[:180]
     return out
 
+
+
+# Offline-only sealed native artifact -> receipt identity LKG.  No raw HTML
+# replay, no network, no FIELD/Golden/publication promotion.
+def audit_next_native_receipt_archive(archive, *, expected_zip_sha256, expected_head):
+    import io
+    import zipfile
+    from datetime import timedelta
+    if not isinstance(archive, bytes) or not 0 < len(archive) <= 1048576:
+        raise ValueError("NEXT_RECEIPT_ARCHIVE_BOUND_HOLD")
+    if (not re.fullmatch(r"[0-9a-f]{64}", expected_zip_sha256 or "")
+            or hashlib.sha256(archive).hexdigest() != expected_zip_sha256):
+        raise ValueError("NEXT_RECEIPT_ARTIFACT_SHA_HOLD")
+    if not re.fullmatch(r"[0-9a-f]{40}", expected_head or ""):
+        raise ValueError("NEXT_RECEIPT_HEAD_HOLD")
+    required = {"SHA256SUMS.txt", "readiness.txt",
+                "next_native_A.json", "next_native_B.json"}
+    with zipfile.ZipFile(io.BytesIO(archive)) as z:
+        names = z.namelist()
+        if (len(names) != len(set(names)) or len(names) > 20
+                or not required.issubset(names)
+                or any("/" in n or "\\" in n or n.startswith(".") for n in names)
+                or any(i.file_size > 131072 for i in z.infolist())
+                or z.testzip() is not None):
+            raise ValueError("NEXT_RECEIPT_ZIP_CRC_MEMBERS_HOLD")
+        files = {n: z.read(n) for n in names}
+    manifest = {}
+    for line in files["SHA256SUMS.txt"].decode("utf-8", "strict").splitlines():
+        match = re.fullmatch(r"([0-9a-f]{64})  ([^\s]+)", line)
+        if not match or match[2] in manifest:
+            raise ValueError("NEXT_RECEIPT_MANIFEST_FORMAT_HOLD")
+        manifest[match[2]] = match[1]
+    for name in required - {"SHA256SUMS.txt"}:
+        path = "evidence/" + name
+        if (path not in manifest
+                or hashlib.sha256(files[name]).hexdigest() != manifest[path]):
+            raise ValueError("NEXT_RECEIPT_MANIFEST_SHA_HOLD")
+    for name in names:
+        if name != "SHA256SUMS.txt" and "evidence/" + name in manifest:
+            if hashlib.sha256(files[name]).hexdigest() != manifest["evidence/" + name]:
+                raise ValueError("NEXT_RECEIPT_EXTRA_MANIFEST_SHA_HOLD")
+    readiness = files["readiness.txt"].decode("utf-8", "strict").splitlines()
+    if ("head=" + expected_head not in readiness
+            or not {"formal_fields=0", "golden=0", "published=0"}.issubset(readiness)):
+        raise ValueError("NEXT_RECEIPT_EXACT_HEAD_RELEASE_HOLD")
+    a = json.loads(files["next_native_A.json"])
+    b = json.loads(files["next_native_B.json"])
+    if (a.get("line") != "A" or a.get("event_id") != NEXT["A"]["id"]
+            or a.get("native_lkg") != 0 or a.get("formal_fields") != 0
+            or a.get("golden") != 0 or a.get("published") != 0):
+        raise ValueError("NEXT_RECEIPT_A_RELEASE_PARITY_HOLD")
+    expected = {"kind": "P30_AB_DISTINCT_NATIVE_ONESHOT_V1",
+                "line": "B", "source_id": NEXT["B"]["source"],
+                "event_id": NEXT["B"]["id"], "attempted": 3,
+                "http200": 2, "native_list": 1, "native_detail": 1,
+                "native_identity": 1, "review_fields": 2,
+                "native_lkg": 0, "formal_fields": 0, "golden": 0,
+                "published": 0, "raw_html_saved": False,
+                "release_state": "HARD_HOLD_NO_PUBLICATION",
+                "decision": "REVIEW_NON_SESSION_ONLY",
+                "first_failure": "INDEPENDENT_ACCEPTANCE_AND_LKG_HOLD",
+                "policy": "ROBOTS_ALLOW"}
+    if any(type(b.get(k)) is not type(v) or b[k] != v for k, v in expected.items()):
+        raise ValueError("NEXT_RECEIPT_B_IDENTITY_RELEASE_HOLD")
+    robots, pages, fields = b.get("robots_receipt"), b.get("source_receipts"), b.get("field_receipts")
+    if not isinstance(robots, dict) or not isinstance(pages, list) or len(pages) != 2:
+        raise ValueError("NEXT_RECEIPT_MISSING_TRANSPORT_HOLD")
+    if not isinstance(fields, list) or len(fields) != 2:
+        raise ValueError("NEXT_RECEIPT_MISSING_FIELDS_HOLD")
+    def check_receipt(rec, url, mime, cap):
+        if (not isinstance(rec, dict) or rec.get("url") != url
+                or rec.get("http_status") != 200
+                or rec.get("content_type") != mime
+                or rec.get("transport") != "NATIVE_NO_REDIRECT_NO_RETRY"
+                or type(rec.get("body_bytes")) is not int
+                or not 0 < rec["body_bytes"] <= cap
+                or not isinstance(rec.get("body_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", rec["body_sha256"])):
+            raise ValueError("NEXT_RECEIPT_SOURCE_ROLE_SHA_HOLD")
+        try:
+            stamp = datetime.fromisoformat(rec["observed_at_utc"].replace("Z", "+00:00"))
+            if stamp.utcoffset() != timedelta(0):
+                raise ValueError("UTC_REQUIRED")
+        except (KeyError, AttributeError, TypeError, ValueError) as exc:
+            raise ValueError("NEXT_RECEIPT_UTC_HOLD") from exc
+        return stamp
+    stamps = [check_receipt(robots, NEXT["B"]["origin"] + "/robots.txt",
+                            "text/plain", 65536),
+              check_receipt(pages[0], NEXT["B"]["listing"], "text/html", CAP),
+              check_receipt(pages[1], NEXT["B"]["detail"], "text/html", CAP)]
+    if not (stamps[0] <= stamps[1] <= stamps[2]
+            and stamps[2] - stamps[0] <= timedelta(minutes=10)):
+        raise ValueError("NEXT_RECEIPT_SOURCE_TIME_SKEW_HOLD")
+    if len({r["body_sha256"] for r in [robots] + pages}) != 3:
+        raise ValueError("NEXT_RECEIPT_SAME_BODY_FALLBACK_HOLD")
+    roles = {"SOURCE_EVENT_TITLE_REVIEW", "SOURCE_VENUE_REVIEW"}
+    if {r.get("role") for r in fields if isinstance(r, dict)} != roles:
+        raise ValueError("NEXT_RECEIPT_FIELD_ROLES_HOLD")
+    for f in fields:
+        if (f.get("source_url") != NEXT["B"]["detail"]
+                or f.get("event_id") != NEXT["B"]["id"]
+                or f.get("body_sha256") != pages[1]["body_sha256"]
+                or f.get("observed_at_utc") != pages[1]["observed_at_utc"]
+                or f.get("decision") != "REVIEW"
+                or f.get("formal_accepted") is not False):
+            raise ValueError("NEXT_RECEIPT_FIELD_SOURCE_BINDING_HOLD")
+    return {"kind": "P30_B_ZEPP_167511_SEALED_RECEIPT_ONLY_LKG_V1",
+            "source_id": NEXT["B"]["source"], "source_event_id": NEXT["B"]["id"],
+            "artifact_sha256": expected_zip_sha256, "exact_head": expected_head,
+            "source_receipts": [robots] + pages, "field_receipts": fields,
+            "native_list": 1, "native_detail": 1, "native_identity_review": 1,
+            "receipt_only_identity_lkg": 1, "native_body_replay_lkg": 0,
+            "formal_accepted_fields": 0, "golden": 0, "published": 0,
+            "decision": "REVIEW_RECEIPT_ONLY_NO_RAW_BODY",
+            "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+
+def persist_next_native_receipt_lkg(archive, target, repo_root, *,
+                                    expected_zip_sha256, expected_head,
+                                    expected_previous_sha256=None):
+    """Atomic, exclusive-lock CAS for an audited artifact; never write in repo."""
+    import os
+    import tempfile
+    from pathlib import Path
+    snapshot = audit_next_native_receipt_archive(
+        archive, expected_zip_sha256=expected_zip_sha256,
+        expected_head=expected_head)
+    target, root = Path(target), Path(repo_root).resolve(strict=True)
+    parent = target.parent.resolve(strict=True)
+    if (not target.is_absolute() or target.is_symlink()
+            or parent == root or root in parent.parents
+            or target.name in ("", ".", "..")
+            or (expected_previous_sha256 is not None
+                and not re.fullmatch(r"[0-9a-f]{64}", expected_previous_sha256))):
+        raise ValueError("NEXT_RECEIPT_ISOLATION_CAS_PATH_HOLD")
+    canonical = json.dumps(snapshot, sort_keys=True, ensure_ascii=False,
+                           separators=(",", ":"), allow_nan=False).encode("utf-8")
+    digest = hashlib.sha256(canonical).hexdigest()
+    lock, fd, tmp = target.with_name(target.name + ".lock"), None, None
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        if target.exists():
+            prior_bytes = target.read_bytes()
+            if len(prior_bytes) > 32768:
+                raise ValueError("NEXT_RECEIPT_PRIOR_BOUND_HOLD")
+            prior = json.loads(prior_bytes)
+            if (set(prior) != {"kind", "snapshot", "sha256"}
+                    or prior["kind"] != "P30_B_SEALED_RECEIPT_ENVELOPE_V1"
+                    or prior["sha256"] != hashlib.sha256(json.dumps(
+                        prior["snapshot"], sort_keys=True, ensure_ascii=False,
+                        separators=(",", ":"), allow_nan=False
+                    ).encode("utf-8")).hexdigest()):
+                raise ValueError("NEXT_RECEIPT_PRIOR_ENVELOPE_HOLD")
+            if prior["sha256"] == digest:
+                return {"persisted": False, "idempotent": True,
+                        "snapshot_sha256": digest, "receipt_only_identity_lkg": 1,
+                        "native_body_replay_lkg": 0}
+            if prior["sha256"] != expected_previous_sha256:
+                raise ValueError("NEXT_RECEIPT_FULL_ENVELOPE_CAS_HOLD")
+        elif expected_previous_sha256 is not None:
+            raise ValueError("NEXT_RECEIPT_MISSING_PRIOR_CAS_HOLD")
+        envelope = {"kind": "P30_B_SEALED_RECEIPT_ENVELOPE_V1",
+                    "snapshot": snapshot, "sha256": digest}
+        payload = (json.dumps(envelope, sort_keys=True, ensure_ascii=False,
+                              separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+        fd_tmp, tmp = tempfile.mkstemp(prefix=".next_receipt.", dir=str(parent))
+        with os.fdopen(fd_tmp, "wb") as output:
+            output.write(payload)
+            output.flush()
+            os.fsync(output.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, target)
+        tmp = None
+        if os.name == "posix":
+            dfd = os.open(parent, os.O_RDONLY)
+            try:
+                os.fsync(dfd)
+            finally:
+                os.close(dfd)
+        return {"persisted": True, "idempotent": False,
+                "snapshot_sha256": digest, "receipt_only_identity_lkg": 1,
+                "native_body_replay_lkg": 0}
+    finally:
+        if tmp is not None:
+            os.unlink(tmp)
+        if fd is not None:
+            os.close(fd)
+            os.unlink(lock)
+
 if __name__ == "__main__":
     for line in ("A", "B"):
         print(json.dumps(run_native_once(line), ensure_ascii=False, sort_keys=True))
