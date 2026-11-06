@@ -228,9 +228,20 @@ NEXT = {
 }
 
 class NextScoped(LocalHTML):
+    """Bind event field text to an event-local ARTICLE/SECTION, not MAIN-wide."""
     def __init__(self):
         super().__init__()
         self.local_text, self.local_size = [], 0
+        self.scopes, self.active_scopes = [], []
+
+    def handle_starttag(self, tag, attrs):
+        super().handle_starttag(tag, attrs)
+        if tag in ("main", "article", "section"):
+            if len(self.scopes) >= 256:
+                raise ValueError("NEXT_EVENT_SCOPE_CAP_HOLD")
+            self.scopes.append(dict(tag=tag, depth=len(self.stack),
+                                    texts=[], headings=[]))
+            self.active_scopes.append(len(self.scopes) - 1)
 
     def handle_data(self, value):
         super().handle_data(value)
@@ -240,6 +251,17 @@ class NextScoped(LocalHTML):
             if self.local_size > 200000:
                 raise ValueError("NEXT_LOCAL_TEXT_CAP_HOLD")
             self.local_text.append(value)
+            for idx in self.active_scopes:
+                self.scopes[idx]["texts"].append(value)
+
+    def handle_endtag(self, tag):
+        if self.heading is not None and tag == self.heading[0]:
+            heading = norm("".join(self.heading[1]))
+            for idx in self.active_scopes:
+                self.scopes[idx]["headings"].append(heading)
+        super().handle_endtag(tag)
+        self.active_scopes = [idx for idx in self.active_scopes
+                              if self.scopes[idx]["depth"] <= len(self.stack)]
 
 def exact_next_href(line, href):
     from urllib.parse import parse_qsl
@@ -273,7 +295,15 @@ def inspect_next_pair(line, listing_html, detail_html):
         return dict(decision="HOLD",reason="NEXT_LIST_EXACT_ID_TITLE_HOLD",identity=0,fields=0)
     if dp.headings.count(norm(cfg["title"])) != 1:
         return dict(decision="HOLD",reason="NEXT_DETAIL_MAIN_TITLE_HOLD",identity=0,fields=0)
-    if norm(cfg["venue"]).casefold() not in norm(" ".join(dp.local_text)).casefold():
+    # MAIN-wide venue text could belong to another event's sibling article.
+    owned_scopes = [scope for scope in dp.scopes
+                    if norm(cfg["title"]) in scope["headings"]]
+    if any(scope["tag"] in ("article", "section") for scope in owned_scopes):
+        owned_scopes = [scope for scope in owned_scopes
+                        if scope["tag"] in ("article", "section")]
+    if not any(norm(cfg["venue"]).casefold() in
+               norm(" ".join(scope["texts"])).casefold()
+               for scope in owned_scopes):
         return dict(decision="HOLD",reason="NEXT_EVENT_LOCAL_VENUE_HOLD",identity=1,fields=1)
     return dict(decision="REVIEW_NON_SESSION_ONLY",reason="INDEPENDENT_ACCEPTANCE_AND_LKG_HOLD",
                 identity=1,fields=2,roles=["SOURCE_EVENT_TITLE_REVIEW","SOURCE_VENUE_REVIEW"])
