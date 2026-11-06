@@ -127,6 +127,57 @@ class TestDistinctNext(unittest.TestCase):
                      '</p></section></article></main>')
             self.assertEqual(m.inspect_next_pair(line, listing, owned)["fields"], 2)
 
+    def test_zepp_official_event_date_start_vs_sale_role_diagnostics(self):
+        # Indexed official rid=167511 shows 11/27 START 19:30, but 7/25 is
+        # a sale-start date, never a performance date or KKTIX Session.
+        listing, _ = self.pair("B")
+        cfg = m.NEXT["B"]
+        def detail(show="2026.11.27 (五) 19:30",
+                   start="[START] 19:30",
+                   sale="2026.7.25 (六) 下午13:00"):
+            return ('<main><article><h1>' + cfg["title"] +
+                    '</h1><p>' + cfg["venue"] +
+                    '</p><p>時間 ' + start + '</p><p>日期｜' + show +
+                    '</p><p>開賣時間｜' + sale + '</p></article></main>')
+        positive = m.inspect_next_pair("B", listing, detail())
+        self.assertEqual(positive["decision"], "REVIEW_NON_SESSION_ONLY")
+        self.assertEqual(positive["fields"], 2)  # immutable native receipt roles
+        diag = positive["event_local_role_diagnostics"]
+        self.assertEqual(diag["decision"], "REVIEW_ONLY")
+        self.assertEqual(diag["event_date_review"], "2026-11-27")
+        self.assertEqual(diag["start_local_review"], "19:30")
+        self.assertEqual(diag["sale_date_diagnostic"], "2026-07-25")
+        self.assertFalse(diag["sale_date_is_event_date"])
+        self.assertFalse(diag["formal_accepted"])
+        for html in (
+            detail(start="OPEN 18:30"),
+            detail(start="[START] 20:30"),
+            detail(show="2026.11.28 (六) 19:30"),
+            detail(sale="2026.11.27 (五) 下午13:00"),
+            detail(sale=""),
+            detail().replace("</article>", "<p>日期｜2026.11.27 (五) 19:30</p></article>"),
+        ):
+            result = m.inspect_next_pair("B", listing, html)
+            self.assertEqual(result["fields"], 2)
+            self.assertEqual(result["event_local_role_diagnostics"]["decision"], "HOLD")
+            self.assertFalse(result["event_local_role_diagnostics"]["formal_accepted"])
+
+    def test_zepp_date_cannot_borrow_from_sibling_article(self):
+        listing, _ = self.pair("B")
+        cfg = m.NEXT["B"]
+        unrelated = ('<main><article><h1>' + cfg["title"] +
+                     '</h1><p>' + cfg["venue"] +
+                     '</p></article><article><h1>OTHER EVENT</h1>'
+                     '<p>日期｜2026.11.27 (五) 19:30</p>'
+                     '<p>時間 [START] 19:30</p>'
+                     '<p>開賣時間｜2026.7.25 (六) 下午13:00</p>'
+                     '</article></main>')
+        result = m.inspect_next_pair("B", listing, unrelated)
+        self.assertEqual(result["decision"], "REVIEW_NON_SESSION_ONLY")
+        self.assertEqual(result["event_local_role_diagnostics"]["decision"], "HOLD")
+        self.assertIsNone(result["event_local_role_diagnostics"]["event_date_review"])
+
+
     def test_invalid_line(self):
         with self.assertRaises(ValueError): m.run_next_native_once("C")
         with self.assertRaises(ValueError): m.inspect_next_pair("C","","")
