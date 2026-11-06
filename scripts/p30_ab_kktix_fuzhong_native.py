@@ -5,6 +5,7 @@ browser/indexed evidence are never native provenance. No checkout, redirects,
 retries, Session/availability inference, raw-body persistence or publication.
 """
 from __future__ import annotations
+import hashlib
 import json
 import re
 import urllib.error
@@ -237,6 +238,36 @@ def b_list_row_roles(listing):
     return ["LIST_11_06_19_00_REVIEW_NO_YEAR"] if len(matched) == 1 else []
 
 
+
+def foreign_same_source_event_edges(line, scope):
+    """Detect a sibling event/product URL inside the title-owned DOM scope.
+
+    A valid event heading alone does not own a neighboring event's SHOW/HALL.
+    Reject same-origin sibling detail paths and same-path different event IDs,
+    but never treat a cross-source ticket edge as the venue's event ID.
+    """
+    expected = urlsplit(SOURCES[line]["detail"])
+    parent = expected.path.rsplit("/", 1)[0] + "/"
+    foreign = 0
+    for href, _ in scope["edges"]:
+        if not isinstance(href, str) or not href:
+            continue
+        try:
+            u = urlsplit(urljoin(SOURCES[line]["detail"], href))
+        except ValueError:
+            return 1
+        if (u.scheme != "https" or u.hostname != expected.hostname
+                or u.port is not None or u.username or u.password):
+            continue
+        same_path_different_id = (u.path == expected.path and
+                                  u.query != expected.query)
+        sibling_detail_path = (u.path.startswith(parent) and
+                               u.path != expected.path)
+        if same_path_different_id or sibling_detail_path:
+            foreign += 1
+    return foreign
+
+
 def inspect_pair(line, listing, detail):
     """Offline/caller HTML never establishes a native GET or a formal FIELD."""
     if line not in SOURCES:
@@ -265,7 +296,21 @@ def inspect_pair(line, listing, detail):
             result.update(decision="REVIEW_LIST_ROW_ONLY",
                           first_failure="AB_DETAIL_EVENT_LOCAL_FIELD_SCOPE_HOLD")
         return result
+    # Field roles must not borrow dates or halls from a sibling event's
+    # same-source DETAIL link within an otherwise title-owned container.
+    foreign = foreign_same_source_event_edges(line, owned[0])
+    if foreign:
+        result["first_failure"] = "AB_EVENT_LOCAL_FOREIGN_SAME_SOURCE_EVENT_HOLD"
+        result["foreign_event_edge_count"] = foreign
+        return result
     local = norm(" ".join(owned[0]["texts"]))
+    # Only a digest and role names leave the native reader, never raw HTML.
+    result["event_local_scope"] = {
+        "tag": owned[0]["tag"],
+        "normalized_text_sha256": hashlib.sha256(local.encode("utf-8")).hexdigest(),
+        "foreign_event_edge_count": 0,
+        "raw_scope_saved": False,
+    }
     if line == "A_UDN":
         # Range and hall are non-session REVIEW only, and only from an
         # unambiguous exact-title-owned ARTICLE/SECTION (not global HOME).
@@ -435,6 +480,8 @@ def run_native_once(line):
         out["first_failure"] = verdict["first_failure"]
         out["native_same_id_review"] = verdict["same_id_review"]
         out["field_roles"] = verdict["field_roles"]
+        if "event_local_scope" in verdict:
+            out["event_local_scope"] = verdict["event_local_scope"]
         out["ticket_event_edge_review"] = verdict.get("ticket_event_edge_review", 0)
         if out["ticket_event_edge_review"]:
             out["ticket_event_url"] = verdict["ticket_event_url"]
@@ -445,7 +492,10 @@ def run_native_once(line):
                 dict(source_id=source["source_id"], event_id=source["event_id"],
                      source_url=source["detail"], body_sha256=dr["body_sha256"],
                      observed_at_utc=dr["observed_at_utc"],
-                     role=role, decision="REVIEW", formal_accepted=False)
+                     role=role, decision="REVIEW", formal_accepted=False,
+                     event_local_scope_sha256=(
+                         verdict["event_local_scope"]["normalized_text_sha256"]
+                         if "event_local_scope" in verdict else None))
                 for role in roles]
             # LIST row roles are bound to LIST bytes/clock, never DETAIL.
             out["field_receipts"].extend(
