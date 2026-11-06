@@ -7667,3 +7667,29 @@ direct HTTP/new Android UI UNVERIFIED; historical L8 5/5 PASS
 NEXT A independent sealed SHOW/HALL source authority; B lawful event-local
 date/hall DOM hypothesis with original raw+hash+time if newly fetched.
 ```
+
+
+### 2026-11-06 22:00 — deterministic Zepp sealed receipt CAS fix
+
+```text
+Engineering Draft #236 HEAD 1cc567608914992560b85f282d145d0575bc4416
+  scripts/p30_source_stream_gate.py::audit_zepp_takase_sealed_archive
+    BEFORE: adjudicate_sealed_field_roles default wall-clock now
+            -> source_age_seconds changed across replay
+            -> durable full-envelope CAS/idempotence at risk
+    AFTER: now_utc=sealed DETAIL observation time (UTC)
+           clock_basis=SEALED_DETAIL_OBSERVED_AT_ONLY
+           wall_clock_freshness=NOT_ASSESSED
+           deterministic sealed receipt snapshot, no current freshness claim
+  tests/p30/test_p30_source_stream_gate.py
+    repeated audit exact equality + clock-basis/no-field negatives
+  CI #42229941918 SUCCESS, job #127932969036, 228 tests
+  Artifact #13507003546 SHA256
+    609e75b3dcd7c7ef5154fc0760d91d886101e870b346458329ac49122a68b542
+  independent ZIP CRC PASS, 6 members, 21 manifest, 5/5 packaged SHA PASS
+  B receipt-only durable LKG 1 (prior native), body LKG 0
+  A/B new native GET/LIST/DETAIL/identity/FIELD 0/0/0/0/0
+  accepted FIELD/Golden/Published 0/0/0; NO PUBLISH
+  Source main/data/status and 19 platforms unchanged
+  Owner action none for isolated work; separate Golden/Publisher authorization
+```
