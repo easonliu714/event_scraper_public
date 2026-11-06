@@ -320,5 +320,86 @@ class TestSealedNativeReceiptOnlyLKG(unittest.TestCase):
                 raw, repo / "docs" / "data.json", repo,
                 expected_zip_sha256=digest, expected_head=self.HEAD)
 
+
+
+class TestTixfun09DistinctNative(unittest.TestCase):
+    """Source-owned event identity; never confuse PRODUCT with Session."""
+    def setUp(self):
+        self.listing = ('<main><article><a href="' + m.TIXFUN_DETAIL +
+                        '">戲劇 ' + m.TIXFUN_TITLE +
+                        ' 2026/11/07 - 2026/11/07</a></article></main>')
+        self.detail = ('<main><article><h1>' + m.TIXFUN_TITLE +
+                       '</h1><p>2026/11/07</p><p>NT$0</p></article></main>')
+
+    def test_distinct_same_product_review_only(self):
+        r = m.inspect_tixfun_pair(self.listing, self.detail)
+        self.assertEqual(r["list_exact_edge"], 1)
+        self.assertEqual(r["same_id_review"], 1)
+        self.assertEqual(r["formal_accepted_fields"], 0)
+        self.assertNotIn("SESSION", str(r))
+        self.assertEqual(m.tixfun_exact_href(m.TIXFUN_DETAIL), m.TIXFUN_DETAIL)
+
+    def test_detail_missing_heading_cannot_borrow_list_title(self):
+        r = m.inspect_tixfun_pair(self.listing,
+                                  "<main><article><p>2026/11/07 NT$0</p></article></main>")
+        self.assertEqual(r["reason"], "TIXFUN_DETAIL_EXACT_TITLE_HOLD")
+        self.assertEqual(r["same_id_review"], 0)
+        self.assertEqual(r["list_exact_edge"], 1)
+        self.assertEqual(m.inspect_tixfun_pair(
+            self.listing, "<header><h1>" + m.TIXFUN_TITLE +
+            "</h1></header>")["same_id_review"], 0)
+
+    def test_wrong_product_duplicate_query_checkout_and_host_hold(self):
+        for href in (m.TIXFUN_DETAIL + "&SESSION=1",
+                     m.TIXFUN_DETAIL + "#x",
+                     "http://tixfun.com/UTK0201_?PRODUCT_ID=Q029NZNY",
+                     "https://evil.example/UTK0201_?PRODUCT_ID=Q029NZNY",
+                     "https://tixfun.com/checkout?PRODUCT_ID=Q029NZNY",
+                     m.TIXFUN_DETAIL.replace("Q029NZNY", "WRONG")):
+            self.assertIsNone(m.tixfun_exact_href(href))
+        self.assertEqual(m.inspect_tixfun_pair(
+            self.listing + self.listing, self.detail)["same_id_review"], 0)
+
+    def test_native_policy_denies_before_list(self):
+        from unittest.mock import patch
+        with patch.object(m.urllib.request, "build_opener") as opener, \
+             patch.object(m, "read_public", return_value=(
+                 "User-agent: *\nDisallow: /\n",
+                 dict(url="https://tixfun.com/robots.txt",
+                      body_sha256="a" * 64))) as reader:
+            r = m.run_tixfun_native_once()
+        self.assertEqual(reader.call_count, 1)
+        self.assertEqual(r["attempted"], 1)
+        self.assertEqual(r["http200"], 0)
+        self.assertIn("TIXFUN_ROBOTS_DISALLOW_HOLD", r["first_failure"])
+
+    def test_native_missing_detail_title_keeps_http_receipts_but_no_lkg(self):
+        from unittest.mock import patch
+        stamps = "2026-11-06T03:55:00+00:00"
+        def receipt(url, digest):
+            return dict(url=url, http_status=200, body_sha256=digest * 64,
+                        body_bytes=123, content_type="text/html",
+                        observed_at_utc=stamps,
+                        transport="NATIVE_NO_REDIRECT_NO_RETRY")
+        answers = [
+            ("User-agent: *\nAllow: /\n",
+             receipt("https://tixfun.com/robots.txt", "a")),
+            (self.listing, receipt(m.TIXFUN_LIST, "b")),
+            ("<main><article><p>2026/11/07 NT$0</p></article></main>",
+             receipt(m.TIXFUN_DETAIL, "c")),
+        ]
+        with patch.object(m.urllib.request, "build_opener"), \
+             patch.object(m, "read_public", side_effect=answers) as reader:
+            r = m.run_tixfun_native_once()
+        self.assertEqual(reader.call_count, 3)
+        self.assertEqual((r["http200"], r["native_list"], r["native_detail"]), (2, 1, 1))
+        self.assertEqual(r["list_exact_edge"], 1)
+        self.assertEqual(r["native_same_id_review"], 0)
+        self.assertEqual(r["native_lkg"], 0)
+        self.assertEqual(r["formal_accepted_fields"], 0)
+        self.assertEqual(r["golden"], 0)
+        self.assertEqual(r["published"], 0)
+        self.assertFalse(r["raw_html_saved"])
+
 if __name__ == "__main__":
     unittest.main()

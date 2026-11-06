@@ -1729,6 +1729,30 @@ jobs:
               print("NEXT_NATIVE",line,d["http200"],d["native_list"],
                     d["native_detail"],d["native_identity"],d["first_failure"],flush=True)
           PY
+      - name: One-shot A TixFun #09 exact PRODUCT information (NO CHECKOUT, NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tixfun-native-once]'; then
+            echo 'TIXFUN_NATIVE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_dual_native_rotation import run_tixfun_native_once
+          d=run_tixfun_native_once()
+          assert d["kind"]=="P30_A_TIXFUN_09_NATIVE_ONESHOT_V1"
+          assert d["source_id"]=="09" and d["source_event_id"]=="Q029NZNY"
+          assert d["attempted"]<=3 and d["http200"]<=2
+          assert d["native_lkg"]==d["formal_accepted_fields"]==d["golden"]==d["published"]==0
+          assert d["raw_html_saved"] is False and d["release_state"]=="HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/tixfun_09_native_once.json").write_text(
+              json.dumps(d,ensure_ascii=False,sort_keys=True)+"\n",encoding="utf-8")
+          print("TIXFUN_NATIVE",d["attempted"],d["http200"],d["native_list"],
+                d["native_detail"],d["native_same_id_review"],d["first_failure"],flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |

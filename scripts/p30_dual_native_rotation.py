@@ -618,6 +618,128 @@ def persist_next_native_receipt_lkg(archive, target, repo_root, *,
             os.close(fd)
             os.unlink(lock)
 
+
+
+# TixFun #09 is a DISTINCT source from the consumed tixCraft/Fami probes.
+# Its public PRODUCT_ID detail is an event-information page, not a checkout
+# Session.  Do not infer performance date, eligibility or admission from NT$0.
+TIXFUN_LIST = "https://tixfun.com/"
+TIXFUN_DETAIL = "https://tixfun.com/UTK0201_?PRODUCT_ID=Q029NZNY"
+TIXFUN_ID = "Q029NZNY"
+TIXFUN_TITLE = "湖光山色藝術季秋季公演《煦客》"
+
+
+def tixfun_exact_href(href):
+    """Reject all other products, added query params, redirects and checkout."""
+    if not isinstance(href, str) or not href:
+        return None
+    try:
+        url = urljoin(TIXFUN_LIST, href)
+        p, expected = urlsplit(url), urlsplit(TIXFUN_DETAIL)
+        if (p.scheme == expected.scheme == "https"
+                and p.netloc == expected.netloc and p.path == expected.path
+                and p.query == expected.query and not p.fragment
+                and not p.username and not p.password and p.port is None):
+            return url
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def inspect_tixfun_pair(list_html, detail_html):
+    """Caller-HTML exact product link and event-local heading; REVIEW only.
+
+    A source LIST title does not authorize a missing DETAIL title, even when
+    the page advertises a date, free admission, or a different product title.
+    """
+    lp, dp = LocalHTML(), LocalHTML()
+    lp.feed(list_html)
+    dp.feed(detail_html)
+    edges = [(tixfun_exact_href(h), norm(t)) for h, t in lp.anchors
+             if tixfun_exact_href(h)]
+    if len(edges) != 1 or norm(TIXFUN_TITLE) not in edges[0][1]:
+        return dict(decision="HOLD", reason="TIXFUN_LIST_EXACT_PRODUCT_TITLE_HOLD",
+                    list_exact_edge=0, same_id_review=0,
+                    formal_accepted_fields=0)
+    heading_count = dp.headings.count(norm(TIXFUN_TITLE))
+    if heading_count != 1:
+        return dict(decision="HOLD", reason="TIXFUN_DETAIL_EXACT_TITLE_HOLD",
+                    list_exact_edge=1, detail_main_heading_count=heading_count,
+                    same_id_review=0, formal_accepted_fields=0)
+    return dict(decision="REVIEW_NON_SESSION_ONLY",
+                reason="INDEPENDENT_DETAIL_FIELD_AUTHORITY_HOLD",
+                list_exact_edge=1, detail_main_heading_count=1,
+                same_id_review=1, field_roles=["SOURCE_EVENT_TITLE_REVIEW"],
+                source_event_id=TIXFUN_ID, detail_url=TIXFUN_DETAIL,
+                formal_accepted_fields=0)
+
+
+def run_tixfun_native_once():
+    """Robots-authorized normal GET: robots, public HOME, same PRODUCT detail.
+
+    No cookies, login, checkout, redirect, retry, raw-page persistence or
+    promotion to formal FIELD/Golden/Published. CI one-shot marker is external.
+    """
+    out = dict(kind="P30_A_TIXFUN_09_NATIVE_ONESHOT_V1", line="A",
+               source_id="09", source_event_id=TIXFUN_ID,
+               attempted=0, http200=0, native_list=0, native_detail=0,
+               native_same_id_review=0, native_lkg=0,
+               formal_accepted_fields=0, golden=0, published=0,
+               raw_html_saved=False, source_receipts=[],
+               decision="HOLD", first_failure="NOT_STARTED",
+               release_state="HARD_HOLD_NO_PUBLICATION")
+    opener = urllib.request.build_opener(NoRedirect())
+    try:
+        out["attempted"] += 1
+        robots, rr = read_public(opener, "https://tixfun.com/robots.txt", "text/plain")
+        out["robots_receipt"] = rr
+        if len(robots.encode("utf-8")) > 65536:
+            raise ValueError("TIXFUN_ROBOTS_BODY_CAP_HOLD")
+        if (not re.search(r"(?im)^\s*user-agent\s*:\s*(?:\*|EventRadarPublicSourceAudit)(?:\s|$)", robots)
+                or not re.search(r"(?im)^\s*(?:allow|disallow)\s*:", robots)
+                or re.search(r"(?i)<(?:!doctype\s+html|html|head|body)(?:\s|>)", robots[:2048])):
+            raise ValueError("TIXFUN_ROBOTS_APPLICABLE_POLICY_HOLD")
+        policy = urllib.robotparser.RobotFileParser()
+        policy.parse(robots.splitlines())
+        if not policy.can_fetch(UA, TIXFUN_LIST) or not policy.can_fetch(UA, TIXFUN_DETAIL):
+            raise ValueError("TIXFUN_ROBOTS_DISALLOW_HOLD")
+        out["policy"] = "ROBOTS_ALLOW"
+        out["attempted"] += 1
+        listing, lr = read_public(opener, TIXFUN_LIST, "text/html")
+        out["source_receipts"].append(lr)
+        out["http200"] += 1
+        out["native_list"] = 1
+        if rr["body_sha256"] == lr["body_sha256"]:
+            raise ValueError("TIXFUN_ROBOTS_HOME_FALLBACK_HOLD")
+        lp = LocalHTML()
+        lp.feed(listing)
+        edges = [(tixfun_exact_href(h), norm(t)) for h, t in lp.anchors
+                 if tixfun_exact_href(h)]
+        if len(edges) != 1 or norm(TIXFUN_TITLE) not in edges[0][1]:
+            raise ValueError("TIXFUN_NATIVE_LIST_EXACT_PRODUCT_TITLE_HOLD")
+        if not policy.can_fetch(UA, edges[0][0]):
+            raise ValueError("TIXFUN_ROBOTS_DETAIL_DISALLOW_HOLD")
+        out["attempted"] += 1
+        detail, dr = read_public(opener, edges[0][0], "text/html")
+        out["source_receipts"].append(dr)
+        out["http200"] += 1
+        out["native_detail"] = 1
+        result = inspect_tixfun_pair(listing, detail)
+        out["decision"], out["first_failure"] = result["decision"], result["reason"]
+        out["native_same_id_review"] = result["same_id_review"]
+        out["list_exact_edge"] = result["list_exact_edge"]
+        out["detail_main_heading_count"] = result.get("detail_main_heading_count", 0)
+        if result["same_id_review"] == 1:
+            out["field_receipts"] = [dict(
+                role="SOURCE_EVENT_TITLE_REVIEW", event_id=TIXFUN_ID,
+                source_url=TIXFUN_DETAIL, body_sha256=dr["body_sha256"],
+                observed_at_utc=dr["observed_at_utc"],
+                decision="REVIEW", formal_accepted=False)]
+    except (ValueError, UnicodeError, OSError, TimeoutError,
+            urllib.error.URLError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:160]
+    return out
+
 if __name__ == "__main__":
     for line in ("A", "B"):
         print(json.dumps(run_native_once(line), ensure_ascii=False, sort_keys=True))
