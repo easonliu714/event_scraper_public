@@ -515,5 +515,135 @@ class TestSourceStreamGate(unittest.TestCase):
                     archive, root / "zepp_receipt_identity_lkg.json", root)
 
 
+    def _takase_synthetic_archive(self, *, mutate=None):
+        """Synthetic sealed receipt; not the pinned native CI artifact."""
+        import zipfile
+        src = {
+            "source_id": "ZEPP_NEWTAIPEI_OFFICIAL",
+            "source_event_id": "160668",
+            "list": "https://www.zepp.co.jp/hall/newtaipei/",
+            "detail": "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668",
+        }
+        stamp_list = "2026-11-06T10:04:43.302880+00:00"
+        stamp_detail = "2026-11-06T10:04:43.822457+00:00"
+        sha_list = "890893c79a796f222f52d4ad628edae2da273be73a7e033ef4ea95d992ebd657"
+        sha_detail = "d78ae5cedcd1089619b28c55b4fadff1ac1b66946de79551c52fa7bc6d93a4f6"
+        receipt = {
+            "kind": "P30_AB_KKTIX_FUZHONG_NATIVE_ONESHOT_V1",
+            "line": "B_ZEPP_TAKASE", "source_id": src["source_id"],
+            "source_event_id": src["source_event_id"],
+            "decision": "REVIEW_IDENTITY_ONLY",
+            "first_failure": "AB_EVENT_LOCAL_FIELD_SCOPE_HOLD",
+            "native_get_attempted": 3, "native_http200": 2,
+            "native_list": 1, "native_detail": 1,
+            "native_same_id_review": 1, "native_lkg": 0,
+            "field_roles": [], "list_row_roles": [], "raw_html_saved": False,
+            "formal_accepted_fields": 0, "golden": 0, "published": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "robots_receipt": {
+                "url": "https://www.zepp.co.jp/robots.txt",
+                "http_status": 200, "body_bytes": 160,
+                "body_sha256": "f85c8154288b52d4d691b12fa3d0df1bec3f51cba30933d11eb9d20b3d99d6cd",
+                "transport": "NATIVE_NO_REDIRECT_NO_RETRY"},
+            "source_receipts": [
+                {"url": src["list"], "http_status": 200,
+                 "content_type": "text/html", "body_bytes": 336693,
+                 "body_sha256": sha_list, "observed_at_utc": stamp_list,
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY"},
+                {"url": src["detail"], "http_status": 200,
+                 "content_type": "text/html", "body_bytes": 313606,
+                 "body_sha256": sha_detail, "observed_at_utc": stamp_detail,
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY"}],
+            "field_receipts": [{
+                "source_id": src["source_id"], "event_id": src["source_event_id"],
+                "source_url": src["detail"], "body_sha256": sha_detail,
+                "observed_at_utc": stamp_detail, "role": "SOURCE_EXACT_TITLE_REVIEW",
+                "decision": "REVIEW", "formal_accepted": False}],
+        }
+        if mutate:
+            mutate(receipt)
+        evidence = {
+            "readiness.txt": b"review only",
+            "field_subset_review_proposal.json": b"{}",
+            "canonical_field_authority_contract.json": b"{}",
+            "tmc_field_authority_contract.json": b"{}",
+            "zepp_takase_160668_native_once.json":
+                json.dumps(receipt, ensure_ascii=False, sort_keys=True).encode("utf-8"),
+        }
+        lines = [hashlib.sha256(body).hexdigest() + "  evidence/" + name
+                 for name, body in evidence.items()]
+        lines += ["0" * 64 + "  scripts/unused_%02d.py" % i for i in range(16)]
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, body in evidence.items():
+                z.writestr(name, body)
+            z.writestr("SHA256SUMS.txt", "\n".join(lines) + "\n")
+        return stream.getvalue()
+
+    def test_takase_sealed_receipt_proves_identity_not_body_or_field(self):
+        archive = self._takase_synthetic_archive()
+        out = m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        self.assertEqual(out["source_event_id"], "160668")
+        self.assertEqual(out["historical_native_http200"], 2)
+        self.assertEqual(out["receipt_only_identity_lkg"], 1)
+        self.assertEqual(out["body_review_lkg"], 0)
+        self.assertEqual(out["native_get_this_call"], 0)
+        self.assertEqual(out["field_authority"], "EVENT_LOCAL_SCOPE_HOLD")
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertEqual(out["golden_accepted_events"], 0)
+        self.assertEqual(out["published_events"], 0)
+        self.assertFalse(out["raw_html_saved"])
+
+    def test_takase_sealed_receipt_rejects_cross_id_role_and_clock(self):
+        cases = [
+            lambda r: r.update(source_event_id="160669"),
+            lambda r: r["field_receipts"][0].update(role="VENUE_ACCEPTED"),
+            lambda r: r["source_receipts"][1].update(
+                body_sha256="0" * 64),
+            lambda r: r["source_receipts"][1].update(
+                observed_at_utc="2026-11-07T10:04:43+00:00"),
+            lambda r: r.update(formal_accepted_fields=1),
+        ]
+        for mutate in cases:
+            archive = self._takase_synthetic_archive(mutate=mutate)
+            with self.subTest(case=cases.index(mutate)):
+                with self.assertRaisesRegex(ValueError, "TAKASE_"):
+                    m.audit_zepp_takase_sealed_archive(
+                        archive, hashlib.sha256(archive).hexdigest())
+
+    def test_takase_receipt_lkg_atomic_idempotent_and_cas(self):
+        import tempfile
+        from pathlib import Path
+        archive = self._takase_synthetic_archive()
+        snapshot = m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            isolated = Path(td) / "isolated"
+            isolated.mkdir()
+            dest = isolated / "zepp_takase_receipt_lkg.json"
+            kw = {"expected_filename": dest.name,
+                  "envelope_kind": "P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1"}
+            first = m.persist_sealed_receipt_review_lkg(
+                snapshot, dest, root, **kw)
+            self.assertTrue(first["persisted"])
+            again = m.persist_sealed_receipt_review_lkg(
+                snapshot, dest, root, **kw)
+            self.assertTrue(again["idempotent"])
+            modified = dict(snapshot, source_event_id="160669")
+            with self.assertRaisesRegex(ValueError, "FULL_ENVELOPE_CAS_HOLD"):
+                m.persist_sealed_receipt_review_lkg(
+                    modified, dest, root, **kw)
+            self.assertEqual(json.loads(dest.read_text())["snapshot"], snapshot)
+            with self.assertRaisesRegex(ValueError, "REPOSITORY_PATH_HOLD"):
+                m.persist_sealed_receipt_review_lkg(
+                    snapshot, root / dest.name, root, **kw)
+            with self.assertRaisesRegex(ValueError, "TAKASE_ARTIFACT_SHA_HOLD"):
+                m.persist_zepp_takase_receipt_lkg(archive, dest, root)
+
+
+
 if __name__ == "__main__":
     unittest.main()
