@@ -139,9 +139,9 @@ def inspect_pair(line, listing, detail):
         return result
     local = norm(" ".join(owned[0]["texts"]))
     if line == "A":
-        if len(re.findall(r"日期\s*[｜:]\s*2026\.11\.28.{0,75}?START\s*18:00", local)) == 1:
+        if len(re.findall(r"日期\s*[|｜:]\s*2026\.11\.28.{0,75}?START\s*18:00", local)) == 1:
             result["field_roles"].append("SHOW_START_2026_11_28_1800_REVIEW")
-        if len(re.findall(r"地點\s*[｜:]\s*The Wall Live House", local, re.I)) == 1:
+        if len(re.findall(r"地點\s*[|｜:]\s*The Wall Live House", local, re.I)) == 1:
             result["field_roles"].append("VENUE_THE_WALL_REVIEW")
         # VIP, presale, onsite, concession and pickup fee are distinct roles;
         # no advertised tier becomes eligible general admission or inventory.
