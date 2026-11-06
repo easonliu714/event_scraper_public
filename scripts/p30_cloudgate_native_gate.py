@@ -39,11 +39,19 @@ class LocalEvent(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.stack, self.anchors, self.headings, self.local_text = [], [], [], []
         self.anchor, self.heading = None, None
+        # MAIN-wide text cannot establish the identity of an event.
+        self.scopes, self.active_scopes = [], []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
         if tag not in ("img", "br", "meta", "link", "input", "hr", "source"):
             self.stack.append(tag)
+        if tag in ("article", "section"):
+            if len(self.scopes) >= 128:
+                raise ValueError("CLOUDGATE_EVENT_SCOPE_CAP_HOLD")
+            self.scopes.append(dict(tag=tag, depth=len(self.stack),
+                                    headings=[], texts=[]))
+            self.active_scopes.append(len(self.scopes) - 1)
         if tag == "a":
             self.anchor = [attrs.get("href", ""), []]
         if tag in ("h1", "h2", "h3") and any(
@@ -56,20 +64,27 @@ class LocalEvent(HTMLParser):
         if self.heading is not None:
             self.heading[1].append(value)
         if any(t in ("main", "article") for t in self.stack) and not any(
-                t in ("script", "style", "noscript") for t in self.stack):
+                t in ("script", "style", "noscript", "template") for t in self.stack):
             self.local_text.append(value)
+            for index in self.active_scopes:
+                self.scopes[index]["texts"].append(value)
 
     def handle_endtag(self, tag):
         if tag == "a" and self.anchor is not None:
             self.anchors.append((self.anchor[0], norm("".join(self.anchor[1]))))
             self.anchor = None
         if self.heading is not None and tag == self.heading[0]:
-            self.headings.append(norm("".join(self.heading[1])))
+            heading = norm("".join(self.heading[1]))
+            self.headings.append(heading)
+            for index in self.active_scopes:
+                self.scopes[index]["headings"].append(heading)
             self.heading = None
         if tag in self.stack:
             while self.stack:
                 if self.stack.pop() == tag:
                     break
+        self.active_scopes = [index for index in self.active_scopes
+                              if self.scopes[index]["depth"] <= len(self.stack)]
 
 def inspect_pair(list_html, detail_html):
     listing, detail = LocalEvent(), LocalEvent()
@@ -83,7 +98,17 @@ def inspect_pair(list_html, detail_html):
     if detail.headings.count(norm(TITLE)) != 1:
         return {"decision":"HOLD","first_failure":"CLOUDGATE_DETAIL_MAIN_LOCAL_TITLE_HOLD",
                 "same_id_review":0,"postponement_review":0}
-    local = norm(" ".join(detail.local_text))
+    # Require the exact title and postponement in the same event-local scope.
+    # An ARTICLE outranks its containing SECTION; sibling text never qualifies.
+    owned = [scope for scope in detail.scopes
+             if norm(TITLE) in scope["headings"]]
+    articles = [scope for scope in owned if scope["tag"] == "article"]
+    owned = articles or [scope for scope in owned if scope["tag"] == "section"]
+    if len(owned) != 1:
+        return {"decision":"HOLD",
+                "first_failure":"CLOUDGATE_EVENT_LOCAL_TITLE_SCOPE_HOLD",
+                "same_id_review":0,"postponement_review":0}
+    local = norm(" ".join(owned[0]["texts"]))
     if not (re.search(r"原\s*11/14.*?延期至\s*12/19", local)
             and "12月19日" in local):
         return {"decision":"HOLD","first_failure":"CLOUDGATE_POSTPONEMENT_LOCAL_AUTHORITY_HOLD",
