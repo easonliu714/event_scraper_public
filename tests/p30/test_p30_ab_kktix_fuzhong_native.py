@@ -408,6 +408,38 @@ class ABSourceTests(unittest.TestCase):
         self.assertNotIn("PRICE", repr(result))
         self.assertNotIn("TICKET_SESSION_ID", repr(result["field_roles"]))
 
+    def test_b_day1_locale_only_and_mixed_day_scope_fail_closed(self):
+        source = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        listing = ('<article><a href="/events/takasetoya202611-2">'
+                   + source["title"] + '</a></article>')
+        body = ('<article><h1>' + source["title"] + '</h1>'
+                '<a href="?locale=en">English</a>'
+                '<p>[DAY1] SETLIST A 日期：2026年11月7日</p>'
+                '<p>時間：開場 17:00 / 開演 18:00</p>'
+                '<p>會場：Zepp New Taipei</p></article>')
+        valid = m.inspect_pair("B_KKTIX_TAKASE_DAY1", listing, body)
+        self.assertEqual(valid["same_id_review"], 1)
+        self.assertEqual(len(valid["field_roles"]), 2)
+        self.assertEqual(valid["event_local_scope"]["foreign_event_edge_count"], 0)
+        for extra in ("[DAY2] SETLIST B", "11/08場 開演17:00",
+                      "2026-11-08", "兩日通票"):
+            with self.subTest(extra=extra):
+                mixed = body.replace("</article>", "<p>" + extra + "</p></article>")
+                got = m.inspect_pair("B_KKTIX_TAKASE_DAY1", listing, mixed)
+                self.assertEqual(got["same_id_review"], 1)
+                self.assertEqual(got["field_roles"], [])
+                self.assertEqual(got["first_failure"],
+                                 "AB_KKTIX_DAY1_MIXED_EVENT_LOCAL_DAY_HOLD")
+        foreign = body.replace('href="?locale=en"', 'href="?event_id=other"')
+        got = m.inspect_pair("B_KKTIX_TAKASE_DAY1", listing, foreign)
+        self.assertEqual(got["field_roles"], [])
+        self.assertEqual(got["first_failure"],
+                         "AB_EVENT_LOCAL_FOREIGN_SAME_SOURCE_EVENT_HOLD")
+        duplicate = body.replace('href="?locale=en"',
+                                 'href="?locale=en&amp;locale=zh-TW"')
+        self.assertEqual(m.inspect_pair(
+            "B_KKTIX_TAKASE_DAY1", listing, duplicate)["field_roles"], [])
+
     def test_b_kktix_day1_one_shot_mocked_native_source_receipts(self):
         source = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
         listing = '<main><a href="/events/takasetoya202611-2">' + source["title"] + '</a></main>'

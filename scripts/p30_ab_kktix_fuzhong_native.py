@@ -259,8 +259,18 @@ def foreign_same_source_event_edges(line, scope):
         if (u.scheme != "https" or u.hostname != expected.hostname
                 or u.port is not None or u.username or u.password):
             continue
+        # KKTIX's exact event URL may expose an English/localized view.
+        # A locale-only link is still this event, never a new event ID;
+        # all other query differences (including duplicate locale keys)
+        # remain foreign and fail closed.
+        same_event_locale = (
+            line == "B_KKTIX_TAKASE_DAY1"
+            and u.path == expected.path and not expected.query
+            and parse_qsl(u.query, keep_blank_values=True)
+            in ([("locale", "en")], [("locale", "zh-TW")]))
         same_path_different_id = (u.path == expected.path and
-                                  u.query != expected.query)
+                                  u.query != expected.query and
+                                  not same_event_locale)
         sibling_detail_path = (u.path.startswith(parent) and
                                u.path != expected.path)
         if same_path_different_id or sibling_detail_path:
@@ -358,8 +368,16 @@ def inspect_pair(line, listing, detail):
         # plus an exact DETAIL heading is identity REVIEW, not a Session.
         # DAY1 show start must be explicitly event-local and may never be
         # borrowed from DAY2, the two-day pass or a ticket sale deadline.
-        if ("[DAY2]" not in local and "2026年11月8日" not in local
-                and len(re.findall(r"\[DAY1\]\s*SETLIST\s*A", local)) == 1
+        # A title-owned article may still contain DAY2 or a two-day
+        # ticket description. In that case neither SHOW nor HALL is
+        # attributable to DAY1, even when one DAY1 time is present.
+        mixed_day = re.search(
+            r"(?i)\[DAY\s*2\]|(?:2026\s*[年./-]\s*)?11\s*(?:月|[./-])\s*0?8(?:\s*日|(?!\d))|兩日(?:通票|票)|雙日(?:通票|票)",
+            local)
+        if mixed_day:
+            result["first_failure"] = "AB_KKTIX_DAY1_MIXED_EVENT_LOCAL_DAY_HOLD"
+            return result
+        if (len(re.findall(r"\[DAY1\]\s*SETLIST\s*A", local)) == 1
                 and len(re.findall(r"日期\s*:\s*2026年11月7日", local)) == 1
                 and len(re.findall(
                     r"時間\s*:\s*開場\s*17:00\s*/\s*開演\s*18:00", local)) == 1):
