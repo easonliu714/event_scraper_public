@@ -1855,6 +1855,40 @@ jobs:
                 report["native_detail"], report["native_same_id_review"],
                 report["first_failure"], flush=True)
           PY
+      - name: One-shot A Tixcraft #03 new indexed event exact LIST DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # First CI attempt only; prior Tixcraft events are not re-probed.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tixcraft03-native-once]'; then
+            echo 'TIXCRAFT03_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          report = run_native_once("A_TIXCRAFT")
+          assert report["kind"] == "P30_AB_KKTIX_FUZHONG_NATIVE_ONESHOT_V1"
+          assert report["line"] == "A_TIXCRAFT" and report["source_id"] == "03"
+          assert report["source_event_id"] == "26_aftp"
+          assert 0 <= report["native_get_attempted"] <= 3
+          assert 0 <= report["native_http200"] <= 2
+          assert report["native_list"] <= 1 and report["native_detail"] <= 1
+          assert report["native_same_id_review"] <= report["native_detail"]
+          assert report["native_lkg"] == report["formal_accepted_fields"] == report["golden"] == report["published"] == 0
+          assert report["raw_html_saved"] is False
+          assert report["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          assert len(report["source_receipts"]) <= 2
+          Path("evidence/tixcraft03_native_once.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8")
+          print("TIXCRAFT03_NATIVE", report["native_get_attempted"],
+                report["native_http200"], report["native_list"],
+                report["native_detail"], report["native_same_id_review"],
+                report["first_failure"], flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1883,6 +1917,7 @@ jobs:
           if [ -f evidence/native_adapter_structural_audit.json ]; then sha256sum evidence/native_adapter_structural_audit.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_cksmh_rotation.json ]; then sha256sum evidence/native_cksmh_rotation.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/accupass02_native_once.json ]; then sha256sum evidence/accupass02_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/tixcraft03_native_once.json ]; then sha256sum evidence/tixcraft03_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/zepp_takase_160668_native_once.json ]; then sha256sum evidence/zepp_takase_160668_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/canonical_field_authority_contract.json >> evidence/SHA256SUMS.txt
