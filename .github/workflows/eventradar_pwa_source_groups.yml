@@ -1,0 +1,59 @@
+name: EventRadar PWA source groups exact-head UI NO PUBLISH
+on:
+  pull_request:
+    paths:
+      - 'docs/index.html'
+      - 'tests/p30/test_pwa_source_groups.js'
+      - '.github/workflows/eventradar_pwa_source_groups.yml'
+permissions:
+  contents: read
+jobs:
+  pwa-source-groups:
+    if: github.repository == 'easonliu714/event_scraper_public'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD and immutable production data, status and publisher
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          base=b7e04a8501f12df56677c833166e7038c4a6702b
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/platform-status.html)" = 1abaec4d47fcba809430e24b8ff9312a08bc3de5
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_source_groups.yml' 'docs/index.html' 'tests/p30/test_pwa_source_groups.js' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNAPPROVED_UI_SCOPE; exit 1; }
+          echo PASS_EXACT_HEAD_FROZEN_EVENT_DATA_STATUS_PUBLISHER_THREE_FILE_SCOPE
+      - name: Source grouping and existing Android/PWA UI regressions
+        run: |
+          set -euo pipefail
+          node tests/p30/test_pwa_source_groups.js
+          node tests/p30/test_candidate_review_ui_provenance.js
+          node tests/p30/test_candidate_source_summary.js
+          node tests/p30/test_formal_card_role_summary.js
+          echo PASS_PWA_GROUPS_LEGACY_FILTERS_AND_CANDIDATE_ISOLATION
+      - name: Evidence file hash manifest
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/exact_head.txt
+          git rev-parse HEAD:docs/data.json > evidence/formal_data_blob.txt
+          git rev-parse HEAD:docs/platform_status.json > evidence/formal_status_blob.txt
+          sha256sum docs/index.html tests/p30/test_pwa_source_groups.js .github/workflows/eventradar_pwa_source_groups.yml evidence/*.txt > evidence/SHA256SUMS.txt
+          sha256sum -c evidence/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-pwa-source-groups-exact-head
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
