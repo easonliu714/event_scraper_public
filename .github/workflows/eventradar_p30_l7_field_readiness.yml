@@ -1801,6 +1801,31 @@ jobs:
                     report["native_http200"], report["native_same_id_review"],
                     report["first_failure"], flush=True)
           PY
+      - name: One-shot A ACCUPASS #02 new exact event search card (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[accupass02-native-once]'; then
+            echo 'ACCUPASS02_NATIVE_SKIPPED_NO_UNCONSUMED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          report = run_native_once("A_ACCUPASS")
+          assert report["source_id"] == "02"
+          assert report["source_event_id"] == "2610261742421131142843"
+          assert report["native_get_attempted"] <= 3 and report["native_http200"] <= 2
+          assert report["native_lkg"] == report["formal_accepted_fields"] == report["golden"] == report["published"] == 0
+          assert report["raw_html_saved"] is False and report["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/accupass02_native_once.json").write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+          print("ACCUPASS02_NATIVE", report["native_get_attempted"], report["native_http200"],
+                report["native_list"], report["native_detail"], report["native_same_id_review"],
+                report["first_failure"], flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1828,6 +1853,7 @@ jobs:
           if [ -f evidence/native_twtc_adapter_lkg.json ]; then sha256sum evidence/native_twtc_adapter_lkg.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_adapter_structural_audit.json ]; then sha256sum evidence/native_adapter_structural_audit.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_cksmh_rotation.json ]; then sha256sum evidence/native_cksmh_rotation.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/accupass02_native_once.json ]; then sha256sum evidence/accupass02_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/canonical_field_authority_contract.json >> evidence/SHA256SUMS.txt
           if [ -f evidence/native_huashan_rotation.json ]; then sha256sum evidence/native_huashan_rotation.json >> evidence/SHA256SUMS.txt; fi
