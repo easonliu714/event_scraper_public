@@ -34,6 +34,44 @@ class CloudGateTests(unittest.TestCase):
         self.assertEqual(r["postponement_review"],0)
         self.assertEqual(r["same_id_review"],1)
 
+    def test_sibling_article_postponement_cannot_borrow(self):
+        # Regression: an unrelated sibling event must not supply the 12/19 role.
+        foreign = ('<main><article><h1>'+m.TITLE+'</h1>'
+                   '<p>原11/14演出，詳情待公告</p></article>'
+                   '<article><h1>其他節目</h1>'
+                   '<p>● 12月19日(六) 13:30</p>'
+                   '<p>原11/14兩場講座延期至12/19</p>'
+                   '</article></main>')
+        r = m.inspect_pair(self.list_html, foreign)
+        self.assertEqual(r["same_id_review"], 1)
+        self.assertEqual(r["postponement_review"], 0)
+        self.assertEqual(r["first_failure"],
+                         "CLOUDGATE_POSTPONEMENT_LOCAL_AUTHORITY_HOLD")
+
+    def test_main_only_heading_and_sibling_section_hold(self):
+        main_only = ('<main><h1>'+m.TITLE+'</h1>'
+                     '<p>● 12月19日</p>'
+                     '<p>原11/14兩場講座延期至12/19</p></main>')
+        r = m.inspect_pair(self.list_html, main_only)
+        self.assertEqual(r["same_id_review"], 0)
+        self.assertEqual(r["first_failure"],
+                         "CLOUDGATE_EVENT_LOCAL_TITLE_SCOPE_HOLD")
+        sibling = ('<main><section><h1>'+m.TITLE+'</h1></section>'
+                   '<section><p>● 12月19日</p>'
+                   '<p>原11/14兩場講座延期至12/19</p></section></main>')
+        self.assertEqual(m.inspect_pair(
+            self.list_html, sibling)["postponement_review"], 0)
+
+    def test_nested_title_article_owns_correction(self):
+        nested = ('<main><section><article><h1>'+m.TITLE+'</h1>'
+                  '<p>● 12月19日(六) 13:30</p>'
+                  '<p>原11/14兩場講座延期至12/19</p>'
+                  '</article></section></main>')
+        r = m.inspect_pair(self.list_html, nested)
+        self.assertEqual((r["same_id_review"],
+                          r["postponement_review"]), (1, 1))
+        self.assertEqual(r["formal_accepted_fields"], 0)
+
     def test_duplicate_event_edges_hold(self):
         self.assertEqual(m.inspect_pair(self.list_html+self.list_html,
             self.detail_html)["same_id_review"],0)
