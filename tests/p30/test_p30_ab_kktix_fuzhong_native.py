@@ -376,6 +376,60 @@ class ABSourceTests(unittest.TestCase):
                 self.assertEqual(r["formal_accepted_fields"], 0)
 
 
+    def test_b_kktix_takase_day1_organizer_exact_id_and_field_boundary(self):
+        source = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        self.assertEqual(source["source_id"], "01")
+        self.assertEqual(source["event_id"], "takasetoya202611-2")
+        listing = ('<main><article><a href="/events/takasetoya202611-1">'
+                   '〖兩日通票〗TAKASE TOYA</a></article><article>'
+                   '<a href="/events/takasetoya202611-2">' + source["title"] +
+                   '</a></article><article><a href="/events/takasetoya202611-3">'
+                   '〖11/08場〗TAKASE TOYA</a></article></main>')
+        detail = ('<main><article><h1>' + source["title"] + '</h1>'
+                  '<p>[DAY1] SETLIST A 日期：2026年11月7日(六)</p>'
+                  '<p>時間：開場 17:00 / 開演 18:00</p>'
+                  '<p>會場：Zepp New Taipei</p></article></main>')
+        result = m.inspect_pair("B_KKTIX_TAKASE_DAY1", listing, detail)
+        self.assertEqual(result["same_id_review"], 1)
+        self.assertEqual(set(result["field_roles"]), {
+            "KKTIX_DAY1_SHOW_START_REVIEW_NOT_SESSION",
+            "KKTIX_DAY1_HALL_REVIEW"})
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertIsNone(m.exact_detail("B_KKTIX_TAKASE_DAY1",
+            "/events/takasetoya202611-1"))
+        self.assertIsNone(m.exact_detail("B_KKTIX_TAKASE_DAY1",
+            "/events/takasetoya202611-3"))
+        self.assertEqual(m.inspect_pair("B_KKTIX_TAKASE_DAY1",
+            listing.replace('takasetoya202611-2', 'takasetoya202611-3'),
+            detail)["same_id_review"], 0)
+        mixed = detail.replace('</article>', '<p>[DAY2] 2026年11月8日 開演 17:00</p></article>')
+        roles = m.inspect_pair("B_KKTIX_TAKASE_DAY1", listing, mixed)["field_roles"]
+        self.assertNotIn("KKTIX_DAY1_SHOW_START_REVIEW_NOT_SESSION", roles)
+        self.assertNotIn("PRICE", repr(result))
+        self.assertNotIn("SESSION", repr(result["field_roles"]))
+
+    def test_b_kktix_day1_one_shot_mocked_native_source_receipts(self):
+        source = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        listing = '<main><a href="/events/takasetoya202611-2">' + source["title"] + '</a></main>'
+        detail = ('<main><article><h1>' + source["title"] + '</h1>'
+                  '<p>[DAY1] SETLIST A 日期：2026年11月7日</p>'
+                  '<p>時間：開場 17:00 / 開演 18:00</p>'
+                  '<p>會場：Zepp New Taipei</p></article></main>')
+        receipts = [
+            ("User-agent: *\\nAllow: /\\n", {"body_sha256": "a"*64}),
+            (listing, {"body_sha256": "b"*64, "observed_at_utc": "2026-11-06T19:00:00+00:00"}),
+            (detail, {"body_sha256": "c"*64, "observed_at_utc": "2026-11-06T19:00:01+00:00"})]
+        with patch.object(m, "read_public", side_effect=receipts) as mocked:
+            out = m.run_native_once("B_KKTIX_TAKASE_DAY1")
+        self.assertEqual(mocked.call_count, 3)
+        self.assertEqual((out["native_get_attempted"], out["native_http200"],
+                          out["native_list"], out["native_detail"],
+                          out["native_same_id_review"]), (3, 2, 1, 1, 1), out)
+        self.assertEqual(len(out["field_receipts"]), 3)
+        self.assertTrue(all(not r["formal_accepted"] for r in out["field_receipts"]))
+        self.assertEqual((out["formal_accepted_fields"], out["golden"],
+                          out["published"], out["native_lkg"]), (0, 0, 0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

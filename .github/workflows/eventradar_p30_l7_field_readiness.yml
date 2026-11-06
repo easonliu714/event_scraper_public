@@ -1948,6 +1948,31 @@ jobs:
           assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
           print('KKTIX_TAKASE', d['decision'], d['first_failure'])
           PY
+      - name: B KKTIX Day1 public organizer LIST to same-ID DETAIL (one shot)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kktix-day1-list-detail-once]'; then
+            echo 'KKTIX_DAY1_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY' > evidence/kktix_day1_native_once.json
+          import json
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          print(json.dumps(run_native_once("B_KKTIX_TAKASE_DAY1"), ensure_ascii=False, sort_keys=True))
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/kktix_day1_native_once.json').read_text())
+          assert d['source_id']=='01' and d['source_event_id']=='takasetoya202611-2'
+          assert d['native_get_attempted'] <= 3
+          assert d['native_http200'] <= 2
+          assert d['raw_html_saved'] is False
+          assert d['formal_accepted_fields']==d['golden']==d['published']==d['native_lkg']==0
+          print('KKTIX_DAY1', d['decision'], d['first_failure'])
+          PY
       - name: Pinned Zepp 160668 native receipt -> isolated durable LKG (NO OFFICIAL GET)
         shell: bash
         env:
@@ -2031,6 +2056,7 @@ jobs:
           if [ -f evidence/songshan_second_uuid_isolated_review_lkg.json ]; then sha256sum evidence/songshan_second_uuid_isolated_review_lkg.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_cksmh_session_roles.json ]; then sha256sum evidence/native_cksmh_session_roles.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_huashan_home_date.json ]; then sha256sum evidence/native_huashan_home_date.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/kktix_day1_native_once.json ]; then sha256sum evidence/kktix_day1_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/zepp_takase_receipt_only_lkg.json >> evidence/SHA256SUMS.txt
           if [ -f evidence/kktix_takase_public_native_once.json ]; then sha256sum evidence/kktix_takase_public_native_once.json >> evidence/SHA256SUMS.txt; fi

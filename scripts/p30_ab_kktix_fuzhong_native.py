@@ -77,6 +77,17 @@ SOURCES = {
         # not a KKTIX registration/checkout Session or inventory receipt.
         "public_ticket_event": "https://freeplanetml.kktix.cc/events/takasetoya202611",
     },
+    "B_KKTIX_TAKASE_DAY1": {
+        # Canonical KKTIX platform #01, not a new venue platform.
+        # Public organizer index advertises separate -1 (two-day pass),
+        # -2 (Nov 7) and -3 (Nov 8) registration event IDs. A Zepp
+        # rid=160668 is not any of these ticket event IDs or Sessions.
+        "source_id": "01", "event_id": "takasetoya202611-2",
+        "list": "https://freeplanetml.kktix.cc/",
+        "detail": "https://freeplanetml.kktix.cc/events/takasetoya202611-2",
+        "title": "〖11/07場〗TAKASE TOYA 5th Album “∞” Release Live in Taipei",
+        "origin": "https://freeplanetml.kktix.cc",
+    },
     "B_CERAMICS": {
         "source_id": "YINGGE_CERAMICS_NEWTIPEI_OFFICIAL",
         "event_id": "0Q218346582180038351",
@@ -297,6 +308,20 @@ def inspect_pair(line, listing, detail):
             result["first_failure"] = "AB_EVENT_LOCAL_DATE_HALL_AUTHORITY_HOLD"
         # The source page describes TWO days; rid=160668 does not attest
         # both event-local sessions or an eligible price. DATE/HALL stay HOLD.
+    elif line == "B_KKTIX_TAKASE_DAY1":
+        # An organizer LIST edge to its own exact registration event ID
+        # plus an exact DETAIL heading is identity REVIEW, not a Session.
+        # DAY1 show start must be explicitly event-local and may never be
+        # borrowed from DAY2, the two-day pass or a ticket sale deadline.
+        if ("[DAY2]" not in local and "2026年11月8日" not in local
+                and len(re.findall(r"\\[DAY1\\]\\s*SETLIST\\s*A", local)) == 1
+                and len(re.findall(r"日期\\s*:\\s*2026年11月7日", local)) == 1
+                and len(re.findall(
+                    r"時間\\s*:\\s*開場\\s*17:00\\s*/\\s*開演\\s*18:00", local)) == 1):
+            result["field_roles"].append("KKTIX_DAY1_SHOW_START_REVIEW_NOT_SESSION")
+        if local.count("會場: Zepp New Taipei") == 1:
+            result["field_roles"].append("KKTIX_DAY1_HALL_REVIEW")
+        # This KKTIX source does not independently attest the Zepp rid.
     elif line == "B_CERAMICS":
         if len(re.findall(r"展覽時間\s*[:：]\s*2026年11月20日至2026年12月20日", local)) == 1:
             result["field_roles"].append("EXHIBITION_RANGE_REVIEW_NO_SESSION")
