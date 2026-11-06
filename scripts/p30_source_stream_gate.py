@@ -1270,6 +1270,125 @@ def persist_zepp_takase_receipt_lkg(archive_bytes, destination, repo_root,
         expected_previous_sha256=expected_previous_sha256)
 
 
+
+# Source-owned field provenance is distinct from independent field authority.
+# This shared A/B adjudicator only classifies conflicts and NEVER grants FIELD.
+def adjudicate_sealed_field_roles(*, source_id, source_event_id, detail_url,
+                                 detail_body_sha256, observed_at_utc,
+                                 transport, role_receipts,
+                                 independent_claims=(), now_utc=None):
+    """Fail closed on ID/role/SHA/time and cross-source claims; no native GET."""
+    allowed = {"VENUE_SHOW_NOT_SALE", "VENUE_HALL",
+               "SOURCE_EXACT_TITLE_REVIEW"}
+    if (not isinstance(source_id, str) or not source_id
+            or not isinstance(source_event_id, str) or not source_event_id
+            or not isinstance(detail_url, str)
+            or urlsplit(detail_url).scheme != "https"
+            or urlsplit(detail_url).username is not None
+            or urlsplit(detail_url).fragment
+            or not isinstance(detail_body_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", detail_body_sha256) is None
+            or transport not in ("BUILTIN_NATIVE_GET",
+                                 "NATIVE_NO_REDIRECT_NO_RETRY",
+                                 "TEST_INJECTED_NOT_NATIVE")
+            or not isinstance(role_receipts, (list, tuple))
+            or not role_receipts or len(role_receipts) > 3):
+        raise ValueError("FIELD_SOURCE_ENVELOPE_HOLD")
+
+    def utc(value):
+        if not isinstance(value, str):
+            raise ValueError("FIELD_SOURCE_CLOCK_HOLD")
+        try:
+            result = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("FIELD_SOURCE_CLOCK_HOLD") from exc
+        if result.utcoffset() is None or result.utcoffset().total_seconds() != 0:
+            raise ValueError("FIELD_SOURCE_CLOCK_HOLD")
+        return result
+
+    observed = utc(observed_at_utc)
+    now = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("FIELD_SOURCE_CLOCK_HOLD")
+    age = (now - observed).total_seconds()
+    native = transport in ("BUILTIN_NATIVE_GET", "NATIVE_NO_REDIRECT_NO_RETRY")
+    fresh = 0 <= age <= 86400
+    rows = []
+    seen = set()
+    for field in role_receipts:
+        if not isinstance(field, dict):
+            raise ValueError("FIELD_ROLE_RECEIPT_SHAPE_HOLD")
+        role = field.get("role")
+        value = field.get("value")
+        if (role not in allowed or role in seen
+                or not isinstance(value, str) or not value.strip()
+                or field.get("source_id") != source_id
+                or field.get("source_event_id") != source_event_id
+                or field.get("source_url") != detail_url
+                or field.get("body_sha256") != detail_body_sha256
+                or field.get("observed_at_utc") != observed_at_utc
+                or field.get("formal_accepted") is not False):
+            raise ValueError("FIELD_ROLE_ID_SHA_PROVENANCE_HOLD")
+        seen.add(role)
+        rows.append({"role": role, "value": value, "source_id": source_id,
+                     "source_event_id": source_event_id,
+                     "source_url": detail_url,
+                     "body_sha256": detail_body_sha256,
+                     "observed_at_utc": observed_at_utc,
+                     "native_receipt": native, "fresh_within_24h": fresh,
+                     "independent_authority": False,
+                     "decision": "HOLD_INDEPENDENT_AUTHORITY"})
+
+    if not isinstance(independent_claims, (list, tuple)) or len(independent_claims) > 3:
+        raise ValueError("FIELD_INDEPENDENT_CLAIM_SHAPE_HOLD")
+    claims_by_role = {}
+    for claim in independent_claims:
+        if not isinstance(claim, dict):
+            raise ValueError("FIELD_INDEPENDENT_CLAIM_SHAPE_HOLD")
+        role = claim.get("role")
+        link = claim.get("direct_event_link")
+        source_url = claim.get("source_url")
+        if (role not in seen or role in claims_by_role
+                or claim.get("source_id") in (None, "", source_id)
+                or claim.get("source_event_id") != source_event_id
+                or link != detail_url
+                or not isinstance(source_url, str)
+                or urlsplit(source_url).scheme != "https"
+                or source_url == detail_url
+                or not isinstance(claim.get("body_sha256"), str)
+                or re.fullmatch(r"[0-9a-f]{64}", claim["body_sha256"]) is None
+                or not isinstance(claim.get("value"), str)
+                or not claim["value"].strip()
+                or claim.get("formal_accepted") is not False):
+            raise ValueError("FIELD_INDEPENDENT_DIRECT_EDGE_HOLD")
+        utc(claim.get("observed_at_utc"))
+        claims_by_role[role] = claim
+
+    conflict_roles = []
+    for row in rows:
+        claim = claims_by_role.get(row["role"])
+        if claim is not None:
+            if " ".join(claim["value"].split()) != " ".join(row["value"].split()):
+                row["decision"] = "HOLD_EXPLICIT_CROSS_SOURCE_CONFLICT"
+                conflict_roles.append(row["role"])
+            else:
+                # A caller-provided matching claim is not a verified artifact.
+                row["decision"] = "REVIEW_CONCORDANT_CLAIM_NOT_ATTESTED"
+    return {
+        "kind": "P30_AB_SOURCE_OWNED_FIELD_CONFLICT_AUDIT_V1",
+        "source_id": source_id, "source_event_id": source_event_id,
+        "detail_url": detail_url, "detail_body_sha256": detail_body_sha256,
+        "source_age_seconds": int(age), "native_receipt": native,
+        "fresh_within_24h": fresh, "field_matrix": rows,
+        "conflict_roles": conflict_roles,
+        "first_failure": ("FIELD_SOURCE_NOT_NATIVE_OR_STALE" if not native or not fresh
+                          else "FIELD_EXPLICIT_CROSS_SOURCE_CONFLICT" if conflict_roles
+                          else "FIELD_INDEPENDENT_SEALED_AUTHORITY_MISSING"),
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
