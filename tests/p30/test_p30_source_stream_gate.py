@@ -682,7 +682,9 @@ class TestSourceStreamGate(unittest.TestCase):
         # Even a same-event, same-value claim is NOT a verified sealed artifact.
         claim = dict(role=roles[0]["role"], value=roles[0]["value"],
                      source_id="INDEPENDENT_ORGANIZER",
-                     source_event_id=source["source_event_id"],
+                     source_event_id="organizer-event-1",
+                     target_source_id=source["source_id"],
+                     target_source_event_id=source["source_event_id"],
                      direct_event_link=source["detail_url"],
                      source_url="https://organizer.example.org/event/1",
                      body_sha256="b" * 64, observed_at_utc=stamp,
@@ -698,11 +700,26 @@ class TestSourceStreamGate(unittest.TestCase):
         self.assertEqual(conflict["conflict_roles"], ["VENUE_SHOW_NOT_SALE"])
         self.assertEqual(conflict["first_failure"],
                          "FIELD_EXPLICIT_CROSS_SOURCE_CONFLICT")
-        claim["source_event_id"] = "OTHER"
+        # Explicit cross-namespace binding must not accept a wrong target.
+        claim["target_source_event_id"] = "OTHER"
         with self.assertRaisesRegex(ValueError,
                                     "FIELD_INDEPENDENT_DIRECT_EDGE_HOLD"):
             m.adjudicate_sealed_field_roles(
                 **source, role_receipts=roles, independent_claims=[claim])
+        claim["target_source_event_id"] = source["source_event_id"]
+        for field, replacement in (
+                ("target_source_id", "ANOTHER_TARGET"),
+                ("source_event_id", ""),
+                ("source_url", source["detail_url"].replace("/tw/blog/show/", "/other/")),
+                ("source_url", "https://fake@organizer.example.org/event/1"),
+                ("source_url", "https://organizer.example.org/event/1#session"),
+                ("direct_event_link", source["detail_url"] + "?checkout=1")):
+            with self.subTest(independent_field=field):
+                invalid = dict(claim, **{field: replacement})
+                with self.assertRaisesRegex(ValueError,
+                                            "FIELD_INDEPENDENT_DIRECT_EDGE_HOLD"):
+                    m.adjudicate_sealed_field_roles(
+                        **source, role_receipts=roles, independent_claims=[invalid])
 
         for field, replacement in (
                 ("source_event_id", "OTHER"),

@@ -1369,10 +1369,22 @@ def adjudicate_sealed_field_roles(*, source_id, source_event_id, detail_url,
         source_url = claim.get("source_url")
         if (role not in seen or role in claims_by_role
                 or claim.get("source_id") in (None, "", source_id)
-                or claim.get("source_event_id") != source_event_id
+                # The independent page owns its OWN local event ID; it
+                # cannot borrow the target's event ID as source provenance.
+                # A separately explicit target ID + exact direct URL binds
+                # the two namespaces, never fuzzy title/venue similarity.
+                or not isinstance(claim.get("source_event_id"), str)
+                or not claim["source_event_id"].strip()
+                or claim.get("target_source_id") != source_id
+                or claim.get("target_source_event_id") != source_event_id
                 or link != detail_url
                 or not isinstance(source_url, str)
                 or urlsplit(source_url).scheme != "https"
+                or urlsplit(source_url).hostname is None
+                or urlsplit(source_url).hostname == urlsplit(detail_url).hostname
+                or urlsplit(source_url).username is not None
+                or urlsplit(source_url).password is not None
+                or urlsplit(source_url).fragment
                 or source_url == detail_url
                 or not isinstance(claim.get("body_sha256"), str)
                 or re.fullmatch(r"[0-9a-f]{64}", claim["body_sha256"]) is None
