@@ -342,5 +342,40 @@ class ABSourceTests(unittest.TestCase):
         self.assertEqual(m.inspect_pair("B_NTCAM", listing, seo_only)["same_id_review"], 0)
 
 
+    def test_zepp_exact_event_local_organizer_edge_not_checkout_or_session(self):
+        source = m.SOURCES["B_ZEPP_TAKASE"]
+        listing = ('<main><a href="' + source["detail"] + '">'
+                   + source["title"] + ' 2026 11.7 18:00</a></main>')
+        ticket = source["public_ticket_event"]
+        detail = ('<main><article><h1>' + source["title"] + '</h1>'
+                  '<a href="' + ticket + '">KKTIX</a>'
+                  '<p>[DAY1] 2026年11月7日 開演 18:00</p>'
+                  '<p>[DAY2] 2026年11月8日 開演 17:00</p>'
+                  '<p>會場：Zepp New Taipei</p></article></main>')
+        result = m.inspect_pair("B_ZEPP_TAKASE", listing, detail)
+        self.assertEqual(result["same_id_review"], 1)
+        self.assertEqual(result["ticket_event_edge_review"], 1)
+        self.assertEqual(result["ticket_event_url"], ticket)
+        self.assertEqual(result["decision"],
+                         "REVIEW_SOURCE_DIRECT_TICKET_EDGE_NO_SESSION")
+        self.assertEqual(result["first_failure"],
+                         "AB_EVENT_LOCAL_DATE_HALL_AUTHORITY_HOLD")
+        self.assertEqual(result["field_roles"], [])
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        for altered in (
+            detail.replace(ticket, ticket + "?registrations=new"),
+            detail.replace(ticket, "https://evil.example/events/takasetoya202611"),
+            detail.replace(">KKTIX</a>", ">Get Ticket</a>"),
+            detail.replace('</article>', '<a href="' + ticket + '">KKTIX</a></article>'),
+            ('<main><article><h1>' + source["title"] + '</h1></article>'
+             '<article><a href="' + ticket + '">KKTIX</a></article></main>'),
+        ):
+            with self.subTest(altered=altered[-90:]):
+                r = m.inspect_pair("B_ZEPP_TAKASE", listing, altered)
+                self.assertEqual(r["ticket_event_edge_review"], 0)
+                self.assertEqual(r["formal_accepted_fields"], 0)
+
+
+
 if __name__ == "__main__":
     unittest.main()
