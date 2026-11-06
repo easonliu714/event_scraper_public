@@ -7657,7 +7657,7 @@ CI #42229526050 SUCCESS, job #127931524296
   228 Python tests, SHA256SUMS PASS
   Artifact #13507073119, 6555 bytes
   Actions ZIP SHA256 9a6dd2cf92a54cc1480417e917b9bd23097bfe55372e7e9d60284e2264b33b39
-  independent ZIP CRC: UNVERIFIED
+  independent ZIP SHA256/CRC PASS; 6 members, 21 manifest rows, 5/5 packaged SHA PASS
 A new native GET/LIST/DETAIL/identity/FIELD=0/0/0/0/0
 B new native GET/LIST/DETAIL/identity/FIELD=0/0/0/0/0
 A/B accepted FIELD=0; Golden=0; Published=0
