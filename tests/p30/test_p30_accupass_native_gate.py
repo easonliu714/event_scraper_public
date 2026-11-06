@@ -42,5 +42,81 @@ class TestAccupassSource(unittest.TestCase):
                 self.assertIsNone(gate.exact_public_event_url(url))
 
 
+
+class TestAccupassRobotsAuthority(unittest.TestCase):
+    """The previous permissive text/* policy could treat an HTML HOME as robots."""
+
+    class Response:
+        status = 200
+        def __init__(self, url, content_type, raw):
+            self.url, self.headers, self.raw = url, {"Content-Type": content_type}, raw
+        def geturl(self):
+            return self.url
+        def read(self, cap):
+            return self.raw[:cap]
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            return False
+
+    def test_robots_html_fallback_rejected_before_policy(self):
+        from unittest.mock import Mock
+        opener = Mock()
+        opener.open.return_value = self.Response(
+            "https://www.accupass.com/robots.txt", "text/html",
+            b"<html><body>HOME</body></html>")
+        with self.assertRaisesRegex(ValueError, "ACCUPASS_ROBOTS_MIME_HOLD"):
+            gate.public_get(opener, "https://www.accupass.com/robots.txt",
+                            131072, "text/plain")
+
+    def test_list_plain_text_rejected_before_html_parser(self):
+        from unittest.mock import Mock
+        opener = Mock()
+        opener.open.return_value = self.Response(
+            gate.LIST_URL, "text/plain", b"User-agent: *\\nAllow: /\\n")
+        with self.assertRaisesRegex(ValueError, "ACCUPASS_HTML_MIME_HOLD"):
+            gate.public_get(opener, gate.LIST_URL, gate.MAX_BODY, "text/html")
+
+    def test_robots_other_agent_cannot_default_allow(self):
+        receipt = {"content_type": "text/plain"}
+        for robots in ("User-agent: OtherBot\\nAllow: /\\n",
+                       "User-agent: *\\n",
+                       "<html><body>User-agent: *\\nAllow: /</body></html>"):
+            with self.subTest(robots=robots):
+                with self.assertRaisesRegex(ValueError, "ACCUPASS_ROBOTS_.*_HOLD"):
+                    gate.checked_robots_policy(robots, receipt)
+
+    def test_applicable_robots_rules_still_enforce_disallow(self):
+        receipt = {"content_type": "text/plain"}
+        policy = gate.checked_robots_policy(
+            "User-agent: *\\nDisallow: /search\\nAllow: /event/\\n", receipt)
+        self.assertFalse(policy.can_fetch(gate.USER_AGENT, gate.LIST_URL))
+        self.assertTrue(policy.can_fetch(
+            gate.USER_AGENT, "https://www.accupass.com" + gate.DETAIL_PATH))
+
+    def test_robots_and_list_identical_body_transport_not_list(self):
+        from unittest.mock import patch
+        policy = b"User-agent: *\\nAllow: /\\n"
+        class Opener:
+            def __init__(self):
+                self.calls = []
+            def open(self, request, timeout):
+                url = request.full_url
+                self.calls.append(url)
+                return TestAccupassRobotsAuthority.Response(
+                    url, "text/plain" if url.endswith("robots.txt") else "text/html",
+                    policy)
+        opener = Opener()
+        with patch.object(gate.urllib.request, "build_opener", return_value=opener):
+            result = gate.run_native_once()
+        self.assertEqual(len(opener.calls), 2)
+        self.assertEqual(result["native_http200"], 1)
+        self.assertEqual(result["native_list"], 0)
+        self.assertEqual(result["native_detail"], 0)
+        self.assertIn("ACCUPASS_ROBOTS_LIST_IDENTICAL_BODY_HOLD", result["first_failure"])
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["published"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
