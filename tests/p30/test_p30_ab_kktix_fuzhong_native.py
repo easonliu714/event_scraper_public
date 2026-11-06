@@ -293,5 +293,54 @@ class ABSourceTests(unittest.TestCase):
         self.assertFalse(r["raw_html_saved"])
 
 
+    def test_a_kimu_exact_organizer_list_detail_event_local_roles(self):
+        source = m.SOURCES["A_KIMU"]
+        listing = '<main><a href="/events/2026itmgameforum">' + source["title"] + '</a></main>'
+        detail = ('<main><article><h1>' + source["title"] + '</h1>'
+                  '<p>時間：2026/11/14（六）10:00 - 16:30</p>'
+                  '<p>地點：世貿展覽館一館 / 1F數發部數產署主題館舞台區</p>'
+                  '<p>費用：免費</p></article></main>')
+        r = m.inspect_pair("A_KIMU", listing, detail)
+        self.assertEqual(r["same_id_review"], 1)
+        self.assertEqual(set(r["field_roles"]), {
+            "FORUM_TIME_RANGE_REVIEW_NOT_TICKET_SESSION",
+            "VENUE_TWTC_HALL1_STAGE_REVIEW"})
+        self.assertEqual(r["formal_accepted_fields"], 0)
+        self.assertNotIn("PRICE", repr(r))
+        self.assertIsNone(m.exact_detail("A_KIMU", "/events/2026itmgameforum/registrations/new"))
+        self.assertIsNone(m.exact_detail("A_KIMU", "/events/2026itmgameforum?session=1"))
+
+    def test_a_kimu_rejects_cross_event_or_global_unowned_time(self):
+        source = m.SOURCES["A_KIMU"]
+        listing = '<main><a href="/events/2026itmgameforum">' + source["title"] + '</a></main>'
+        wrong = listing.replace("2026itmgameforum", "2026itmgameforum-other")
+        detail = ('<header><h1>' + source["title"] + '</h1></header>'
+                  '<main><article><p>時間：2026/11/14（六）10:00 - 16:30</p>'
+                  '</article></main>')
+        self.assertEqual(m.inspect_pair("A_KIMU", wrong, detail)["same_id_review"], 0)
+        self.assertEqual(m.inspect_pair("A_KIMU", listing, detail)["same_id_review"], 1)
+        self.assertEqual(m.inspect_pair("A_KIMU", listing, detail)["field_roles"], [])
+
+    def test_b_ntcam_exact_public_event_identity_without_inferred_field(self):
+        source = m.SOURCES["B_NTCAM"]
+        listing = '<main><a href="/event_content.aspx?id=E2609013">' + source["title"] + '</a></main>'
+        detail = '<main><article><h1>' + source["title"] + '</h1><p>新北市美術館</p></article></main>'
+        r = m.inspect_pair("B_NTCAM", listing, detail)
+        self.assertEqual(r["same_id_review"], 1)
+        self.assertEqual(r["field_roles"], [])
+        self.assertEqual(r["formal_accepted_fields"], 0)
+        self.assertIsNone(m.exact_detail("B_NTCAM", "/event_content.aspx?id=E2609014"))
+        self.assertIsNone(m.exact_detail("B_NTCAM", "/event_content.aspx?id=E2609013&ticket=1"))
+
+    def test_b_ntcam_dynamic_index_and_seo_only_are_hold(self):
+        source = m.SOURCES["B_NTCAM"]
+        detail = '<main><article><h1>' + source["title"] + '</h1></article></main>'
+        self.assertEqual(m.inspect_pair("B_NTCAM", "<main><div id='app'></div></main>",
+                                        detail)["same_id_review"], 0)
+        listing = '<main><a href="/event_content.aspx?id=E2609013">' + source["title"] + '</a></main>'
+        seo_only = '<head><title>' + source["title"] + '</title></head><main></main>'
+        self.assertEqual(m.inspect_pair("B_NTCAM", listing, seo_only)["same_id_review"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
