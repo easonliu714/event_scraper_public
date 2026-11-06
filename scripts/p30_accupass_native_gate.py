@@ -1,4 +1,4 @@
-"""ACCUPASS canonical #06 public LIST -> same-ID DETAIL native diagnostic.
+"""ACCUPASS canonical #02 public LIST -> same-ID DETAIL native diagnostic.
 
 No checkout, retries, redirects, persistence, formal field acceptance or publishing.
 A one-shot workflow marker is required; all HTML stays in process memory.
@@ -111,9 +111,13 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def public_get(opener, url, cap):
+def public_get(opener, url, cap, expected_media):
+    """Role-bound response: robots must be plain text, event pages HTML."""
+    if expected_media not in ("text/plain", "text/html"):
+        raise ValueError("ACCUPASS_UNSUPPORTED_MEDIA_ROLE_HOLD")
     request = urllib.request.Request(url, headers={
-        "User-Agent": USER_AGENT, "Accept": "text/html, text/plain;q=0.8"})
+        "User-Agent": USER_AGENT, "Accept": expected_media,
+        "Accept-Encoding": "identity"})
     with opener.open(request, timeout=12) as response:
         status = response.status
         final = response.geturl()
@@ -121,16 +125,51 @@ def public_get(opener, url, cap):
         raw = response.read(cap + 1)
     if status != 200 or final != url:
         raise ValueError("ACCUPASS_HTTP_STATUS_OR_REDIRECT_HOLD")
-    if len(raw) > cap:
-        raise ValueError("ACCUPASS_BODY_CAP_HOLD")
-    if "text/" not in ctype.lower():
-        raise ValueError("ACCUPASS_CONTENT_TYPE_HOLD")
-    receipt = {"url": url, "http_status": status, "content_type": ctype,
+    if not 0 < len(raw) <= cap:
+        raise ValueError("ACCUPASS_EMPTY_OR_BODY_CAP_HOLD")
+    media = ctype.split(";", 1)[0].strip().lower()
+    accepted = ("text/plain",) if expected_media == "text/plain" else (
+        "text/html", "application/xhtml+xml")
+    if media not in accepted:
+        raise ValueError("ACCUPASS_ROBOTS_MIME_HOLD" if expected_media == "text/plain"
+                         else "ACCUPASS_HTML_MIME_HOLD")
+    receipt = {"url": url, "http_status": status, "content_type": media,
                "body_bytes": len(raw), "body_sha256": hashlib.sha256(raw).hexdigest(),
                "observed_at_utc": datetime.now(timezone.utc).isoformat(),
                "transport": "NATIVE_NO_REDIRECT_NO_RETRY"}
     return raw.decode("utf-8", errors="strict"), receipt
 
+
+def checked_robots_policy(robots_text, receipt):
+    """Never infer an allow from a missing applicable robots group or HTML fallback."""
+    if receipt.get("content_type") != "text/plain":
+        raise ValueError("ACCUPASS_ROBOTS_MIME_HOLD")
+    if re.search(r"(?i)<(?:!doctype\s+html|html|head|body)(?:\s|>)",
+                 robots_text[:2048]):
+        raise ValueError("ACCUPASS_ROBOTS_HTML_FALLBACK_HOLD")
+    groups, agents, has_rule = [], [], False
+    for raw_line in robots_text.splitlines():
+        line = raw_line.split("#", 1)[0].strip()
+        if not line or ":" not in line:
+            continue
+        key, value = (part.strip().lower() for part in line.split(":", 1))
+        if key == "user-agent":
+            if has_rule:
+                groups.append((tuple(agents), has_rule))
+                agents, has_rule = [], False
+            if value:
+                agents.append(value)
+        elif key in ("allow", "disallow") and agents:
+            has_rule = True
+    if agents:
+        groups.append((tuple(agents), has_rule))
+    agent_token = USER_AGENT.split("/", 1)[0].lower()
+    if not any(has_rule and any(a in ("*", agent_token, USER_AGENT.lower())
+                                for a in agents) for agents, has_rule in groups):
+        raise ValueError("ACCUPASS_ROBOTS_APPLICABLE_RULES_HOLD")
+    policy = urllib.robotparser.RobotFileParser()
+    policy.parse(robots_text.splitlines())
+    return policy
 
 def run_native_once():
     result = {"kind": "P30_A_ACCUPASS_DISTINCT_NATIVE_LIST_DETAIL_V1",
@@ -146,17 +185,18 @@ def run_native_once():
     try:
         robots_url = "https://www.accupass.com/robots.txt"
         result["native_get_attempted"] += 1
-        robots_text, robots_receipt = public_get(opener, robots_url, 131072)
+        robots_text, robots_receipt = public_get(opener, robots_url, 131072, "text/plain")
         result["robots_receipt"] = robots_receipt
-        policy = urllib.robotparser.RobotFileParser()
-        policy.parse(robots_text.splitlines())
+        policy = checked_robots_policy(robots_text, robots_receipt)
         if not policy.can_fetch(USER_AGENT, LIST_URL):
             raise ValueError("ACCUPASS_ROBOTS_LIST_DISALLOW")
         if not policy.can_fetch(USER_AGENT, "https://www.accupass.com" + DETAIL_PATH):
             raise ValueError("ACCUPASS_ROBOTS_DETAIL_DISALLOW")
         result["policy_decision"] = "ALLOW_ROBOTS_200"
         result["native_get_attempted"] += 1
-        list_html, list_receipt = public_get(opener, LIST_URL, MAX_BODY)
+        list_html, list_receipt = public_get(opener, LIST_URL, MAX_BODY, "text/html")
+        if robots_receipt["body_sha256"] == list_receipt["body_sha256"]:
+            raise ValueError("ACCUPASS_ROBOTS_LIST_IDENTICAL_BODY_HOLD")
         result["native_http200"] += 1
         result["native_list"] = 1
         result["source_receipts"].append(list_receipt)
@@ -172,7 +212,7 @@ def run_native_once():
         if not policy.can_fetch(USER_AGENT, detail_url):
             raise ValueError("ACCUPASS_ROBOTS_EXACT_DETAIL_DISALLOW")
         result["native_get_attempted"] += 1
-        detail_html, detail_receipt = public_get(opener, detail_url, MAX_BODY)
+        detail_html, detail_receipt = public_get(opener, detail_url, MAX_BODY, "text/html")
         result["native_http200"] += 1
         result["native_detail"] = 1
         result["source_receipts"].append(detail_receipt)
