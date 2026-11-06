@@ -346,6 +346,52 @@ def inspect_pair(line, listing, detail):
     return result
 
 
+
+def adjudicate_robots_policy(body, agent, urls):
+    """Fail-closed policy authority; retain only rule counts, never robots body.
+
+    A generic robots HTTP200 or an unrelated User-agent is not an applicable
+    permission. The sealed native receipt supplies bytes/SHA/UTC separately.
+    """
+    out = dict(kind="P30_AB_ROBOTS_APPLICABLE_AUTHORITY_V1",
+               decision="HOLD", first_failure="AB_ROBOTS_UNREADABLE_HOLD",
+               applicable_groups=0, applicable_rulelines=0,
+               checked_urls=0, raw_policy_saved=False)
+    if (not isinstance(body, str) or not isinstance(agent, str)
+            or not isinstance(urls, (tuple, list)) or len(urls) != 2):
+        return out
+    if not body or len(body.encode("utf-8")) > 65536:
+        out["first_failure"] = "AB_ROBOTS_EMPTY_OR_BOUNDS_HOLD"
+        return out
+    if re.search(r"(?i)<(?:!doctype\s+html|html|head|body)(?:\s|>)",
+                 body[:2048]):
+        out["first_failure"] = "AB_ROBOTS_HTML_FALLBACK_HOLD"
+        return out
+    if not re.search(r"(?im)^\s*user-agent\s*:\s*[^\s#]+", body):
+        out["first_failure"] = "AB_ROBOTS_NO_USER_AGENT_HOLD"
+        return out
+    if any(not isinstance(u, str) or urlsplit(u).scheme != "https"
+           for u in urls):
+        out["first_failure"] = "AB_ROBOTS_TARGET_URL_HOLD"
+        return out
+    policy = urllib.robotparser.RobotFileParser()
+    policy.parse(body.splitlines())
+    groups = [entry for entry in policy.entries
+              if entry.applies_to(agent)]
+    if policy.default_entry is not None and policy.default_entry.applies_to(agent):
+        groups.append(policy.default_entry)
+    out["applicable_groups"] = len(groups)
+    out["applicable_rulelines"] = sum(len(e.rulelines) for e in groups)
+    if not groups or not out["applicable_rulelines"]:
+        out["first_failure"] = "AB_ROBOTS_APPLICABLE_RULE_MISSING_HOLD"
+        return out
+    out["checked_urls"] = len(urls)
+    if not all(policy.can_fetch(agent, u) for u in urls):
+        out["first_failure"] = "AB_ROBOTS_DISALLOW_HOLD"
+        return out
+    out.update(decision="ALLOW", first_failure=None)
+    return out
+
 def run_native_once(line):
     """One robots GET, one LIST GET, then one source-derived DETAIL GET at most."""
     if line not in SOURCES:
@@ -365,14 +411,11 @@ def run_native_once(line):
         out["native_get_attempted"] += 1
         robots, rr = read_public(opener, source["origin"] + "/robots.txt", "text/plain")
         out["robots_receipt"] = rr
-        if (not re.search(r"(?im)^\s*user-agent\s*:\s*[^\s#]+", robots)
-                or re.search(r"(?i)<(?:!doctype\s+html|html|head|body)(?:\s|>)",
-                             robots[:2048])):
-            raise ValueError("AB_ROBOTS_POLICY_AUTHORITY_HOLD")
-        policy = urllib.robotparser.RobotFileParser()
-        policy.parse(robots.splitlines())
-        if not policy.can_fetch(UA, source["list"]) or not policy.can_fetch(UA, source["detail"]):
-            raise ValueError("AB_ROBOTS_DISALLOW_HOLD")
+        audit = adjudicate_robots_policy(
+            robots, UA, (source["list"], source["detail"]))
+        out["robots_policy_audit"] = audit
+        if audit["decision"] != "ALLOW":
+            raise ValueError(audit["first_failure"])
         out["native_get_attempted"] += 1
         listing, lr = read_public(opener, source["list"], "text/html")
         if rr["body_sha256"] == lr["body_sha256"]:

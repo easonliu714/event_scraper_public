@@ -167,7 +167,7 @@ class ABSourceTests(unittest.TestCase):
                             body_sha256=letter*64,
                             observed_at_utc="2026-11-06T07:55:00+00:00",
                             content_type="text/html", transport="NATIVE_NO_REDIRECT_NO_RETRY")
-            answers = [("User-agent: *\\nAllow: /\\n",
+            answers = [("User-agent: *\nAllow: /\n",
                         receipt(src["origin"] + "/robots.txt", "a")),
                        (listing, receipt(src["list"], "b")),
                        (detail, receipt(src["detail"], "c"))]
@@ -416,7 +416,7 @@ class ABSourceTests(unittest.TestCase):
                   '<p>時間：開場 17:00 / 開演 18:00</p>'
                   '<p>會場：Zepp New Taipei</p></article></main>')
         receipts = [
-            ("User-agent: *\\nAllow: /\\n", {"body_sha256": "a"*64}),
+            ("User-agent: *\nAllow: /\n", {"body_sha256": "a"*64}),
             (listing, {"body_sha256": "b"*64, "observed_at_utc": "2026-11-06T19:00:00+00:00"}),
             (detail, {"body_sha256": "c"*64, "observed_at_utc": "2026-11-06T19:00:01+00:00"})]
         with patch.object(m, "read_public", side_effect=receipts) as mocked:
@@ -429,6 +429,58 @@ class ABSourceTests(unittest.TestCase):
         self.assertTrue(all(not r["formal_accepted"] for r in out["field_receipts"]))
         self.assertEqual((out["formal_accepted_fields"], out["golden"],
                           out["published"], out["native_lkg"]), (0, 0, 0, 0))
+
+
+
+class RobotsPolicyAuthorityTests(unittest.TestCase):
+    def test_applicable_group_and_both_urls_required(self):
+        src = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        urls = (src["list"], src["detail"])
+        valid = m.adjudicate_robots_policy(
+            "User-agent: *\nAllow: /\n", m.UA, urls)
+        self.assertEqual(valid["decision"], "ALLOW")
+        self.assertEqual(valid["checked_urls"], 2)
+        self.assertGreaterEqual(valid["applicable_rulelines"], 1)
+        self.assertFalse(valid["raw_policy_saved"])
+        self.assertNotIn("User-agent", repr(valid))
+
+    def test_no_unrelated_or_empty_group_permission(self):
+        src = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        urls = (src["list"], src["detail"])
+        for raw in ("# comment only\n", "User-agent: OtherBot\nAllow: /\n",
+                    "User-agent: *\n", "User-agent: *\\nAllow: /\\n"):
+            with self.subTest(raw=raw):
+                out = m.adjudicate_robots_policy(raw, m.UA, urls)
+                self.assertEqual(out["decision"], "HOLD")
+                self.assertEqual(out["checked_urls"], 0)
+        html = m.adjudicate_robots_policy(
+            "<html><body>User-agent: *\nAllow: /</body></html>", m.UA, urls)
+        self.assertEqual(html["first_failure"], "AB_ROBOTS_HTML_FALLBACK_HOLD")
+        deny = m.adjudicate_robots_policy(
+            "User-agent: *\nDisallow: /\n", m.UA, urls)
+        self.assertEqual(deny["first_failure"], "AB_ROBOTS_DISALLOW_HOLD")
+
+    def test_native_stops_after_policy_only_and_seals_diagnostic(self):
+        src = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        receipt = {"url": src["origin"] + "/robots.txt", "http_status": 200,
+                   "body_bytes": 204, "body_sha256": "a"*64,
+                   "content_type": "text/plain",
+                   "observed_at_utc": "2026-11-06T19:03:46+00:00",
+                   "transport": "NATIVE_NO_REDIRECT_NO_RETRY"}
+        with patch.object(m, "read_public", return_value=(
+                "User-agent: OtherBot\nAllow: /\n", receipt)) as reader:
+            out = m.run_native_once("B_KKTIX_TAKASE_DAY1")
+        self.assertEqual(reader.call_count, 1)
+        self.assertEqual(out["native_get_attempted"], 1)
+        self.assertEqual((out["native_list"], out["native_detail"],
+                          out["native_same_id_review"]), (0, 0, 0))
+        self.assertEqual(out["first_failure"],
+                         "ValueError:AB_ROBOTS_APPLICABLE_RULE_MISSING_HOLD")
+        self.assertEqual(out["robots_receipt"]["body_sha256"], "a"*64)
+        self.assertFalse(out["robots_policy_audit"]["raw_policy_saved"])
+        self.assertNotIn("OtherBot", repr(out))
+        self.assertEqual((out["formal_accepted_fields"], out["golden"],
+                          out["published"]), (0, 0, 0))
 
 
 if __name__ == "__main__":
