@@ -73,15 +73,15 @@ class TestAccupassRobotsAuthority(unittest.TestCase):
         from unittest.mock import Mock
         opener = Mock()
         opener.open.return_value = self.Response(
-            gate.LIST_URL, "text/plain", b"User-agent: *\\nAllow: /\\n")
+            gate.LIST_URL, "text/plain", b"User-agent: *\nAllow: /\n")
         with self.assertRaisesRegex(ValueError, "ACCUPASS_HTML_MIME_HOLD"):
             gate.public_get(opener, gate.LIST_URL, gate.MAX_BODY, "text/html")
 
     def test_robots_other_agent_cannot_default_allow(self):
         receipt = {"content_type": "text/plain"}
-        for robots in ("User-agent: OtherBot\\nAllow: /\\n",
-                       "User-agent: *\\n",
-                       "<html><body>User-agent: *\\nAllow: /</body></html>"):
+        for robots in ("User-agent: OtherBot\nAllow: /\n",
+                       "User-agent: *\n",
+                       "<html><body>User-agent: *\nAllow: /</body></html>"):
             with self.subTest(robots=robots):
                 with self.assertRaisesRegex(ValueError, "ACCUPASS_ROBOTS_.*_HOLD"):
                     gate.checked_robots_policy(robots, receipt)
@@ -89,14 +89,14 @@ class TestAccupassRobotsAuthority(unittest.TestCase):
     def test_applicable_robots_rules_still_enforce_disallow(self):
         receipt = {"content_type": "text/plain"}
         policy = gate.checked_robots_policy(
-            "User-agent: *\\nDisallow: /search\\nAllow: /event/\\n", receipt)
+            "User-agent: *\nDisallow: /search\nAllow: /event/\n", receipt)
         self.assertFalse(policy.can_fetch(gate.USER_AGENT, gate.LIST_URL))
         self.assertTrue(policy.can_fetch(
             gate.USER_AGENT, "https://www.accupass.com" + gate.DETAIL_PATH))
 
     def test_robots_and_list_identical_body_transport_not_list(self):
         from unittest.mock import patch
-        policy = b"User-agent: *\\nAllow: /\\n"
+        policy = b"User-agent: *\nAllow: /\n"
         class Opener:
             def __init__(self):
                 self.calls = []
