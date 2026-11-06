@@ -1031,6 +1031,245 @@ def persist_zepp_receipt_identity_lkg(archive_bytes, destination, repo_root,
             os.unlink(lock)
 
 
+
+# B Zepp rid=160668 is a PRIOR, source-owned same-ID native REVIEW. The
+# original HTML was not retained; this never reparses it or promotes a field.
+ZEPP_TAKASE_ARTIFACT_SHA256 = "00bbdbbf0361e81a172aa3286b876181614865650eb3daf5747de52c07ea4e87"
+ZEPP_TAKASE_RECEIPT_SHA256 = "c54f0cbcd182295f9eff509a800032d619dac407058c007cc6878a2f526b50ba"
+
+
+def audit_zepp_takase_sealed_archive(archive_bytes, expected_artifact_sha256):
+    """Audit an immutable native CI receipt, not a native GET or body replay.
+
+    The caller-supplied digest supports isolated tests; only the pinned real
+    digest is accepted by the durable handoff below.
+    """
+    import io
+    import zipfile
+    from scripts.p30_ab_kktix_fuzhong_native import SOURCES
+    source = SOURCES["B_ZEPP_TAKASE"]
+    if (not isinstance(archive_bytes, bytes) or not 0 < len(archive_bytes) <= 131072
+            or not isinstance(expected_artifact_sha256, str)
+            or re.fullmatch(r"[0-9a-f]{64}", expected_artifact_sha256) is None
+            or hashlib.sha256(archive_bytes).hexdigest() != expected_artifact_sha256):
+        raise ValueError("TAKASE_ARTIFACT_SHA_HOLD")
+    names_expected = {"SHA256SUMS.txt", "readiness.txt",
+                      "field_subset_review_proposal.json",
+                      "canonical_field_authority_contract.json",
+                      "tmc_field_authority_contract.json",
+                      "zepp_takase_160668_native_once.json"}
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as z:
+        names = z.namelist()
+        if (len(names) != 6 or set(names) != names_expected
+                or len(set(names)) != len(names)
+                or any(z.getinfo(n).file_size > 16384 for n in names)
+                or z.testzip() is not None):
+            raise ValueError("TAKASE_ZIP_CRC_MEMBERS_HOLD")
+        manifest = z.read("SHA256SUMS.txt").decode("ascii", "strict")
+        pairs = [line.split("  ", 1) for line in manifest.splitlines()]
+        if (len(pairs) != 21 or any(len(pair) != 2 for pair in pairs)
+                or len({pair[1] for pair in pairs}) != 21
+                or any(re.fullmatch(r"[0-9a-f]{64}", pair[0]) is None
+                       for pair in pairs)):
+            raise ValueError("TAKASE_MANIFEST_SHAPE_HOLD")
+        evidence = {name: digest for digest, name in pairs
+                    if name.startswith("evidence/")}
+        expected_evidence = {"evidence/" + n for n in names_expected
+                             if n != "SHA256SUMS.txt"}
+        if (set(evidence) != expected_evidence
+                or any(hashlib.sha256(z.read(name.removeprefix("evidence/")))
+                       .hexdigest() != digest for name, digest in evidence.items())):
+            raise ValueError("TAKASE_MANIFEST_EVIDENCE_SHA_HOLD")
+        raw = z.read("zepp_takase_160668_native_once.json")
+    receipt_sha = hashlib.sha256(raw).hexdigest()
+    if (expected_artifact_sha256 == ZEPP_TAKASE_ARTIFACT_SHA256
+            and receipt_sha != ZEPP_TAKASE_RECEIPT_SHA256):
+        raise ValueError("TAKASE_PINNED_RECEIPT_SHA_HOLD")
+    receipt = json.loads(raw)
+    if (not isinstance(receipt, dict)
+            or receipt.get("kind") != "P30_AB_KKTIX_FUZHONG_NATIVE_ONESHOT_V1"
+            or receipt.get("line") != "B_ZEPP_TAKASE"
+            or receipt.get("source_id") != source["source_id"]
+            or receipt.get("source_event_id") != source["event_id"]
+            or receipt.get("decision") != "REVIEW_IDENTITY_ONLY"
+            or receipt.get("first_failure") != "AB_EVENT_LOCAL_FIELD_SCOPE_HOLD"
+            or receipt.get("native_get_attempted") != 3
+            or receipt.get("native_http200") != 2
+            or receipt.get("native_list") != 1
+            or receipt.get("native_detail") != 1
+            or receipt.get("native_same_id_review") != 1
+            or receipt.get("native_lkg") != 0
+            or receipt.get("field_roles") != []
+            or receipt.get("list_row_roles") != []
+            or receipt.get("raw_html_saved") is not False
+            or any(receipt.get(k) != 0 for k in
+                   ("formal_accepted_fields", "golden", "published"))
+            or receipt.get("release_state") != "HARD_HOLD_NO_PUBLICATION"):
+        raise ValueError("TAKASE_NATIVE_IDENTITY_AUTHORITY_HOLD")
+    robots = receipt.get("robots_receipt")
+    if (not isinstance(robots, dict)
+            or robots.get("url") != "https://www.zepp.co.jp/robots.txt"
+            or robots.get("http_status") != 200
+            or robots.get("body_bytes") != 160
+            or robots.get("body_sha256") !=
+               "f85c8154288b52d4d691b12fa3d0df1bec3f51cba30933d11eb9d20b3d99d6cd"
+            or robots.get("transport") != "NATIVE_NO_REDIRECT_NO_RETRY"):
+        raise ValueError("TAKASE_ROBOTS_RECEIPT_HOLD")
+    sources = receipt.get("source_receipts")
+    expected = (
+        (source["list"], 336693,
+         "890893c79a796f222f52d4ad628edae2da273be73a7e033ef4ea95d992ebd657"),
+        (source["detail"], 313606,
+         "d78ae5cedcd1089619b28c55b4fadff1ac1b66946de79551c52fa7bc6d93a4f6"))
+    if not isinstance(sources, list) or len(sources) != 2:
+        raise ValueError("TAKASE_SOURCE_PAIR_HOLD")
+    times = []
+    for item, (url, count, digest) in zip(sources, expected):
+        if (not isinstance(item, dict) or item.get("url") != url
+                or item.get("http_status") != 200
+                or item.get("content_type") != "text/html"
+                or item.get("body_bytes") != count
+                or item.get("body_sha256") != digest
+                or item.get("transport") != "NATIVE_NO_REDIRECT_NO_RETRY"):
+            raise ValueError("TAKASE_SOURCE_SHA_IDENTITY_HOLD")
+        try:
+            stamp = datetime.fromisoformat(
+                item["observed_at_utc"].replace("Z", "+00:00"))
+        except (TypeError, KeyError, ValueError, AttributeError) as exc:
+            raise ValueError("TAKASE_SOURCE_CLOCK_HOLD") from exc
+        if stamp.utcoffset() is None or stamp.utcoffset().total_seconds() != 0:
+            raise ValueError("TAKASE_SOURCE_CLOCK_HOLD")
+        times.append(stamp)
+    if not 0 <= (times[1] - times[0]).total_seconds() <= 120:
+        raise ValueError("TAKASE_LIST_DETAIL_CLOCK_SKEW_HOLD")
+    fields = receipt.get("field_receipts")
+    if (not isinstance(fields, list) or len(fields) != 1
+            or not isinstance(fields[0], dict)
+            or fields[0].get("source_id") != source["source_id"]
+            or fields[0].get("event_id") != source["event_id"]
+            or fields[0].get("source_url") != source["detail"]
+            or fields[0].get("body_sha256") != expected[1][2]
+            or fields[0].get("observed_at_utc") != sources[1]["observed_at_utc"]
+            or fields[0].get("role") != "SOURCE_EXACT_TITLE_REVIEW"
+            or fields[0].get("decision") != "REVIEW"
+            or fields[0].get("formal_accepted") is not False):
+        raise ValueError("TAKASE_FIELD_RECEIPT_AUTHORITY_HOLD")
+    return {
+        "kind": "P30_B_ZEPP_TAKASE_SEALED_RECEIPT_REVIEW_V1",
+        "decision": "RECEIPT_ONLY_SAME_ID_REVIEW_NOT_BODY_REPLAY",
+        "source_id": source["source_id"], "source_event_id": source["event_id"],
+        "source_title_review": source["title"],
+        "source_receipts": sources, "field_receipts": fields,
+        "artifact_sha256": expected_artifact_sha256,
+        "receipt_sha256": receipt_sha,
+        "observed_at_utc": sources[1]["observed_at_utc"],
+        "native_get_this_call": 0, "historical_native_http200": 2,
+        "historical_same_id_review": 1,
+        "receipt_only_identity_lkg": 1, "body_review_lkg": 0,
+        "field_authority": "EVENT_LOCAL_SCOPE_HOLD",
+        "showtime_role": "UNKNOWN_NOT_SESSION",
+        "venue_role": "UNKNOWN_NOT_ACCEPTED",
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "raw_html_saved": False,
+        "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+
+def persist_sealed_receipt_review_lkg(snapshot, destination, repo_root,
+                                      *, expected_filename, envelope_kind,
+                                      expected_previous_sha256=None):
+    """Reusable nonpublishing receipt-only durable CAS, never a formal row."""
+    import os
+    import tempfile
+    if (not isinstance(snapshot, dict)
+            or snapshot.get("receipt_only_identity_lkg") != 1
+            or snapshot.get("body_review_lkg") != 0
+            or snapshot.get("native_get_this_call") != 0
+            or any(snapshot.get(k) != 0 for k in
+                   ("formal_accepted_fields", "golden_accepted_events",
+                    "published_events"))
+            or snapshot.get("release_state") != "HARD_HOLD_NO_PUBLICATION"):
+        raise ValueError("RECEIPT_LKG_NONPUBLISHING_CONTRACT_HOLD")
+    target = Path(destination)
+    root = Path(repo_root).resolve(strict=True)
+    if (target.name != expected_filename
+            or any(part.is_symlink() for part in (target, *target.parents))
+            or not target.parent.is_dir()):
+        raise ValueError("RECEIPT_LKG_ISOLATION_PATH_HOLD")
+    parent = target.parent.resolve(strict=True)
+    if parent == root or root in parent.parents:
+        raise ValueError("RECEIPT_LKG_REPOSITORY_PATH_HOLD")
+    serialized = json.dumps(snapshot, sort_keys=True, ensure_ascii=False,
+                            separators=(",", ":"), allow_nan=False)
+    digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+    envelope = {"kind": envelope_kind, "snapshot": snapshot, "sha256": digest}
+    data = (json.dumps(envelope, sort_keys=True, ensure_ascii=False,
+                       separators=(",", ":"), allow_nan=False) + "\n").encode("utf-8")
+    if len(data) > 32768:
+        raise ValueError("RECEIPT_LKG_SIZE_HOLD")
+    lock = target.with_name(target.name + ".lock")
+    lock_fd, temporary = None, None
+    try:
+        lock_fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        if target.exists():
+            old = target.read_bytes()
+            if len(old) > 32768:
+                raise ValueError("RECEIPT_LKG_PRIOR_SIZE_HOLD")
+            prior = json.loads(old)
+            if (not isinstance(prior, dict)
+                    or set(prior) != {"kind", "snapshot", "sha256"}
+                    or prior["kind"] != envelope_kind
+                    or prior["sha256"] != hashlib.sha256(json.dumps(
+                        prior["snapshot"], sort_keys=True, ensure_ascii=False,
+                        separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+                    or prior["snapshot"].get("release_state") !=
+                       "HARD_HOLD_NO_PUBLICATION"):
+                raise ValueError("RECEIPT_LKG_PRIOR_ENVELOPE_HOLD")
+            if prior["sha256"] == digest:
+                return {"persisted": False, "idempotent": True,
+                        "snapshot_sha256": digest, "receipt_only_identity_lkg": 1}
+            if prior["sha256"] != expected_previous_sha256:
+                raise ValueError("RECEIPT_LKG_FULL_ENVELOPE_CAS_HOLD")
+        elif expected_previous_sha256 is not None:
+            raise ValueError("RECEIPT_LKG_MISSING_PRIOR_CAS_HOLD")
+        fd, temporary = tempfile.mkstemp(prefix=".receipt_lkg.", suffix=".tmp",
+                                         dir=str(parent))
+        with os.fdopen(fd, "wb") as out:
+            out.write(data)
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, target)
+        temporary = None
+        if os.name == "posix":
+            dir_fd = os.open(parent, os.O_RDONLY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+        if target.read_bytes() != data:
+            raise ValueError("RECEIPT_LKG_ATOMIC_READBACK_HOLD")
+        return {"persisted": True, "idempotent": False,
+                "snapshot_sha256": digest, "receipt_only_identity_lkg": 1}
+    finally:
+        if temporary is not None:
+            os.unlink(temporary)
+        if lock_fd is not None:
+            os.close(lock_fd)
+            os.unlink(lock)
+
+
+def persist_zepp_takase_receipt_lkg(archive_bytes, destination, repo_root,
+                                    expected_previous_sha256=None):
+    """Pinned prior native Zepp rid 160668 -> isolated receipt LKG only."""
+    snapshot = audit_zepp_takase_sealed_archive(
+        archive_bytes, ZEPP_TAKASE_ARTIFACT_SHA256)
+    return persist_sealed_receipt_review_lkg(
+        snapshot, destination, repo_root,
+        expected_filename="zepp_takase_receipt_lkg.json",
+        envelope_kind="P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1",
+        expected_previous_sha256=expected_previous_sha256)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
