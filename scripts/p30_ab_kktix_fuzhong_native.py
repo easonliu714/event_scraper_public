@@ -30,6 +30,15 @@ SOURCES = {
         "title": "倫敦全本音樂劇《史瑞克》",
         "origin": "https://tickets.udnfunlife.com",
     },
+    "A_ACCUPASS": {
+        # Existing canonical platform #02; one new public search-card hypothesis.
+        # This is an indexed discovery only until a separately gated native run.
+        "source_id": "02", "event_id": "2610261742421131142843",
+        "list": "https://www.accupass.com/search",
+        "detail": "https://www.accupass.com/event/2610261742421131142843",
+        "title": "讀書會－〖讀品交義〗11月份｜台北場",
+        "origin": "https://www.accupass.com",
+    },
     "B_CERAMICS": {
         "source_id": "YINGGE_CERAMICS_NEWTIPEI_OFFICIAL",
         "event_id": "0Q218346582180038351",
@@ -62,11 +71,22 @@ def exact_detail(line, href):
     try:
         actual = urlsplit(urljoin(SOURCES[line]["list"], href))
         expected = urlsplit(SOURCES[line]["detail"])
+        # ACCUPASS search cards may append only the three observed
+        # discovery UTM tags; no sale/session/checkout parameters survive.
+        # The returned URL is always the canonical source event URL.
+        query = parse_qsl(actual.query, keep_blank_values=True)
+        expected_query = parse_qsl(expected.query, keep_blank_values=True)
+        if line == "A_ACCUPASS" and query:
+            allowed = {"utm_campaign": "accu_e_", "utm_medium": "search_result_",
+                       "utm_source": "web"}
+            if (len(query) != len(set(k for k, _ in query))
+                    or any(allowed.get(k) != v for k, v in query)):
+                return None
+            query = []
         if (actual.scheme != "https" or actual.hostname != expected.hostname
                 or actual.port is not None or actual.username or actual.password
                 or actual.path != expected.path or actual.fragment
-                or sorted(parse_qsl(actual.query, keep_blank_values=True))
-                != sorted(parse_qsl(expected.query, keep_blank_values=True))):
+                or sorted(query) != sorted(expected_query)):
             return None
         return SOURCES[line]["detail"]
     except ValueError:
@@ -199,6 +219,13 @@ def inspect_pair(line, listing, detail):
             result["field_roles"].append("ADVERTISED_SHOW_RANGE_REVIEW_NO_SESSION")
         if local.count("臺北表演藝術中心 大劇院") == 1:
             result["field_roles"].append("VENUE_TPAC_GRAND_THEATER_REVIEW")
+    elif line == "A_ACCUPASS":
+        # Explicit event-local advertised date and venue, never registration
+        # inventory or an independently accepted ticket Session.
+        if len(re.findall(r"2026[./]11[./]22\s*(?:\\(Sun\\)\\s*)?13:45\s*[-–]\s*17:00", local)) == 1:
+            result["field_roles"].append("ADVERTISED_EVENT_RANGE_REVIEW_NO_SESSION")
+        if local.count("植境plantārium-複合式空間") == 1:
+            result["field_roles"].append("VENUE_PLANTARIUM_REVIEW")
     elif line == "B_CERAMICS":
         if len(re.findall(r"展覽時間\s*[:：]\s*2026年11月20日至2026年12月20日", local)) == 1:
             result["field_roles"].append("EXHIBITION_RANGE_REVIEW_NO_SESSION")
