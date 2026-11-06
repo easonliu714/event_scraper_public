@@ -1492,7 +1492,8 @@ def probe_kktix_takase_native_once():
     """Fail closed on robots, status, redirect, MIME, bytes and DOM; receipt only."""
     import urllib.error
     import urllib.request
-    import urllib.robotparser
+    # Reuse applicable-User-agent policy; HTTP404 never grants event GET.
+    from scripts.p30_ab_kktix_fuzhong_native import adjudicate_robots_policy
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
@@ -1518,16 +1519,18 @@ def probe_kktix_takase_native_once():
                 if len(raw) > 65536:
                     raise ValueError("KKTIX_ROBOTS_SIZE_HOLD")
                 out["robots_sha256"] = hashlib.sha256(raw).hexdigest()
-                robot = urllib.robotparser.RobotFileParser()
-                robot.parse(raw.decode("utf-8", "strict").splitlines())
-                if not robot.can_fetch("EventRadarSourceAudit", KKTIX_TAKASE_URL):
-                    raise ValueError("KKTIX_ROBOTS_DISALLOW_HOLD")
+                audit = adjudicate_robots_policy(
+                    raw.decode("utf-8", "strict"), headers["User-Agent"],
+                    (KKTIX_TAKASE_URL,))
+                out["robots_policy_audit"] = audit
+                if audit["decision"] != "ALLOW":
+                    raise ValueError("KKTIX_" + audit["first_failure"])
                 out["robots_http_status"] = 200
         except urllib.error.HTTPError as exc:
             out["robots_http_status"] = exc.code
-            if exc.code != 404:
-                raise ValueError("KKTIX_ROBOTS_HTTP_HOLD_" + str(exc.code))
-        out["policy_decision"] = "ALLOW_ROBOTS_200_OR_404"
+            # A missing robots file is not an explicit applicable Allow rule.
+            raise ValueError("KKTIX_ROBOTS_HTTP_HOLD_" + str(exc.code)) from exc
+        out["policy_decision"] = "ALLOW_EXPLICIT_APPLICABLE_RULE"
     except (ValueError, UnicodeError, OSError, TimeoutError, urllib.error.URLError) as exc:
         out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:100]
         return out
