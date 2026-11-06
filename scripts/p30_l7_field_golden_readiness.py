@@ -3005,6 +3005,26 @@ def assess_tmc_non_session_field_authority(snapshot, now_utc=None):
     report["next_required_evidence"] = (
         "Independent same-event official SHOW/HALL observation, conflict decision, "
         "fresh UTC source-body receipt; never KHAM checkout or ticket Session")
+    # Same source-owned A contract as the sealed B Zepp receipt. This binds
+    # exact event ID/URL/role/body SHA/clock but never invents an independent
+    # organizer receipt, Session, Golden acceptance or formal publication.
+    from scripts.p30_source_stream_gate import adjudicate_sealed_field_roles
+    sealed_field_audit = adjudicate_sealed_field_roles(
+        source_id="TMC_OFFICIAL", source_event_id=meta["source_event_id"],
+        detail_url=PUBLIC_TMC_DETAIL,
+        detail_body_sha256=src["bounded_acquisition"]["detail_body_sha256"],
+        observed_at_utc=row["scraped_at"],
+        transport=src["bounded_acquisition"]["transport"],
+        role_receipts=[{
+            "role": f["role"], "value": f["value"],
+            "source_id": "TMC_OFFICIAL",
+            "source_event_id": meta["source_event_id"],
+            "source_url": PUBLIC_TMC_DETAIL,
+            "body_sha256": src["bounded_acquisition"]["detail_body_sha256"],
+            "observed_at_utc": row["scraped_at"],
+            "formal_accepted": False,
+        } for f in fields], now_utc=now)
+    report["sealed_field_conflict_audit"] = sealed_field_audit
     report["field_matrix"] = [
         {"field": f["field"], "role": f["role"], "value": f["value"],
          "source_url": PUBLIC_TMC_DETAIL, "observed_at_utc": row["scraped_at"],
