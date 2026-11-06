@@ -3936,3 +3936,11 @@ Independent final GitHub readback: [exact-head run #41495782054](https://github.
 - **本輪新 native event GET/LIST/DETAIL/IDENTITY/FIELD A/B 均 0**；新增 A/B 各 1 組**公開官方來源獨立網頁觀測（非 native）**；正式 accepted FIELD/Golden/Published **0/0/0**。保留 19 正式來源、formal docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4、formal status blob 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd、HARD_HOLD_NO_PUBLICATION。Owner 22:17 Android 分組四場地 USER_ATTESTED_PASS 已於前輪治理記錄；跨組 OR 多選 Android 仍 UNVERIFIED，無需重做 L8/CKSMH/TWTC。
 - **下一未完成 Gate**：A 針對已發現 KHAM _00 獨立 SHOW/HALL 只評估合法非訂購的官方替代證據／封存權威；B 對 KKTIX DAY1 原始 body 的 event-local 身分做 robots-authorized、未消耗假說下的一次可審計 native LIST→DETAIL，若 robots 403/404 或政策未允許則直接 HOLD，轉站，不重試轟炸；兩線保持 REVIEW/LKG 隔離與主線不發布。
 
+
+### 2026-11-07 06:00 Asia/Taipei｜A/B scope-owner 修補 exact-head CI 完成／失敗根因封存
+- 工程 Draft PR #236 最終 HEAD **9c5e5b4a395f141b1195990acf6a822e75dd06dc**；CI [#42301091164](https://github.com/easonliu714/event_scraper_public/actions/runs/42301091164) **SUCCESS**、job source-field-readiness SUCCESS，7 組 unittest **239/239 PASS**（134+30+11+5+23+7+29）；本輪新增 3 項實際 adapter 測試，非新 native GET。
+- 首個真實 CI failure：[run #42300942680](https://github.com/easonliu714/event_scraper_public/actions/runs/42300942680) 失敗於 test_native_detail_receipts_bind_scope_hash_without_raw_body，原因是測試 mock robots 文字使用雙反斜線跳脫而非實際換行，導致 robots policy HOLD、event_local_scope 未產生；已在 commit 9c5e5b4 修正為真換行，**未放寬 robots 或 field 權威條件**。
+- Artifact [#13544875812](https://github.com/easonliu714/event_scraper_public/actions/runs/42301091164/artifacts/13544875812) ZIP SHA256 **43c832f0d254cec637f4f84623095ccc25e7bb386fd729199c42b94b4df15655** 與 GitHub digest 相符；獨立下載後 ZIP CRC PASS、6 members、SHA256SUMS 中 5 個 evidence 檔 SHA 全 PASS、readiness.txt exact HEAD 9c5e5b4 與 formal_fields/golden/published=0/0/0 PASS。
+- 校正 05:55 記錄用語：B KKTIX DAY1 -2 event URL **早已存在既有 Source Adapter SOURCES**，本輪新增的是對該官方 URL 與 Zepp rid=160668 的**當日獨立公開網頁讀取核實**，並非新發現 event ID、也非原生 CI GET。A KHAM _00 仍僅官方公開索引線索且涉及訂購，不進行 native GET。
+- 本輪 A/B 新 native event GET/LIST/DETAIL/identity/FIELD 仍 **0/0/0/0/0**；A source-owned Body LKG 歷史 1、B receipt-only LKG 歷史 1 / Body LKG 0；accepted FIELD/Golden/Published **0/0/0**。PR #236 維持 Draft 未合併；正式 main、docs/data.json、platform_status、19 平台、已驗收 Android UI 與 HARD_HOLD_NO_PUBLICATION 不變。下一 Gate 須 source-native event-local field receipt 或合法獨立權威，不能用 239 個 tests 代替。
+
