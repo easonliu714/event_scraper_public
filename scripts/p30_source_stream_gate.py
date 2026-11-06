@@ -1154,6 +1154,20 @@ def audit_zepp_takase_sealed_archive(archive_bytes, expected_artifact_sha256):
             or fields[0].get("decision") != "REVIEW"
             or fields[0].get("formal_accepted") is not False):
         raise ValueError("TAKASE_FIELD_RECEIPT_AUTHORITY_HOLD")
+    # Real sealed receipt binds only source-owned TITLE, not date/venue/Session.
+    field_audit = adjudicate_sealed_field_roles(
+        source_id=source["source_id"], source_event_id=source["event_id"],
+        detail_url=source["detail"], detail_body_sha256=expected[1][2],
+        observed_at_utc=sources[1]["observed_at_utc"],
+        transport=sources[1]["transport"],
+        role_receipts=[{
+            "role": "SOURCE_EXACT_TITLE_REVIEW", "value": source["title"],
+            "source_id": source["source_id"],
+            "source_event_id": source["event_id"],
+            "source_url": source["detail"], "body_sha256": expected[1][2],
+            "observed_at_utc": sources[1]["observed_at_utc"],
+            "formal_accepted": False,
+        }])
     return {
         "kind": "P30_B_ZEPP_TAKASE_SEALED_RECEIPT_REVIEW_V1",
         "decision": "RECEIPT_ONLY_SAME_ID_REVIEW_NOT_BODY_REPLAY",
@@ -1167,6 +1181,7 @@ def audit_zepp_takase_sealed_archive(archive_bytes, expected_artifact_sha256):
         "historical_same_id_review": 1,
         "receipt_only_identity_lkg": 1, "body_review_lkg": 0,
         "field_authority": "EVENT_LOCAL_SCOPE_HOLD",
+        "sealed_field_conflict_audit": field_audit,
         "showtime_role": "UNKNOWN_NOT_SESSION",
         "venue_role": "UNKNOWN_NOT_ACCEPTED",
         "formal_accepted_fields": 0, "golden_accepted_events": 0,
