@@ -47,6 +47,24 @@ SOURCES = {
         "title": "凱基金控xAccusefive告五人 [在這裡 @century] 世界巡迴演唱會",
         "origin": "https://tixcraft.com",
     },
+    "A_KIMU": {
+        # Fresh public organizer LIST -> one exact KKTIX event; no checkout.
+        # Indexed discovery is not native evidence until one-shot CI executes.
+        "source_id": "01", "event_id": "2026itmgameforum",
+        "list": "https://kimu.kktix.cc/",
+        "detail": "https://kimu.kktix.cc/events/2026itmgameforum",
+        "title": "2026資訊月x臺灣教育科技展 ： 數位遊戲主題論壇",
+        "origin": "https://kimu.kktix.cc",
+    },
+    "B_NTCAM": {
+        # New Taipei City Art Museum official public event; not platform #20.
+        # A dynamic JS-only index must HOLD rather than invent a LIST edge.
+        "source_id": "NEW_TAIPEI_ART_MUSEUM_OFFICIAL", "event_id": "E2609013",
+        "list": "https://ntcart.museum/event.aspx?kind=current",
+        "detail": "https://ntcart.museum/event_content.aspx?id=E2609013",
+        "title": "新生地藝術節 𓆸 𝐅𝐥𝐨𝐰𝐞𝐫 𝐄𝐩𝐢𝐬𝐨𝐝𝐞 小插花 𓆹",
+        "origin": "https://ntcart.museum",
+    },
     "B_ZEPP_TAKASE": {
         # New event rid under existing Zepp New Taipei canonical venue source.
         # Official homepage event card -> exact rid; never infer KKTIX Session.
@@ -245,6 +263,19 @@ def inspect_pair(line, listing, detail):
             result["field_roles"].append("ADVERTISED_EVENT_RANGE_REVIEW_NO_SESSION")
         if local.count("植境plantārium-複合式空間") == 1:
             result["field_roles"].append("VENUE_PLANTARIUM_REVIEW")
+    elif line == "A_KIMU":
+        # Only the event-local organizer text, not the KKTIX checkout or
+        # ticket availability, may establish non-session REVIEW roles.
+        if len(re.findall(
+                r"2026/11/14\\s*(?:\\(六\\))?\\s*10:00\\s*[-–]\\s*16:30", local)) == 1:
+            result["field_roles"].append("FORUM_TIME_RANGE_REVIEW_NOT_TICKET_SESSION")
+        if local.count("世貿展覽館一館 / 1F數發部數產署主題館舞台區") == 1:
+            result["field_roles"].append("VENUE_TWTC_HALL1_STAGE_REVIEW")
+    elif line == "B_NTCAM":
+        # Museum indexed page may be client-rendered. Identity is REVIEW
+        # only if a unique exact native LIST edge and DETAIL heading exist.
+        # No inferred date, price, registration or Session from SEO metadata.
+        pass
     elif line == "B_ZEPP_TAKASE":
         # Multi-day copy in this page is not a single Session or FIELD.
         # Only source-bound title/identity can be REVIEW pending native DOM.
