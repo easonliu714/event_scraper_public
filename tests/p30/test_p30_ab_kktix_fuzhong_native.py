@@ -225,6 +225,41 @@ class ABSourceTests(unittest.TestCase):
         self.assertEqual(m.inspect_pair("A_ACCUPASS", listing * 2,
                          detail)["same_id_review"], 0)
 
+    def test_zepp_takase_160668_new_home_card_exact_rid(self):
+        src = m.SOURCES["B_ZEPP_TAKASE"]
+        # Official homepage is an event card, not an exact-title-only anchor.
+        card = ('<main><a href="/hall/newtaipei/schedule/single/?rid=160668">'
+                '2026 11.7 SAT 高瀬統也 ' + src["title"] +
+                ' [OPEN] 17:00 [START] 18:00 READ MORE</a></main>')
+        detail = '<main><article><h2>' + src["title"] + '</h2></article></main>'
+        out = m.inspect_pair("B_ZEPP_TAKASE", card, detail)
+        self.assertEqual((out["same_id_review"], out["formal_accepted_fields"]),
+                         (1, 0))
+        self.assertEqual(out["field_roles"], [])
+        self.assertEqual(out["first_failure"], "AB_EVENT_LOCAL_FIELD_SCOPE_HOLD")
+        for bad in ("?rid=167511", "?rid=160668&rid=167511",
+                    "?rid=160668&checkout=1", "?rid=160668#buy"):
+            self.assertIsNone(m.exact_detail("B_ZEPP_TAKASE",
+                "/hall/newtaipei/schedule/single/" + bad))
+        self.assertEqual(m.inspect_pair("B_ZEPP_TAKASE",
+            card.replace("2026 11.7", "2026 11.8"), detail)["same_id_review"], 0)
+        self.assertEqual(m.inspect_pair("B_ZEPP_TAKASE",
+            card + card, detail)["same_id_review"], 0)
+
+    def test_tixcraft_03_rotation_indexed_only_no_cross_event(self):
+        src = m.SOURCES["A_TIXCRAFT"]
+        listing = '<a href="/activity/detail/26_aftp">' + src["title"] + '</a>'
+        detail = '<article><h1>' + src["title"] + '</h1></article>'
+        out = m.inspect_pair("A_TIXCRAFT", listing, detail)
+        self.assertEqual((out["same_id_review"], out["field_roles"],
+                          out["formal_accepted_fields"]), (1, [], 0))
+        for bad in ("/activity/detail/26_btskns",
+                    "/activity/detail/26_aftp?session=1",
+                    "https://other.example/activity/detail/26_aftp"):
+            self.assertIsNone(m.exact_detail("A_TIXCRAFT", bad))
+        self.assertEqual(m.inspect_pair("A_TIXCRAFT",
+            listing.replace("26_aftp", "26_btskns"), detail)["same_id_review"], 0)
+
     def test_native_robots_denied_before_list(self):
         rr = dict(url="https://gutspromotion.kktix.cc/robots.txt",
                   http_status=200, body_bytes=25, body_sha256="a"*64,
