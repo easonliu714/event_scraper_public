@@ -1889,6 +1889,41 @@ jobs:
                 report["native_detail"], report["native_same_id_review"],
                 report["first_failure"], flush=True)
           PY
+      - name: One-shot A KIMU public forum and B New Taipei Art Museum native rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Never re-consume the probe on rerun or a later unrelated commit.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kimu-ntcam-native-once]'; then
+            echo 'KIMU_NTCAM_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import SOURCES, run_native_once
+          for line, filename in (("A_KIMU", "kimu_native_once.json"),
+                                 ("B_NTCAM", "ntcam_native_once.json")):
+              report = run_native_once(line)
+              assert report["source_id"] == SOURCES[line]["source_id"]
+              assert report["source_event_id"] == SOURCES[line]["event_id"]
+              assert 0 <= report["native_get_attempted"] <= 3
+              assert 0 <= report["native_http200"] <= 2
+              assert report["native_list"] <= 1 and report["native_detail"] <= 1
+              assert report["native_same_id_review"] <= report["native_detail"]
+              assert report["native_lkg"] == report["formal_accepted_fields"] == report["golden"] == report["published"] == 0
+              assert report["raw_html_saved"] is False
+              assert report["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+              assert len(report["source_receipts"]) <= 2
+              Path("evidence", filename).write_text(
+                  json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                  encoding="utf-8")
+              print("KIMU_NTCAM_NATIVE", line, report["native_get_attempted"],
+                    report["native_http200"], report["native_list"],
+                    report["native_detail"], report["native_same_id_review"],
+                    report["first_failure"], flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1918,6 +1953,7 @@ jobs:
           if [ -f evidence/native_cksmh_rotation.json ]; then sha256sum evidence/native_cksmh_rotation.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/accupass02_native_once.json ]; then sha256sum evidence/accupass02_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/tixcraft03_native_once.json ]; then sha256sum evidence/tixcraft03_native_once.json >> evidence/SHA256SUMS.txt; fi
+          for f in evidence/kimu_native_once.json evidence/ntcam_native_once.json; do if [ -f "$f" ]; then sha256sum "$f" >> evidence/SHA256SUMS.txt; fi; done
           if [ -f evidence/zepp_takase_160668_native_once.json ]; then sha256sum evidence/zepp_takase_160668_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/canonical_field_authority_contract.json >> evidence/SHA256SUMS.txt
