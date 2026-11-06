@@ -39,6 +39,23 @@ SOURCES = {
         "title": "讀書會－〖讀品交義〗11月份｜台北場",
         "origin": "https://www.accupass.com",
     },
+    "A_TIXCRAFT": {
+        # Existing platform #03; fresh public indexed discovery, NOT native evidence.
+        "source_id": "03", "event_id": "26_aftp",
+        "list": "https://tixcraft.com/activity",
+        "detail": "https://tixcraft.com/activity/detail/26_aftp",
+        "title": "凱基金控xAccusefive告五人 [在這裡 @century] 世界巡迴演唱會",
+        "origin": "https://tixcraft.com",
+    },
+    "B_ZEPP_TAKASE": {
+        # New event rid under existing Zepp New Taipei canonical venue source.
+        # Official homepage event card -> exact rid; never infer KKTIX Session.
+        "source_id": "ZEPP_NEWTAIPEI_OFFICIAL", "event_id": "160668",
+        "list": "https://www.zepp.co.jp/hall/newtaipei/",
+        "detail": "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668",
+        "title": "TAKASE TOYA 5th Album “♾️” Release Live in Taipei",
+        "origin": "https://www.zepp.co.jp",
+    },
     "B_CERAMICS": {
         "source_id": "YINGGE_CERAMICS_NEWTIPEI_OFFICIAL",
         "event_id": "0Q218346582180038351",
@@ -165,7 +182,7 @@ def exact_list_edges(line, listing):
     # A prefixed "四人套票-" is a different PRODUCT and cannot pass.
     return [(exact_detail(line, href), label) for href, label in p.anchors
             if exact_detail(line, href) and
-            (label == title or (line == "A_UDN" and label.startswith(title + " ")))]
+            (label == title or (line == "A_UDN" and label.startswith(title + " ")) or\n             (line == "B_ZEPP_TAKASE" and label.count(title) == 1\n              and "2026 11.7" in label and "18:00" in label))]
 
 def b_list_row_roles(listing):
     """Review-only exact same-TR SID/month-day/time, never infer a year."""
@@ -226,7 +243,7 @@ def inspect_pair(line, listing, detail):
             result["field_roles"].append("ADVERTISED_EVENT_RANGE_REVIEW_NO_SESSION")
         if local.count("植境plantārium-複合式空間") == 1:
             result["field_roles"].append("VENUE_PLANTARIUM_REVIEW")
-    elif line == "B_CERAMICS":
+    elif line == "B_ZEPP_TAKASE":\n        # Multi-day copy in this page is not a single Session or FIELD.\n        # Only source-bound title/identity can be REVIEW pending native DOM.\n        pass\n    elif line == "B_CERAMICS":
         if len(re.findall(r"展覽時間\s*[:：]\s*2026年11月20日至2026年12月20日", local)) == 1:
             result["field_roles"].append("EXHIBITION_RANGE_REVIEW_NO_SESSION")
         if len(re.findall(r"展覽地點\s*[:：]\s*[Bb]1陶藝長廊", local)) == 1:
