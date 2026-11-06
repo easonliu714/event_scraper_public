@@ -245,7 +245,11 @@ def inspect_pair(line, listing, detail):
             result["field_roles"].append("ADVERTISED_EVENT_RANGE_REVIEW_NO_SESSION")
         if local.count("植境plantārium-複合式空間") == 1:
             result["field_roles"].append("VENUE_PLANTARIUM_REVIEW")
-    elif line == "B_ZEPP_TAKASE":\n        # Multi-day copy in this page is not a single Session or FIELD.\n        # Only source-bound title/identity can be REVIEW pending native DOM.\n        pass\n    elif line == "B_CERAMICS":
+    elif line == "B_ZEPP_TAKASE":
+        # Multi-day copy in this page is not a single Session or FIELD.
+        # Only source-bound title/identity can be REVIEW pending native DOM.
+        pass
+    elif line == "B_CERAMICS":
         if len(re.findall(r"展覽時間\s*[:：]\s*2026年11月20日至2026年12月20日", local)) == 1:
             result["field_roles"].append("EXHIBITION_RANGE_REVIEW_NO_SESSION")
         if len(re.findall(r"展覽地點\s*[:：]\s*[Bb]1陶藝長廊", local)) == 1:
