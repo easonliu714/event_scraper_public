@@ -28,6 +28,22 @@ class ABSourceTests(unittest.TestCase):
         self.assertEqual(r["formal_accepted_fields"], 0)
         self.assertNotIn("PRICE", repr(r))
 
+    def test_b_list_same_row_date_time_review_without_detail_scope(self):
+        src = m.SOURCES["B"]
+        listing = ('<table><tr><td>11/06(五)</td><td>19:00</td><td><a href="' +
+                   src["detail"].replace("&", "&amp;") + '">' + src["title"] +
+                   '</a></td></tr></table>')
+        detail = '<main><h1>' + src["title"] + '</h1></main>'
+        r = m.inspect_pair("B", listing, detail)
+        self.assertEqual(r["decision"], "REVIEW_LIST_ROW_ONLY")
+        self.assertEqual(r["list_row_roles"], ["LIST_11_06_19_00_REVIEW_NO_YEAR"])
+        self.assertEqual((r["field_roles"], r["formal_accepted_fields"]), ([], 0))
+        borrowed = '<table><tr><td>11/06(五)</td><td>19:00</td></tr></table>' + (
+            listing.replace('<td>11/06(五)</td><td>19:00</td>', '<td>--</td><td>--</td>'))
+        r2 = m.inspect_pair("B", borrowed, detail)
+        self.assertEqual(r2["list_row_roles"], [])
+        self.assertEqual(r2["decision"], "REVIEW_IDENTITY_ONLY")
+
     def test_b_exact_sid_two_screenings_not_update_date(self):
         r = m.inspect_pair("B", self.b_list, self.b_detail)
         self.assertEqual(r["same_id_review"], 1)

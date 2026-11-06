@@ -63,6 +63,7 @@ class LocalEventHTML(HTMLParser):
         self.stack, self.anchors, self.headings = [], [], []
         self.anchor, self.heading = None, None
         self.scopes, self.active = [], []
+        self.rows, self.active_rows = [], []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -74,6 +75,11 @@ class LocalEventHTML(HTMLParser):
             self.scopes.append(dict(tag=tag, depth=len(self.stack),
                                     headings=[], texts=[]))
             self.active.append(len(self.scopes) - 1)
+        if tag == "tr":
+            if len(self.rows) >= 512:
+                raise ValueError("AB_LIST_ROW_CAP_HOLD")
+            self.rows.append(dict(depth=len(self.stack), texts=[], edges=[]))
+            self.active_rows.append(len(self.rows) - 1)
         if tag == "a":
             self.anchor = [attrs.get("href", ""), []]
         if tag in ("h1", "h2", "h3"):
@@ -88,10 +94,15 @@ class LocalEventHTML(HTMLParser):
             self.heading[1].append(value)
         for index in self.active:
             self.scopes[index]["texts"].append(value)
+        for index in self.active_rows:
+            self.rows[index]["texts"].append(value)
 
     def handle_endtag(self, tag):
         if tag == "a" and self.anchor is not None:
-            self.anchors.append((self.anchor[0], norm("".join(self.anchor[1]))))
+            edge = (self.anchor[0], norm("".join(self.anchor[1])))
+            self.anchors.append(edge)
+            for index in self.active_rows:
+                self.rows[index]["edges"].append(edge)
             self.anchor = None
         if self.heading is not None and tag == self.heading[0]:
             title = norm("".join(self.heading[1]))
@@ -105,6 +116,8 @@ class LocalEventHTML(HTMLParser):
                     break
         self.active = [i for i in self.active
                        if self.scopes[i]["depth"] <= len(self.stack)]
+        self.active_rows = [i for i in self.active_rows
+                            if self.rows[i]["depth"] <= len(self.stack)]
 
 
 def exact_list_edges(line, listing):
@@ -113,6 +126,22 @@ def exact_list_edges(line, listing):
     title = norm(SOURCES[line]["title"])
     return [(exact_detail(line, href), label) for href, label in p.anchors
             if exact_detail(line, href) and label == title]
+
+def b_list_row_roles(listing):
+    """Review-only exact same-TR SID/month-day/time, never infer a year."""
+    p = LocalEventHTML()
+    p.feed(listing)
+    matched = []
+    for row in p.rows:
+        edges = [(exact_detail("B", href), label) for href, label in row["edges"]]
+        if len(edges) != 1 or edges[0] != (SOURCES["B"]["detail"], norm(SOURCES["B"]["title"])):
+            continue
+        local = norm(" ".join(row["texts"]))
+        dates = re.findall(r"(?<![0-9])11/06(?![0-9])", local)
+        times = re.findall(r"(?<![0-9])19:00(?![0-9])", local)
+        if len(dates) == len(times) == 1 and local.count(norm(SOURCES["B"]["title"])) == 1:
+            matched.append(row)
+    return ["LIST_11_06_19_00_REVIEW_NO_YEAR"] if len(matched) == 1 else []
 
 
 def inspect_pair(line, listing, detail):
@@ -132,10 +161,15 @@ def inspect_pair(line, listing, detail):
     result.update(decision="REVIEW_IDENTITY_ONLY",
                   first_failure="AB_EVENT_LOCAL_FIELD_SCOPE_HOLD",
                   same_id_review=1)
+    if line == "B":
+        result["list_row_roles"] = b_list_row_roles(listing)
     owned = [s for s in p.scopes if title in s["headings"]]
     articles = [s for s in owned if s["tag"] == "article"]
     owned = articles or [s for s in owned if s["tag"] == "section"]
     if len(owned) != 1 or len(set(owned[0]["headings"])) != 1:
+        if line == "B" and result.get("list_row_roles"):
+            result.update(decision="REVIEW_LIST_ROW_ONLY",
+                          first_failure="AB_DETAIL_EVENT_LOCAL_FIELD_SCOPE_HOLD")
         return result
     local = norm(" ".join(owned[0]["texts"]))
     if line == "A":
