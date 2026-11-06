@@ -195,11 +195,11 @@ def run_native_once():
         result["policy_decision"] = "ALLOW_ROBOTS_200"
         result["native_get_attempted"] += 1
         list_html, list_receipt = public_get(opener, LIST_URL, MAX_BODY, "text/html")
+        result["native_http200"] += 1
+        result["source_receipts"].append(list_receipt)
         if robots_receipt["body_sha256"] == list_receipt["body_sha256"]:
             raise ValueError("ACCUPASS_ROBOTS_LIST_IDENTICAL_BODY_HOLD")
-        result["native_http200"] += 1
         result["native_list"] = 1
-        result["source_receipts"].append(list_receipt)
         listing = LocalEvidence()
         listing.feed(list_html)
         matched = [(exact_public_event_url(href), title)
