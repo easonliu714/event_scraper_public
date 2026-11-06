@@ -48,6 +48,30 @@ class TestNTPCCanonicalVenue(unittest.TestCase):
             "&sq=&", "&") + '">' + m.TITLE + '</a></main>')
         self.assertEqual(m.inspect_caller_html(other, self.detail)["same_id_review"], 0)
 
+    def test_event_local_venue_must_not_be_borrowed_from_sibling(self):
+        # Prior parser concatenated MAIN text and incorrectly accepted this.
+        foreign = ('<main><article><h3>' + m.TITLE + '</h3></article>'
+                   '<article><p>★展覽地點：' + m.VENUE +
+                   '</p></article></main>')
+        out = m.inspect_caller_html(self.listing, foreign)
+        self.assertEqual(out["same_id_review"], 0)
+        self.assertEqual(out["first_failure"],
+                         "NTPC_DETAIL_EXACT_VENUE_LABEL_HOLD")
+
+    def test_event_local_venue_in_same_article_remains_review_only(self):
+        out = m.inspect_caller_html(self.listing, self.detail)
+        self.assertEqual(out["same_id_review"], 1)
+        self.assertEqual(out["venue_room_review"], 1)
+        self.assertEqual(out["native_get"], 0)
+        self.assertEqual(out["formal_accepted_fields"], 0)
+
+    def test_event_local_venue_from_foreign_section_is_not_accepted(self):
+        foreign = ('<main><section><h3>' + m.TITLE + '</h3></section>'
+                   '<section><h3>其他展覽</h3><p>★展覽地點：' +
+                   m.VENUE + '</p></section></main>')
+        out = m.inspect_caller_html(self.listing, foreign)
+        self.assertEqual(out["same_id_review"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

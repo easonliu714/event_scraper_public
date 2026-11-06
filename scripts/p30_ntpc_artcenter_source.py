@@ -46,9 +46,19 @@ class Page(HTMLParser):
         self.anchors = []
         self.headings = []
         self.texts = []
+        # Bind a title and venue label to the smallest enclosing event scope.
+        # Aggregating all MAIN text can borrow a venue from a sibling event.
+        self.event_scopes = []
+        self.active_event_scopes = []
+        self.scope_malformed = False
 
     def handle_starttag(self, tag, attrs):
         self.stack.append(tag)
+        if tag in ("main", "article", "section"):
+            scope = {"tag": tag, "depth": len(self.active_event_scopes),
+                     "headings": [], "texts": []}
+            self.event_scopes.append(scope)
+            self.active_event_scopes.append(scope)
         if tag == "a":
             self.anchor = [dict(attrs).get("href", ""), []]
         if tag in ("h1", "h2", "h3") and any(
@@ -62,6 +72,8 @@ class Page(HTMLParser):
             self.heading[1].append(value)
         if any(t in ("main", "article") for t in self.stack):
             self.texts.append(value)
+        for scope in self.active_event_scopes:
+            scope["texts"].append(value)
 
     def handle_endtag(self, tag):
         if tag == "a" and self.anchor is not None:
@@ -69,8 +81,17 @@ class Page(HTMLParser):
             self.anchor = None
         if tag in ("h1", "h2", "h3") and self.heading is not None:
             if tag == self.heading[0]:
-                self.headings.append(norm("".join(self.heading[1])))
+                heading = norm("".join(self.heading[1]))
+                self.headings.append(heading)
+                for scope in self.active_event_scopes:
+                    scope["headings"].append(heading)
                 self.heading = None
+        if tag in ("main", "article", "section"):
+            if (not self.active_event_scopes or
+                    self.active_event_scopes[-1]["tag"] != tag):
+                self.scope_malformed = True
+            else:
+                self.active_event_scopes.pop()
         if tag in self.stack:
             while self.stack:
                 if self.stack.pop() == tag:
@@ -102,7 +123,20 @@ def inspect_caller_html(list_html, detail_html):
     if detail.headings.count(norm(TITLE)) != 1:
         out["first_failure"] = "NTPC_DETAIL_EVENT_LOCAL_TITLE_HOLD"
         return out
-    text = norm(" ".join(detail.texts))
+    # A matching heading in one ARTICLE/SECTION cannot borrow the venue
+    # from another sibling or from the whole MAIN. Caller HTML is not native.
+    title = norm(TITLE)
+    owners = [scope for scope in detail.event_scopes
+              if scope["headings"].count(title) == 1]
+    if detail.scope_malformed or not owners:
+        out["first_failure"] = "NTPC_EVENT_LOCAL_SCOPE_HOLD"
+        return out
+    deepest = max(scope["depth"] for scope in owners)
+    owners = [scope for scope in owners if scope["depth"] == deepest]
+    if len(owners) != 1:
+        out["first_failure"] = "NTPC_EVENT_LOCAL_SCOPE_AMBIGUOUS_HOLD"
+        return out
+    text = norm(" ".join(owners[0]["texts"]))
     if not re.search(r"展覽地點\s*[：:]\s*" + re.escape(VENUE), text):
         out["first_failure"] = "NTPC_DETAIL_EXACT_VENUE_LABEL_HOLD"
         return out
