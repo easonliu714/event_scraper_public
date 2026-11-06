@@ -110,6 +110,23 @@ class TestDistinctNext(unittest.TestCase):
             self.assertEqual(m.inspect_next_pair(line,l,d.replace("<main><article>","<header>").replace("</article></main>","</header>"))["identity"],0)
             self.assertEqual(m.inspect_next_pair(line,l,d.replace("<p>"+c["venue"]+"</p>",""))["fields"],1)
 
+    def test_cross_event_sibling_article_venue_cannot_promote(self):
+        # One exact title cannot borrow the venue from an unrelated event.
+        for line in "AB":
+            cfg = m.NEXT[line]
+            listing, _ = self.pair(line)
+            foreign = ('<main><article><h1>' + cfg["title"] +
+                       '</h1></article><article><h1>UNRELATED EVENT</h1><p>' +
+                       cfg["venue"] + '</p></article></main>')
+            result = m.inspect_next_pair(line, listing, foreign)
+            self.assertEqual(result["decision"], "HOLD")
+            self.assertEqual(result["reason"], "NEXT_EVENT_LOCAL_VENUE_HOLD")
+            self.assertEqual(result["fields"], 1)
+            owned = ('<main><article><section><h1>' + cfg["title"] +
+                     '</h1></section><section><p>' + cfg["venue"] +
+                     '</p></section></article></main>')
+            self.assertEqual(m.inspect_next_pair(line, listing, owned)["fields"], 2)
+
     def test_invalid_line(self):
         with self.assertRaises(ValueError): m.run_next_native_once("C")
         with self.assertRaises(ValueError): m.inspect_next_pair("C","","")
