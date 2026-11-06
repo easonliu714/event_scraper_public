@@ -1167,7 +1167,11 @@ def audit_zepp_takase_sealed_archive(archive_bytes, expected_artifact_sha256):
             "source_url": source["detail"], "body_sha256": expected[1][2],
             "observed_at_utc": sources[1]["observed_at_utc"],
             "formal_accepted": False,
-        }])
+        }], now_utc=times[1])
+    # Durable sealed receipt must be byte-stable across later CI replays.
+    # This is source-observation-relative, NOT a wall-clock freshness grant.
+    field_audit["clock_basis"] = "SEALED_DETAIL_OBSERVED_AT_ONLY"
+    field_audit["wall_clock_freshness"] = "NOT_ASSESSED"
     return {
         "kind": "P30_B_ZEPP_TAKASE_SEALED_RECEIPT_REVIEW_V1",
         "decision": "RECEIPT_ONLY_SAME_ID_REVIEW_NOT_BODY_REPLAY",
