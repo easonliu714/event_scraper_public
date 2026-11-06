@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
 permissions:
   contents: read
+  actions: read
 jobs:
   source-field-readiness:
     if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l7-field-golden-readiness-contract'
@@ -1924,6 +1925,48 @@ jobs:
                     report["native_detail"], report["native_same_id_review"],
                     report["first_failure"], flush=True)
           PY
+      - name: Pinned Zepp 160668 native receipt -> isolated durable LKG (NO OFFICIAL GET)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/eventradar_zepp_prior" evidence
+          # Read a sealed prior CI artifact; no repeated official source GET.
+          curl --fail --silent --show-error --location --max-redirs 2 --max-time 30 \
+            --retry 0 --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/13493064500/zip" \
+            --output "$RUNNER_TEMP/eventradar_zepp_prior/pinned.zip"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          from scripts.p30_source_stream_gate import (
+              ZEPP_TAKASE_ARTIFACT_SHA256, persist_zepp_takase_receipt_lkg)
+          prior = Path(os.environ["RUNNER_TEMP"]) / "eventradar_zepp_prior"
+          archive = (prior / "pinned.zip").read_bytes()
+          assert hashlib.sha256(archive).hexdigest() == ZEPP_TAKASE_ARTIFACT_SHA256
+          target = prior / "zepp_takase_receipt_lkg.json"
+          first = persist_zepp_takase_receipt_lkg(archive, target, Path.cwd())
+          assert first["persisted"] and not first["idempotent"]
+          second = persist_zepp_takase_receipt_lkg(archive, target, Path.cwd())
+          assert second["idempotent"] and not second["persisted"]
+          envelope = json.loads(target.read_text(encoding="utf-8"))
+          snapshot = envelope["snapshot"]
+          assert envelope["kind"] == "P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1"
+          assert snapshot["source_event_id"] == "160668"
+          assert snapshot["receipt_only_identity_lkg"] == 1
+          assert snapshot["body_review_lkg"] == 0
+          assert snapshot["native_get_this_call"] == 0
+          assert snapshot["formal_accepted_fields"] == snapshot["golden_accepted_events"] == snapshot["published_events"] == 0
+          assert snapshot["field_authority"] == "EVENT_LOCAL_SCOPE_HOLD"
+          assert snapshot["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/zepp_takase_receipt_only_lkg.json").write_text(
+              json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8")
+          print("PASS_PINNED_ZEPP_160668_RECEIPT_ONLY_DURABLE_LKG",
+                first["snapshot_sha256"], "NO_NATIVE_GET_NO_FORMAL_FIELD", flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1966,6 +2009,7 @@ jobs:
           if [ -f evidence/native_cksmh_session_roles.json ]; then sha256sum evidence/native_cksmh_session_roles.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_huashan_home_date.json ]; then sha256sum evidence/native_huashan_home_date.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
+          sha256sum evidence/zepp_takase_receipt_only_lkg.json >> evidence/SHA256SUMS.txt
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
