@@ -282,6 +282,62 @@ def exact_next_href(line, href):
     except (TypeError, ValueError):
         return None
 
+def inspect_zepp_event_local_roles(owned_scopes):
+    """Offline caller-HTML role diagnostics; never a native or formal attestation.
+
+    Date/START must be explicitly event-labelled in one title+venue-owned
+    ARTICLE (or a unique SECTION fallback).  Sale date is a different role.
+    """
+    article_scopes = [s for s in owned_scopes if s["tag"] == "article"]
+    scopes = article_scopes or [s for s in owned_scopes if s["tag"] == "section"]
+    if len(scopes) != 1:
+        return dict(decision="HOLD", reason="ZEPP_EVENT_DATE_SCOPE_AMBIGUOUS_HOLD",
+                    event_date_review=None, start_local_review=None,
+                    sale_date_diagnostic=None, formal_accepted=False)
+    local = norm(" ".join(scopes[0]["texts"]))
+    show = re.findall(
+        r"日期\s*[|｜:：]\s*(20\d{2})[./-](\d{1,2})[./-](\d{1,2})"
+        r"\s*(?:\([^)]{1,4}\))?\s*(\d{1,2}):(\d{2})", local)
+    start = re.findall(r"(?:\[START\]|\bSTART\b)\s*(\d{1,2}):(\d{2})",
+                       local, flags=re.I)
+    sale = re.findall(
+        r"開賣時間\s*[|｜:：]\s*(20\d{2})[./-](\d{1,2})[./-](\d{1,2})",
+        local)
+    if len(show) != 1 or len(start) != 1 or len(sale) != 1:
+        return dict(decision="HOLD", reason="ZEPP_EXPLICIT_DATE_START_SALE_ROLE_HOLD",
+                    event_date_review=None, start_local_review=None,
+                    sale_date_diagnostic=None, formal_accepted=False)
+    try:
+        from datetime import date
+        y, mo, d, h, minute = map(int, show[0])
+        sy, sm, sd = map(int, sale[0])
+        show_date = date(y, mo, d)
+        sale_date = date(sy, sm, sd)
+        if (not 0 <= h < 24 or not 0 <= minute < 60
+                or not 0 <= int(start[0][0]) < 24
+                or not 0 <= int(start[0][1]) < 60
+                or (h, minute) != tuple(map(int, start[0]))
+                or sale_date >= show_date):
+            raise ValueError("ZEPP_DATE_ROLE_CONFLICT")
+    except ValueError:
+        return dict(decision="HOLD", reason="ZEPP_DATE_ROLE_CONFLICT_HOLD",
+                    event_date_review=None, start_local_review=None,
+                    sale_date_diagnostic=None, formal_accepted=False)
+    # Independent indexed Zepp rid=167511 labels; do not infer KKTIX Session.
+    if (show_date.isoformat() != "2026-11-27"
+            or (h, minute) != (19, 30)
+            or sale_date.isoformat() != "2026-07-25"):
+        return dict(decision="HOLD", reason="ZEPP_INDEXED_ROLE_PARITY_HOLD",
+                    event_date_review=None, start_local_review=None,
+                    sale_date_diagnostic=None, formal_accepted=False)
+    return dict(decision="REVIEW_ONLY",
+                reason="CALLER_HTML_NOT_NATIVE_ATTESTED_FORMAL_HOLD",
+                event_date_review=show_date.isoformat(),
+                start_local_review=f"{h:02d}:{minute:02d}",
+                sale_date_diagnostic=sale_date.isoformat(),
+                sale_date_is_event_date=False, formal_accepted=False)
+
+
 def inspect_next_pair(line, listing_html, detail_html):
     """Caller HTML cannot claim native provenance; event-local only."""
     if line not in NEXT:
@@ -305,8 +361,17 @@ def inspect_next_pair(line, listing_html, detail_html):
                norm(" ".join(scope["texts"])).casefold()
                for scope in owned_scopes):
         return dict(decision="HOLD",reason="NEXT_EVENT_LOCAL_VENUE_HOLD",identity=1,fields=1)
-    return dict(decision="REVIEW_NON_SESSION_ONLY",reason="INDEPENDENT_ACCEPTANCE_AND_LKG_HOLD",
-                identity=1,fields=2,roles=["SOURCE_EVENT_TITLE_REVIEW","SOURCE_VENUE_REVIEW"])
+    result = dict(decision="REVIEW_NON_SESSION_ONLY",
+                  reason="INDEPENDENT_ACCEPTANCE_AND_LKG_HOLD",
+                  identity=1, fields=2,
+                  roles=["SOURCE_EVENT_TITLE_REVIEW", "SOURCE_VENUE_REVIEW"])
+    # Do not alter the sealed two-role native receipt/LKG contract.
+    if line == "B":
+        result["event_local_role_diagnostics"] = inspect_zepp_event_local_roles(
+            [s for s in owned_scopes
+             if norm(cfg["venue"]).casefold() in
+             norm(" ".join(s["texts"])).casefold()])
+    return result
 
 def run_next_native_once(line):
     """One robots+LIST+conditional DETAIL, bounded, no redirect/retry/checkout."""
