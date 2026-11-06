@@ -336,7 +336,8 @@ class TestTixfun09DistinctNative(unittest.TestCase):
         self.assertEqual(r["list_exact_edge"], 1)
         self.assertEqual(r["same_id_review"], 1)
         self.assertEqual(r["formal_accepted_fields"], 0)
-        self.assertNotIn("SESSION", str(r))
+        self.assertEqual(r["decision"], "REVIEW_NON_SESSION_ONLY")
+        self.assertNotIn("SESSION", " ".join(r["field_roles"]))
         self.assertEqual(m.tixfun_exact_href(m.TIXFUN_DETAIL), m.TIXFUN_DETAIL)
 
     def test_detail_missing_heading_cannot_borrow_list_title(self):
