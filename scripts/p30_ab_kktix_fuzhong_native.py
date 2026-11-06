@@ -1,4 +1,4 @@
-"""One-shot, robots-gated A KKTIX #01 and B Fuzhong15 venue source adapter.
+"""One-shot robots-gated A KKTIX/UDN and B Fuzhong15/Yingge venue adapters.
 
 Only first-party public LIST -> exact same-source DETAIL. Caller HTML and
 browser/indexed evidence are never native provenance. No checkout, redirects,
@@ -21,6 +21,23 @@ SOURCES = {
         "detail": "https://gutspromotion.kktix.cc/events/myds2026",
         "title": "名譽傳說 1st ONEMAN TOUR 2026",
         "origin": "https://gutspromotion.kktix.cc",
+    },
+    "A_UDN": {
+        "source_id": "06", "event_id": "P1AEBJG5",
+        "list": "https://tickets.udnfunlife.com/Application/UTK01/UTK0101_.aspx",
+        "detail": ("https://tickets.udnfunlife.com/Application/UTK02/"
+                   "UTK0201_.aspx?PRODUCT_ID=P1AEBJG5"),
+        "title": "倫敦全本音樂劇《史瑞克》",
+        "origin": "https://tickets.udnfunlife.com",
+    },
+    "B_CERAMICS": {
+        "source_id": "YINGGE_CERAMICS_NEWTIPEI_OFFICIAL",
+        "event_id": "0Q218346582180038351",
+        "list": "https://www.ceramics.ntpc.gov.tw/sitesearch?sq=2026",
+        "detail": ("https://www.ceramics.ntpc.gov.tw/xmdoc/cont?"
+                   "sid=0Q218346582180038351&sq=2026&xsmsid=0J148497613881029302"),
+        "title": "無形之源：道的流動與生成-楊逸雪個展",
+        "origin": "https://www.ceramics.ntpc.gov.tw",
     },
     "B": {
         "source_id": "FUZHONG15_NEWTIPEI_OFFICIAL",
@@ -124,8 +141,11 @@ def exact_list_edges(line, listing):
     p = LocalEventHTML()
     p.feed(listing)
     title = norm(SOURCES[line]["title"])
+    # UDN HOME cards carry dates/venue/price after the exact event title.
+    # A prefixed "四人套票-" is a different PRODUCT and cannot pass.
     return [(exact_detail(line, href), label) for href, label in p.anchors
-            if exact_detail(line, href) and label == title]
+            if exact_detail(line, href) and
+            (label == title or (line == "A_UDN" and label.startswith(title + " ")))]
 
 def b_list_row_roles(listing):
     """Review-only exact same-TR SID/month-day/time, never infer a year."""
@@ -172,7 +192,19 @@ def inspect_pair(line, listing, detail):
                           first_failure="AB_DETAIL_EVENT_LOCAL_FIELD_SCOPE_HOLD")
         return result
     local = norm(" ".join(owned[0]["texts"]))
-    if line == "A":
+    if line == "A_UDN":
+        # Range and hall are non-session REVIEW only, and only from an
+        # unambiguous exact-title-owned ARTICLE/SECTION (not global HOME).
+        if len(re.findall(r"2026/11/20\s*[~～]\s*2026/11/29", local)) == 1:
+            result["field_roles"].append("ADVERTISED_SHOW_RANGE_REVIEW_NO_SESSION")
+        if local.count("臺北表演藝術中心 大劇院") == 1:
+            result["field_roles"].append("VENUE_TPAC_GRAND_THEATER_REVIEW")
+    elif line == "B_CERAMICS":
+        if len(re.findall(r"展覽時間\s*[:：]\s*2026年11月20日至2026年12月20日", local)) == 1:
+            result["field_roles"].append("EXHIBITION_RANGE_REVIEW_NO_SESSION")
+        if len(re.findall(r"展覽地點\s*[:：]\s*[Bb]1陶藝長廊", local)) == 1:
+            result["field_roles"].append("VENUE_B1_CERAMICS_GALLERY_REVIEW")
+    elif line == "A":
         if len(re.findall(r"日期\s*[|｜:]\s*2026\.11\.28.{0,75}?START\s*18:00", local)) == 1:
             result["field_roles"].append("SHOW_START_2026_11_28_1800_REVIEW")
         if len(re.findall(r"地點\s*[|｜:]\s*The Wall Live House", local, re.I)) == 1:
@@ -259,5 +291,7 @@ def run_native_once(line):
 
 
 if __name__ == "__main__":
-    for stream in ("A", "B"):
+    # Explicit native one-shot sources are selected by the CI gate; never
+    # silently repeat previously consumed KKTIX/Fuzhong probes.
+    for stream in ("A_UDN", "B_CERAMICS"):
         print(json.dumps(run_native_once(stream), ensure_ascii=False, sort_keys=True))
