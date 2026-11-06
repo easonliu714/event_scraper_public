@@ -645,5 +645,99 @@ class TestSourceStreamGate(unittest.TestCase):
 
 
 
+    def test_ab_source_owned_field_authority_matrix_stays_nonpublishing(self):
+        from datetime import timedelta
+        now = datetime(2026, 11, 6, 13, 0, tzinfo=timezone.utc)
+        stamp = (now - timedelta(minutes=10)).isoformat()
+        source = {
+            "source_id": "TMC_OFFICIAL",
+            "source_event_id": "2026SungNien-Yu",
+            "detail_url": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+            "detail_body_sha256": "a" * 64,
+            "observed_at_utc": stamp,
+            "transport": "BUILTIN_NATIVE_GET",
+            "now_utc": now,
+        }
+        roles = [
+            {"role": "VENUE_SHOW_NOT_SALE", "value": "2026/11/07 19:30"},
+            {"role": "VENUE_HALL", "value": "臺北流行音樂中心 表演廳"},
+        ]
+        for item in roles:
+            item.update(source_id=source["source_id"],
+                        source_event_id=source["source_event_id"],
+                        source_url=source["detail_url"],
+                        body_sha256=source["detail_body_sha256"],
+                        observed_at_utc=stamp, formal_accepted=False)
+        result = m.adjudicate_sealed_field_roles(
+            **source, role_receipts=roles)
+        self.assertEqual(len(result["field_matrix"]), 2)
+        self.assertEqual(result["first_failure"],
+                         "FIELD_INDEPENDENT_SEALED_AUTHORITY_MISSING")
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["golden_accepted_events"], 0)
+        self.assertEqual(result["published_events"], 0)
+        self.assertTrue(all(not r["independent_authority"]
+                            for r in result["field_matrix"]))
+
+        # Even a same-event, same-value claim is NOT a verified sealed artifact.
+        claim = dict(role=roles[0]["role"], value=roles[0]["value"],
+                     source_id="INDEPENDENT_ORGANIZER",
+                     source_event_id=source["source_event_id"],
+                     direct_event_link=source["detail_url"],
+                     source_url="https://organizer.example.org/event/1",
+                     body_sha256="b" * 64, observed_at_utc=stamp,
+                     formal_accepted=False)
+        concordant = m.adjudicate_sealed_field_roles(
+            **source, role_receipts=roles, independent_claims=[claim])
+        self.assertEqual(concordant["field_matrix"][0]["decision"],
+                         "REVIEW_CONCORDANT_CLAIM_NOT_ATTESTED")
+        self.assertEqual(concordant["formal_accepted_fields"], 0)
+        claim["value"] = "2026/11/08 19:30"
+        conflict = m.adjudicate_sealed_field_roles(
+            **source, role_receipts=roles, independent_claims=[claim])
+        self.assertEqual(conflict["conflict_roles"], ["VENUE_SHOW_NOT_SALE"])
+        self.assertEqual(conflict["first_failure"],
+                         "FIELD_EXPLICIT_CROSS_SOURCE_CONFLICT")
+        claim["source_event_id"] = "OTHER"
+        with self.assertRaisesRegex(ValueError,
+                                    "FIELD_INDEPENDENT_DIRECT_EDGE_HOLD"):
+            m.adjudicate_sealed_field_roles(
+                **source, role_receipts=roles, independent_claims=[claim])
+
+        for field, replacement in (
+                ("source_event_id", "OTHER"),
+                ("body_sha256", "0" * 64),
+                ("role", "TICKET_SESSION"),
+                ("formal_accepted", True)):
+            bad = [dict(r) for r in roles]
+            bad[0][field] = replacement
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError,
+                                            "FIELD_ROLE_ID_SHA_PROVENANCE_HOLD"):
+                    m.adjudicate_sealed_field_roles(
+                        **source, role_receipts=bad)
+        old = dict(source, observed_at_utc="2026-11-04T10:00:00+00:00")
+        stale_roles = [dict(r, observed_at_utc=old["observed_at_utc"])
+                       for r in roles]
+        stale = m.adjudicate_sealed_field_roles(
+            **old, role_receipts=stale_roles)
+        self.assertFalse(stale["fresh_within_24h"])
+        self.assertEqual(stale["first_failure"],
+                         "FIELD_SOURCE_NOT_NATIVE_OR_STALE")
+
+    def test_zepp_pinned_receipt_audit_includes_shared_field_conflict_gate(self):
+        archive = self._takase_synthetic_archive()
+        result = m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        audit = result["sealed_field_conflict_audit"]
+        self.assertEqual(audit["source_event_id"], "160668")
+        self.assertEqual(len(audit["field_matrix"]), 1)
+        self.assertEqual(audit["field_matrix"][0]["role"],
+                         "SOURCE_EXACT_TITLE_REVIEW")
+        self.assertFalse(audit["field_matrix"][0]["independent_authority"])
+        self.assertEqual(audit["formal_accepted_fields"], 0)
+        self.assertEqual(audit["published_events"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
