@@ -319,7 +319,7 @@ def inspect_pair(line, listing, detail):
                 and len(re.findall(
                     r"時間\s*:\s*開場\s*17:00\s*/\s*開演\s*18:00", local)) == 1):
             result["field_roles"].append("KKTIX_DAY1_SHOW_START_REVIEW_NOT_SESSION")
-        if local.count("會場: Zepp New Taipei") == 1:
+        if len(re.findall(r"會場\s*:\s*Zepp New Taipei", local)) == 1:
             result["field_roles"].append("KKTIX_DAY1_HALL_REVIEW")
         # This KKTIX source does not independently attest the Zepp rid.
     elif line == "B_CERAMICS":
