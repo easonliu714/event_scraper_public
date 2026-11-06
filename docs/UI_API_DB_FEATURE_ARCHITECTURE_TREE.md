@@ -7562,3 +7562,52 @@ Source main b7e04a8501f12df56677c833166e7038c4a6702b
 - **B identity/field boundary:** Existing `SOURCES["B_ZEPP_TAKASE"]` rid `160668` has prior native same-rid LIST→DETAIL identity REVIEW=1. `LocalEventHTML` records only ARTICLE/SECTION semantic scopes; `inspect_pair` requires exactly one title-owned scope with one distinct heading. Native result `AB_EVENT_LOCAL_FIELD_SCOPE_HOLD` means the event-local FIELD owner is not established. The original body is not saved, so DIV-only/SEO/alternate ancestor explanations remain hypotheses, **not** verified DOM root causes. This round B new native 0; no reGET of consumed source. Next B choose distinct lawful P0 New Taipei venue source/independent DOM evidence rather than synthetic scope microtests.
 - **Evidence:** Engineering [PR #236](https://github.com/easonliu714/event_scraper_public/pull/236) HEAD `84f20a7ae2dada69a8b5b91a92827bfa3ef9ea57`, [CI #42205938533](https://github.com/easonliu714/event_scraper_public/actions/runs/42205938533) SUCCESS, job #127852459073, [artifact #13495839026](https://github.com/easonliu714/event_scraper_public/actions/runs/42205938533/artifacts/13495839026) ZIP 5558 bytes SHA256 `776111652674602316931676c786d30241f70f4f605452b0514a00e9368770be`, CRC PASS, six members, JSON independently read back. Source main `b7e04a8501f12df56677c833166e7038c4a6702b`, formal data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `645f68c3db1b0fa06527d73f8dae4a36fadcbbdd`, 19 platforms; status-only #237 MERGED. New formal FIELD/Golden/Published 0/0/0, `HARD_HOLD_NO_PUBLICATION`, historical CKSMH5/TWTC39/L8 Android 5/5 PASS preserved; Pages direct HTTP/new Android status UNVERIFIED. No Owner action required.
 
+
+### 2026-11-06 20:00 Asia/Taipei — A/B distinct public source adapter topology + policy authority boundary (NO PUBLISH)
+
+```text
+Engineering Draft PR #236 exact HEAD ec6826e708a62570a37aac494a05c1cfaee507dc
+  scripts/p30_ab_kktix_fuzhong_native.py (existing ADD-only module)
+    SOURCES["A_KIMU"] -> existing canonical KKTIX platform #01
+      organizer LIST https://kimu.kktix.cc/
+      event DETAIL https://kimu.kktix.cc/events/2026itmgameforum
+      exact_detail: strict HTTPS host/path, no checkout/query drift
+      inspect_pair: unique event title + ARTICLE/SECTION-local time/hall
+      roles: FORUM_TIME_RANGE_REVIEW_NOT_TICKET_SESSION,
+             VENUE_TWTC_HALL1_STAGE_REVIEW (only if source-local proof)
+    SOURCES["B_NTCAM"] -> NEW_TAIPEI_ART_MUSEUM_OFFICIAL
+      official LIST https://ntcart.museum/event.aspx?kind=current
+      DETAIL https://ntcart.museum/event_content.aspx?id=E2609013
+      identity only; JS-only LIST and SEO-only DETAIL are HOLD
+      not a new formal 19-platform record
+    run_native_once -> robots policy first, then exact LIST -> same ID DETAIL
+      one-shot, no redirect/retry/login/checkout; in-memory HTML only
+      raw SHA256 + observed_at_utc receipts; no formal data/Golden/LKG
+  tests/p30/test_p30_ab_kktix_fuzhong_native.py
+    4 new positive/negative cases: exact identity, event-local roles,
+    cross-event/checkout, JS-only LIST, SEO-only DETAIL fail-closed
+  .github/workflows/eventradar_p30_l7_field_readiness.yml
+    exact HEAD + immutable release guard + one-shot commit marker
+    [kimu-ntcam-native-once], first CI attempt only
+    SHA256SUMS and independently audited artifact
+Native result at 2026-11-06 20:00 +08:
+  A KIMU robots HTTP200 / 204B / SHA db1bdff2915b56166b566faba5ed87a53aae2bd3d1161c94fb53bf9c42af44f4
+    policy authority HOLD, native LIST/DETAIL/identity/field/LKG = 0
+  B NTCAM robots HTTP404, native LIST/DETAIL/identity/field/LKG = 0
+  These are genuine new policy diagnostics, not native event success.
+CI #42214330267 SUCCESS 223/223 offline, job 127880474165
+Artifact #13500800978 ZIP SHA 93d2ee78da839d9ab38142a93207c56cae91ab1d68921d46eeb4f6499dc13b8f
+  CRC PASS, 6/6 packaged evidence SHA PASS
+First CI FAIL #42214246422/#42214268297:
+  doubled regex escape in inspect_pair KIMU time branch;
+  fixed exact regex, retained negative tests and strict fail-closed.
+Immutable Source main b7e04a8501f12df56677c833166e7038c4a6702b
+  docs/data.json blob 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+  docs/platform_status.json blob 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd
+  19 platforms; #237 MERGED status-only; Pages direct HTTP/new Android UNVERIFIED
+  formal FIELD/Golden/Published 0/0/0; HARD_HOLD_NO_PUBLICATION
+  CKSMH5/TWTC39/L8 Android 5/5 historical PASS preserved
+NEXT: rotate to lawful policy-authoritative new canonical A/B source;
+  no duplicate policy GET or JS/SEO authority shortcut; no Owner action
+```
+
