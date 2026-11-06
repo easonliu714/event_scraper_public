@@ -73,6 +73,9 @@ SOURCES = {
         "detail": "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668",
         "title": "TAKASE TOYA 5th Album “♾️” Release Live in Taipei",
         "origin": "https://www.zepp.co.jp",
+        # Official venue DETAIL directly links this public organizer EVENT,
+        # not a KKTIX registration/checkout Session or inventory receipt.
+        "public_ticket_event": "https://freeplanetml.kktix.cc/events/takasetoya202611",
     },
     "B_CERAMICS": {
         "source_id": "YINGGE_CERAMICS_NEWTIPEI_OFFICIAL",
@@ -145,7 +148,7 @@ class LocalEventHTML(HTMLParser):
             if len(self.scopes) >= 128:
                 raise ValueError("AB_EVENT_LOCAL_SCOPE_CAP_HOLD")
             self.scopes.append(dict(tag=tag, depth=len(self.stack),
-                                    headings=[], texts=[]))
+                                    headings=[], texts=[], edges=[]))
             self.active.append(len(self.scopes) - 1)
         if tag == "tr":
             if len(self.rows) >= 512:
@@ -175,6 +178,8 @@ class LocalEventHTML(HTMLParser):
             self.anchors.append(edge)
             for index in self.active_rows:
                 self.rows[index]["edges"].append(edge)
+            for index in self.active:
+                self.scopes[index]["edges"].append(edge)
             self.anchor = None
         if self.heading is not None and tag == self.heading[0]:
             title = norm("".join(self.heading[1]))
@@ -226,7 +231,8 @@ def inspect_pair(line, listing, detail):
     if line not in SOURCES:
         raise ValueError("AB_SOURCE_LINE_HOLD")
     result = dict(decision="HOLD", first_failure="AB_LIST_EXACT_EDGE_HOLD",
-                  same_id_review=0, field_roles=[], formal_accepted_fields=0)
+                  same_id_review=0, field_roles=[], ticket_event_edge_review=0,
+                  formal_accepted_fields=0)
     if len(exact_list_edges(line, listing)) != 1:
         return result
     p = LocalEventHTML()
@@ -277,9 +283,20 @@ def inspect_pair(line, listing, detail):
         # No inferred date, price, registration or Session from SEO metadata.
         pass
     elif line == "B_ZEPP_TAKASE":
-        # Multi-day copy in this page is not a single Session or FIELD.
-        # Only source-bound title/identity can be REVIEW pending native DOM.
-        pass
+        # Independent public reader saw this exact organizer EVENT link on
+        # Zepp rid=160668. Only a uniquely title-owned ARTICLE/SECTION may
+        # attest the edge in a future native body. Do not borrow global nav,
+        # sibling-event anchors, duplicate edges, or registration Sessions.
+        expected = SOURCES[line]["public_ticket_event"]
+        matches = [edge for edge in owned[0]["edges"]
+                   if edge == (expected, "KKTIX")]
+        if len(matches) == 1 and len(owned[0]["edges"]) <= 32:
+            result["ticket_event_edge_review"] = 1
+            result["ticket_event_url"] = expected
+            result["decision"] = "REVIEW_SOURCE_DIRECT_TICKET_EDGE_NO_SESSION"
+            result["first_failure"] = "AB_EVENT_LOCAL_DATE_HALL_AUTHORITY_HOLD"
+        # The source page describes TWO days; rid=160668 does not attest
+        # both event-local sessions or an eligible price. DATE/HALL stay HOLD.
     elif line == "B_CERAMICS":
         if len(re.findall(r"展覽時間\s*[:：]\s*2026年11月20日至2026年12月20日", local)) == 1:
             result["field_roles"].append("EXHIBITION_RANGE_REVIEW_NO_SESSION")
@@ -350,6 +367,9 @@ def run_native_once(line):
         out["first_failure"] = verdict["first_failure"]
         out["native_same_id_review"] = verdict["same_id_review"]
         out["field_roles"] = verdict["field_roles"]
+        out["ticket_event_edge_review"] = verdict.get("ticket_event_edge_review", 0)
+        if out["ticket_event_edge_review"]:
+            out["ticket_event_url"] = verdict["ticket_event_url"]
         out["list_row_roles"] = verdict.get("list_row_roles", [])
         if verdict["same_id_review"]:
             roles = ["SOURCE_EXACT_TITLE_REVIEW"] + verdict["field_roles"]
