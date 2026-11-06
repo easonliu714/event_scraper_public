@@ -1420,6 +1420,150 @@ def adjudicate_sealed_field_roles(*, source_id, source_event_id, detail_url,
     }
 
 
+
+# Public KKTIX organizer event (new source), distinct from Zepp rid=160668.
+# One robots-gated GET only; no checkout, ticket Session or formal promotion.
+KKTIX_TAKASE_URL = "https://freeplanetml.kktix.cc/events/takasetoya202611"
+
+
+def inspect_kktix_takase_event_scope(raw):
+    """Return source-local DAY1/DAY2 roles only when one section owns all fields."""
+    if not isinstance(raw, bytes) or not 0 < len(raw) <= 4194304:
+        raise ValueError("KKTIX_EVENT_BODY_BOUND_HOLD")
+    class Sections(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.depth = 0
+            self.scopes = []
+            self.completed = []
+            self.nodes = 0
+            self.hidden = 0
+        def handle_starttag(self, tag, attrs):
+            self.nodes += 1
+            if self.nodes > 40000 or self.depth > 100:
+                raise ValueError("KKTIX_EVENT_DOM_BOUND_HOLD")
+            if tag in ("script", "style", "template"):
+                self.hidden += 1
+            if tag not in ("br", "img", "meta", "input", "link", "hr", "source"):
+                self.depth += 1
+                if tag in ("section", "article"):
+                    self.scopes.append([self.depth, []])
+        def handle_data(self, data):
+            if not self.hidden:
+                for scope in self.scopes:
+                    scope[1].append(data)
+                    if sum(map(len, scope[1])) > 80000:
+                        raise ValueError("KKTIX_EVENT_SECTION_BOUND_HOLD")
+        def handle_endtag(self, tag):
+            if tag in ("script", "style", "template"):
+                self.hidden = max(0, self.hidden - 1)
+            if tag not in ("br", "img", "meta", "input", "link", "hr", "source"):
+                for scope in list(self.scopes):
+                    if scope[0] == self.depth:
+                        self.completed.append(" ".join("".join(scope[1]).split()))
+                        self.scopes.remove(scope)
+                self.depth = max(0, self.depth - 1)
+    parser = Sections()
+    parser.feed(raw.decode("utf-8", "strict"))
+    matches = [s for s in parser.completed if all(t in s for t in
+               ("TAKASE TOYA", "[DAY1]", "[DAY2]", "2026年11月7日",
+                "2026年11月8日", "會場：Zepp New Taipei"))]
+    if not matches:
+        raise ValueError("KKTIX_EVENT_LOCAL_DOM_SCOPE_HOLD")
+    matches.sort(key=len)
+    if len(matches) > 1 and len(matches[0]) == len(matches[1]):
+        raise ValueError("KKTIX_EVENT_AMBIGUOUS_SECTION_HOLD")
+    s = matches[0]
+    day1 = re.search(r"\[DAY1\].{0,240}?2026年11月7日.{0,120}?開演\s*18:00", s)
+    day2 = re.search(r"\[DAY2\].{0,240}?2026年11月8日.{0,120}?開演\s*17:00", s)
+    if not day1 or not day2 or day1.end() >= day2.start():
+        raise ValueError("KKTIX_EVENT_DAY_TIME_SCOPE_HOLD")
+    return {"source_id": "01", "source_event_id": "takasetoya202611",
+            "source_url": KKTIX_TAKASE_URL,
+            "event_local_day_roles": ["2026-11-07 18:00", "2026-11-08 17:00"],
+            "venue_role": "ZEPP_NEW_TAIPEI_SOURCE_LOCAL_REVIEW",
+            "zepp_rid": "160668", "direct_cross_source_id_edge": False,
+            "accepted_session": False, "formal_accepted_fields": 0,
+            "golden_accepted_events": 0, "published_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+
+def probe_kktix_takase_native_once():
+    """Fail closed on robots, status, redirect, MIME, bytes and DOM; receipt only."""
+    import urllib.error
+    import urllib.request
+    import urllib.robotparser
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+    opener = urllib.request.build_opener(NoRedirect)
+    out = {"kind": "P30_KKTIX_TAKASE_PUBLIC_ONESHOT_V1",
+           "line": "B", "policy_get_attempted": 1,
+           "native_get_attempted": 0, "native_http200": 0,
+           "native_same_id_review": 0, "body_lkg": 0, "receipt_lkg": 0,
+           "decision": "HOLD", "first_failure": "ROBOTS_NOT_CHECKED",
+           "raw_html_saved": False, "formal_accepted_fields": 0,
+           "golden_accepted_events": 0, "published_events": 0,
+           "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    headers = {"User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+               "Accept-Encoding": "identity"}
+    try:
+        robots = "https://freeplanetml.kktix.cc/robots.txt"
+        req = urllib.request.Request(robots, headers=dict(headers, Accept="text/plain"))
+        try:
+            with opener.open(req, timeout=8) as response:
+                if response.status != 200 or response.geturl() != robots:
+                    raise ValueError("KKTIX_ROBOTS_REDIRECT_OR_STATUS_HOLD")
+                raw = response.read(65537)
+                if len(raw) > 65536:
+                    raise ValueError("KKTIX_ROBOTS_SIZE_HOLD")
+                out["robots_sha256"] = hashlib.sha256(raw).hexdigest()
+                robot = urllib.robotparser.RobotFileParser()
+                robot.parse(raw.decode("utf-8", "strict").splitlines())
+                if not robot.can_fetch("EventRadarSourceAudit", KKTIX_TAKASE_URL):
+                    raise ValueError("KKTIX_ROBOTS_DISALLOW_HOLD")
+                out["robots_http_status"] = 200
+        except urllib.error.HTTPError as exc:
+            out["robots_http_status"] = exc.code
+            if exc.code != 404:
+                raise ValueError("KKTIX_ROBOTS_HTTP_HOLD_" + str(exc.code))
+        out["policy_decision"] = "ALLOW_ROBOTS_200_OR_404"
+    except (ValueError, UnicodeError, OSError, TimeoutError, urllib.error.URLError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:100]
+        return out
+    out["native_get_attempted"] = 1
+    receipt = {"url": KKTIX_TAKASE_URL,
+               "observed_at_utc": datetime.now(timezone.utc).isoformat(),
+               "transport": "NATIVE_NO_REDIRECT_NO_RETRY",
+               "http_status": None, "body_sha256": None}
+    try:
+        req = urllib.request.Request(KKTIX_TAKASE_URL,
+                 headers=dict(headers, Accept="text/html,application/xhtml+xml"))
+        with opener.open(req, timeout=8) as response:
+            receipt["http_status"] = response.status
+            if response.status != 200 or response.geturl() != KKTIX_TAKASE_URL:
+                raise ValueError("KKTIX_EVENT_REDIRECT_OR_STATUS_HOLD")
+            if response.headers.get("Content-Type", "").split(";")[0].strip().lower() != "text/html":
+                raise ValueError("KKTIX_EVENT_MIME_HOLD")
+            body = response.read(4194305)
+            receipt["body_bytes"] = len(body)
+            if not 0 < len(body) <= 4194304:
+                raise ValueError("KKTIX_EVENT_BODY_BOUND_HOLD")
+            receipt["body_sha256"] = hashlib.sha256(body).hexdigest()
+            out["native_http200"] = 1
+            out["event_local_review"] = inspect_kktix_takase_event_scope(body)
+            out["native_same_id_review"] = 1
+            out["decision"] = "REVIEW_SOURCE_LOCAL_DAY_ROLES_ONLY"
+            out["first_failure"] = "ZEPP_RID_DIRECT_EVENT_EDGE_UNVERIFIED"
+    except urllib.error.HTTPError as exc:
+        receipt["http_status"] = exc.code
+        out["first_failure"] = "KKTIX_EVENT_HTTP_" + str(exc.code)
+    except (ValueError, UnicodeError, OSError, TimeoutError, urllib.error.URLError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:100]
+    out["source_receipt"] = receipt
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
