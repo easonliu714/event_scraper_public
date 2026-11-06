@@ -183,6 +183,48 @@ class ABSourceTests(unittest.TestCase):
                               out["golden"], out["published"]), (0, 0, 0, 0))
             self.assertFalse(out["raw_html_saved"])
 
+
+    def test_accupass_02_new_exact_search_card_to_same_event_review(self):
+        src = m.SOURCES["A_ACCUPASS"]
+        tracking = ("?utm_campaign=accu_e_&utm_medium=search_result_"
+                    "&utm_source=web")
+        listing = ('<main><a href="' + src["detail"] + tracking + '">'
+                   + src["title"] + '</a></main>')
+        detail = ('<main><article><h1>' + src["title"] + '</h1>'
+                  '<p>2026.11.22 (Sun) 13:45 - 17:00 (GMT+8)</p>'
+                  '<p>植境plantārium-複合式空間</p>'
+                  '<p>After registration, show your ticket</p>'
+                  '</article></main>')
+        r = m.inspect_pair("A_ACCUPASS", listing, detail)
+        self.assertEqual((r["same_id_review"], r["decision"]),
+                         (1, "REVIEW_NON_SESSION_ONLY"))
+        self.assertEqual(set(r["field_roles"]), {
+            "ADVERTISED_EVENT_RANGE_REVIEW_NO_SESSION",
+            "VENUE_PLANTARIUM_REVIEW"})
+        self.assertEqual(r["formal_accepted_fields"], 0)
+        self.assertNotIn("PRICE", repr(r))
+        self.assertEqual(m.exact_detail("A_ACCUPASS",
+                         src["detail"] + tracking), src["detail"])
+        for bad in ("?session=1", "?utm_source=web&checkout=1",
+                    "?utm_source=web&utm_source=web",
+                    "?utm_campaign=other", "#checkout"):
+            self.assertIsNone(m.exact_detail("A_ACCUPASS",
+                              src["detail"] + bad))
+
+    def test_accupass_02_sibling_borrow_and_duplicate_hold(self):
+        src = m.SOURCES["A_ACCUPASS"]
+        listing = ('<a href="' + src["detail"] + '">' +
+                   src["title"] + '</a>')
+        detail = ('<article><h1>' + src["title"] + '</h1></article>'
+                  '<article><h1>另一場活動</h1>'
+                  '<p>2026.11.22 (Sun) 13:45 - 17:00</p>'
+                  '<p>植境plantārium-複合式空間</p></article>')
+        r = m.inspect_pair("A_ACCUPASS", listing, detail)
+        self.assertEqual((r["same_id_review"], r["field_roles"]), (1, []))
+        self.assertEqual(r["first_failure"], "AB_EVENT_LOCAL_FIELD_SCOPE_HOLD")
+        self.assertEqual(m.inspect_pair("A_ACCUPASS", listing * 2,
+                         detail)["same_id_review"], 0)
+
     def test_native_robots_denied_before_list(self):
         rr = dict(url="https://gutspromotion.kktix.cc/robots.txt",
                   http_status=200, body_bytes=25, body_sha256="a"*64,
