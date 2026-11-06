@@ -761,5 +761,26 @@ class TestSourceStreamGate(unittest.TestCase):
             archive, hashlib.sha256(archive).hexdigest()))
 
 
+    def test_kktix_takase_event_scope_two_days_fail_closed(self):
+        good = ("""<main><section><h1>TAKASE TOYA</h1>
+        <p>[DAY1] SETLIST A 日期：2026年11月7日(六)
+        時間：開場 17:00 / 開演 18:00</p>
+        <p>[DAY2] SETLIST B 日期：2026年11月8日(日)
+        時間：開場 16:00 / 開演 17:00</p>
+        <p>會場：Zepp New Taipei</p></section></main>""").encode()
+        a = m.inspect_kktix_takase_event_scope(good)
+        self.assertEqual(a["event_local_day_roles"],
+                         ["2026-11-07 18:00", "2026-11-08 17:00"])
+        self.assertFalse(a["direct_cross_source_id_edge"])
+        self.assertFalse(a["accepted_session"])
+        self.assertEqual(a["formal_accepted_fields"], 0)
+        for bad in (good.replace(b"<section>", b"<div>").replace(b"</section>", b"</div>"),
+                    good.replace(b"18:00", b"19:00"),
+                    good.replace(b"Zepp New Taipei", b"Other Hall"),
+                    good.replace(b"[DAY2]", b"[DAY1]")):
+            with self.assertRaisesRegex(ValueError, "KKTIX_EVENT_"):
+                m.inspect_kktix_takase_event_scope(bad)
+
+
 if __name__ == "__main__":
     unittest.main()
