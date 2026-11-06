@@ -106,6 +106,83 @@ class ABSourceTests(unittest.TestCase):
         self.assertEqual((r["native_lkg"], r["formal_accepted_fields"], r["published"]),
                          (0, 0, 0))
 
+    def test_udn_exact_product_card_is_not_bundle_or_checkout(self):
+        src = m.SOURCES["A_UDN"]
+        home = ('<main><a href="/Application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1AEBJG5">'
+                + src["title"] + ' 2026/11/20 ~ 2026/11/29 臺北表演藝術中心 大劇院 NT$ 1,000 ~ 4,600</a>'
+                '<a href="/Application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1BUNDLE">'
+                '四人套票-' + src["title"] + '</a></main>')
+        detail = ('<main><section><h2>' + src["title"] + '</h2>'
+                  '<p>2026/11/20 ~ 2026/11/29</p>'
+                  '<p>臺北表演藝術中心 大劇院</p>'
+                  '<p>票價 NT$ 1,000 ~ 4,600</p></section></main>')
+        r = m.inspect_pair("A_UDN", home, detail)
+        self.assertEqual(r["same_id_review"], 1)
+        self.assertEqual(set(r["field_roles"]), {
+            "ADVERTISED_SHOW_RANGE_REVIEW_NO_SESSION",
+            "VENUE_TPAC_GRAND_THEATER_REVIEW"})
+        self.assertEqual(r["formal_accepted_fields"], 0)
+        self.assertNotIn("PRICE", repr(r))
+        for bad in ("?PRODUCT_ID=P1AEBJG5&SESSION=1",
+                    "?PRODUCT_ID=P1BUNDLE",
+                    "?PRODUCT_ID=P1AEBJG5#checkout"):
+            self.assertIsNone(m.exact_detail("A_UDN",
+                "/Application/UTK02/UTK0201_.aspx" + bad))
+        self.assertEqual(m.inspect_pair("A_UDN", home,
+            '<main><p>' + src["title"] + '</p></main>')["same_id_review"], 0)
+
+    def test_yingge_exact_sid_identity_and_no_sibling_date_borrow(self):
+        src = m.SOURCES["B_CERAMICS"]
+        listing = ('<main><a href="' + src["detail"].replace("&", "&amp;") +
+                   '">' + src["title"] + '</a></main>')
+        detail = ('<main><article><h3>' + src["title"] + '</h3>'
+                  '<p>展覽時間:2026年11月20日至2026年12月20日</p>'
+                  '<p>展覽地點:b1陶藝長廊</p></article></main>')
+        r = m.inspect_pair("B_CERAMICS", listing, detail)
+        self.assertEqual(r["same_id_review"], 1)
+        self.assertEqual(set(r["field_roles"]), {
+            "EXHIBITION_RANGE_REVIEW_NO_SESSION",
+            "VENUE_B1_CERAMICS_GALLERY_REVIEW"})
+        sibling = ('<main><article><h3>' + src["title"] + '</h3></article>'
+                   '<article><h3>其他展覽</h3>'
+                   '<p>展覽時間:2026年11月20日至2026年12月20日</p>'
+                   '<p>展覽地點:b1陶藝長廊</p></article></main>')
+        r2 = m.inspect_pair("B_CERAMICS", listing, sibling)
+        self.assertEqual((r2["same_id_review"], r2["field_roles"]), (1, []))
+        self.assertIsNone(m.exact_detail("B_CERAMICS",
+            src["detail"] + "&checkout=1"))
+        self.assertIsNone(m.exact_detail("B_CERAMICS",
+            src["detail"].replace("0Q218346582180038351", "WRONG")))
+
+    def test_new_rotation_native_receipts_are_source_owned_not_formal(self):
+        for line in ("A_UDN", "B_CERAMICS"):
+            src = m.SOURCES[line]
+            title = src["title"]
+            label = title + " 2026/11/20 ~ 2026/11/29" if line == "A_UDN" else title
+            listing = ('<main><a href="' + src["detail"].replace("&", "&amp;") +
+                       '">' + label + '</a></main>')
+            detail = '<main><section><h2>' + title + '</h2></section></main>'
+            def receipt(url, letter):
+                return dict(url=url, http_status=200, body_bytes=256,
+                            body_sha256=letter*64,
+                            observed_at_utc="2026-11-06T07:55:00+00:00",
+                            content_type="text/html", transport="NATIVE_NO_REDIRECT_NO_RETRY")
+            answers = [("User-agent: *\\nAllow: /\\n",
+                        receipt(src["origin"] + "/robots.txt", "a")),
+                       (listing, receipt(src["list"], "b")),
+                       (detail, receipt(src["detail"], "c"))]
+            with patch.object(m.urllib.request, "build_opener"), patch.object(
+                    m, "read_public", side_effect=answers) as reader:
+                out = m.run_native_once(line)
+            self.assertEqual(reader.call_count, 3)
+            self.assertEqual((out["native_list"], out["native_detail"],
+                              out["native_same_id_review"]), (1, 1, 1))
+            self.assertEqual(out["field_receipts"][0]["body_sha256"], "c"*64)
+            self.assertEqual(out["field_receipts"][0]["source_url"], src["detail"])
+            self.assertEqual((out["native_lkg"], out["formal_accepted_fields"],
+                              out["golden"], out["published"]), (0, 0, 0, 0))
+            self.assertFalse(out["raw_html_saved"])
+
     def test_native_robots_denied_before_list(self):
         rr = dict(url="https://gutspromotion.kktix.cc/robots.txt",
                   http_status=200, body_bytes=25, body_sha256="a"*64,
