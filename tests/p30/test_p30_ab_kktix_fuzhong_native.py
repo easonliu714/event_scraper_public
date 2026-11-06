@@ -90,7 +90,7 @@ class ABSourceTests(unittest.TestCase):
             return dict(url=url, http_status=200, body_bytes=100,
                         body_sha256=sha*64, observed_at_utc="2026-11-06T06:00:00+00:00",
                         content_type="text/html", transport="NATIVE_NO_REDIRECT_NO_RETRY")
-        answers = [("User-agent: *\\nAllow: /\\n", receipt(src["origin"] + "/robots.txt", "a")),
+        answers = [("User-agent: *\nAllow: /\n", receipt(src["origin"] + "/robots.txt", "a")),
                    (listing, receipt(src["list"], "b")),
                    (detail, receipt(src["detail"], "c"))]
         with patch.object(m.urllib.request, "build_opener"), patch.object(
@@ -406,7 +406,7 @@ class ABSourceTests(unittest.TestCase):
         roles = m.inspect_pair("B_KKTIX_TAKASE_DAY1", listing, mixed)["field_roles"]
         self.assertNotIn("KKTIX_DAY1_SHOW_START_REVIEW_NOT_SESSION", roles)
         self.assertNotIn("PRICE", repr(result))
-        self.assertNotIn("SESSION", repr(result["field_roles"]))
+        self.assertNotIn("TICKET_SESSION_ID", repr(result["field_roles"]))
 
     def test_b_kktix_day1_one_shot_mocked_native_source_receipts(self):
         source = m.SOURCES["B_KKTIX_TAKASE_DAY1"]

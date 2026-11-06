@@ -314,10 +314,10 @@ def inspect_pair(line, listing, detail):
         # DAY1 show start must be explicitly event-local and may never be
         # borrowed from DAY2, the two-day pass or a ticket sale deadline.
         if ("[DAY2]" not in local and "2026年11月8日" not in local
-                and len(re.findall(r"\\[DAY1\\]\\s*SETLIST\\s*A", local)) == 1
-                and len(re.findall(r"日期\\s*:\\s*2026年11月7日", local)) == 1
+                and len(re.findall(r"\[DAY1\]\s*SETLIST\s*A", local)) == 1
+                and len(re.findall(r"日期\s*:\s*2026年11月7日", local)) == 1
                 and len(re.findall(
-                    r"時間\\s*:\\s*開場\\s*17:00\\s*/\\s*開演\\s*18:00", local)) == 1):
+                    r"時間\s*:\s*開場\s*17:00\s*/\s*開演\s*18:00", local)) == 1):
             result["field_roles"].append("KKTIX_DAY1_SHOW_START_REVIEW_NOT_SESSION")
         if local.count("會場: Zepp New Taipei") == 1:
             result["field_roles"].append("KKTIX_DAY1_HALL_REVIEW")
