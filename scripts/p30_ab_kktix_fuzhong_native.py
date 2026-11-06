@@ -267,7 +267,7 @@ def inspect_pair(line, listing, detail):
         # Only the event-local organizer text, not the KKTIX checkout or
         # ticket availability, may establish non-session REVIEW roles.
         if len(re.findall(
-                r"2026/11/14\\s*(?:\\(六\\))?\\s*10:00\\s*[-–]\\s*16:30", local)) == 1:
+                r"2026/11/14\s*(?:\(六\))?\s*10:00\s*[-–]\s*16:30", local)) == 1:
             result["field_roles"].append("FORUM_TIME_RANGE_REVIEW_NOT_TICKET_SESSION")
         if local.count("世貿展覽館一館 / 1F數發部數產署主題館舞台區") == 1:
             result["field_roles"].append("VENUE_TWTC_HALL1_STAGE_REVIEW")
