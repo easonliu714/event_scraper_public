@@ -483,7 +483,7 @@ class EventLocalSiblingOwnershipTests(unittest.TestCase):
                   '<p>時間：開場 17:00 / 開演 18:00</p>'
                   '<p>會場：Zepp New Taipei</p></article>')
         receipts = [
-            ("User-agent: *\\nAllow: /\\n", {"body_sha256": "a"*64}),
+            ("User-agent: *\nAllow: /\n", {"body_sha256": "a"*64}),
             (listing, {"body_sha256": "b"*64,
                        "observed_at_utc": "2026-11-07T00:00:00+00:00"}),
             (detail, {"body_sha256": "c"*64,
