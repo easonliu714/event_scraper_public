@@ -761,6 +761,46 @@ class TestSourceStreamGate(unittest.TestCase):
             archive, hashlib.sha256(archive).hexdigest()))
 
 
+    def test_kktix_native_robots_404_and_unrelated_agent_stop_before_event(self):
+        # Offline transport: missing/unrelated/HTML policy never triggers GET.
+        import urllib.error
+        from unittest.mock import patch
+
+        class PolicyResponse:
+            status = 200
+            def __init__(self, body):
+                self.body = body
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def geturl(self):
+                return "https://freeplanetml.kktix.cc/robots.txt"
+            def read(self, limit):
+                return self.body[:limit]
+
+        for policy in (None, b"User-agent: OtherBot\\nAllow: /\\n",
+                       b"<html>User-agent: *\\nAllow: /</html>"):
+            calls = []
+            class Opener:
+                def open(self, request, timeout):
+                    calls.append(request.full_url)
+                    if policy is None:
+                        raise urllib.error.HTTPError(request.full_url, 404,
+                                                     "Not Found", {}, None)
+                    return PolicyResponse(policy)
+            with self.subTest(policy=policy), patch(
+                    "urllib.request.build_opener", return_value=Opener()):
+                result = m.probe_kktix_takase_native_once()
+                self.assertEqual(calls, [
+                    "https://freeplanetml.kktix.cc/robots.txt"])
+                self.assertEqual(result["native_get_attempted"], 0)
+                self.assertEqual(result["native_http200"], 0)
+                self.assertEqual(result["decision"], "HOLD")
+                self.assertEqual(result["formal_accepted_fields"], 0)
+                self.assertEqual(result["published_events"], 0)
+                self.assertNotIn("ALLOW_EXPLICIT", str(result))
+
     def test_kktix_takase_event_scope_two_days_fail_closed(self):
         good = ("""<main><section><h1>TAKASE TOYA</h1>
         <p>[DAY1] SETLIST A 日期：2026年11月7日(六)
