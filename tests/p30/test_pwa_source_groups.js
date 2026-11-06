@@ -13,7 +13,7 @@ for (const id of ["ticket-platform-chips", "venue-platform-chips"]) {
     assert.ok(html.includes('id="' + id + '"'), "missing group: " + id);
 }
 assert.ok(!html.includes('id="platform-chips"'), "legacy mixed source group remains");
-assert.match(html, /售票／活動資訊平台/);
+assert.match(html, /售票/活動資訊平台/);
 assert.match(html, /活動場地/);
 assert.match(script, /function renderChips\(\)\s*\{\s*renderSourceChips\(\)/);
 assert.match(script, /filters\.platforms\.size\s*>\s*0\s*&&\s*!filters\.platforms\.has\(e\.platform\)/);
