@@ -114,5 +114,143 @@ class TestDistinctNext(unittest.TestCase):
         with self.assertRaises(ValueError): m.run_next_native_once("C")
         with self.assertRaises(ValueError): m.inspect_next_pair("C","","")
 
+
+
+class TestSealedNativeReceiptOnlyLKG(unittest.TestCase):
+    """No HTTP, no raw body, no formal-field promotion."""
+    HEAD = "a" * 40
+
+    def make_archive(self, *, b_override=None, a_override=None,
+                     wrong_manifest=False):
+        import io
+        import hashlib
+        import json
+        import zipfile
+        cfg = m.NEXT["B"]
+        stamp0 = "2026-11-05T23:53:45.220002+00:00"
+        stamp1 = "2026-11-05T23:53:46.546587+00:00"
+        stamp2 = "2026-11-05T23:53:48.066652+00:00"
+        def receipt(url, stamp, mime, size, digit):
+            return {"url": url, "http_status": 200, "body_bytes": size,
+                    "body_sha256": digit * 64, "content_type": mime,
+                    "observed_at_utc": stamp,
+                    "transport": "NATIVE_NO_REDIRECT_NO_RETRY"}
+        a = {"line": "A", "event_id": m.NEXT["A"]["id"],
+             "native_lkg": 0, "formal_fields": 0, "golden": 0,
+             "published": 0, "first_failure": "HTTPError:HTTP Error 403"}
+        b = {"kind": "P30_AB_DISTINCT_NATIVE_ONESHOT_V1", "line": "B",
+             "source_id": cfg["source"], "event_id": cfg["id"],
+             "attempted": 3, "http200": 2, "native_list": 1,
+             "native_detail": 1, "native_identity": 1,
+             "review_fields": 2, "native_lkg": 0,
+             "formal_fields": 0, "golden": 0, "published": 0,
+             "raw_html_saved": False, "policy": "ROBOTS_ALLOW",
+             "decision": "REVIEW_NON_SESSION_ONLY",
+             "first_failure": "INDEPENDENT_ACCEPTANCE_AND_LKG_HOLD",
+             "release_state": "HARD_HOLD_NO_PUBLICATION",
+             "robots_receipt": receipt(cfg["origin"] + "/robots.txt",
+                                       stamp0, "text/plain", 160, "a"),
+             "source_receipts": [
+                 receipt(cfg["listing"], stamp1, "text/html", 343607, "b"),
+                 receipt(cfg["detail"], stamp2, "text/html", 309088, "c")],
+             "field_receipts": [
+                 {"source_url": cfg["detail"], "event_id": cfg["id"],
+                  "body_sha256": "c" * 64, "observed_at_utc": stamp2,
+                  "role": role, "decision": "REVIEW",
+                  "formal_accepted": False}
+                 for role in ("SOURCE_EVENT_TITLE_REVIEW",
+                              "SOURCE_VENUE_REVIEW")]}
+        if a_override:
+            a_override(a)
+        if b_override:
+            b_override(b)
+        files = {"readiness.txt": ("head=" + self.HEAD +
+                 "\nformal_fields=0\ngolden=0\npublished=0\n").encode(),
+                 "next_native_A.json": json.dumps(a).encode(),
+                 "next_native_B.json": json.dumps(b).encode()}
+        lines = []
+        for name, data in files.items():
+            digest = hashlib.sha256(data).hexdigest()
+            if wrong_manifest and name == "next_native_B.json":
+                digest = "0" * 64
+            lines.append(digest + "  evidence/" + name)
+        files["SHA256SUMS.txt"] = ("\n".join(lines) + "\n").encode()
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, data in files.items():
+                z.writestr(name, data)
+        raw = buf.getvalue()
+        return raw, hashlib.sha256(raw).hexdigest()
+
+    def audit(self, raw, digest):
+        return m.audit_next_native_receipt_archive(
+            raw, expected_zip_sha256=digest, expected_head=self.HEAD)
+
+    def test_original_shape_receipt_only_not_body_or_formal(self):
+        raw, digest = self.make_archive()
+        snapshot = self.audit(raw, digest)
+        self.assertEqual(snapshot["source_event_id"], "167511")
+        self.assertEqual(snapshot["receipt_only_identity_lkg"], 1)
+        self.assertEqual(snapshot["native_body_replay_lkg"], 0)
+        self.assertEqual(snapshot["formal_accepted_fields"], 0)
+        self.assertEqual(snapshot["golden"], 0)
+        self.assertEqual(snapshot["published"], 0)
+
+    def test_digest_manifest_and_native_identity_fail_closed(self):
+        raw, digest = self.make_archive()
+        with self.assertRaisesRegex(ValueError, "ARTIFACT_SHA"):
+            self.audit(raw, "0" * 64)
+        raw, digest = self.make_archive(wrong_manifest=True)
+        with self.assertRaisesRegex(ValueError, "MANIFEST_SHA"):
+            self.audit(raw, digest)
+        for mutate in (
+            lambda b: b.update(event_id="OTHER"),
+            lambda b: b.update(native_identity=0),
+            lambda b: b.update(formal_fields=1),
+            lambda b: b["source_receipts"][1].update(
+                body_sha256="e" * 64),
+            lambda b: b["field_receipts"][0].update(
+                formal_accepted=True),
+            lambda b: b["field_receipts"][0].update(
+                source_url="https://evil.example/"),
+            lambda b: b["robots_receipt"].update(
+                content_type="text/html"),
+            lambda b: b["source_receipts"][1].update(
+                observed_at_utc="2026-11-05T23:30:00+00:00"),
+        ):
+            raw, digest = self.make_archive(b_override=mutate)
+            with self.assertRaises(ValueError):
+                self.audit(raw, digest)
+
+    def test_atomic_cas_idempotence_and_isolation(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        raw, digest = self.make_archive()
+        repo = Path(__file__).resolve().parents[2]
+        with tempfile.TemporaryDirectory() as temp:
+            target = Path(temp) / "receipt_lkg.json"
+            kwargs = {"expected_zip_sha256": digest,
+                      "expected_head": self.HEAD}
+            first = m.persist_next_native_receipt_lkg(
+                raw, target, repo, **kwargs)
+            self.assertTrue(first["persisted"])
+            self.assertEqual(first["native_body_replay_lkg"], 0)
+            second = m.persist_next_native_receipt_lkg(
+                raw, target, repo, **kwargs)
+            self.assertTrue(second["idempotent"])
+            payload = json.loads(target.read_text())
+            self.assertEqual(payload["snapshot"]["formal_accepted_fields"], 0)
+            payload["snapshot"]["formal_accepted_fields"] = 1
+            target.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(ValueError, "PRIOR_ENVELOPE"):
+                m.persist_next_native_receipt_lkg(
+                    raw, target, repo, **kwargs)
+            self.assertFalse((Path(temp) / "receipt_lkg.json.lock").exists())
+        with self.assertRaisesRegex(ValueError, "ISOLATION"):
+            m.persist_next_native_receipt_lkg(
+                raw, repo / "docs" / "data.json", repo,
+                expected_zip_sha256=digest, expected_head=self.HEAD)
+
 if __name__ == "__main__":
     unittest.main()
