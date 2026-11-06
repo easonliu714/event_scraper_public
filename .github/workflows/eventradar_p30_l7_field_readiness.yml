@@ -1925,6 +1925,29 @@ jobs:
                     report["native_detail"], report["native_same_id_review"],
                     report["first_failure"], flush=True)
           PY
+      - name: One-shot B KKTIX public organizer DAY1/DAY2 event-local native (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kktix-takase-native-once]'; then
+            echo 'KKTIX_TAKASE_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY' > evidence/kktix_takase_public_native_once.json
+          import json
+          from scripts.p30_source_stream_gate import probe_kktix_takase_native_once
+          print(json.dumps(probe_kktix_takase_native_once(), ensure_ascii=False, sort_keys=True))
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/kktix_takase_public_native_once.json').read_text())
+          assert d['native_get_attempted'] <= 1
+          assert d['raw_html_saved'] is False
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          print('KKTIX_TAKASE', d['decision'], d['first_failure'])
+          PY
       - name: Pinned Zepp 160668 native receipt -> isolated durable LKG (NO OFFICIAL GET)
         shell: bash
         env:
@@ -2010,6 +2033,7 @@ jobs:
           if [ -f evidence/native_huashan_home_date.json ]; then sha256sum evidence/native_huashan_home_date.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/zepp_takase_receipt_only_lkg.json >> evidence/SHA256SUMS.txt
+          if [ -f evidence/kktix_takase_public_native_once.json ]; then sha256sum evidence/kktix_takase_public_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum -c evidence/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
