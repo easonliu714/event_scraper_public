@@ -222,7 +222,7 @@ def inspect_pair(line, listing, detail):
     elif line == "A_ACCUPASS":
         # Explicit event-local advertised date and venue, never registration
         # inventory or an independently accepted ticket Session.
-        if len(re.findall(r"2026[./]11[./]22\s*(?:\\(Sun\\)\\s*)?13:45\s*[-–]\s*17:00", local)) == 1:
+        if len(re.findall(r"2026[./]11[./]22\s*(?:\(Sun\)\s*)?13:45\s*[-–]\s*17:00", local)) == 1:
             result["field_roles"].append("ADVERTISED_EVENT_RANGE_REVIEW_NO_SESSION")
         if local.count("植境plantārium-複合式空間") == 1:
             result["field_roles"].append("VENUE_PLANTARIUM_REVIEW")
