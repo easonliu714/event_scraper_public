@@ -358,7 +358,7 @@ def adjudicate_robots_policy(body, agent, urls):
                applicable_groups=0, applicable_rulelines=0,
                checked_urls=0, raw_policy_saved=False)
     if (not isinstance(body, str) or not isinstance(agent, str)
-            or not isinstance(urls, (tuple, list)) or len(urls) != 2):
+            or not isinstance(urls, (tuple, list)) or len(urls) not in (1, 2)):
         return out
     if not body or len(body.encode("utf-8")) > 65536:
         out["first_failure"] = "AB_ROBOTS_EMPTY_OR_BOUNDS_HOLD"
