@@ -80,6 +80,32 @@ class ABSourceTests(unittest.TestCase):
             "放映日期：2026/11/07 18:00")
         self.assertEqual(m.inspect_pair("B", self.b_list, bad)["field_roles"], [])
 
+    def test_native_b_list_row_receipt_bound_to_list_not_detail(self):
+        src = m.SOURCES["B"]
+        listing = ('<table><tr><td>11/06(五)</td><td>19:00</td><td><a href="' +
+                   src["detail"].replace("&", "&amp;") + '">' + src["title"] +
+                   '</a></td></tr></table>')
+        detail = '<main><h1>' + src["title"] + '</h1></main>'
+        def receipt(url, sha):
+            return dict(url=url, http_status=200, body_bytes=100,
+                        body_sha256=sha*64, observed_at_utc="2026-11-06T06:00:00+00:00",
+                        content_type="text/html", transport="NATIVE_NO_REDIRECT_NO_RETRY")
+        answers = [("User-agent: *\\nAllow: /\\n", receipt(src["origin"] + "/robots.txt", "a")),
+                   (listing, receipt(src["list"], "b")),
+                   (detail, receipt(src["detail"], "c"))]
+        with patch.object(m.urllib.request, "build_opener"), patch.object(
+                m, "read_public", side_effect=answers) as reader:
+            r = m.run_native_once("B")
+        self.assertEqual(reader.call_count, 3)
+        self.assertEqual(r["decision"], "REVIEW_LIST_ROW_ONLY")
+        self.assertEqual(r["list_row_roles"], ["LIST_11_06_19_00_REVIEW_NO_YEAR"])
+        self.assertEqual(len(r["field_receipts"]), 2)
+        self.assertEqual(r["field_receipts"][0]["body_sha256"], "c"*64)
+        self.assertEqual(r["field_receipts"][1]["body_sha256"], "b"*64)
+        self.assertEqual(r["field_receipts"][1]["source_url"], src["list"])
+        self.assertEqual((r["native_lkg"], r["formal_accepted_fields"], r["published"]),
+                         (0, 0, 0))
+
     def test_native_robots_denied_before_list(self):
         rr = dict(url="https://gutspromotion.kktix.cc/robots.txt",
                   http_status=200, body_bytes=25, body_sha256="a"*64,

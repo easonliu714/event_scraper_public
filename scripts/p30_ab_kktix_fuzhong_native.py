@@ -201,7 +201,7 @@ def run_native_once(line):
                source_event_id=source["event_id"],
                native_get_attempted=0, native_http200=0,
                native_list=0, native_detail=0, native_same_id_review=0,
-               field_roles=[], field_receipts=[], native_lkg=0,
+               field_roles=[], list_row_roles=[], field_receipts=[], native_lkg=0,
                formal_accepted_fields=0, golden=0, published=0,
                raw_html_saved=False, release_state="HARD_HOLD_NO_PUBLICATION",
                source_receipts=[], decision="HOLD", first_failure="NOT_STARTED")
@@ -237,6 +237,7 @@ def run_native_once(line):
         out["first_failure"] = verdict["first_failure"]
         out["native_same_id_review"] = verdict["same_id_review"]
         out["field_roles"] = verdict["field_roles"]
+        out["list_row_roles"] = verdict.get("list_row_roles", [])
         if verdict["same_id_review"]:
             roles = ["SOURCE_EXACT_TITLE_REVIEW"] + verdict["field_roles"]
             out["field_receipts"] = [
@@ -245,6 +246,13 @@ def run_native_once(line):
                      observed_at_utc=dr["observed_at_utc"],
                      role=role, decision="REVIEW", formal_accepted=False)
                 for role in roles]
+            # LIST row roles are bound to LIST bytes/clock, never DETAIL.
+            out["field_receipts"].extend(
+                dict(source_id=source["source_id"], event_id=source["event_id"],
+                     source_url=source["list"], body_sha256=lr["body_sha256"],
+                     observed_at_utc=lr["observed_at_utc"], role=role,
+                     decision="REVIEW", formal_accepted=False)
+                for role in out["list_row_roles"])
     except (ValueError, UnicodeError, OSError, TimeoutError, urllib.error.URLError) as exc:
         out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:180]
     return out
