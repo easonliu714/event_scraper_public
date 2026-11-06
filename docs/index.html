@@ -38,6 +38,8 @@
         .chip span { opacity: 0.6; font-size: 0.8em; }
         .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
         .chip.active span { opacity: 1; color: #fff; }
+        /* 可觸控、可鍵盤操作的來源標籤，沿用既有 chip 外觀。 */
+        .source-chip { color: var(--text); font-family: inherit; min-height: 36px; align-items: center; }
         
         .list-header { padding: 12px 16px; font-size: 0.9rem; color: #aaa; background: #121212; border-bottom: 1px solid #222; }
         .list-info-row { display: flex; justify-content: space-between; align-items: center; }
@@ -99,9 +101,14 @@
 </header>
 
 <div class="filter-section">
-    <div class="filter-block">
-        <div class="block-title">🏛️ 平台篩選</div>
-        <div id="platform-chips" class="chips"></div>
+    <!-- 來源分組僅影響首頁篩選呈現，不改變活動來源身分、正式資料或發布狀態。 -->
+    <div class="filter-block" aria-labelledby="ticket-source-label">
+        <div id="ticket-source-label" class="block-title">🎟️ 售票／活動資訊平台</div>
+        <div id="ticket-platform-chips" class="chips"></div>
+    </div>
+    <div class="filter-block" aria-labelledby="venue-source-label">
+        <div id="venue-source-label" class="block-title">🏛️ 活動場地</div>
+        <div id="venue-platform-chips" class="chips"></div>
     </div>
     
     <div class="filter-block">
@@ -551,17 +558,53 @@
         return myKeywords.some(k => t.includes(k.toLowerCase()));
     }
 
+    // 場地型來源以官方來源身分明確對照，不猜測活動實際舉辦地點。
+    // 此對照僅調整篩選 UI，不寫回 data.json，也不影響原始 e.platform。
+    const VENUE_SOURCE_NAMES = new Set([
+        '華山', '華山1914', '華山1914文創園區', '華山1914文化創意產業園區',
+        '松山文創', '松山文創園區',
+        '台北世貿', '臺北世貿', '台北世界貿易中心', '臺北世界貿易中心',
+        '中正紀念堂', '國立中正紀念堂'
+    ]);
+
+    function sourceGroup(platformName) {
+        const name = String(platformName || '').normalize('NFKC').replace(/[\s\u3000]+/g, '');
+        return VENUE_SOURCE_NAMES.has(name) ? 'venue' : 'platform';
+    }
+
+    // 本次修改：原單一平台 chips 改為售票／活動資訊與活動場地兩組。
+    // 安全性：使用 text node，不將來源名稱拼接為 HTML 或內聯 onclick。
+    function renderSourceChips() {
+        const roots = {
+            platform: document.getElementById('ticket-platform-chips'),
+            venue: document.getElementById('venue-platform-chips')
+        };
+        Object.values(roots).forEach(root => root.replaceChildren());
+
+        const counts = new Map();
+        for (const event of allEvents) {
+            const name = typeof event.platform === 'string' ? event.platform.trim() : '';
+            if (name) counts.set(name, (counts.get(name) || 0) + 1);
+        }
+        const sorted = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-TW'));
+        for (const [name, count] of sorted) {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'chip source-chip' + (filters.platforms.has(name) ? ' active' : '');
+            chip.setAttribute('aria-pressed', String(filters.platforms.has(name)));
+            const countNode = document.createElement('span');
+            countNode.textContent = String(count);
+            chip.append(document.createTextNode(name + ' '), countNode);
+            chip.addEventListener('click', () => {
+                toggleFilter('platforms', name, chip);
+                chip.setAttribute('aria-pressed', String(filters.platforms.has(name)));
+            });
+            roots[sourceGroup(name)].append(chip);
+        }
+    }
+
     function renderChips() {
-        // 1. 平台篩選 (Platforms)
-        const pStats = {}; 
-        allEvents.forEach(e => pStats[e.platform] = (pStats[e.platform]||0)+1);
-        document.getElementById('platform-chips').innerHTML = Object.entries(pStats)
-            .sort((a,b) => b[1]-a[1])
-            .map(([k,v]) => {
-                // 增加 isActive 判斷，確保下拉更新後選取狀態不會消失
-                const isActive = filters.platforms.has(k) ? 'active' : '';
-                return `<div class="chip ${isActive}" onclick="toggleFilter('platforms', '${k}', this)">${k} <span>${v}</span></div>`;
-            }).join('');
+        renderSourceChips();
 
         // 2. 地區篩選 (Regions) - [新增] 動態生成邏輯
         const regionMap = [
