@@ -737,6 +737,11 @@ class TestSourceStreamGate(unittest.TestCase):
         self.assertFalse(audit["field_matrix"][0]["independent_authority"])
         self.assertEqual(audit["formal_accepted_fields"], 0)
         self.assertEqual(audit["published_events"], 0)
+        self.assertEqual(audit["clock_basis"], "SEALED_DETAIL_OBSERVED_AT_ONLY")
+        self.assertEqual(audit["wall_clock_freshness"], "NOT_ASSESSED")
+        self.assertEqual(audit["source_age_seconds"], 0)
+        self.assertEqual(result, m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest()))
 
 
 if __name__ == "__main__":
