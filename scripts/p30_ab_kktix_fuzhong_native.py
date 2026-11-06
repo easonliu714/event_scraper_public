@@ -182,7 +182,9 @@ def exact_list_edges(line, listing):
     # A prefixed "四人套票-" is a different PRODUCT and cannot pass.
     return [(exact_detail(line, href), label) for href, label in p.anchors
             if exact_detail(line, href) and
-            (label == title or (line == "A_UDN" and label.startswith(title + " ")) or\n             (line == "B_ZEPP_TAKASE" and label.count(title) == 1\n              and "2026 11.7" in label and "18:00" in label))]
+            (label == title or (line == "A_UDN" and label.startswith(title + " ")) or
+             (line == "B_ZEPP_TAKASE" and label.count(title) == 1
+              and "2026 11.7" in label and "18:00" in label))]
 
 def b_list_row_roles(listing):
     """Review-only exact same-TR SID/month-day/time, never infer a year."""
