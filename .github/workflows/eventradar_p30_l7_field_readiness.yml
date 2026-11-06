@@ -1780,6 +1780,27 @@ jobs:
                     d['native_http200'],d['native_list'],d['native_detail'],
                     d['native_same_id_review'],d['field_roles'],d['first_failure'],flush=True)
           PY
+      - name: One-shot new A UDN #06 and B Yingge official LIST DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[udn-yingge-probe-once]'; then
+            echo 'UDN_YINGGE_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          for line in ("A_UDN", "B_CERAMICS"):
+              report = run_native_once(line)
+              path = Path("evidence/ab_udn_yingge_native_" + line + ".json")
+              path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\\n", encoding="utf-8")
+              print("UDN_YINGGE_NATIVE", line, report["native_get_attempted"],
+                    report["native_http200"], report["native_same_id_review"],
+                    report["first_failure"], flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -1796,6 +1817,7 @@ jobs:
           if [ -f evidence/native_rotation_B.json ]; then sha256sum evidence/native_rotation_B.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/cloudgate_native_once.json ]; then sha256sum evidence/cloudgate_native_once.json >> evidence/SHA256SUMS.txt; fi
           for line in A B; do if [ -f "evidence/ab_kktix_fuzhong_native_${line}.json" ]; then sha256sum "evidence/ab_kktix_fuzhong_native_${line}.json" >> evidence/SHA256SUMS.txt; fi; done
+          for line in A_UDN B_CERAMICS; do if [ -f "evidence/ab_udn_yingge_native_${line}.json" ]; then sha256sum "evidence/ab_udn_yingge_native_${line}.json" >> evidence/SHA256SUMS.txt; fi; done
           if [ -f evidence/next_native_A.json ]; then sha256sum evidence/next_native_A.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/next_native_B.json ]; then sha256sum evidence/next_native_B.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
