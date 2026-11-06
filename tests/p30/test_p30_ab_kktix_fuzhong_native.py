@@ -432,6 +432,79 @@ class ABSourceTests(unittest.TestCase):
 
 
 
+
+class EventLocalSiblingOwnershipTests(unittest.TestCase):
+    """Real adapter path: same title cannot borrow sibling event fields."""
+
+    def test_a_udn_foreign_product_id_blocks_show_hall_review(self):
+        src = m.SOURCES["A_UDN"]
+        listing = '<a href="' + src["detail"] + '">' + src["title"] + '</a>'
+        owned = ('<article><h1>' + src["title"] + '</h1>'
+                 '<p>2026/11/20 ~ 2026/11/29</p>'
+                 '<p>臺北表演藝術中心 大劇院</p>')
+        clean = m.inspect_pair("A_UDN", listing, owned + '</article>')
+        self.assertEqual(clean["same_id_review"], 1)
+        self.assertEqual(len(clean["field_roles"]), 2)
+        self.assertEqual(len(clean["event_local_scope"]["normalized_text_sha256"]), 64)
+        self.assertFalse(clean["event_local_scope"]["raw_scope_saved"])
+        foreign = ('<a href="/Application/UTK02/UTK0201_.aspx?'
+                   'PRODUCT_ID=P1OTHER">other product</a>')
+        bad = m.inspect_pair("A_UDN", listing, owned + foreign + '</article>')
+        self.assertEqual(bad["same_id_review"], 1)
+        self.assertEqual(bad["field_roles"], [])
+        self.assertEqual(bad["first_failure"],
+                         "AB_EVENT_LOCAL_FOREIGN_SAME_SOURCE_EVENT_HOLD")
+        self.assertEqual(bad["foreign_event_edge_count"], 1)
+        self.assertNotIn("event_local_scope", bad)
+
+    def test_b_day1_other_kktix_event_blocks_field_ownership(self):
+        src = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        listing = '<a href="/events/takasetoya202611-2">' + src["title"] + '</a>'
+        owned = ('<article><h1>' + src["title"] + '</h1>'
+                 '<p>[DAY1] SETLIST A 日期：2026年11月7日</p>'
+                 '<p>時間：開場 17:00 / 開演 18:00</p>'
+                 '<p>會場：Zepp New Taipei</p>')
+        clean = m.inspect_pair("B_KKTIX_TAKASE_DAY1",
+                               listing, owned + '</article>')
+        self.assertEqual(len(clean["field_roles"]), 2)
+        foreign = '<a href="/events/takasetoya202611-3">DAY2</a>'
+        bad = m.inspect_pair("B_KKTIX_TAKASE_DAY1",
+                             listing, owned + foreign + '</article>')
+        self.assertEqual(bad["field_roles"], [])
+        self.assertEqual(bad["same_id_review"], 1)
+        self.assertEqual(bad["first_failure"],
+                         "AB_EVENT_LOCAL_FOREIGN_SAME_SOURCE_EVENT_HOLD")
+
+    def test_native_detail_receipts_bind_scope_hash_without_raw_body(self):
+        src = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
+        listing = '<a href="/events/takasetoya202611-2">' + src["title"] + '</a>'
+        detail = ('<article><h1>' + src["title"] + '</h1>'
+                  '<p>[DAY1] SETLIST A 日期：2026年11月7日</p>'
+                  '<p>時間：開場 17:00 / 開演 18:00</p>'
+                  '<p>會場：Zepp New Taipei</p></article>')
+        receipts = [
+            ("User-agent: *\\nAllow: /\\n", {"body_sha256": "a"*64}),
+            (listing, {"body_sha256": "b"*64,
+                       "observed_at_utc": "2026-11-07T00:00:00+00:00"}),
+            (detail, {"body_sha256": "c"*64,
+                      "observed_at_utc": "2026-11-07T00:00:01+00:00"})]
+        with patch.object(m, "read_public", side_effect=receipts):
+            out = m.run_native_once("B_KKTIX_TAKASE_DAY1")
+        scope = out["event_local_scope"]
+        self.assertEqual(scope["foreign_event_edge_count"], 0)
+        self.assertFalse(scope["raw_scope_saved"])
+        self.assertEqual(len(scope["normalized_text_sha256"]), 64)
+        self.assertEqual(len(out["field_receipts"]), 3)
+        self.assertTrue(all(
+            r["event_local_scope_sha256"] == scope["normalized_text_sha256"]
+            and r["body_sha256"] == "c"*64
+            and r["formal_accepted"] is False
+            for r in out["field_receipts"]))
+        self.assertEqual((out["native_lkg"], out["formal_accepted_fields"],
+                          out["golden"], out["published"]), (0, 0, 0, 0))
+
+
+
 class RobotsPolicyAuthorityTests(unittest.TestCase):
     def test_applicable_group_and_both_urls_required(self):
         src = m.SOURCES["B_KKTIX_TAKASE_DAY1"]
