@@ -139,6 +139,44 @@ class ReviewBridgeTests(unittest.TestCase):
                 bridge.write_isolated_review_lkg(envelope, target, root,
                                                  expected_sha=first)
 
+    def test_checksum_valid_preview_field_injection_is_quarantined(self):
+        """A/B caller receipts cannot silently become display price/date/venue."""
+        for line, listing, detail in (
+                ("A", self.a_list, self.a_detail),
+                ("B", self.b_list, self.b_detail)):
+            envelope = bridge.build_review_envelope(line, listing, detail, STAMP)
+            self.assertEqual(envelope["decision"], "REVIEW_ONLY_NOT_NATIVE")
+            changes = {
+                "price": lambda c: c.__setitem__("price", "NT$100"),
+                "date": lambda c: c.__setitem__("date", "2026-11-22"),
+                "remote_image": lambda c: c.__setitem__("img_url", "https://example.com/x.jpg"),
+                "extra_property": lambda c: c.__setitem__("sale_status", "AVAILABLE"),
+                "foreign_title": lambda c: c.__setitem__("title", "FOREIGN EVENT"),
+                "field_evidence": lambda c: c["_candidate"].__setitem__(
+                    "field_evidence", {"price": {"decision": "REVIEW"}}),
+                "foreign_sources": lambda c: c["_candidate"].__setitem__(
+                    "sources", ["https://example.com/foreign"]),
+            }
+            for label, mutate in changes.items():
+                with self.subTest(line=line, injection=label):
+                    forged = json.loads(json.dumps(envelope, ensure_ascii=False))
+                    mutate(forged["candidate"])
+                    sealed = {
+                        "payload": forged,
+                        "sha256": hashlib.sha256(bridge._canonical(forged)).hexdigest(),
+                    }
+                    with self.assertRaisesRegex(
+                            ValueError, "REVIEW_SNAPSHOT_PREVIEW_FIELD_AUTHORITY_HOLD"):
+                        bridge._validate_snapshot(sealed)
+                    with tempfile.TemporaryDirectory() as td:
+                        root = Path(td)
+                        target = (root / "_isolated_review" / line /
+                                  "review_snapshot.json")
+                        with self.assertRaisesRegex(
+                                ValueError, "REVIEW_SNAPSHOT_PREVIEW_FIELD_AUTHORITY_HOLD"):
+                            bridge.write_isolated_review_lkg(forged, target, root)
+                        self.assertFalse(target.exists())
+
     def test_caller_supplied_review_cannot_forge_native_body_lkg(self):
         """A checksum-valid caller envelope is never native source evidence."""
         envelope = bridge.build_review_envelope(
