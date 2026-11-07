@@ -376,5 +376,60 @@ class ReviewBridgeTests(unittest.TestCase):
             self.assertEqual(list(Path(outside).iterdir()), [])
 
 
+    def test_tpac_event_2072_conflicting_official_dates_review_cas(self):
+        """Exact same event identity is not permission to accept date/session."""
+        from scripts import p30_tpac_event_source as tpac
+        listing = ('<main><article><a href="/event/2072">' + tpac.TITLE +
+                   '</a><p>2026-11-10 - 2026-11-12</p></article></main>').encode()
+        detail = ('<main><article><h1>' + tpac.TITLE +
+                  '</h1><p>2026-11-11 - 2026-11-13</p></article></main>').encode()
+        verdict = tpac.inspect_caller_html(listing.decode(), detail.decode())
+        self.assertEqual(verdict["same_id_review"], 1)
+        self.assertTrue(verdict["date_conflict"])
+        self.assertEqual(verdict["field_roles"], ["EVENT_TITLE_REVIEW"])
+        self.assertEqual(verdict["first_failure"],
+                         "TPAC_EVENT_OFFICIAL_LIST_DETAIL_DATE_CONFLICT_HOLD")
+        envelope = bridge.build_review_envelope(
+            "B", listing, detail, STAMP, adapter_key="B_TPAC_EVENT2072")
+        self.assertEqual(envelope["decision"], "REVIEW_ONLY_NOT_NATIVE")
+        self.assertEqual(envelope["first_failure"], verdict["first_failure"])
+        self.assertEqual([r["role"] for r in envelope["role_receipts"]],
+                         ["EVENT_TITLE_REVIEW"])
+        self.assertIn(verdict["first_failure"],
+                      envelope["candidate"]["_candidate"]["hold_reasons"])
+        manifest = {**{k: envelope[k] for k in (
+            "line", "adapter_key", "source_id", "source_event_id",
+            "list_url", "detail_url", "observed_at_utc",
+            "source_attestation")}, **envelope["body_digests"]}
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            out = bridge.replay_manifest_to_isolated_lkg(
+                manifest, listing, detail, root)
+            self.assertEqual((out["native_get"], out["formal_accepted_fields"],
+                              out["golden"], out["published"]), (0, 0, 0, 0))
+            target = root / "_isolated_review/B/B_TPAC_EVENT2072/review_snapshot.json"
+            before = target.read_bytes()
+            self.assertEqual(json.loads(before)["sha256"], out["snapshot_sha256"])
+            held = bridge.replay_manifest_to_isolated_lkg(
+                manifest, listing.replace(b"/event/2072", b"/event/2073"),
+                detail, root, out["snapshot_sha256"])
+            self.assertEqual(held["decision"], "HOLD")
+            self.assertEqual(target.read_bytes(), before)
+        # A sibling event's date cannot be borrowed into this event owner.
+        no_date = ('<main><article><a href="/event/2072">' + tpac.TITLE +
+                   '</a></article><article><p>2026-11-11 - 2026-11-13'
+                   '</p></article></main>')
+        self.assertEqual(tpac.inspect_caller_html(no_date, detail.decode())[
+            "first_failure"], "TPAC_EVENT_DATE_RANGE_LOCAL_AUTHORITY_HOLD")
+        ghost = '<main><script><article><a href="/event/2072">' + tpac.TITLE + '</a></article></script></main>'
+        self.assertEqual(tpac.inspect_caller_html(ghost, detail.decode())[
+            "same_id_review"], 0)
+        aligned = detail.replace(b"2026-11-11 - 2026-11-13",
+                                 b"2026-11-10 - 2026-11-12")
+        positive = tpac.inspect_caller_html(listing.decode(), aligned.decode())
+        self.assertEqual(positive["field_roles"],
+                         ["EVENT_TITLE_REVIEW", "VENUE_EVENT_DATE_RANGE_REVIEW_NOT_SESSION"])
+        self.assertEqual(positive["formal_accepted_fields"], 0)
+
 if __name__ == "__main__":
     unittest.main()

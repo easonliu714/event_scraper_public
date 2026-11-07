@@ -15,13 +15,14 @@ from pathlib import Path
 
 from scripts import p30_ab_kktix_fuzhong_native as ticket
 from scripts import p30_ntpc_artcenter_source as venue
+from scripts import p30_tpac_event_source as tpac_event
 from scripts import p30_candidate_review_pipeline as preview
 
 MAX_HTML = 2 * 1024 * 1024
 ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
 # Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
 ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A",
-                 "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B"}
+                 "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B",\n                 "B_TPAC_EVENT2072": "B"
 DEFAULT_ADAPTER = {"A": "A_KIMU", "B": "B_NTPC"}
 
 
@@ -61,7 +62,7 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         listing, detail = list_body.decode("utf-8"), detail_body.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError("REVIEW_BODY_UTF8_HOLD") from exc
-    if adapter_key != "B_NTPC":
+    if adapter_key not in ("B_NTPC", "B_TPAC_EVENT2072"):
         # The same source-local parser also handles alternate A/B official
         # LIST→DETAIL identities. Never promote LIST roles as DETAIL receipts.
         source = ticket.SOURCES[adapter_key]
@@ -77,6 +78,13 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
             "B_CERAMICS": ("鶯歌陶瓷博物館", "展覽"),
             "B_ZEPP_TAKASE": ("Zepp New Taipei", "活動"),
         }[adapter_key]
+    elif adapter_key == "B_TPAC_EVENT2072":
+        verdict = tpac_event.inspect_caller_html(listing, detail)
+        list_url, detail_url = tpac_event.LIST_URL, tpac_event.DETAIL_URL
+        title, source_id, event_id = (tpac_event.TITLE, tpac_event.SOURCE_ID,
+                                      tpac_event.EVENT_ID)
+        roles = list(verdict["field_roles"])
+        platform, kind = "臺北表演藝術中心", "活動"
     else:
         verdict = venue.inspect_caller_html(listing, detail)
         list_url = venue.LIST_URL
@@ -123,6 +131,10 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
             "published": False,
         },
     }
+    if adapter_key == "B_TPAC_EVENT2072":
+        # Indexed LIST and DETAIL disagree on dates: preserve identity only.
+        # The disagreement is a HOLD, not a Session/date/price receipt.
+        raw["_candidate"]["hold_reasons"].append(verdict["first_failure"])
     candidate, reasons = preview.normalize_record(raw)
     if reasons:
         envelope["first_failure"] = "PREVIEW_NORMALIZER_HOLD:" + ",".join(reasons)
@@ -149,7 +161,9 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
             "native_attested": False, "formal_accepted": False,
         }
     envelope["decision"] = "REVIEW_ONLY_NOT_NATIVE"
-    envelope["first_failure"] = "NATIVE_ATTESTATION_AND_FIELD_AUTHORITY_PENDING"
+    envelope["first_failure"] = (verdict["first_failure"]
+        if adapter_key == "B_TPAC_EVENT2072"
+        else "NATIVE_ATTESTATION_AND_FIELD_AUTHORITY_PENDING")
     return envelope
 
 
@@ -167,6 +181,9 @@ def _validate_snapshot(snapshot):
             "/artcenter_chi/xmdoc/cont?sid=" + venue.SID +
             "&sq=&xsmsid=" + venue.XSMSID),
             "NTPC_ARTCENTER_OFFICIAL_NOT_FORMAL_19_PLATFORM", venue.SID)
+    elif adapter == "B_TPAC_EVENT2072":
+        expected = (tpac_event.LIST_URL, tpac_event.DETAIL_URL,
+                    tpac_event.SOURCE_ID, tpac_event.EVENT_ID)
     else:
         source = ticket.SOURCES[adapter]
         expected = (source["list"], source["detail"],
