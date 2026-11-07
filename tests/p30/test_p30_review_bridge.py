@@ -209,6 +209,58 @@ class ReviewBridgeTests(unittest.TestCase):
                         {**manifest, "adapter_key": "B_NTPC" if line == "A" else "A_UDN"},
                         listing, detail, root, out["snapshot_sha256"])
 
+    def test_accupass_and_zepp_exact_event_pipeline_with_ticket_edge(self):
+        """Reuse distinct official-source parsers; caller bytes are not native."""
+        a_src = a.SOURCES["A_ACCUPASS"]
+        b_src = a.SOURCES["B_ZEPP_TAKASE"]
+        cases = [
+            ("A", "A_ACCUPASS",
+             ('<main><a href="' + a_src["detail"] + '">' +
+              a_src["title"] + '</a></main>').encode("utf-8"),
+             ('<article><h1>' + a_src["title"] +
+              '</h1><p>2026.11.22 (Sun) 13:45 - 17:00</p>' +
+              '<p>植境plantārium-複合式空間</p></article>').encode("utf-8"),
+             False),
+            ("B", "B_ZEPP_TAKASE",
+             ('<main><a href="/hall/newtaipei/schedule/single/?rid=160668">' +
+              '2026 11.7 SAT 高瀬統也 ' + b_src["title"] +
+              ' [OPEN] 17:00 [START] 18:00 READ MORE</a></main>').encode("utf-8"),
+             ('<article><h2>' + b_src["title"] + '</h2>' +
+              '<a href="' + b_src["public_ticket_event"] +
+              '">KKTIX</a></article>').encode("utf-8"),
+             True),
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for line, key, listing, detail, has_edge in cases:
+                with self.subTest(adapter=key):
+                    envelope = bridge.build_review_envelope(
+                        line, listing, detail, STAMP, adapter_key=key)
+                    self.assertEqual(envelope["decision"], "REVIEW_ONLY_NOT_NATIVE")
+                    self.assertEqual(envelope["source_event_id"],
+                                     a.SOURCES[key]["event_id"])
+                    self.assertEqual(bool(envelope["direct_ticket_edge"]), has_edge)
+                    manifest = {**{k: envelope[k] for k in (
+                        "line", "adapter_key", "source_id", "source_event_id",
+                        "list_url", "detail_url", "observed_at_utc",
+                        "source_attestation")}, **envelope["body_digests"]}
+                    out = bridge.replay_manifest_to_isolated_lkg(
+                        manifest, listing, detail, root)
+                    self.assertEqual(out["direct_ticket_edge_review"], int(has_edge))
+                    self.assertEqual((out["native_get"],
+                                      out["formal_accepted_fields"],
+                                      out["golden"], out["published"]), (0, 0, 0, 0))
+                    target = root / "_isolated_review" / line / key / "review_snapshot.json"
+                    saved = json.loads(target.read_text(encoding="utf-8"))
+                    self.assertEqual(saved["sha256"], out["snapshot_sha256"])
+                    if has_edge:
+                        self.assertEqual(
+                            saved["payload"]["direct_ticket_edge"]["target_url"],
+                            b_src["public_ticket_event"])
+                        # The ticket event edge is not a venue event ID.
+                        self.assertEqual(saved["payload"]["source_event_id"], "160668")
+                    self.assertFalse((root / "docs" / "data.json").exists())
+
     def test_manifest_cli_integrates_both_source_adapters(self):
         for line, listing, detail in (
                 ("A", self.a_list, self.a_detail),

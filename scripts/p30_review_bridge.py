@@ -20,8 +20,8 @@ from scripts import p30_candidate_review_pipeline as preview
 MAX_HTML = 2 * 1024 * 1024
 ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
 # Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
-ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A",
-                 "B_NTPC": "B", "B_CERAMICS": "B"}
+ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A",
+                 "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B"}
 DEFAULT_ADAPTER = {"A": "A_KIMU", "B": "B_NTPC"}
 
 
@@ -73,7 +73,9 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         platform, kind = {
             "A_KIMU": ("KKTIX", "活動"),
             "A_UDN": ("UDN售票網", "活動"),
+            "A_ACCUPASS": ("ACCUPASS", "活動"),
             "B_CERAMICS": ("鶯歌陶瓷博物館", "展覽"),
+            "B_ZEPP_TAKASE": ("Zepp New Taipei", "活動"),
         }[adapter_key]
     else:
         verdict = venue.inspect_caller_html(listing, detail)
@@ -98,7 +100,7 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         "golden": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
         "decision": "HOLD", "first_failure": verdict["first_failure"],
-        "role_receipts": [], "candidate": None,
+        "role_receipts": [], "direct_ticket_edge": None, "candidate": None,
     }
     if verdict.get("same_id_review") != 1:
         return envelope
@@ -133,6 +135,19 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
          "native_attested": False, "formal_accepted": False}
         for role in sorted(set(roles))
     ]
+    # Zepp venue rid is NOT the KKTIX ticket event ID. Preserve the exact
+    # official event-local outbound link as a separate REVIEW edge, never
+    # infer ticket Session, performance date, availability or eligible price.
+    if (adapter_key == "B_ZEPP_TAKASE"
+            and verdict.get("ticket_event_edge_review") == 1):
+        envelope["direct_ticket_edge"] = {
+            "role": "VENUE_TO_TICKET_EVENT_EDGE_REVIEW_NOT_SESSION",
+            "source_url": detail_url,
+            "target_url": ticket.SOURCES[adapter_key]["public_ticket_event"],
+            "body_sha256": digests["detail_sha256"],
+            "observed_at_utc": stamp,
+            "native_attested": False, "formal_accepted": False,
+        }
     envelope["decision"] = "REVIEW_ONLY_NOT_NATIVE"
     envelope["first_failure"] = "NATIVE_ATTESTATION_AND_FIELD_AUTHORITY_PENDING"
     return envelope
@@ -194,6 +209,18 @@ def _validate_snapshot(snapshot):
             not isinstance(item.get("role"), str) or not item["role"]
             for item in receipts):
         raise ValueError("REVIEW_SNAPSHOT_ROLE_PROVENANCE_HOLD")
+    # A ticket link is a separately scoped venue edge; its target is never
+    # treated as this venue's event ID or as a verified ticket Session.
+    edge = payload.get("direct_ticket_edge")
+    if edge is not None:
+        if adapter != "B_ZEPP_TAKASE" or edge != {
+                "role": "VENUE_TO_TICKET_EVENT_EDGE_REVIEW_NOT_SESSION",
+                "source_url": payload["detail_url"],
+                "target_url": ticket.SOURCES[adapter]["public_ticket_event"],
+                "body_sha256": payload.get("body_digests", {}).get("detail_sha256"),
+                "observed_at_utc": payload.get("observed_at_utc"),
+                "native_attested": False, "formal_accepted": False}:
+            raise ValueError("REVIEW_SNAPSHOT_TICKET_EDGE_AUTHORITY_HOLD")
     digest = hashlib.sha256(_canonical(payload)).hexdigest()
     if snapshot["sha256"] != digest:
         raise ValueError("REVIEW_SNAPSHOT_CHECKSUM_HOLD")
@@ -361,6 +388,7 @@ def replay_manifest_to_isolated_lkg(manifest, list_body, detail_body,
     return {"decision": "REVIEW_ONLY_NOT_NATIVE", "snapshot_sha256": digest,
             "native_get": 0, "source_event_id": envelope["source_event_id"],
             "role_receipts": len(envelope["role_receipts"]),
+            "direct_ticket_edge_review": int(envelope["direct_ticket_edge"] is not None),
             "formal_accepted_fields": 0, "golden": 0, "published": 0}
 
 
