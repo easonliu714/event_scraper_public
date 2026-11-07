@@ -37,7 +37,10 @@ def _observed(value):
         raise ValueError("REVIEW_OBSERVED_AT_MISSING_HOLD")
     try:
         date = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        if date.tzinfo is None or date.utcoffset() is None:
+        # Manifest timestamps are explicitly UTC; a local offset must not
+        # silently enter source provenance as observed_at_utc.
+        if (date.tzinfo is None or date.utcoffset() is None or
+                date.utcoffset().total_seconds() != 0):
             raise ValueError("timezone")
     except (ValueError, OverflowError) as exc:
         raise ValueError("REVIEW_OBSERVED_AT_INVALID_HOLD") from exc
@@ -412,10 +415,15 @@ def replay_manifest_to_isolated_lkg(manifest, list_body, detail_body,
 
 def _isolated_inbox_file(repo_root, supplied, max_bytes):
     root = Path(repo_root).resolve()
-    inbox = root / "_isolated_review" / "inbox"
+    isolation = root / "_isolated_review"
+    inbox = isolation / "inbox"
     path = Path(supplied).absolute()
-    if (path.is_symlink() or inbox.is_symlink() or
+    # The inbox is read-only input but remains a trust boundary. A symlinked
+    # isolation ancestor otherwise permits reading files outside repo_root.
+    if (isolation.is_symlink() or inbox.is_symlink() or
+            path.is_symlink() or not inbox.resolve().is_relative_to(root) or
             path.parent.resolve() != inbox.resolve() or
+            not path.resolve().is_relative_to(root) or
             not path.is_relative_to(root) or not path.is_file()):
         raise ValueError("REVIEW_INBOX_PATH_HOLD")
     with path.open("rb") as stream:
