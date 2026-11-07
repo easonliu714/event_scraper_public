@@ -131,12 +131,23 @@ def read_public(url, mime, cap):
         raise ValueError("NTCH_ORIGIN_HOLD")
     req = urllib.request.Request(
         url, headers={"User-Agent": UA, "Accept": mime, "Accept-Encoding": "identity"})
+    # Check response authority before reading any body. The first native
+    # NTCH robots attempt collapsed MIME/status/redirect into one HOLD; this
+    # preserves the exact safe failure class without repeating that probe.
     with urllib.request.build_opener(NoRedirect()).open(req, timeout=12) as response:
+        status = response.status
+        final_url = response.geturl()
+        actual_mime = response.headers.get_content_type()
+        if status != 200:
+            raise ValueError("NTCH_HTTP_STATUS_HOLD:" + str(status))
+        if final_url != url:
+            raise ValueError("NTCH_REDIRECT_HOLD")
+        if actual_mime != mime:
+            raise ValueError("NTCH_CONTENT_TYPE_HOLD:expected=" + mime +
+                             ":actual=" + actual_mime)
         body = response.read(cap + 1)
-        if (response.status != 200 or response.geturl() != url
-                or response.headers.get_content_type() != mime
-                or not 0 < len(body) <= cap):
-            raise ValueError("NTCH_STATUS_MIME_CAP_REDIRECT_HOLD")
+        if not 0 < len(body) <= cap:
+            raise ValueError("NTCH_BODY_CAP_HOLD")
     receipt = {"url": url, "http_status": 200, "body_bytes": len(body),
                "body_sha256": hashlib.sha256(body).hexdigest(),
                "observed_at_utc": datetime.now(timezone.utc).isoformat(),

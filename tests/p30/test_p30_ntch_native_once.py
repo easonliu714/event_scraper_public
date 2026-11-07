@@ -1,6 +1,6 @@
 """Fail-closed NTCH native source identity and policy tests; all HTTP mocked."""
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from scripts import p30_ntch_native_once as m
 
 URL = "https://npac-ntch.org/programs/panai-2026"
@@ -27,6 +27,38 @@ class NTCHGateTests(unittest.TestCase):
             m.explicit_robots_allow(b"User-agent: *\nDisallow: /programs\n", (m.LIST_URL,))
         with self.assertRaisesRegex(ValueError, "NO_APPLICABLE"):
             m.explicit_robots_allow(b"User-agent: OtherBot\nAllow: /\n", (m.LIST_URL,))
+
+    @patch.object(m.urllib.request, "build_opener")
+    def test_transport_header_failures_do_not_consume_body(self, opener):
+        # Future distinct lawful probes must distinguish MIME, redirect and
+        # status. These tests are fully mocked; never re-fetch NTCH robots.
+        for status, final, mime, reason in (
+                (200, m.ROBOTS_URL, "text/html", "NTCH_CONTENT_TYPE_HOLD:expected=text/plain:actual=text/html"),
+                (200, m.LIST_URL, "text/plain", "NTCH_REDIRECT_HOLD"),
+                (204, m.ROBOTS_URL, "text/plain", "NTCH_HTTP_STATUS_HOLD:204")):
+            with self.subTest(reason=reason):
+                response = MagicMock()
+                response.__enter__.return_value = response
+                response.status = status
+                response.geturl.return_value = final
+                response.headers.get_content_type.return_value = mime
+                opener.return_value.open.return_value = response
+                with self.assertRaisesRegex(ValueError, reason):
+                    m.read_public(m.ROBOTS_URL, "text/plain", m.MAX_ROBOTS)
+                response.read.assert_not_called()
+
+    @patch.object(m.urllib.request, "build_opener")
+    def test_body_cap_stays_fail_closed(self, opener):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.status = 200
+        response.geturl.return_value = m.ROBOTS_URL
+        response.headers.get_content_type.return_value = "text/plain"
+        response.read.return_value = b"x" * 9
+        opener.return_value.open.return_value = response
+        with self.assertRaisesRegex(ValueError, "NTCH_BODY_CAP_HOLD"):
+            m.read_public(m.ROBOTS_URL, "text/plain", 8)
+        response.read.assert_called_once_with(9)
 
     @patch.object(m, "read_public")
     def test_one_shot_in_memory_receipts_no_publish(self, read):
