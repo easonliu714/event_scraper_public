@@ -235,6 +235,30 @@ def _validate_snapshot(snapshot):
             meta.get("sessions") != [] or meta.get("ticket_session_id") is not None or
             meta.get("inventory") is not None):
         raise ValueError("REVIEW_SNAPSHOT_NESTED_AUTHORITY_HOLD")
+    # Caller HTML is not independent field provenance. Even a recomputed
+    # checksum cannot authorize a price, show date, venue, remote image or
+    # arbitrary preview property in this non-native bridge.
+    allowed_preview_keys = {
+        "title", "url", "platform", "type", "scraped_at",
+        "date", "location", "price", "description", "region",
+        "img_url", "_candidate",
+    }
+    expected_title = (
+        opentix.SOURCES["A"]["title"] if adapter == "A_OPENTIX" else
+        venue.TITLE if adapter == "B_NTPC" else
+        tpac_event.TITLE if adapter == "B_TPAC_EVENT2072" else
+        ticket.SOURCES[adapter]["title"]
+    )
+    if (set(candidate) != allowed_preview_keys or
+            candidate.get("title") != expected_title or
+            candidate.get("scraped_at") != payload.get("observed_at_utc") or
+            any(candidate.get(key) != "未確認" for key in
+                ("date", "location", "price", "description", "region")) or
+            candidate.get("img_url") is not None or
+            meta.get("field_evidence") != {} or
+            meta.get("sources") != [payload.get("list_url"),
+                                   payload.get("detail_url")]):
+        raise ValueError("REVIEW_SNAPSHOT_PREVIEW_FIELD_AUTHORITY_HOLD")
     receipts = payload.get("role_receipts")
     if not isinstance(receipts, list) or any(
             not isinstance(item, dict) or
