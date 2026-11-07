@@ -69,17 +69,14 @@ def _prepare_line(root, line, supplied):
             not isinstance(expected, str) or
             not re.fullmatch(r"[0-9a-f]{64}", expected)):
         raise ValueError("AB_FIXED_EXPECTED_SHA_HOLD")
-    if target.exists():
-        prior = json.loads(target.read_text(encoding="utf-8"))
-        prior_sha = bridge._validate_snapshot(prior)
-        if prior_sha != expected:
-            raise ValueError("AB_FIXED_PREFLIGHT_CAS_HOLD")
-        if any(prior["payload"].get(k) != envelope.get(k) for k in (
-                "line", "adapter_key", "source_id", "source_event_id",
-                "list_url", "detail_url")):
-            raise ValueError("AB_FIXED_PREFLIGHT_CROSS_ID_HOLD")
-    elif expected is not None:
-        raise ValueError("AB_FIXED_PREFLIGHT_MISSING_LKG_HOLD")
+    # Validate the candidate and BOTH transition contracts before A can commit.
+    # The writer repeats the same transition check under its slot lease.
+    bridge._validate_snapshot({
+        "payload": envelope,
+        "sha256": hashlib.sha256(bridge._canonical(envelope)).hexdigest(),
+    })
+    prior = json.loads(target.read_text(encoding="utf-8")) if target.exists() else None
+    bridge.preflight_review_lkg_transition(prior, envelope, expected)
     return manifest, listing, detail, expected
 
 

@@ -289,6 +289,46 @@ def _validate_snapshot(snapshot):
     return digest
 
 
+def preflight_review_lkg_transition(prior, envelope, expected_sha=None):
+    """Pure A/B per-slot transition guard; shared by pair preflight and writer.
+
+    The prior snapshot must be checksum-valid. A mismatched CAS, identity,
+    timestamp or role set is HOLD before any durable pair slot is touched.
+    A second check under the per-slot writer lease still protects TOCTOU.
+    """
+    if prior is not None:
+        current = _validate_snapshot(prior)
+        if expected_sha != current:
+            raise ValueError("REVIEW_LKG_CAS_MISMATCH_HOLD")
+        # An acknowledged checksum is not permission to replace a different
+        # source/event, roll back observation time, or silently rewrite bytes
+        # at the same observation instant. Preserve the original LKG on HOLD.
+        previous = prior["payload"]
+        identity = ("line", "adapter_key", "source_id", "source_event_id",
+                    "list_url", "detail_url")
+        if any(previous.get(key) != envelope.get(key) for key in identity):
+            raise ValueError("REVIEW_LKG_CROSS_IDENTITY_HOLD")
+        prior_time = datetime.fromisoformat(
+            _observed(previous.get("observed_at_utc")).replace("Z", "+00:00"))
+        next_time = datetime.fromisoformat(
+            _observed(envelope.get("observed_at_utc")).replace("Z", "+00:00"))
+        if next_time < prior_time:
+            raise ValueError("REVIEW_LKG_STALE_OBSERVATION_HOLD")
+        if (next_time == prior_time and
+                previous.get("body_digests") != envelope.get("body_digests")):
+            raise ValueError("REVIEW_LKG_SAME_INSTANT_BODY_DRIFT_HOLD")
+        # A later same-ID source observation may add verified REVIEW roles,
+        # but cannot silently downgrade an already durable role. This is an
+        # incremental diff gate, not independent FIELD acceptance.
+        prior_roles = {item["role"] for item in previous["role_receipts"]}
+        next_roles = {item["role"] for item in envelope["role_receipts"]}
+        if not prior_roles.issubset(next_roles):
+            raise ValueError("REVIEW_LKG_ROLE_REGRESSION_HOLD")
+        if next_time == prior_time and prior_roles != next_roles:
+            raise ValueError("REVIEW_LKG_SAME_INSTANT_ROLE_DRIFT_HOLD")
+    elif expected_sha is not None:
+        raise ValueError("REVIEW_LKG_CAS_MISSING_HOLD")
+
 def write_isolated_review_lkg(envelope, target, repo_root, expected_sha=None):
     """Serialize read/CAS/replace per slot; atomic replace alone is not CAS.
 
@@ -355,39 +395,8 @@ def _write_isolated_review_lkg_locked(envelope, target, repo_root, expected_sha=
     digest = _validate_snapshot({
         "payload": envelope, "sha256": hashlib.sha256(_canonical(envelope)).hexdigest()
     })
-    if dest.exists():
-        old = json.loads(dest.read_text(encoding="utf-8"))
-        current = _validate_snapshot(old)
-        if expected_sha != current:
-            raise ValueError("REVIEW_LKG_CAS_MISMATCH_HOLD")
-        # An acknowledged checksum is not permission to replace a different
-        # source/event, roll back observation time, or silently rewrite bytes
-        # at the same observation instant. Preserve the original LKG on HOLD.
-        previous = old["payload"]
-        identity = ("line", "adapter_key", "source_id", "source_event_id",
-                    "list_url", "detail_url")
-        if any(previous.get(key) != envelope.get(key) for key in identity):
-            raise ValueError("REVIEW_LKG_CROSS_IDENTITY_HOLD")
-        prior_time = datetime.fromisoformat(
-            _observed(previous.get("observed_at_utc")).replace("Z", "+00:00"))
-        next_time = datetime.fromisoformat(
-            _observed(envelope.get("observed_at_utc")).replace("Z", "+00:00"))
-        if next_time < prior_time:
-            raise ValueError("REVIEW_LKG_STALE_OBSERVATION_HOLD")
-        if (next_time == prior_time and
-                previous.get("body_digests") != envelope.get("body_digests")):
-            raise ValueError("REVIEW_LKG_SAME_INSTANT_BODY_DRIFT_HOLD")
-        # A later same-ID source observation may add verified REVIEW roles,
-        # but cannot silently downgrade an already durable role. This is an
-        # incremental diff gate, not independent FIELD acceptance.
-        prior_roles = {item["role"] for item in previous["role_receipts"]}
-        next_roles = {item["role"] for item in envelope["role_receipts"]}
-        if not prior_roles.issubset(next_roles):
-            raise ValueError("REVIEW_LKG_ROLE_REGRESSION_HOLD")
-        if next_time == prior_time and prior_roles != next_roles:
-            raise ValueError("REVIEW_LKG_SAME_INSTANT_ROLE_DRIFT_HOLD")
-    elif expected_sha is not None:
-        raise ValueError("REVIEW_LKG_CAS_MISSING_HOLD")
+    prior = json.loads(dest.read_text(encoding="utf-8")) if dest.exists() else None
+    preflight_review_lkg_transition(prior, envelope, expected_sha)
     dest.parent.mkdir(parents=True, exist_ok=True)
     blob = _canonical({"payload": envelope, "sha256": digest}) + b"\n"
     fd, temp = tempfile.mkstemp(prefix=".review-", dir=str(dest.parent))

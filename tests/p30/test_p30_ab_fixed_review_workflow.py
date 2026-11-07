@@ -122,6 +122,29 @@ class FixedABWorkflowTests(unittest.TestCase):
             self.assertEqual({line: path.read_bytes() for line, path in paths.items()},
                              before)
 
+    def test_stale_b_preflight_blocks_new_a_observation_without_partial_commit(self):
+        """A valid later A receipt must not commit if B is already stale."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root)
+            initial = workflow.run_fixed_ab(root, inputs)
+            paths = {line: (root / "_isolated_review" / line /
+                            initial["lines"][line]["adapter_key"] /
+                            "review_snapshot.json") for line in ("A", "B")}
+            before = {line: path.read_bytes() for line, path in paths.items()}
+            for line, observed in (
+                    ("A", "2026-11-08T00:55:00+00:00"),
+                    ("B", "2026-11-06T00:55:00+00:00")):
+                inputs[line]["expected_sha"] = initial["lines"][line]["snapshot_sha256"]
+                manifest_path = inputs[line]["manifest"]
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["observed_at_utc"] = observed
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "REVIEW_LKG_STALE_OBSERVATION_HOLD"):
+                workflow.run_fixed_ab(root, inputs)
+            self.assertEqual({line: path.read_bytes() for line, path in paths.items()},
+                             before)
+
     def test_cli_runs_fixed_pair_and_no_formal_write(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
