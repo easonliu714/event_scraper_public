@@ -1895,6 +1895,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # One fresh, bounded robots-gated source rotation per official site.
+          # No raw HTML, checkout, repeat GET, or automatic formal promotion.
           # Never re-consume the probe on rerun or a later unrelated commit.
           if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kimu-ntcam-native-once]'; then
             echo 'KIMU_NTCAM_NATIVE_SKIPPED_NO_UNUSED_MARKER'

@@ -82,6 +82,26 @@ class ReviewBridgeTests(unittest.TestCase):
                 bridge.write_isolated_review_lkg(envelope, target, root,
                                                  expected_sha=first)
 
+    def test_cas_cannot_replace_other_source_or_replay_old_bytes(self):
+        good = bridge.build_review_envelope("A", self.a_list, self.a_detail, STAMP)
+        other = bridge.build_review_envelope("B", self.b_list, self.b_detail, STAMP)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "_isolated_review" / "review_snapshot.json"
+            sha = bridge.write_isolated_review_lkg(good, target, root)
+            with self.assertRaisesRegex(ValueError, "CROSS_IDENTITY_HOLD"):
+                bridge.write_isolated_review_lkg(other, target, root, sha)
+            stale = bridge.build_review_envelope(
+                "A", self.a_list, self.a_detail, "2026-11-06T01:00:00+00:00")
+            with self.assertRaisesRegex(ValueError, "STALE_OBSERVATION_HOLD"):
+                bridge.write_isolated_review_lkg(stale, target, root, sha)
+            drift = bridge.build_review_envelope(
+                "A", self.a_list.replace(b"<main>", b"<main> "),
+                self.a_detail, STAMP)
+            with self.assertRaisesRegex(ValueError, "SAME_INSTANT_BODY_DRIFT_HOLD"):
+                bridge.write_isolated_review_lkg(drift, target, root, sha)
+            self.assertEqual(json.loads(target.read_text())["sha256"], sha)
+
     def test_hold_never_replaces_lkg_or_writes_formal_docs(self):
         good = bridge.build_review_envelope("A", self.a_list, self.a_detail, STAMP)
         bad = bridge.build_review_envelope("A", b"<main/>", self.a_detail, STAMP)

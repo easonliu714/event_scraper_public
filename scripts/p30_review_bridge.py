@@ -166,6 +166,23 @@ def write_isolated_review_lkg(envelope, target, repo_root, expected_sha=None):
         current = _validate_snapshot(old)
         if expected_sha != current:
             raise ValueError("REVIEW_LKG_CAS_MISMATCH_HOLD")
+        # An acknowledged checksum is not permission to replace a different
+        # source/event, roll back observation time, or silently rewrite bytes
+        # at the same observation instant. Preserve the original LKG on HOLD.
+        previous = old["payload"]
+        identity = ("line", "source_id", "source_event_id",
+                    "list_url", "detail_url")
+        if any(previous.get(key) != envelope.get(key) for key in identity):
+            raise ValueError("REVIEW_LKG_CROSS_IDENTITY_HOLD")
+        prior_time = datetime.fromisoformat(
+            _observed(previous.get("observed_at_utc")).replace("Z", "+00:00"))
+        next_time = datetime.fromisoformat(
+            _observed(envelope.get("observed_at_utc")).replace("Z", "+00:00"))
+        if next_time < prior_time:
+            raise ValueError("REVIEW_LKG_STALE_OBSERVATION_HOLD")
+        if (next_time == prior_time and
+                previous.get("body_digests") != envelope.get("body_digests")):
+            raise ValueError("REVIEW_LKG_SAME_INSTANT_BODY_DRIFT_HOLD")
     elif expected_sha is not None:
         raise ValueError("REVIEW_LKG_CAS_MISSING_HOLD")
     dest.parent.mkdir(parents=True, exist_ok=True)
