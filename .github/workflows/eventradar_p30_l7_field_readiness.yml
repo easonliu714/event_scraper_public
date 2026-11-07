@@ -57,6 +57,61 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_ab_opentix_ticc_native_once.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_ntch_native_once.py' -v
           python scripts/p30_l7_field_golden_readiness.py
+      - name: Native A/B one-shot consumed-register preflight (NO GET)
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+          
+          def decide(subject, prior, registered, attempt):
+              markers = re.findall(r'\[[a-z0-9-]+-once\]', subject)
+              if len(markers) != len(set(markers)):
+                  return 'PROBE_DUPLICATE_CURRENT_MARKER_HOLD', markers
+              if any(m not in registered for m in markers):
+                  return 'PROBE_UNREGISTERED_MARKER_HOLD', markers
+              if markers and attempt != 1:
+                  return 'PROBE_RERUN_ATTEMPT_HOLD', markers
+              if any(m in earlier for m in markers for earlier in prior):
+                  return 'PROBE_MARKER_ALREADY_CONSUMED_HOLD', markers
+              return 'PASS_NO_NATIVE_MARKER' if not markers else 'PASS_UNCONSUMED_FIRST_ATTEMPT', markers
+          
+          known = {'[a-native-once]', '[b-native-once]'}
+          assert decide('[a-native-once] [b-native-once]', [], known, 1)[0].startswith('PASS_')
+          assert decide('[a-native-once]', ['old [a-native-once]'], known, 1)[0] == 'PROBE_MARKER_ALREADY_CONSUMED_HOLD'
+          assert decide('[b-native-once]', [], known, 2)[0] == 'PROBE_RERUN_ATTEMPT_HOLD'
+          assert decide('[c-native-once]', [], known, 1)[0] == 'PROBE_UNREGISTERED_MARKER_HOLD'
+          assert decide('[a-native-once] [a-native-once]', [], known, 1)[0] == 'PROBE_DUPLICATE_CURRENT_MARKER_HOLD'
+          assert decide('fix [no-get]', ['old [a-native-once]'], known, 2)[0] == 'PASS_NO_NATIVE_MARKER'
+          
+          workflow = Path('.github/workflows/eventradar_p30_l7_field_readiness.yml').read_text(encoding='utf-8')
+          registered = set(re.findall(r"grep\s+-Fq\s+['\"](\[[a-z0-9-]+-once\])['\"]", workflow))
+          head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          subject = subprocess.check_output(['git', 'show', '-s', '--format=%s', 'HEAD'], text=True).strip()
+          prior = subprocess.check_output(['git', 'log', '--format=%s', 'HEAD^'], text=True).splitlines()
+          attempt = int(os.environ['GITHUB_RUN_ATTEMPT'])
+          expected = os.environ['EXPECTED_HEAD_SHA']
+          if head != expected or not registered:
+              verdict, markers = 'PROBE_HEAD_OR_REGISTER_HOLD', []
+          else:
+              verdict, markers = decide(subject, prior, registered, attempt)
+          receipt = dict(kind='P30_NATIVE_PROBE_CONSUMPTION_REGISTER_V1', decision=verdict,
+                         current_markers=markers, registered_marker_count=len(registered),
+                         prior_commit_count=len(prior), head_sha=head,
+                         native_get_this_step=0, formal_accepted_fields=0, golden=0,
+                         published=0, release_state='HARD_HOLD_NO_PUBLICATION')
+          Path('evidence/native_probe_consumption_guard.json').write_text(json.dumps(receipt, sort_keys=True, indent=2)+'\n', encoding='utf-8')
+          print('PROBE_CONSUMPTION_GUARD', verdict, markers)
+          if not verdict.startswith('PASS_'):
+              raise SystemExit(49)
+          PY
       - name: One-shot bounded official native GET acquisition diagnosis (not Golden)
         shell: bash
         run: |
@@ -2125,6 +2180,7 @@ jobs:
           if [ -f evidence/tixcraft03_native_once.json ]; then sha256sum evidence/tixcraft03_native_once.json >> evidence/SHA256SUMS.txt; fi
           for f in evidence/kimu_native_once.json evidence/ntcam_native_once.json; do if [ -f "$f" ]; then sha256sum "$f" >> evidence/SHA256SUMS.txt; fi; done
           if [ -f evidence/zepp_takase_160668_native_once.json ]; then sha256sum evidence/zepp_takase_160668_native_once.json >> evidence/SHA256SUMS.txt; fi
+          sha256sum evidence/native_probe_consumption_guard.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/canonical_field_authority_contract.json >> evidence/SHA256SUMS.txt
           if [ -f evidence/native_huashan_rotation.json ]; then sha256sum evidence/native_huashan_rotation.json >> evidence/SHA256SUMS.txt; fi
