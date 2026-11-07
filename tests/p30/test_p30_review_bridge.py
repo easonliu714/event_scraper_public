@@ -146,7 +146,7 @@ class ReviewBridgeTests(unittest.TestCase):
                 self.assertEqual(result["decision"], "REVIEW_ONLY_NOT_NATIVE")
                 self.assertEqual(result["native_get"], 0)
                 self.assertEqual(result["formal_accepted_fields"], 0)
-                snapshot = root / "_isolated_review" / "review_snapshot.json"
+                snapshot = root / "_isolated_review" / line / "review_snapshot.json"
                 self.assertEqual(json.loads(snapshot.read_text())["sha256"],
                                  result["snapshot_sha256"])
                 with self.assertRaisesRegex(ValueError, "CAS_MISMATCH"):
@@ -164,7 +164,7 @@ class ReviewBridgeTests(unittest.TestCase):
             root = Path(td)
             good = bridge.replay_manifest_to_isolated_lkg(
                 manifest, self.b_list, self.b_detail, root)
-            target = root / "_isolated_review" / "review_snapshot.json"
+            target = root / "_isolated_review" / "B" / "review_snapshot.json"
             original = target.read_bytes()
             for key, bad in (
                     ("source_event_id", "foreign"),
@@ -186,6 +186,52 @@ class ReviewBridgeTests(unittest.TestCase):
             (outside / "list.html").write_bytes(self.b_list)
             with self.assertRaisesRegex(ValueError, "INBOX_PATH_HOLD"):
                 bridge._isolated_inbox_file(root, outside / "list.html", 1024)
+
+
+    def test_dual_line_durable_replay_is_independent_and_symlink_fail_closed(self):
+        """Both official-source adapters can retain independent REVIEW LKGs."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            outcomes = {}
+            for line, listing, detail in (
+                    ("A", self.a_list, self.a_detail),
+                    ("B", self.b_list, self.b_detail)):
+                envelope = bridge.build_review_envelope(line, listing, detail, STAMP)
+                manifest = {**{k: envelope[k] for k in (
+                    "line", "source_id", "source_event_id", "list_url",
+                    "detail_url", "observed_at_utc", "source_attestation")},
+                    **envelope["body_digests"]}
+                outcomes[line] = bridge.replay_manifest_to_isolated_lkg(
+                    manifest, listing, detail, root)
+                self.assertEqual(outcomes[line]["decision"], "REVIEW_ONLY_NOT_NATIVE")
+                self.assertEqual(outcomes[line]["native_get"], 0)
+            a_path = root / "_isolated_review" / "A" / "review_snapshot.json"
+            b_path = root / "_isolated_review" / "B" / "review_snapshot.json"
+            self.assertTrue(a_path.is_file())
+            self.assertTrue(b_path.is_file())
+            a_bytes, b_bytes = a_path.read_bytes(), b_path.read_bytes()
+            self.assertNotEqual(a_bytes, b_bytes)
+            self.assertEqual(json.loads(a_bytes)["payload"]["line"], "A")
+            self.assertEqual(json.loads(b_bytes)["payload"]["line"], "B")
+            with self.assertRaisesRegex(ValueError, "CAS_MISMATCH"):
+                bridge.replay_manifest_to_isolated_lkg(
+                    manifest, listing, detail, root)
+            self.assertEqual(a_path.read_bytes(), a_bytes)
+            self.assertEqual(b_path.read_bytes(), b_bytes)
+
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as outside:
+            root = Path(td)
+            isolation = root / "_isolated_review"
+            try:
+                isolation.symlink_to(outside, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation unsupported")
+            envelope = bridge.build_review_envelope(
+                "A", self.a_list, self.a_detail, STAMP)
+            with self.assertRaisesRegex(ValueError, "TARGET_ISOLATION_HOLD"):
+                bridge.write_isolated_review_lkg(
+                    envelope, isolation / "A" / "review_snapshot.json", root)
+            self.assertEqual(list(Path(outside).iterdir()), [])
 
 
 if __name__ == "__main__":
