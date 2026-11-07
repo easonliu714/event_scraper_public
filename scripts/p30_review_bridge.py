@@ -22,7 +22,8 @@ MAX_HTML = 2 * 1024 * 1024
 ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
 # Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
 ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A",
-                 "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B",\n                 "B_TPAC_EVENT2072": "B"
+                 "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B",
+                 "B_TPAC_EVENT2072": "B"
 DEFAULT_ADAPTER = {"A": "A_KIMU", "B": "B_NTPC"}
 
 
