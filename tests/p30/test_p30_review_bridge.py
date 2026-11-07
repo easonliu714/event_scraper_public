@@ -410,10 +410,10 @@ class ReviewBridgeTests(unittest.TestCase):
             target = root / "_isolated_review/B/B_TPAC_EVENT2072/review_snapshot.json"
             before = target.read_bytes()
             self.assertEqual(json.loads(before)["sha256"], out["snapshot_sha256"])
-            held = bridge.replay_manifest_to_isolated_lkg(
-                manifest, listing.replace(b"/event/2072", b"/event/2073"),
-                detail, root, out["snapshot_sha256"])
-            self.assertEqual(held["decision"], "HOLD")
+            with self.assertRaisesRegex(ValueError, "REVIEW_MANIFEST_BODY_SHA_HOLD"):
+                bridge.replay_manifest_to_isolated_lkg(
+                    manifest, listing.replace(b"/event/2072", b"/event/2073"),
+                    detail, root, out["snapshot_sha256"])
             self.assertEqual(target.read_bytes(), before)
         # A sibling event's date cannot be borrowed into this event owner.
         no_date = ('<main><article><a href="/event/2072">' + tpac.TITLE +
