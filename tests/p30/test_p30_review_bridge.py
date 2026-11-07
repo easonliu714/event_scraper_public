@@ -1,5 +1,8 @@
 """Executable A/B same-ID -> preview REVIEW -> checksum/CAS LKG integration."""
+import hashlib
+import io
 import json
+from contextlib import redirect_stdout
 import tempfile
 import unittest
 from pathlib import Path
@@ -115,6 +118,74 @@ class ReviewBridgeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "TARGET"):
                 bridge.write_isolated_review_lkg(good, root / "docs" /
                                                  "review_snapshot.json", root)
+
+    def test_manifest_cli_integrates_both_source_adapters(self):
+        for line, listing, detail in (
+                ("A", self.a_list, self.a_detail),
+                ("B", self.b_list, self.b_detail)):
+            with self.subTest(line=line), tempfile.TemporaryDirectory() as td:
+                root = Path(td)
+                envelope = bridge.build_review_envelope(line, listing, detail, STAMP)
+                manifest = {**{k: envelope[k] for k in (
+                    "line", "source_id", "source_event_id", "list_url",
+                    "detail_url", "observed_at_utc", "source_attestation")},
+                    **envelope["body_digests"]}
+                inbox = root / "_isolated_review" / "inbox"
+                inbox.mkdir(parents=True)
+                (inbox / "manifest.json").write_text(json.dumps(manifest))
+                (inbox / "list.html").write_bytes(listing)
+                (inbox / "detail.html").write_bytes(detail)
+                with redirect_stdout(io.StringIO()) as output:
+                    code = bridge.main([
+                        "--repo-root", str(root),
+                        "--manifest", str(inbox / "manifest.json"),
+                        "--list-html", str(inbox / "list.html"),
+                        "--detail-html", str(inbox / "detail.html")])
+                self.assertEqual(code, 0)
+                result = json.loads(output.getvalue())
+                self.assertEqual(result["decision"], "REVIEW_ONLY_NOT_NATIVE")
+                self.assertEqual(result["native_get"], 0)
+                self.assertEqual(result["formal_accepted_fields"], 0)
+                snapshot = root / "_isolated_review" / "review_snapshot.json"
+                self.assertEqual(json.loads(snapshot.read_text())["sha256"],
+                                 result["snapshot_sha256"])
+                with self.assertRaisesRegex(ValueError, "CAS_MISMATCH"):
+                    bridge.replay_manifest_to_isolated_lkg(
+                        manifest, listing, detail, root)
+
+    def test_manifest_tamper_and_hold_preserve_lkg(self):
+        envelope = bridge.build_review_envelope("B", self.b_list,
+                                                self.b_detail, STAMP)
+        manifest = {**{k: envelope[k] for k in (
+            "line", "source_id", "source_event_id", "list_url",
+            "detail_url", "observed_at_utc", "source_attestation")},
+            **envelope["body_digests"]}
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            good = bridge.replay_manifest_to_isolated_lkg(
+                manifest, self.b_list, self.b_detail, root)
+            target = root / "_isolated_review" / "review_snapshot.json"
+            original = target.read_bytes()
+            for key, bad in (
+                    ("source_event_id", "foreign"),
+                    ("detail_url", "https://example.org/checkout"),
+                    ("detail_sha256", "0" * 64),
+                    ("source_attestation", "NATIVE_HTTP_200")):
+                with self.subTest(key=key), self.assertRaises(ValueError):
+                    bridge.replay_manifest_to_isolated_lkg(
+                        {**manifest, key: bad}, self.b_list, self.b_detail,
+                        root, good["snapshot_sha256"])
+                self.assertEqual(target.read_bytes(), original)
+            held = bridge.replay_manifest_to_isolated_lkg(
+                {**manifest, "list_sha256": hashlib.sha256(b"<main/>").hexdigest()},
+                b"<main/>", self.b_detail, root, good["snapshot_sha256"])
+            self.assertEqual(held["decision"], "HOLD")
+            self.assertEqual(target.read_bytes(), original)
+            outside = root / "docs"
+            outside.mkdir()
+            (outside / "list.html").write_bytes(self.b_list)
+            with self.assertRaisesRegex(ValueError, "INBOX_PATH_HOLD"):
+                bridge._isolated_inbox_file(root, outside / "list.html", 1024)
 
 
 if __name__ == "__main__":

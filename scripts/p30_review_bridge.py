@@ -5,6 +5,7 @@ publish, create a Golden, or mutate the formal docs/ data pipeline.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -198,3 +199,81 @@ def write_isolated_review_lkg(envelope, target, repo_root, expected_sha=None):
         if os.path.exists(temp):
             os.unlink(temp)
     return digest
+
+# A caller manifest binds bytes and exact event identity, but cannot attest
+# native transport. No network, production feed or publisher is reachable here.
+MANIFEST_KEYS = frozenset((
+    "line", "source_id", "source_event_id", "list_url", "detail_url",
+    "list_sha256", "detail_sha256", "observed_at_utc", "source_attestation"))
+
+
+def replay_manifest_to_isolated_lkg(manifest, list_body, detail_body,
+                                    repo_root, expected_sha=None):
+    """Executable A/B parser -> preview normalizer -> checksum/CAS REVIEW."""
+    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_KEYS:
+        raise ValueError("REVIEW_MANIFEST_SCHEMA_HOLD")
+    if manifest["source_attestation"] != ATTESTATION:
+        raise ValueError("REVIEW_MANIFEST_NATIVE_CLAIM_HOLD")
+    for body in (list_body, detail_body):
+        if not isinstance(body, bytes) or not 0 < len(body) <= MAX_HTML:
+            raise ValueError("REVIEW_MANIFEST_BODY_CAP_HOLD")
+    envelope = build_review_envelope(
+        manifest["line"], list_body, detail_body, manifest["observed_at_utc"])
+    for key in ("line", "source_id", "source_event_id", "list_url", "detail_url"):
+        if manifest[key] != envelope[key]:
+            raise ValueError("REVIEW_MANIFEST_EVENT_IDENTITY_HOLD")
+    for key in ("list_sha256", "detail_sha256"):
+        if manifest[key] != envelope["body_digests"][key]:
+            raise ValueError("REVIEW_MANIFEST_BODY_SHA_HOLD")
+    if envelope["decision"] != "REVIEW_ONLY_NOT_NATIVE":
+        return {"decision": "HOLD", "first_failure": envelope["first_failure"],
+                "snapshot_sha256": None, "native_get": 0,
+                "formal_accepted_fields": 0, "golden": 0, "published": 0}
+    root = Path(repo_root).resolve()
+    target = root / "_isolated_review" / "review_snapshot.json"
+    digest = write_isolated_review_lkg(envelope, target, root, expected_sha)
+    saved = json.loads(target.read_text(encoding="utf-8"))
+    if _validate_snapshot(saved) != digest:
+        raise ValueError("REVIEW_LKG_READBACK_HOLD")
+    return {"decision": "REVIEW_ONLY_NOT_NATIVE", "snapshot_sha256": digest,
+            "native_get": 0, "source_event_id": envelope["source_event_id"],
+            "role_receipts": len(envelope["role_receipts"]),
+            "formal_accepted_fields": 0, "golden": 0, "published": 0}
+
+
+def _isolated_inbox_file(repo_root, supplied, max_bytes):
+    root = Path(repo_root).resolve()
+    inbox = root / "_isolated_review" / "inbox"
+    path = Path(supplied).absolute()
+    if (path.is_symlink() or inbox.is_symlink() or
+            path.parent.resolve() != inbox.resolve() or
+            not path.is_relative_to(root) or not path.is_file()):
+        raise ValueError("REVIEW_INBOX_PATH_HOLD")
+    with path.open("rb") as stream:
+        data = stream.read(max_bytes + 1)
+    if not 0 < len(data) <= max_bytes:
+        raise ValueError("REVIEW_INBOX_SIZE_HOLD")
+    return data
+
+
+def main(argv=None):
+    """Offline CLI: input files restricted to _isolated_review/inbox."""
+    parser = argparse.ArgumentParser(description="A/B REVIEW replay, NO GET/NO PUBLISH")
+    parser.add_argument("--repo-root", required=True)
+    parser.add_argument("--manifest", required=True)
+    parser.add_argument("--list-html", required=True)
+    parser.add_argument("--detail-html", required=True)
+    parser.add_argument("--expected-sha")
+    args = parser.parse_args(argv)
+    root = Path(args.repo_root).resolve()
+    manifest = json.loads(_isolated_inbox_file(root, args.manifest, 8192))
+    listing = _isolated_inbox_file(root, args.list_html, MAX_HTML)
+    detail = _isolated_inbox_file(root, args.detail_html, MAX_HTML)
+    result = replay_manifest_to_isolated_lkg(
+        manifest, listing, detail, root, args.expected_sha)
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    return 0 if result["decision"] == "REVIEW_ONLY_NOT_NATIVE" else 49
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
