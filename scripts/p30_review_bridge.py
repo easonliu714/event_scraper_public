@@ -16,12 +16,13 @@ from pathlib import Path
 from scripts import p30_ab_kktix_fuzhong_native as ticket
 from scripts import p30_ntpc_artcenter_source as venue
 from scripts import p30_tpac_event_source as tpac_event
+from scripts import p30_ab_opentix_ticc_native_once as opentix
 from scripts import p30_candidate_review_pipeline as preview
 
 MAX_HTML = 2 * 1024 * 1024
 ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
 # Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
-ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A",
+ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A", "A_OPENTIX": "A",
                  "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B",
                  "B_TPAC_EVENT2072": "B"}
 DEFAULT_ADAPTER = {"A": "A_KIMU", "B": "B_NTPC"}
@@ -66,7 +67,17 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         listing, detail = list_body.decode("utf-8"), detail_body.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError("REVIEW_BODY_UTF8_HOLD") from exc
-    if adapter_key not in ("B_NTPC", "B_TPAC_EVENT2072"):
+    # Official OPENTIX identity is source #05; caller HTML is never native.
+    if adapter_key == "A_OPENTIX":
+        source = opentix.SOURCES["A"]
+        verdict = opentix.inspect_pair("A", listing, detail)
+        list_url, detail_url = source["list"], source["detail"]
+        title, source_id, event_id = (
+            source["title"], source["source_id"], source["event_id"])
+        roles = (["EVENT_LOCAL_TITLE_REVIEW"]
+                 if verdict.get("role_review") == 1 else [])
+        platform, kind = "OPENTIX", "活動"
+    elif adapter_key not in ("B_NTPC", "B_TPAC_EVENT2072"):
         # The same source-local parser also handles alternate A/B official
         # LIST→DETAIL identities. Never promote LIST roles as DETAIL receipts.
         source = ticket.SOURCES[adapter_key]
@@ -180,7 +191,11 @@ def _validate_snapshot(snapshot):
     adapter = payload.get("adapter_key")
     if ADAPTER_LINES.get(adapter) != payload.get("line"):
         raise ValueError("REVIEW_SNAPSHOT_ADAPTER_IDENTITY_HOLD")
-    if adapter == "B_NTPC":
+    if adapter == "A_OPENTIX":
+        source = opentix.SOURCES["A"]
+        expected = (source["list"], source["detail"],
+                    source["source_id"], source["event_id"])
+    elif adapter == "B_NTPC":
         expected = (venue.LIST_URL, venue.exact_detail(
             "/artcenter_chi/xmdoc/cont?sid=" + venue.SID +
             "&sq=&xsmsid=" + venue.XSMSID),

@@ -10,6 +10,7 @@ from pathlib import Path
 from scripts import p30_ab_kktix_fuzhong_native as a
 from scripts import p30_ntpc_artcenter_source as b
 from scripts import p30_review_bridge as bridge
+from scripts import p30_ab_opentix_ticc_native_once as opentix
 
 STAMP = "2026-11-07T01:00:00+00:00"
 
@@ -26,6 +27,40 @@ class ReviewBridgeTests(unittest.TestCase):
         self.b_detail = ('<main><article><h3>' + b.TITLE +
                          '</h3><p>展覽地點：' + b.VENUE +
                          '</p></article></main>').encode()
+
+    def test_opentix_exact_id_review_to_isolated_cas_lkg(self):
+        src = opentix.SOURCES["A"]
+        listing = ('<main><article><a href="' + src["detail"] + '">' +
+                   src["title"] + '</a></article></main>').encode("utf-8")
+        detail = ('<main><article><h1>' + src["title"] +
+                  '</h1></article></main>').encode("utf-8")
+        env = bridge.build_review_envelope(
+            "A", listing, detail, STAMP, adapter_key="A_OPENTIX")
+        self.assertEqual(env["decision"], "REVIEW_ONLY_NOT_NATIVE")
+        self.assertEqual((env["source_id"], env["source_event_id"]),
+                         ("05", src["event_id"]))
+        self.assertEqual((env["native_get"], env["native_body_lkg"],
+                          env["formal_accepted_fields"], env["published"]),
+                         (0, 0, 0, 0))
+        self.assertFalse(env["role_receipts"][0]["native_attested"])
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = {k: env[k] for k in (
+                "line", "adapter_key", "source_id", "source_event_id",
+                "list_url", "detail_url", "observed_at_utc",
+                "source_attestation")}
+            manifest.update(env["body_digests"])
+            saved = bridge.replay_manifest_to_isolated_lkg(
+                manifest, listing, detail, root)
+            path = root / "_isolated_review" / "A" / "A_OPENTIX" / "review_snapshot.json"
+            self.assertEqual(json.loads(path.read_text())["sha256"],
+                             saved["snapshot_sha256"])
+            self.assertFalse((root / "docs" / "data.json").exists())
+        rejected = bridge.build_review_envelope(
+            "A", b"<main><a href='/event/999'>wrong</a></main>",
+            detail, STAMP, adapter_key="A_OPENTIX")
+        self.assertEqual(rejected["decision"], "HOLD")
+        self.assertIsNone(rejected["candidate"])
 
     def test_a_ticket_adapter_to_real_preview_normalizer(self):
         result = bridge.build_review_envelope("A", self.a_list, self.a_detail, STAMP)

@@ -11,6 +11,7 @@ from scripts import p30_ab_kktix_fuzhong_native as tickets
 from scripts import p30_tpac_event_source as tpac
 from scripts import p30_review_bridge as bridge
 from scripts import p30_ab_fixed_review_workflow as workflow
+from scripts import p30_ab_opentix_ticc_native_once as opentix
 
 STAMP = "2026-11-07T11:55:00+00:00"
 
@@ -19,9 +20,9 @@ class FixedABWorkflowTests(unittest.TestCase):
     def _inbox(self, root):
         inbox = root / "_isolated_review" / "inbox"
         inbox.mkdir(parents=True)
-        a = tickets.SOURCES["A_ACCUPASS"]
+        a = opentix.SOURCES["A"]
         pairs = {
-            "A": ("A_ACCUPASS",
+            "A": ("A_OPENTIX",
                   ('<main><article><a href="' + a["detail"] + '">' +
                    a["title"] + '</a></article></main>').encode(),
                   ('<main><article><h1>' + a["title"] +
@@ -49,7 +50,7 @@ class FixedABWorkflowTests(unittest.TestCase):
             inputs[line] = {**names, "expected_sha": None}
         return inputs
 
-    def test_fixed_a_accupass_b_tpac_end_to_end_and_cas(self):
+    def test_fixed_a_opentix_b_tpac_end_to_end_and_cas(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             inputs = self._inbox(root)
