@@ -76,7 +76,17 @@ def _prepare_line(root, line, supplied):
         "sha256": hashlib.sha256(bridge._canonical(envelope)).hexdigest(),
     })
     prior = json.loads(target.read_text(encoding="utf-8")) if target.exists() else None
-    bridge.preflight_review_lkg_transition(prior, envelope, expected)
+    try:
+        bridge.preflight_review_lkg_transition(prior, envelope, expected)
+    except ValueError as exc:
+        # Preserve existing A/B CLI HOLD codes while sharing the strict writer
+        # transition guard. New timestamp/role failures retain their codes.
+        prior_codes = {
+            "REVIEW_LKG_CAS_MISMATCH_HOLD": "AB_FIXED_PREFLIGHT_CAS_HOLD",
+            "REVIEW_LKG_CAS_MISSING_HOLD": "AB_FIXED_PREFLIGHT_MISSING_LKG_HOLD",
+            "REVIEW_LKG_CROSS_IDENTITY_HOLD": "AB_FIXED_PREFLIGHT_CROSS_ID_HOLD",
+        }
+        raise ValueError(prior_codes.get(str(exc), str(exc))) from exc
     return manifest, listing, detail, expected
 
 
