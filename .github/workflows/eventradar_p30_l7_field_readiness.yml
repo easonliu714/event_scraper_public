@@ -2065,5 +2065,24 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: p30-l7-field-golden-readiness-exact-head
-          path: evidence/
+          path: |
+            evidence/
+            .github/workflows/eventradar_p30_l7_field_readiness.yml
+            scripts/p30_l7_field_golden_readiness.py
+            scripts/p30_source_stream_gate.py
+            tests/p30/test_p30_l7_field_golden_readiness.py
+            tests/p30/test_p30_source_stream_gate.py
+            scripts/p30_accupass_native_gate.py
+            tests/p30/test_p30_accupass_native_gate.py
+            scripts/p30_ntpc_artcenter_source.py
+            tests/p30/test_p30_ntpc_artcenter_source.py
+            scripts/p30_dual_native_rotation.py
+            tests/p30/test_p30_dual_native_rotation.py
+            scripts/p30_cloudgate_native_gate.py
+            tests/p30/test_p30_cloudgate_native_gate.py
+            scripts/p30_ab_kktix_fuzhong_native.py
+            tests/p30/test_p30_ab_kktix_fuzhong_native.py
+            scripts/p30_review_bridge.py
+            tests/p30/test_p30_review_bridge.py
+            tests/p30/fixtures/p30_l7_prince_field_readiness.json
           if-no-files-found: error
