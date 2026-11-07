@@ -431,5 +431,29 @@ class ReviewBridgeTests(unittest.TestCase):
                          ["EVENT_TITLE_REVIEW", "VENUE_EVENT_DATE_RANGE_REVIEW_NOT_SESSION"])
         self.assertEqual(positive["formal_accepted_fields"], 0)
 
+    def test_isolated_inbox_ancestor_symlink_and_utc_receipt_fail_closed(self):
+        """Caller bytes cannot escape the repo or masquerade as UTC evidence."""
+        self.assertEqual(bridge._observed("2026-11-07T12:00:00Z"),
+                         "2026-11-07T12:00:00Z")
+        self.assertEqual(bridge._observed("2026-11-07T12:00:00+00:00"),
+                         "2026-11-07T12:00:00+00:00")
+        with self.assertRaisesRegex(ValueError, "OBSERVED_AT_INVALID_HOLD"):
+            bridge._observed("2026-11-07T20:00:00+08:00")
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as ext:
+            root, outside = Path(td), Path(ext)
+            inbox = outside / "inbox"
+            inbox.mkdir()
+            secret = inbox / "manifest.json"
+            secret.write_text('{"external":true}', encoding="utf-8")
+            isolation = root / "_isolated_review"
+            try:
+                isolation.symlink_to(outside, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation unsupported")
+            with self.assertRaisesRegex(ValueError, "REVIEW_INBOX_PATH_HOLD"):
+                bridge._isolated_inbox_file(root, isolation / "inbox" / "manifest.json", 1024)
+            self.assertEqual(secret.read_text(encoding="utf-8"), '{"external":true}')
+            self.assertFalse((root / "docs").exists())
+
 if __name__ == "__main__":
     unittest.main()
