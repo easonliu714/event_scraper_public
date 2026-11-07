@@ -65,6 +65,33 @@ class TestNTPCCanonicalVenue(unittest.TestCase):
         self.assertEqual(out["native_get"], 0)
         self.assertEqual(out["formal_accepted_fields"], 0)
 
+    def test_inert_markup_cannot_supply_event_local_venue(self):
+        # Before the fix, script/style/template text could satisfy the label.
+        for tag in ("script", "style", "template", "noscript"):
+            with self.subTest(tag=tag):
+                detail = ('<main><article><h3>' + m.TITLE + '</h3><' +
+                          tag + '>★展覽地點：' + m.VENUE + '</' + tag +
+                          '></article></main>')
+                out = m.inspect_caller_html(self.listing, detail)
+                self.assertEqual(out["same_id_review"], 0)
+                self.assertEqual(out["first_failure"],
+                                 "NTPC_DETAIL_EXACT_VENUE_LABEL_HOLD")
+
+    def test_main_heading_cannot_borrow_sibling_section_room(self):
+        detail = ('<main><h3>' + m.TITLE + '</h3>'
+                  '<section><p>★展覽地點：' + m.VENUE +
+                  '</p></section></main>')
+        out = m.inspect_caller_html(self.listing, detail)
+        self.assertEqual(out["same_id_review"], 0)
+        self.assertEqual(out["first_failure"], "NTPC_EVENT_LOCAL_SCOPE_HOLD")
+
+    def test_inert_markup_cannot_supply_detail_heading(self):
+        detail = ('<main><article><script><h3>' + m.TITLE +
+                  '</h3></script><p>★展覽地點：' + m.VENUE +
+                  '</p></article></main>')
+        self.assertEqual(m.inspect_caller_html(self.listing, detail)
+                         ["same_id_review"], 0)
+
     def test_event_local_venue_from_foreign_section_is_not_accepted(self):
         foreign = ('<main><section><h3>' + m.TITLE + '</h3></section>'
                    '<section><h3>其他展覽</h3><p>★展覽地點：' +

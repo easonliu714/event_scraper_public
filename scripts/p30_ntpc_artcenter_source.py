@@ -54,6 +54,10 @@ class Page(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         self.stack.append(tag)
+        # Inert markup is never event-local authority. Keep its tags in the
+        # stack so nested ARTICLE/SECTION and forged text are not collected.
+        if any(t in ("script", "style", "template", "noscript") for t in self.stack):
+            return
         if tag in ("main", "article", "section"):
             scope = {"tag": tag, "depth": len(self.active_event_scopes),
                      "headings": [], "texts": []}
@@ -66,6 +70,9 @@ class Page(HTMLParser):
             self.heading = [tag, []]
 
     def handle_data(self, value):
+        # Script/style/template/noscript text is not visible event evidence.
+        if any(t in ("script", "style", "template", "noscript") for t in self.stack):
+            return
         if self.anchor is not None:
             self.anchor[1].append(value)
         if self.heading is not None:
@@ -76,6 +83,13 @@ class Page(HTMLParser):
             scope["texts"].append(value)
 
     def handle_endtag(self, tag):
+        # Do not close an outer semantic scope from inert nested markup.
+        if any(t in ("script", "style", "template", "noscript") for t in self.stack):
+            if tag in self.stack:
+                while self.stack:
+                    if self.stack.pop() == tag:
+                        break
+            return
         if tag == "a" and self.anchor is not None:
             self.anchors.append((self.anchor[0], norm("".join(self.anchor[1]))))
             self.anchor = None
@@ -135,6 +149,11 @@ def inspect_caller_html(list_html, detail_html):
     owners = [scope for scope in owners if scope["depth"] == deepest]
     if len(owners) != 1:
         out["first_failure"] = "NTPC_EVENT_LOCAL_SCOPE_AMBIGUOUS_HOLD"
+        return out
+    # MAIN is a page aggregate, not a per-event owner: its title can borrow
+    # a sibling SECTION's room even when the heading is unique globally.
+    if owners[0]["tag"] not in ("article", "section"):
+        out["first_failure"] = "NTPC_EVENT_LOCAL_SCOPE_HOLD"
         return out
     text = norm(" ".join(owners[0]["texts"]))
     if not re.search(r"展覽地點\s*[：:]\s*" + re.escape(VENUE), text):
