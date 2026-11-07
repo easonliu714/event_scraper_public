@@ -17,12 +17,13 @@ STAMP = "2026-11-07T11:55:00+00:00"
 
 
 class FixedABWorkflowTests(unittest.TestCase):
-    def _inbox(self, root):
+    def _inbox(self, root, a_adapter="A_OPENTIX"):
         inbox = root / "_isolated_review" / "inbox"
         inbox.mkdir(parents=True)
-        a = opentix.SOURCES["A"]
+        a = (opentix.SOURCES["A"] if a_adapter == "A_OPENTIX"
+             else tickets.SOURCES["A_ACCUPASS"])
         pairs = {
-            "A": ("A_OPENTIX",
+            "A": (a_adapter,
                   ('<main><article><a href="' + a["detail"] + '">' +
                    a["title"] + '</a></article></main>').encode(),
                   ('<main><article><h1>' + a["title"] +
@@ -79,6 +80,18 @@ class FixedABWorkflowTests(unittest.TestCase):
                              out["lines"]["A"]["snapshot_sha256"])
             self.assertEqual(again["lines"]["B"]["snapshot_sha256"],
                              out["lines"]["B"]["snapshot_sha256"])
+            self.assertFalse((root / "docs" / "data.json").exists())
+
+    def test_prior_accupass_fixed_pair_remains_covered(self):
+        """OPENTIX integration must not regress the accepted ACCUPASS path."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root, "A_ACCUPASS")
+            out = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(out["decision"], "REVIEW_ONLY_NOT_NATIVE")
+            self.assertEqual(out["lines"]["A"]["adapter_key"], "A_ACCUPASS")
+            self.assertEqual(out["native_get"], 0)
+            self.assertEqual(out["formal_accepted_fields"], 0)
             self.assertFalse((root / "docs" / "data.json").exists())
 
     def test_invalid_b_digest_preflight_never_writes_a(self):
