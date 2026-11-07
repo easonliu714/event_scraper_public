@@ -139,6 +139,23 @@ class ReviewBridgeTests(unittest.TestCase):
                 bridge.write_isolated_review_lkg(envelope, target, root,
                                                  expected_sha=first)
 
+    def test_caller_supplied_review_cannot_forge_native_body_lkg(self):
+        """A checksum-valid caller envelope is never native source evidence."""
+        envelope = bridge.build_review_envelope(
+            "B", self.b_list, self.b_detail, STAMP)
+        self.assertEqual(envelope["native_body_lkg"], 0)
+        forged = {**envelope, "native_body_lkg": 1}
+        sealed = {"payload": forged,
+                  "sha256": hashlib.sha256(bridge._canonical(forged)).hexdigest()}
+        with self.assertRaisesRegex(ValueError, "REVIEW_SNAPSHOT_AUTHORITY_HOLD"):
+            bridge._validate_snapshot(sealed)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "_isolated_review" / "B" / "review_snapshot.json"
+            with self.assertRaisesRegex(ValueError, "REVIEW_SNAPSHOT_AUTHORITY_HOLD"):
+                bridge.write_isolated_review_lkg(forged, target, root)
+            self.assertFalse(target.exists())
+
     def test_cas_cannot_replace_other_source_or_replay_old_bytes(self):
         good = bridge.build_review_envelope("A", self.a_list, self.a_detail, STAMP)
         other = bridge.build_review_envelope("B", self.b_list, self.b_detail, STAMP)

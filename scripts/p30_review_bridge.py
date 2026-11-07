@@ -213,6 +213,7 @@ def _validate_snapshot(snapshot):
         raise ValueError("REVIEW_SNAPSHOT_SOURCE_IDENTITY_HOLD")
     if (payload.get("source_attestation") != ATTESTATION or
             payload.get("native_get") != 0 or
+            payload.get("native_body_lkg") != 0 or
             payload.get("formal_accepted_fields") != 0 or
             payload.get("golden") != 0 or payload.get("published") != 0 or
             payload.get("release_state") != "HARD_HOLD_NO_PUBLICATION"):
