@@ -149,16 +149,22 @@ def write_isolated_review_lkg(envelope, target, repo_root, expected_sha=None):
     replaces last-known-good; existing files require their verified SHA.
     """
     root = Path(repo_root).resolve()
-    dest = Path(target)
+    dest = Path(target).absolute()
+    isolation = root / "_isolated_review"
+    # A and B require distinct durable LKG slots: one global file made the
+    # second stream fail CROSS_IDENTITY despite a valid same-event REVIEW.
+    # Preserve the legacy single-slot path for existing callers, but require
+    # an exact line-owned slot for the executable manifest bridge.
+    allowed = {
+        isolation / "review_snapshot.json",
+        isolation / envelope.get("line", "") / "review_snapshot.json",
+    }
     if dest.name != "review_snapshot.json":
         raise ValueError("REVIEW_TARGET_NAME_HOLD")
-    dest = dest.absolute()
-    if (not dest.is_relative_to(root) or
-            dest.relative_to(root).parts[:1] != ("_isolated_review",) or
-            dest.is_symlink() or dest.parent.is_symlink()):
+    if (envelope.get("line") not in ("A", "B") or dest not in allowed or
+            isolation.is_symlink() or dest.parent.is_symlink() or
+            dest.is_symlink() or not dest.parent.resolve().is_relative_to(root)):
         raise ValueError("REVIEW_TARGET_ISOLATION_HOLD")
-    if dest.parent.resolve() != (root / "_isolated_review").resolve():
-        raise ValueError("REVIEW_TARGET_PARENT_HOLD")
     digest = _validate_snapshot({
         "payload": envelope, "sha256": hashlib.sha256(_canonical(envelope)).hexdigest()
     })
@@ -230,7 +236,7 @@ def replay_manifest_to_isolated_lkg(manifest, list_body, detail_body,
                 "snapshot_sha256": None, "native_get": 0,
                 "formal_accepted_fields": 0, "golden": 0, "published": 0}
     root = Path(repo_root).resolve()
-    target = root / "_isolated_review" / "review_snapshot.json"
+    target = root / "_isolated_review" / manifest["line"] / "review_snapshot.json"
     digest = write_isolated_review_lkg(envelope, target, root, expected_sha)
     saved = json.loads(target.read_text(encoding="utf-8"))
     if _validate_snapshot(saved) != digest:
