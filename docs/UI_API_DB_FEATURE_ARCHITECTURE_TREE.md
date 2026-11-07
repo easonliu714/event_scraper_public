@@ -8066,3 +8066,30 @@ Isolated, caller-supplied (non-native) pipeline:
 #### 06:04 artifact verification independent readback closure
 
 - Exact Engineering #236 HEAD `8c434d52454f0febbbb2f9287bd1db2b969ca38b`, [CI #42418619783](https://github.com/easonliu714/event_scraper_public/actions/runs/42418619783) SUCCESS; Artifact #13591634490 downloaded and independently audited: ZIP SHA256 `5736756bd70a3dbdb2e2b59f1862ab94ee2eb5082adb83fe88631763c3df5458` equals GitHub digest; 34/34 unique entries, ZIP CRC PASS, embedded SHA256SUMS 33/33 PASS. Probe register exact HEAD, 33 registered markers, PASS_NO_NATIVE_MARKER, native GET 0, formal FIELD/Golden/Published 0. This supersedes the preceding ZIP CRC UNVERIFIED statement for this artifact. No formal pipeline write.
+
+### 2026-11-08 06:55 Asia/Taipei — Shared transition authority for fixed A+B source-owned REVIEW workflow
+
+```text
+A existing ticket source Adapter (e.g. A_OPENTIX/A_ACCUPASS)
+  + B existing P0 venue Adapter (e.g. B_TPAC_EVENT2072)
+  -> each caller-supplied LIST HTML + same-ID DETAIL HTML + exact manifest SHA
+  -> p30_ab_fixed_review_workflow._prepare_line [UPDATED]
+       build_review_envelope -> strict _validate_snapshot
+       -> preflight_review_lkg_transition(prior, envelope, expected_sha)
+          verified checksum / exact source-event ID / CAS / monotonic observed_at
+          same-instant body and role consistency / no role regression
+       BOTH preflight PASS before ANY slot write
+  -> replay_manifest_to_isolated_lkg -> write_isolated_review_lkg
+       exclusive slot lease -> _write_isolated_review_lkg_locked [UPDATED]
+       -> SAME preflight_review_lkg_transition under lease (TOCTOU guard)
+       -> SHA256 / fsync / atomic replace / independent readback
+  -> _isolated_review/A|B/<adapter>/review_snapshot.json
+  -> REVIEW_ONLY_NOT_NATIVE, native_get=0, formal/Golden/Published=0
+  -> post-preflight concurrency may return PARTIAL_HOLD (not pair atomic)
+```
+
+- **Before → after:** `_prepare_line` previously checked B only for prior checksum/CAS and cross-ID, leaving stale observed_at or role regression to fail during B commit **after** A had already written. Now both lines use the same pure transition guard as the durable writer, with strict candidate validation before A. `_write_isolated_review_lkg_locked` previously embedded these transition checks inline; now delegates to `preflight_review_lkg_transition` without changing its lease, atomicity, fail-closed or allowed target. Legacy A/B preflight HOLD code names preserved.
+- **Regression:** `test_stale_b_preflight_blocks_new_a_observation_without_partial_commit` validates no partial A write for a known stale B; old CAS regression remains PASS. Intermediate first CI FAIL #42422978450 (legacy diagnostic drift), corrected; exact-head [CI #42423037576](https://github.com/easonliu714/event_scraper_public/actions/runs/42423037576) SUCCESS **289/289**, job #128555375293, [Artifact #13593714904](https://github.com/easonliu714/event_scraper_public/actions/runs/42423037576/artifacts/13593714904) digest `6fb7fee71900735661840563f99504d63e6cb18bae23ec2164a9cd62b4b3aebf`, independently ZIP CRC 34/34 and manifest 33/33 PASS, probe register 33 markers `PASS_NO_NATIVE_MARKER`.
+- **Provenance boundary:** ACCUPASS indexed ID `2610261742421131142843` still robots UNKNOWN, no bounded native GET; Taipei Dome lacks calendar→event-local detail edge, TPAC /event/2072 indexed date conflict HOLD. A/B **new** native HTTP/LIST/DETAIL/IDENTITY/role REVIEW/accepted FIELD each 0/0/0/0/0/0; Body LKG/receipt-only LKG new 0/0; formal Golden/Published 0/0. Prior TMC Body LKG=1 and Zepp receipt-only LKG=1 are historical. Do not convert caller-supplied SHA into source-native attestation.
+- **Authority readback:** Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`; Engineering Draft #236 HEAD `f0f45acf38d4626ae32d042f11b8c317d0de54af` is behind main, not merge-ready; Preview `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Main data/status blobs `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` / `645f68c3db1b0fa06527d73f8dae4a36fadcbbdd`, 19 platforms, status snapshot 2026-11-05 19:00. L8 5/5, CKSMH5/TWTC39, homepage grouping PASS retained; cross-group OR and direct Pages runtime new UAT UNVERIFIED. `HARD_HOLD_NO_PUBLICATION`; no production merge or formal release authorization.
+
