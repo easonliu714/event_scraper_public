@@ -74,8 +74,9 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         list_url, detail_url = source["list"], source["detail"]
         title, source_id, event_id = (
             source["title"], source["source_id"], source["event_id"])
-        roles = (["EVENT_LOCAL_TITLE_REVIEW"]
-                 if verdict.get("role_review") == 1 else [])
+        # Preserve source-owned event-local roles, never native attestation
+        # from caller-provided HTML.
+        roles = list(verdict.get("field_roles", []))
         platform, kind = "OPENTIX", "活動"
     elif adapter_key not in ("B_NTPC", "B_TPAC_EVENT2072"):
         # The same source-local parser also handles alternate A/B official

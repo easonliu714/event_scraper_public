@@ -62,6 +62,25 @@ class ReviewBridgeTests(unittest.TestCase):
         self.assertEqual(rejected["decision"], "HOLD")
         self.assertIsNone(rejected["candidate"])
 
+    def test_opentix_event_local_venue_receipt_remains_non_native(self):
+        src = opentix.SOURCES["A"]
+        listing = ('<main><article><a href="' + src["detail"] + '">' +
+                   src["title"] + '</a></article></main>').encode()
+        detail = ('<main><article><h1>' + src["title"] +
+                  '</h1><p>場館：' + src["venue"] +
+                  '</p></article></main>').encode()
+        env = bridge.build_review_envelope(
+            "A", listing, detail, STAMP, adapter_key="A_OPENTIX")
+        self.assertEqual({x["role"] for x in env["role_receipts"]},
+                         {"EVENT_LOCAL_TITLE_REVIEW",
+                          "VENUE_ROOM_REVIEW_NOT_SESSION"})
+        self.assertEqual((env["native_get"], env["native_body_lkg"],
+                          env["formal_accepted_fields"], env["golden"],
+                          env["published"]), (0, 0, 0, 0, 0))
+        self.assertTrue(all(x["native_attested"] is False and
+                            x["formal_accepted"] is False
+                            for x in env["role_receipts"]))
+
     def test_a_ticket_adapter_to_real_preview_normalizer(self):
         result = bridge.build_review_envelope("A", self.a_list, self.a_detail, STAMP)
         self.assertEqual(result["decision"], "REVIEW_ONLY_NOT_NATIVE")

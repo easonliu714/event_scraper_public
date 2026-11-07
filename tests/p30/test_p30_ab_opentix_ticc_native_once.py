@@ -25,6 +25,31 @@ class DualOfficialNativeTests(unittest.TestCase):
             self.assertEqual(gate.inspect_pair(line, '<script>' + listing + '</script>', detail)["same_id_review"], 0)
             self.assertEqual(gate.inspect_pair(line, listing + listing, detail)["same_id_review"], 0)
 
+    def test_opentix_event_local_venue_role_and_sibling_refusal(self):
+        src = gate.SOURCES["A"]
+        listing = ('<main><article><a href="' + src["detail"] + '">' +
+                   src["title"] + '</a></article></main>')
+        title = '<h1>' + src["title"] + '</h1>'
+        owned = ('<main><article>' + title + '<p>場館：' +
+                 src["venue"] + '</p></article></main>')
+        verdict = gate.inspect_pair("A", listing, owned)
+        self.assertEqual(verdict["field_roles"],
+                         ["EVENT_LOCAL_TITLE_REVIEW",
+                          "VENUE_ROOM_REVIEW_NOT_SESSION"])
+        sibling = ('<main><article>' + title + '</article>' +
+                   '<article><p>場館：' + src["venue"] +
+                   '</p></article></main>')
+        self.assertEqual(gate.inspect_pair("A", listing, sibling)["field_roles"],
+                         ["EVENT_LOCAL_TITLE_REVIEW"])
+        inert = ('<main><article>' + title + '<template><p>場館：' +
+                 src["venue"] + '</p></template></article></main>')
+        self.assertEqual(gate.inspect_pair("A", listing, inert)["field_roles"],
+                         ["EVENT_LOCAL_TITLE_REVIEW"])
+        duplicated = owned.replace('</article>', '<p>場館：' + src["venue"] +
+                                   '</p></article>')
+        self.assertEqual(gate.inspect_pair("A", listing, duplicated)["field_roles"],
+                         ["EVENT_LOCAL_TITLE_REVIEW"])
+
     def test_explicit_robots_policy(self):
         for line in ("A", "B"):
             gate.explicit_robots_allow(line, b"User-agent: *\nAllow: /\n")

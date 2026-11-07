@@ -26,6 +26,7 @@ SOURCES = {
         "list": "https://www.opentix.life/",
         "detail": "https://www.opentix.life/event/2070446724700692480",
         "title": "2026秋天藝術節 巴奈《流浪邊界》",
+        "venue": "國家兩廳院實驗劇場",  # Official room, not ticket Session.
         "host": "www.opentix.life",
         "robots": "https://www.opentix.life/robots.txt",
     },
@@ -83,6 +84,10 @@ class EventLocal(HTMLParser):
         self.headings = []
         self.anchor = None
         self.heading = None
+        # Only the smallest title-owning ARTICLE/SECTION can attest a role.
+        self.scopes = []
+        self.active_scopes = []
+        self.scope_malformed = False
 
     def handle_starttag(self, tag, attrs):
         inert = any(x in self.INERT for x in self.stack)
@@ -95,21 +100,37 @@ class EventLocal(HTMLParser):
                                           for x in self.stack), len(self.stack)]
         if tag not in self.VOID:
             self.stack.append(tag)
+        if not inert and tag in ("article", "section"):
+            scope = {"tag": tag, "depth": len(self.stack),
+                     "headings": [], "texts": []}
+            self.scopes.append(scope)
+            self.active_scopes.append(scope)
 
     def handle_data(self, value):
         if any(x in self.INERT for x in self.stack):
             return
+        for scope in self.active_scopes:
+            scope["texts"].append(value)
         if self.anchor is not None:
             self.anchor[1].append(value)
         if self.heading is not None:
             self.heading[1].append(value)
 
     def handle_endtag(self, tag):
-        if self.anchor is not None and tag == "a":
+        inert = any(x in self.INERT for x in self.stack)
+        if not inert and tag in ("article", "section"):
+            if not self.active_scopes or self.active_scopes[-1]["tag"] != tag:
+                self.scope_malformed = True
+            else:
+                self.active_scopes.pop()
+        if not inert and self.anchor is not None and tag == "a":
             self.anchors.append((self.anchor[0], norm("".join(self.anchor[1]))))
             self.anchor = None
-        if self.heading is not None and tag == self.heading[0]:
-            self.headings.append((norm("".join(self.heading[1])), self.heading[2]))
+        if not inert and self.heading is not None and tag == self.heading[0]:
+            heading = norm("".join(self.heading[1]))
+            self.headings.append((heading, self.heading[2]))
+            for scope in self.active_scopes:
+                scope["headings"].append(heading)
             self.heading = None
         if tag in self.stack:
             self.stack = self.stack[:len(self.stack) - 1 - self.stack[::-1].index(tag)]
@@ -132,9 +153,25 @@ def inspect_pair(line, listing, detail):
     if len(titles) != 1:
         return {"decision": "HOLD", "first_failure": "AB_NATIVE_DETAIL_LOCAL_HEADING_HOLD",
                 "same_id_review": 0, "role_review": 0}
+    roles = ["EVENT_LOCAL_TITLE_REVIEW"]
+    if line == "A" and not dp.scope_malformed and not dp.active_scopes:
+        owners = [scope for scope in dp.scopes
+                  if scope["headings"].count(source["title"]) == 1]
+        if owners:
+            deepest = max(scope["depth"] for scope in owners)
+            owners = [scope for scope in owners if scope["depth"] == deepest]
+            if len(owners) == 1:
+                local = norm(" ".join(owners[0]["texts"]))
+                # A sibling venue, sale date or checkout choice is not
+                # authority for this event's venue or ticket Session.
+                pattern = (r"(?:^|\s)場館\s*[：:]\s*" +
+                           re.escape(source["venue"]) + r"(?=\s|$)")
+                if len(re.findall(pattern, local)) == 1:
+                    roles.append("VENUE_ROOM_REVIEW_NOT_SESSION")
     return {"decision": "NATIVE_SAME_ID_REVIEW_ONLY",
             "first_failure": "INDEPENDENT_FIELD_AUTHORITY_PENDING",
-            "same_id_review": 1, "role_review": 1}
+            "same_id_review": 1, "role_review": len(roles),
+            "field_roles": roles}
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
