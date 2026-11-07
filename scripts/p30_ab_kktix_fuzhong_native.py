@@ -156,6 +156,11 @@ class LocalEventHTML(HTMLParser):
         attrs = dict(attrs)
         if tag not in VOID:
             self.stack.append(tag)
+        # A/B identity must be visible event-local DOM, not inert template
+        # markup. Never create a LIST anchor, title heading, scope or TR
+        # inside SCRIPT/STYLE/NOSCRIPT/TEMPLATE (including nested elements).
+        if any(t in IGNORE for t in self.stack):
+            return
         if tag in ("article", "section"):
             if len(self.scopes) >= 128:
                 raise ValueError("AB_EVENT_LOCAL_SCOPE_CAP_HOLD")
@@ -185,6 +190,14 @@ class LocalEventHTML(HTMLParser):
             self.rows[index]["texts"].append(value)
 
     def handle_endtag(self, tag):
+        # Mirror the start-tag inert guard: nested template ARTICLE/TR/A/H
+        # must not close or emit evidence for a visible event-local owner.
+        if any(t in IGNORE for t in self.stack):
+            if tag in self.stack:
+                while self.stack:
+                    if self.stack.pop() == tag:
+                        break
+            return
         if tag == "a" and self.anchor is not None:
             edge = (self.anchor[0], norm("".join(self.anchor[1])))
             self.anchors.append(edge)

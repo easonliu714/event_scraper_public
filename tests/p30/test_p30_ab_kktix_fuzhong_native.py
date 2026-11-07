@@ -75,6 +75,45 @@ class ABSourceTests(unittest.TestCase):
         self.assertEqual(r["field_roles"], [])
         self.assertEqual(r["decision"], "REVIEW_IDENTITY_ONLY")
 
+    def test_inert_dom_cannot_forge_or_duplicate_a_b_event_identity(self):
+        # Regression for the reusable source parser, not a native GET.
+        # A/B LIST, DETAIL and B same-TR roles must exclude inert markup.
+        for line, listing, detail in (
+                ("A", self.a_list, self.a_detail),
+                ("B", self.b_list, self.b_detail)):
+            src = m.SOURCES[line]
+            href = src["detail"].replace("&", "&amp;")
+            title = src["title"]
+            ghost_edge = ('<template><a href="' + href + '">' +
+                          title + '</a></template>')
+            ghost_heading = ('<template><article><h3>' + title +
+                             '</h3><p>日期｜2026.11.28 (六) START 18:00</p>' +
+                             '<p>地點｜The Wall Live House</p></article></template>')
+            self.assertEqual(m.inspect_pair(
+                line, '<main>' + ghost_edge + '</main>', detail
+            )["same_id_review"], 0)
+            self.assertEqual(m.inspect_pair(
+                line, listing, '<main>' + ghost_heading + '</main>'
+            )["same_id_review"], 0)
+            real_with_ghost = listing.replace(
+                '</main>', ghost_edge + '</main>')
+            r = m.inspect_pair(line, real_with_ghost, detail)
+            self.assertEqual(r["same_id_review"], 1)
+            self.assertEqual(r["field_roles"],
+                             m.inspect_pair(line, listing, detail)["field_roles"])
+            detail_with_ghost = detail.replace(
+                '</main>', ghost_heading + '</main>')
+            r2 = m.inspect_pair(line, listing, detail_with_ghost)
+            self.assertEqual(r2["same_id_review"], 1)
+            self.assertEqual(r2["field_roles"],
+                             m.inspect_pair(line, listing, detail)["field_roles"])
+        # Hidden Fuzhong same-TR schedule is not a source-local field.
+        b = m.SOURCES["B"]
+        ghost_row = ('<template><table><tr><td>11/06</td><td>19:00</td>'
+                     '<td><a href="' + b["detail"].replace("&", "&amp;") +
+                     '">' + b["title"] + '</a></td></tr></table></template>')
+        self.assertEqual(m.b_list_row_roles(ghost_row), [])
+
     def test_b_unexpected_third_date_and_wrong_role_hold(self):
         bad = self.b_detail.replace("更新日期：2026-10-16",
             "放映日期：2026/11/07 18:00")
