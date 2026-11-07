@@ -27,7 +27,7 @@ jobs:
           base=d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           test "$(git merge-base "$base" HEAD)" = "$base"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'scripts/p30_source_stream_gate.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_source_stream_gate.py' 'scripts/p30_accupass_native_gate.py' 'tests/p30/test_p30_accupass_native_gate.py' 'scripts/p30_ntpc_artcenter_source.py' 'tests/p30/test_p30_ntpc_artcenter_source.py' 'scripts/p30_dual_native_rotation.py' 'tests/p30/test_p30_dual_native_rotation.py' 'scripts/p30_cloudgate_native_gate.py' 'tests/p30/test_p30_cloudgate_native_gate.py' 'scripts/p30_ab_kktix_fuzhong_native.py' 'tests/p30/test_p30_ab_kktix_fuzhong_native.py' 'scripts/p30_tpac_event_source.py' 'scripts/p30_review_bridge.py' 'tests/p30/test_p30_review_bridge.py' 'scripts/p30_ab_fixed_review_workflow.py' 'tests/p30/test_p30_ab_fixed_review_workflow.py' 'scripts/p30_tpac_event2072_native_once.py' 'tests/p30/test_p30_tpac_event2072_native_once.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'scripts/p30_source_stream_gate.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_source_stream_gate.py' 'scripts/p30_accupass_native_gate.py' 'tests/p30/test_p30_accupass_native_gate.py' 'scripts/p30_ntpc_artcenter_source.py' 'tests/p30/test_p30_ntpc_artcenter_source.py' 'scripts/p30_dual_native_rotation.py' 'tests/p30/test_p30_dual_native_rotation.py' 'scripts/p30_cloudgate_native_gate.py' 'tests/p30/test_p30_cloudgate_native_gate.py' 'scripts/p30_ab_kktix_fuzhong_native.py' 'tests/p30/test_p30_ab_kktix_fuzhong_native.py' 'scripts/p30_tpac_event_source.py' 'scripts/p30_review_bridge.py' 'tests/p30/test_p30_review_bridge.py' 'scripts/p30_ab_fixed_review_workflow.py' 'tests/p30/test_p30_ab_fixed_review_workflow.py' 'scripts/p30_tpac_event2072_native_once.py' 'tests/p30/test_p30_tpac_event2072_native_once.py' 'scripts/p30_ab_opentix_ticc_native_once.py' 'tests/p30/test_p30_ab_opentix_ticc_native_once.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
           test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
           git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
@@ -43,7 +43,7 @@ jobs:
           PY
       - name: Source-bound acceptance contract and negative tests
         run: |
-          python -m py_compile scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py
+          python -m py_compile scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py scripts/p30_ab_opentix_ticc_native_once.py tests/p30/test_p30_ab_opentix_ticc_native_once.py
           python -m unittest discover -s tests/p30 -p 'test_p30_l7_field_golden_readiness.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_source_stream_gate.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_accupass_native_gate.py' -v
@@ -54,6 +54,7 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_review_bridge.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_ab_fixed_review_workflow.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event2072_native_once.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_ab_opentix_ticc_native_once.py' -v
           python scripts/p30_l7_field_golden_readiness.py
       - name: One-shot bounded official native GET acquisition diagnosis (not Golden)
         shell: bash
@@ -2041,15 +2042,42 @@ jobs:
           assert d['native_same_id_review']<=d['native_detail']
           print('TPAC_EVENT2072_NATIVE',d['decision'],d['first_failure'])
           PY
+      - name: One-shot A OPENTIX and B TICC robots-gated public source evidence (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[ab-opentix-ticc-native-once]'; then
+            echo 'AB_OPENTIX_TICC_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python -m scripts.p30_ab_opentix_ticc_native_once --evidence evidence/ab_opentix_ticc_native_once.json
+          python - <<'PY'
+          import json
+          d=json.load(open('evidence/ab_opentix_ticc_native_once.json',encoding='utf-8'))
+          assert set(d)=={'A','B'}
+          for line in ('A','B'):
+              x=d[line]
+              assert x['line']==line and x['robots_get_attempted']==1
+              assert x['native_event_get_attempted']<=2
+              assert x['native_list']<=1 and x['native_detail']<=1
+              assert x['native_same_id_review']<=x['native_detail']
+              assert x['formal_accepted_fields']==x['golden']==x['published']==0
+              assert x['native_body_lkg']==x['receipt_only_lkg']==0
+              assert x['raw_html_saved'] is False
+              assert x['release_state']=='HARD_HOLD_NO_PUBLICATION'
+              print('AB_OFFICIAL_NATIVE',line,x['decision'],x['first_failure'])
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p evidence
-          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
+          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py scripts/p30_ab_opentix_ticc_native_once.py tests/p30/test_p30_ab_opentix_ticc_native_once.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
           printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce > evidence/readiness.txt
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/tpac_event2072_native_once.json ]; then sha256sum evidence/tpac_event2072_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/ab_opentix_ticc_native_once.json ]; then sha256sum evidence/ab_opentix_ticc_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/zepp_newtaipei_native_once.json ]; then sha256sum evidence/zepp_newtaipei_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/opentix_fresh_detail_native_once.json ]; then sha256sum evidence/opentix_fresh_detail_native_once.json >> evidence/SHA256SUMS.txt; fi
@@ -2115,6 +2143,9 @@ jobs:
             tests/p30/test_p30_ab_fixed_review_workflow.py
             scripts/p30_tpac_event2072_native_once.py
             tests/p30/test_p30_tpac_event2072_native_once.py
+            scripts/p30_ab_opentix_ticc_native_once.py
+            tests/p30/test_p30_ab_opentix_ticc_native_once.py
+            evidence/ab_opentix_ticc_native_once.json
             evidence/tpac_event2072_native_once.json
             tests/p30/fixtures/p30_l7_prince_field_readiness.json
           if-no-files-found: error
