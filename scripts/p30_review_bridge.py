@@ -136,6 +136,35 @@ def _validate_snapshot(snapshot):
             payload.get("golden") != 0 or payload.get("published") != 0 or
             payload.get("release_state") != "HARD_HOLD_NO_PUBLICATION"):
         raise ValueError("REVIEW_SNAPSHOT_AUTHORITY_HOLD")
+    # The durable REVIEW envelope is a security boundary: top-level HOLD
+    # cannot mask a nested candidate that claims formal publication.
+    candidate = payload.get("candidate")
+    meta = candidate.get("_candidate") if isinstance(candidate, dict) else None
+    if (not isinstance(meta, dict) or
+            meta.get("scope") != "CANDIDATE_PREVIEW_ONLY" or
+            meta.get("decision") not in ("REVIEW", "REVIEW_WITH_HOLD") or
+            meta.get("platform_id") != payload.get("source_id") or
+            meta.get("source_event_id") != payload.get("source_event_id") or
+            meta.get("record_id") != str(payload.get("source_id")) + ":" +
+                str(payload.get("source_event_id")) or
+            candidate.get("url") != payload.get("detail_url") or
+            any(meta.get(k) is not False for k in
+                ("formal_field_pass", "golden_accepted", "published")) or
+            meta.get("sessions") != [] or meta.get("ticket_session_id") is not None or
+            meta.get("inventory") is not None):
+        raise ValueError("REVIEW_SNAPSHOT_NESTED_AUTHORITY_HOLD")
+    receipts = payload.get("role_receipts")
+    if not isinstance(receipts, list) or any(
+            not isinstance(item, dict) or
+            item.get("source_url") != payload.get("detail_url") or
+            item.get("body_sha256") != payload.get("body_digests", {}).get("detail_sha256") or
+            item.get("observed_at_utc") != payload.get("observed_at_utc") or
+            item.get("decision") != "REVIEW" or
+            item.get("native_attested") is not False or
+            item.get("formal_accepted") is not False or
+            not isinstance(item.get("role"), str) or not item["role"]
+            for item in receipts):
+        raise ValueError("REVIEW_SNAPSHOT_ROLE_PROVENANCE_HOLD")
     digest = hashlib.sha256(_canonical(payload)).hexdigest()
     if snapshot["sha256"] != digest:
         raise ValueError("REVIEW_SNAPSHOT_CHECKSUM_HOLD")
@@ -222,6 +251,15 @@ def _write_isolated_review_lkg_locked(envelope, target, repo_root, expected_sha=
         if (next_time == prior_time and
                 previous.get("body_digests") != envelope.get("body_digests")):
             raise ValueError("REVIEW_LKG_SAME_INSTANT_BODY_DRIFT_HOLD")
+        # A later same-ID source observation may add verified REVIEW roles,
+        # but cannot silently downgrade an already durable role. This is an
+        # incremental diff gate, not independent FIELD acceptance.
+        prior_roles = {item["role"] for item in previous["role_receipts"]}
+        next_roles = {item["role"] for item in envelope["role_receipts"]}
+        if not prior_roles.issubset(next_roles):
+            raise ValueError("REVIEW_LKG_ROLE_REGRESSION_HOLD")
+        if next_time == prior_time and prior_roles != next_roles:
+            raise ValueError("REVIEW_LKG_SAME_INSTANT_ROLE_DRIFT_HOLD")
     elif expected_sha is not None:
         raise ValueError("REVIEW_LKG_CAS_MISSING_HOLD")
     dest.parent.mkdir(parents=True, exist_ok=True)

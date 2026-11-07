@@ -148,6 +148,36 @@ class ReviewBridgeTests(unittest.TestCase):
                     a_good, a_target, root, expected_sha=a_sha), a_sha)
             self.assertFalse(lease.exists())
 
+    def test_durable_review_nested_authority_and_monotonic_roles(self):
+        """A/B LKG must not regress source roles or hide nested publication."""
+        good = bridge.build_review_envelope(
+            "B", self.b_list, self.b_detail, STAMP)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            target = root / "_isolated_review" / "B" / "review_snapshot.json"
+            sha = bridge.write_isolated_review_lkg(good, target, root)
+            original = target.read_bytes()
+            newer = bridge.build_review_envelope(
+                "B", self.b_list, self.b_detail, "2026-11-07T02:00:00+00:00")
+            newer["role_receipts"] = []
+            with self.assertRaisesRegex(ValueError, "ROLE_REGRESSION_HOLD"):
+                bridge.write_isolated_review_lkg(newer, target, root, sha)
+            for flag in ("published", "golden_accepted", "formal_field_pass"):
+                nested = bridge.build_review_envelope(
+                    "B", self.b_list, self.b_detail, STAMP)
+                nested["candidate"]["_candidate"][flag] = True
+                with self.subTest(flag=flag), self.assertRaisesRegex(
+                        ValueError, "NESTED_AUTHORITY_HOLD"):
+                    bridge.write_isolated_review_lkg(nested, target, root, sha)
+            forged = bridge.build_review_envelope(
+                "B", self.b_list, self.b_detail, STAMP)
+            forged["role_receipts"][0]["native_attested"] = True
+            with self.assertRaisesRegex(ValueError, "ROLE_PROVENANCE_HOLD"):
+                bridge.write_isolated_review_lkg(forged, target, root, sha)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertEqual(
+                bridge.write_isolated_review_lkg(good, target, root, sha), sha)
+
     def test_manifest_cli_integrates_both_source_adapters(self):
         for line, listing, detail in (
                 ("A", self.a_list, self.a_detail),
