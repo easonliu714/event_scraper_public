@@ -8027,3 +8027,38 @@ Engineering Draft #236 HEAD 1cc567608914992560b85f282d145d0575bc4416
 
 - Engineering Draft #236 exact HEAD `c81cc3c2d1eeb1cef1b8c172220f9fafeba2ce71` independently read back. [CI #42413168436](https://github.com/easonliu714/event_scraper_public/actions/runs/42413168436) **SUCCESS** on that exact HEAD, job #128525446712 all steps SUCCESS, including the new forged-checksum/native-Body-LKG rejection test. No first CI FAIL. Test groups: 134+30+11+11+23+7+31+19+5+4+5+7 = **287 tests PASS**; the 19-test REVIEW bridge group includes the new guard test.
 - [Artifact #13590297112](https://github.com/easonliu714/event_scraper_public/actions/runs/42413168436/artifacts/13590297112) independently downloaded; SHA256 `055f8b55649ab847a1f76ed9c930acb9f0891f8955a9230453e80b1d6127f981` equals GitHub digest; ZIP 34 members, duplicate 0, CRC PASS, SHA256SUMS 33/33 PASS. `native_probe_consumption_guard.json`: exact HEAD, `PASS_NO_NATIVE_MARKER`, 33 registered markers, native GET 0; all one-shot native steps skipped. This validates engineering integrity, not new source-native identity/accepted FIELD/Golden/Published.
+
+### 2026-11-08 06:01 Asia/Taipei — A/B source-owned REVIEW preview-field quarantine + authority topology
+
+```text
+Official source / identity discovery (not native):
+  A ACCUPASS #02 /search indexed event link -> /event/2610261742421131142843
+    -> matching indexed DETAIL title, advertised date/time and venue
+    -> ROBOTS_UNVERIFIED; no source-native raw HTML/observed_at/body SHA
+    -> native GET/LIST/DETAIL/IDENTITY/FIELD 0/0/0/0/0; formal 0
+  B Taipei Dome official November calendar -> F-FOREVER 11/28-29 label
+    -> NO exact calendar-to-detail event ID edge; DOME_EVENT_ID_EDGE_UNVERIFIED_HOLD
+    -> native GET/LIST/DETAIL/IDENTITY/FIELD 0/0/0/0/0; formal 0
+  B TPAC event/2072 indexed LIST/DETAIL date disagreement -> HOLD (unchanged)
+
+Isolated, caller-supplied (non-native) pipeline:
+  scripts/p30_ab_fixed_review_workflow.py::run_fixed_ab
+    -> scripts/p30_review_bridge.py::build_review_envelope
+    -> _validate_snapshot (UPDATED)
+       exact adapter/source/event ID; caller-only attestation; native=0
+       candidate exact display key set; official title; observed_at parity
+       date/location/price/description/region = UNKNOWN
+       img_url = null; field_evidence = {}; sources = exact LIST+DETAIL
+       forbid nested Session/inventory/formal/Golden/publication
+    -> write_isolated_review_lkg: lease + CAS + SHA256 + atomic + readback
+    -> _isolated_review/A|B/<adapter>/review_snapshot.json
+  tests/p30/test_p30_review_bridge.py::
+    test_checksum_valid_preview_field_injection_is_quarantined
+    A/B × 7 forged fields, recomputed valid SHA, all fail closed
+  Not a cryptographic native attestation; never feed formal docs/data.json.
+```
+
+- **Code before/after:** `_validate_snapshot` before validated nested candidate publication flags and role receipts but did not prohibit caller-injected preview `price/date/img_url`, extra keys, foreign title, nested field evidence/sources despite valid recomputed checksum. After exact candidate display allowlist and UNKNOWN-only field contract reject these injections before writing LKG. Test function newly added to existing test file. This closes a reusable A/B snapshot safety gap; not a new native Body LKG or formal accepted FIELD.
+- **Verified Engineering Draft #236:** HEAD `8c434d52454f0febbbb2f9287bd1db2b969ca38b`; [exact-head CI #42418619783](https://github.com/easonliu714/event_scraper_public/actions/runs/42418619783) SUCCESS, job #128542016699 288/288 PASS; first FAIL none. Artifact #13591634490 GitHub digest `sha256:5736756bd70a3dbdb2e2b59f1862ab94ee2eb5082adb83fe88631763c3df5458`, independent ZIP CRC not yet verified. Native probe register PASS_NO_NATIVE_MARKER; no new GET.
+- **Invariant and rollout:** Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`, data blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, status blob `645f68c3db1b0fa06527d73f8dae4a36fadcbbdd`, 19 platforms unchanged. Formal accepted FIELD/Golden/Published = 0/0/0; `HARD_HOLD_NO_PUBLICATION`. Android L8 5/5, CKSMH5/TWTC39, source grouping USER_ATTESTED_PASS retained; cross-group OR and direct Pages HTTP new readback UNVERIFIED. No Owner action for isolated repair; separate authorization mandatory for formal publication/Golden/status-only merge.
+- **Next architecture Gate:** A confirm robots allow + one unconsumed bounded exact-ID ACCUPASS public LIST→DETAIL; B select P0 venue with explicit event-local detail edge. Do not infer native identity from indexed links or promote source role to accepted FIELD without independent provenance.
