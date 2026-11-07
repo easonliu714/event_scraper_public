@@ -143,6 +143,38 @@ def _validate_snapshot(snapshot):
 
 
 def write_isolated_review_lkg(envelope, target, repo_root, expected_sha=None):
+    """Serialize read/CAS/replace per slot; atomic replace alone is not CAS.
+
+    Exclusive mkdir is cross-process and fail-closed. A stale or occupied
+    lease is HOLD (no retry/steal). Separate A/B slots have separate leases.
+    """
+    root = Path(repo_root).resolve()
+    dest = Path(target).absolute()
+    isolation = root / "_isolated_review"
+    allowed = {
+        isolation / "review_snapshot.json",
+        isolation / "A" / "review_snapshot.json",
+        isolation / "B" / "review_snapshot.json",
+    }
+    if (envelope.get("line") not in ("A", "B") or dest not in allowed
+            or isolation.is_symlink() or dest.parent.is_symlink()
+            or dest.is_symlink()
+            or not dest.parent.resolve().is_relative_to(root)):
+        raise ValueError("REVIEW_TARGET_ISOLATION_HOLD")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    lease = dest.parent / ".review_snapshot.lock"
+    try:
+        lease.mkdir()
+    except FileExistsError as exc:
+        raise ValueError("REVIEW_LKG_CONCURRENT_WRITER_HOLD") from exc
+    try:
+        return _write_isolated_review_lkg_locked(
+            envelope, dest, root, expected_sha)
+    finally:
+        lease.rmdir()
+
+
+def _write_isolated_review_lkg_locked(envelope, target, repo_root, expected_sha=None):
     """One-file checksum+atomic replace with fail-closed expected-content CAS.
 
     Only _isolated_review/ under the repo root is writable. HOLD never

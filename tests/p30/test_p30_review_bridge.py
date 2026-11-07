@@ -119,6 +119,35 @@ class ReviewBridgeTests(unittest.TestCase):
                 bridge.write_isolated_review_lkg(good, root / "docs" /
                                                  "review_snapshot.json", root)
 
+    def test_slot_lease_serializes_cas_and_preserves_other_line(self):
+        """Concurrent A writer must HOLD without blocking independent B."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            a_good = bridge.build_review_envelope(
+                "A", self.a_list, self.a_detail, STAMP)
+            b_good = bridge.build_review_envelope(
+                "B", self.b_list, self.b_detail, STAMP)
+            a_target = root / "_isolated_review" / "A" / "review_snapshot.json"
+            b_target = root / "_isolated_review" / "B" / "review_snapshot.json"
+            a_sha = bridge.write_isolated_review_lkg(a_good, a_target, root)
+            original = a_target.read_bytes()
+            lease = a_target.parent / ".review_snapshot.lock"
+            lease.mkdir()
+            try:
+                with self.assertRaisesRegex(ValueError, "CONCURRENT_WRITER_HOLD"):
+                    bridge.write_isolated_review_lkg(
+                        a_good, a_target, root, expected_sha=a_sha)
+                self.assertEqual(a_target.read_bytes(), original)
+                self.assertEqual(
+                    bridge.write_isolated_review_lkg(b_good, b_target, root),
+                    json.loads(b_target.read_text())["sha256"])
+            finally:
+                lease.rmdir()
+            self.assertEqual(
+                bridge.write_isolated_review_lkg(
+                    a_good, a_target, root, expected_sha=a_sha), a_sha)
+            self.assertFalse(lease.exists())
+
     def test_manifest_cli_integrates_both_source_adapters(self):
         for line, listing, detail in (
                 ("A", self.a_list, self.a_detail),
