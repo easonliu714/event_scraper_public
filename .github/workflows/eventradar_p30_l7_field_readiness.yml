@@ -2024,12 +2024,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tpac-event2072-native-once]'; then
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tpac-event2072-native-importfix-once]'; then
             echo 'TPAC_EVENT2072_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
             exit 0
           fi
           mkdir -p evidence
-          python scripts/p30_tpac_event2072_native_once.py --evidence evidence/tpac_event2072_native_once.json
+          python -m scripts.p30_tpac_event2072_native_once --evidence evidence/tpac_event2072_native_once.json
           python - <<'PY'
           import json
           d=json.load(open('evidence/tpac_event2072_native_once.json',encoding='utf-8'))
