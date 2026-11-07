@@ -178,6 +178,37 @@ class ReviewBridgeTests(unittest.TestCase):
             self.assertEqual(
                 bridge.write_isolated_review_lkg(good, target, root, sha), sha)
 
+    def test_existing_alternate_a_b_adapters_have_source_owned_lkg(self):
+        """Reuse two existing parsers end-to-end; no native claim or formal write."""
+        for line, key in (("A", "A_UDN"), ("B", "B_CERAMICS")):
+            with self.subTest(adapter=key), tempfile.TemporaryDirectory() as td:
+                source = a.SOURCES[key]
+                listing = ('<main><a href="' + source["detail"] + '">' +
+                           source["title"] + '</a></main>').encode("utf-8")
+                detail = ('<main><article><h2>' + source["title"] +
+                          '</h2><p>Official detail</p></article></main>').encode("utf-8")
+                envelope = bridge.build_review_envelope(
+                    line, listing, detail, STAMP, adapter_key=key)
+                self.assertEqual(envelope["decision"], "REVIEW_ONLY_NOT_NATIVE")
+                self.assertEqual(envelope["source_event_id"], source["event_id"])
+                manifest = {**{k: envelope[k] for k in (
+                    "line", "adapter_key", "source_id", "source_event_id",
+                    "list_url", "detail_url", "observed_at_utc",
+                    "source_attestation")}, **envelope["body_digests"]}
+                root = Path(td)
+                out = bridge.replay_manifest_to_isolated_lkg(
+                    manifest, listing, detail, root)
+                self.assertEqual(out["native_get"], 0)
+                self.assertEqual(out["formal_accepted_fields"], 0)
+                target = root / "_isolated_review" / line / key / "review_snapshot.json"
+                self.assertEqual(json.loads(target.read_text())["sha256"],
+                                 out["snapshot_sha256"])
+                self.assertFalse((root / "docs" / "data.json").exists())
+                with self.assertRaisesRegex(ValueError, "ADAPTER_LINE_HOLD"):
+                    bridge.replay_manifest_to_isolated_lkg(
+                        {**manifest, "adapter_key": "B_NTPC" if line == "A" else "A_UDN"},
+                        listing, detail, root, out["snapshot_sha256"])
+
     def test_manifest_cli_integrates_both_source_adapters(self):
         for line, listing, detail in (
                 ("A", self.a_list, self.a_detail),

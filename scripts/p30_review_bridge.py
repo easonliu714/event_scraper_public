@@ -19,6 +19,10 @@ from scripts import p30_candidate_review_pipeline as preview
 
 MAX_HTML = 2 * 1024 * 1024
 ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
+# Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
+ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A",
+                 "B_NTPC": "B", "B_CERAMICS": "B"}
+DEFAULT_ADAPTER = {"A": "A_KIMU", "B": "B_NTPC"}
 
 
 def _canonical(value):
@@ -38,7 +42,7 @@ def _observed(value):
     return value
 
 
-def build_review_envelope(line, list_body, detail_body, observed_at_utc):
+def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter_key=None):
     """Run existing A KKTIX / B NTPC exact-ID parsers and preview normalizer.
 
     Returned hashes bind caller bytes, not a native fetch. No dates, room,
@@ -46,6 +50,9 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc):
     """
     if line not in ("A", "B"):
         raise ValueError("REVIEW_SOURCE_LINE_HOLD")
+    adapter_key = adapter_key or DEFAULT_ADAPTER[line]
+    if ADAPTER_LINES.get(adapter_key) != line:
+        raise ValueError("REVIEW_ADAPTER_LINE_HOLD")
     stamp = _observed(observed_at_utc)
     for body in (list_body, detail_body):
         if not isinstance(body, bytes) or not 0 < len(body) <= MAX_HTML:
@@ -54,14 +61,20 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc):
         listing, detail = list_body.decode("utf-8"), detail_body.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise ValueError("REVIEW_BODY_UTF8_HOLD") from exc
-    if line == "A":
-        source = ticket.SOURCES["A_KIMU"]
-        verdict = ticket.inspect_pair("A_KIMU", listing, detail)
+    if adapter_key != "B_NTPC":
+        # The same source-local parser also handles alternate A/B official
+        # LIST→DETAIL identities. Never promote LIST roles as DETAIL receipts.
+        source = ticket.SOURCES[adapter_key]
+        verdict = ticket.inspect_pair(adapter_key, listing, detail)
         list_url, detail_url = source["list"], source["detail"]
         title, source_id, event_id = (source["title"], source["source_id"],
                                       source["event_id"])
         roles = list(verdict.get("field_roles", []))
-        platform, kind = "KKTIX", "活動"
+        platform, kind = {
+            "A_KIMU": ("KKTIX", "活動"),
+            "A_UDN": ("UDN售票網", "活動"),
+            "B_CERAMICS": ("鶯歌陶瓷博物館", "展覽"),
+        }[adapter_key]
     else:
         verdict = venue.inspect_caller_html(listing, detail)
         list_url = venue.LIST_URL
@@ -76,7 +89,8 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc):
                "detail_sha256": hashlib.sha256(detail_body).hexdigest()}
     envelope = {
         "kind": "EVENTRADAR_AB_ISOLATED_REVIEW_BRIDGE_V1",
-        "line": line, "source_id": source_id, "source_event_id": event_id,
+        "line": line, "adapter_key": adapter_key,
+        "source_id": source_id, "source_event_id": event_id,
         "list_url": list_url, "detail_url": detail_url,
         "observed_at_utc": stamp, "body_digests": digests,
         "source_attestation": ATTESTATION, "native_get": 0,
@@ -130,6 +144,21 @@ def _validate_snapshot(snapshot):
     payload = snapshot["payload"]
     if not isinstance(payload, dict) or payload.get("decision") != "REVIEW_ONLY_NOT_NATIVE":
         raise ValueError("REVIEW_SNAPSHOT_NON_REVIEW_HOLD")
+    adapter = payload.get("adapter_key")
+    if ADAPTER_LINES.get(adapter) != payload.get("line"):
+        raise ValueError("REVIEW_SNAPSHOT_ADAPTER_IDENTITY_HOLD")
+    if adapter == "B_NTPC":
+        expected = (venue.LIST_URL, venue.exact_detail(
+            "/artcenter_chi/xmdoc/cont?sid=" + venue.SID +
+            "&sq=&xsmsid=" + venue.XSMSID),
+            "NTPC_ARTCENTER_OFFICIAL_NOT_FORMAL_19_PLATFORM", venue.SID)
+    else:
+        source = ticket.SOURCES[adapter]
+        expected = (source["list"], source["detail"],
+                    source["source_id"], source["event_id"])
+    if tuple(payload.get(k) for k in ("list_url", "detail_url",
+            "source_id", "source_event_id")) != expected:
+        raise ValueError("REVIEW_SNAPSHOT_SOURCE_IDENTITY_HOLD")
     if (payload.get("source_attestation") != ATTESTATION or
             payload.get("native_get") != 0 or
             payload.get("formal_accepted_fields") != 0 or
@@ -180,14 +209,17 @@ def write_isolated_review_lkg(envelope, target, repo_root, expected_sha=None):
     root = Path(repo_root).resolve()
     dest = Path(target).absolute()
     isolation = root / "_isolated_review"
+    line, adapter = envelope.get("line"), envelope.get("adapter_key")
+    if ADAPTER_LINES.get(adapter) != line:
+        raise ValueError("REVIEW_TARGET_ADAPTER_HOLD")
     allowed = {
         isolation / "review_snapshot.json",
-        isolation / "A" / "review_snapshot.json",
-        isolation / "B" / "review_snapshot.json",
+        isolation / line / "review_snapshot.json",
+        isolation / line / adapter / "review_snapshot.json",
     }
-    if (envelope.get("line") not in ("A", "B") or dest not in allowed
-            or isolation.is_symlink() or dest.parent.is_symlink()
-            or dest.is_symlink()
+    if (dest not in allowed or isolation.is_symlink()
+            or (isolation / line).is_symlink()
+            or dest.parent.is_symlink() or dest.is_symlink()
             or not dest.parent.resolve().is_relative_to(root)):
         raise ValueError("REVIEW_TARGET_ISOLATION_HOLD")
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -216,15 +248,20 @@ def _write_isolated_review_lkg_locked(envelope, target, repo_root, expected_sha=
     # second stream fail CROSS_IDENTITY despite a valid same-event REVIEW.
     # Preserve the legacy single-slot path for existing callers, but require
     # an exact line-owned slot for the executable manifest bridge.
+    line, adapter = envelope.get("line"), envelope.get("adapter_key")
+    if ADAPTER_LINES.get(adapter) != line:
+        raise ValueError("REVIEW_TARGET_ADAPTER_HOLD")
     allowed = {
         isolation / "review_snapshot.json",
-        isolation / envelope.get("line", "") / "review_snapshot.json",
+        isolation / line / "review_snapshot.json",
+        isolation / line / adapter / "review_snapshot.json",
     }
     if dest.name != "review_snapshot.json":
         raise ValueError("REVIEW_TARGET_NAME_HOLD")
-    if (envelope.get("line") not in ("A", "B") or dest not in allowed or
-            isolation.is_symlink() or dest.parent.is_symlink() or
-            dest.is_symlink() or not dest.parent.resolve().is_relative_to(root)):
+    if (dest not in allowed or isolation.is_symlink()
+            or (isolation / line).is_symlink()
+            or dest.parent.is_symlink() or dest.is_symlink()
+            or not dest.parent.resolve().is_relative_to(root)):
         raise ValueError("REVIEW_TARGET_ISOLATION_HOLD")
     digest = _validate_snapshot({
         "payload": envelope, "sha256": hashlib.sha256(_canonical(envelope)).hexdigest()
@@ -238,7 +275,7 @@ def _write_isolated_review_lkg_locked(envelope, target, repo_root, expected_sha=
         # source/event, roll back observation time, or silently rewrite bytes
         # at the same observation instant. Preserve the original LKG on HOLD.
         previous = old["payload"]
-        identity = ("line", "source_id", "source_event_id",
+        identity = ("line", "adapter_key", "source_id", "source_event_id",
                     "list_url", "detail_url")
         if any(previous.get(key) != envelope.get(key) for key in identity):
             raise ValueError("REVIEW_LKG_CROSS_IDENTITY_HOLD")
@@ -281,20 +318,26 @@ def _write_isolated_review_lkg_locked(envelope, target, repo_root, expected_sha=
 MANIFEST_KEYS = frozenset((
     "line", "source_id", "source_event_id", "list_url", "detail_url",
     "list_sha256", "detail_sha256", "observed_at_utc", "source_attestation"))
+ALT_MANIFEST_KEYS = MANIFEST_KEYS | {"adapter_key"}
 
 
 def replay_manifest_to_isolated_lkg(manifest, list_body, detail_body,
                                     repo_root, expected_sha=None):
     """Executable A/B parser -> preview normalizer -> checksum/CAS REVIEW."""
-    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_KEYS:
+    if not isinstance(manifest, dict) or set(manifest) not in (
+            MANIFEST_KEYS, ALT_MANIFEST_KEYS):
         raise ValueError("REVIEW_MANIFEST_SCHEMA_HOLD")
+    adapter = manifest.get("adapter_key")
+    if adapter is not None and ADAPTER_LINES.get(adapter) != manifest.get("line"):
+        raise ValueError("REVIEW_MANIFEST_ADAPTER_LINE_HOLD")
     if manifest["source_attestation"] != ATTESTATION:
         raise ValueError("REVIEW_MANIFEST_NATIVE_CLAIM_HOLD")
     for body in (list_body, detail_body):
         if not isinstance(body, bytes) or not 0 < len(body) <= MAX_HTML:
             raise ValueError("REVIEW_MANIFEST_BODY_CAP_HOLD")
     envelope = build_review_envelope(
-        manifest["line"], list_body, detail_body, manifest["observed_at_utc"])
+        manifest["line"], list_body, detail_body,
+        manifest["observed_at_utc"], adapter_key=adapter)
     for key in ("line", "source_id", "source_event_id", "list_url", "detail_url"):
         if manifest[key] != envelope[key]:
             raise ValueError("REVIEW_MANIFEST_EVENT_IDENTITY_HOLD")
@@ -306,7 +349,11 @@ def replay_manifest_to_isolated_lkg(manifest, list_body, detail_body,
                 "snapshot_sha256": None, "native_get": 0,
                 "formal_accepted_fields": 0, "golden": 0, "published": 0}
     root = Path(repo_root).resolve()
-    target = root / "_isolated_review" / manifest["line"] / "review_snapshot.json"
+    # An alternate source in the same line gets its own durable CAS slot.
+    slot = root / "_isolated_review" / manifest["line"]
+    if adapter is not None:
+        slot = slot / envelope["adapter_key"]
+    target = slot / "review_snapshot.json"
     digest = write_isolated_review_lkg(envelope, target, root, expected_sha)
     saved = json.loads(target.read_text(encoding="utf-8"))
     if _validate_snapshot(saved) != digest:
