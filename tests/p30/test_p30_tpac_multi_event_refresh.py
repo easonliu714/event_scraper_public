@@ -302,5 +302,65 @@ class MultiEventRefreshTests(unittest.TestCase):
                 write_isolated_plan(valid, d)
 
 
+    def test_cli_event_manifest_dispatch_cas_and_cross_catalog_hold(self):
+        # One repeatable CLI entrypoint must handle /event without treating
+        # exhibition/guide rows as /program SHOW or altering formal JSON.
+        from scripts.p30_tpac_multi_event_refresh import main as refresh_cli
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        from contextlib import redirect_stdout
+        from io import StringIO
+        observed = datetime(2026, 11, 8, 14, 54, tzinfo=timezone.utc)
+        name = "2026北藝夜遊：Beats到天臺"
+        raw = ('<a class="card-event" title="連結到' + name +
+               '" href="/event/2072"><div class="card-event__text-title">' +
+               name + '</div><div class="card-event__text-datecate"><p>'
+               '2026-11-10 - 2026-11-12</p><p>專題導覽</p></div></a>').encode()
+        detail_raw = event_detail(name, "專題導覽",
+                                  "2026-11-11 - 2026-11-13",
+                                  ["2026-11-11 (三) 19:00"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "list.html").write_bytes(raw)
+            (root / "detail.html").write_bytes(detail_raw)
+            manifest = {
+                "catalog": "event", "list_file": str(root / "list.html"),
+                "list_receipt": event_receipt("https://tpac.org.taipei/event", raw),
+                "details": {"2072": {
+                    "detail_file": str(root / "detail.html"),
+                    "receipt": event_receipt(
+                        "https://tpac.org.taipei/event/2072", detail_raw)}},
+                "prior": empty_prior(), "now": observed.isoformat(),
+            }
+            source = root / "manifest.json"
+            source.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            stage = root / "isolated"
+            with self.assertRaisesRegex(ValueError, "CATALOG_MISMATCH_HOLD"):
+                refresh_cli(["--catalog", "program", "--input", str(source),
+                             "--repo-root", str(stage)])
+            self.assertFalse(stage.exists())
+            with redirect_stdout(StringIO()) as captured:
+                rc = refresh_cli(["--catalog", "event", "--input", str(source),
+                                  "--repo-root", str(stage)])
+            self.assertEqual(rc, 0)
+            result = json.loads(captured.getvalue())
+            self.assertEqual(result["counts"]["qualified"], 1)
+            self.assertEqual(result["published"], 0)
+            target = stage / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
+            saved = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(set(saved["events"]), {"tpac:event:2072"})
+            self.assertFalse(saved["events"]["tpac:event:2072"]["published"])
+            self.assertFalse((stage / "docs" / "data.json").exists())
+            manifest["prior"] = saved
+            source.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                rc = refresh_cli(["--catalog", "event", "--input", str(source),
+                                  "--repo-root", str(stage), "--expected-sha",
+                                  result["result"]["sha256"]])
+            self.assertEqual(rc, 0)
+            self.assertEqual(json.loads(captured.getvalue())["counts"]["unchanged"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()

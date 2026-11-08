@@ -475,15 +475,21 @@ def write_isolated_plan(plan, repo_root, expected_sha=None):
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description="TPAC multi-event offline REVIEW refresh; no GET or PUBLISH")
+    # Explicit namespace prevents a /event archive from silently entering the
+    # legacy /program planner; the default preserves existing program callers.
+    ap.add_argument("--catalog", choices=("program", "event"), default="program")
     ap.add_argument("--input", type=Path, required=True)
     ap.add_argument("--repo-root", type=Path, required=True)
     ap.add_argument("--expected-sha")
     args = ap.parse_args(argv)
     data = json.loads(args.input.read_text(encoding="utf-8"))
+    if data.get("catalog", "program") != args.catalog:
+        raise ValueError("TPAC_MANIFEST_CATALOG_MISMATCH_HOLD")
     pairs = {sid: {"body": Path(row["detail_file"]).read_bytes(), "receipt": row["receipt"]}
              for sid, row in data["details"].items()}
-    plan = refresh_plan(Path(data["list_file"]).read_bytes(), data["list_receipt"],
-                        pairs, data["prior"], _time(data["now"]))
+    planner = refresh_event_plan if args.catalog == "event" else refresh_plan
+    plan = planner(Path(data["list_file"]).read_bytes(), data["list_receipt"],
+                   pairs, data["prior"], _time(data["now"]))
     if plan["decision"] == "REVIEW_SNAPSHOT_READY_NOT_FORMAL":
         result = write_isolated_plan(plan, args.repo_root, args.expected_sha)
     else:
