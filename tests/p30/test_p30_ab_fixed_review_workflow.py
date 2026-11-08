@@ -263,7 +263,7 @@ class FixedABWorkflowTests(unittest.TestCase):
             inputs = self._inbox(root)
             committed = workflow.run_fixed_ab(root, inputs)
             receipt = root / committed["pair_receipt_path"]
-            receipt.write_bytes(receipt.read_bytes() + b"\\n")
+            receipt.write_bytes(receipt.read_bytes() + b"\n")
             with self.assertRaisesRegex(
                     ValueError, "AB_FIXED_VERIFY_RECEIPT_CANONICAL_HOLD"):
                 workflow.verify_pair_receipt(
