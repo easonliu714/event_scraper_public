@@ -324,7 +324,7 @@ class EventSourceOnceTests(unittest.TestCase):
         calls, shared = [], set()
         def denied(url):
             calls.append(url)
-            return b"User-agent: *\\nDisallow: /event\\n"
+            return b"User-agent: *\nDisallow: /event\n"
         with tempfile.TemporaryDirectory() as root:
             cycle = "tpac-r4-20261109-065500z-a1b2c3d4"
             registry_a, registry_b = Path(root)/"a", Path(root)/"b"
