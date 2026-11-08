@@ -8383,3 +8383,48 @@ NEXT (nonpublication only):
 
 **Architecture boundary:** /program and /event are disjoint source identity namespaces, `tpac:program:<id>` vs `tpac:event:<id>`. For /event native receipt use `robots → LIST direct href → exact DETAIL H1 → event-local role`; listing period/category must never be treated as SHOW_START. On LIST/DETAIL period disagreement retain both raw roles and `CONFLICT_HOLD`, not an inferred timezone shift. `/event/1301` exhibition hours ≠ show session; `/event/2072` labelled `場次` is REVIEW-only pending independent FIELD authority. No auto GET, no formal JSON writes, no new source platform ID.
 
+
+
+### 2026-11-08 23:55 Asia/Taipei — TPAC-R3-ARCHIVED-EVENT-CAS-LKG-20261108 / price & region provenance boundary
+
+```text
+Owner formal Android: #244 North region chip/filter USER_ATTESTED_PASS_2026_11_08_TPAC_REGION_NORTH
+  #244 MERGED -> main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+  CI #42493632071 SUCCESS -> Pages #42494130888 SUCCESS
+  formal index blob 489edb5615584458387e0caa853702d278f6ca1f
+  formal data blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 = ONE /program/2040
+  status blob 720cac528faacc9560a5ab41ce725bf8cc183166 = 19 platforms
+  stale production.sourceMainEventDataSHA256GitBlob = HOLD (no silent edit)
+
+TPAC /program/2040 archived native DETAIL SHA bc343444e614342437c3b156da621b33c4ae1cd854f896676561ecae7a1ce682
+  first-party .page-program__aside-ticket-price = 票價 3500-1500 元
+  first-party 購票去 direct OPENTIX /event/2065059039769808896
+  extract_tpac_price_review -> role EVENT_GENERAL_ADMISSION_PRICE_RANGE
+    min 1500 / max 3500 / provenance SHA / observed_at -> REVIEW_NOT_FORMAL
+  reconcile_opentix_price -> normal tier match is REVIEW, not native Body acceptance
+    OPENTIX 10 sessions vs TPAC 8 SHOW: SESSION_SET_CONFLICT_HOLD
+    ticket-only 11/22 18:00, 11/28 12:30; never infer seat stock or per-session price
+  #245 UI-only Draft head 4d7e6ee17ae2f8b33a63ebeb816765fed8806bbf
+    CI #42496262762 SUCCESS; NOT MERGED; formal data price still empty
+    formalCardPriceSummary requires independent EVENT_GENERAL_ADMISSION_MIN_PRICE
+    accepted provenance/identity/observed_at; Owner UI and DATA approvals separate
+
+#243 isolated TPAC multi-event Draft (NO PUBLISH)
+  source original archived /event LIST and DETAIL 1301/2072 from run #42491637804
+    /event 1301 EXHIBITION_PERIOD only; no SHOW_START from exhibition hours
+    /event 2072 NEXT_EVENT_SHOW_START candidate; LIST/DETAIL period conflict HOLD
+  refresh_event_plan(list_body,list_receipt,detail_pairs,prior,now)
+    -> discover_catalog('event') -> inspect_event_detail exact ID/role/receipt
+    -> tpac:event:<id> identity distinct from legacy tpac:<id> /program
+    -> REVIEW partial 2-of-18, missing DETAIL 16 HOLD, no destructive removal
+  write_isolated_plan -> explicit namespace identity/URL + CAS/atomic SHA LKG
+    -> preserve prior on missing/403; 2 historical replays are NOT independent refresh
+  engineering head e7024e62f002203a0b038ad07f91e8aac9765cf6
+    initial CI #42497545364 FAIL regex double escaping; corrected source
+    exact-head CI #42497571854 PENDING at governance write
+  no new GET, no formal FIELD/Golden/Published delta; existing published=1
+
+NEXT R3 exact-head CI + Artifact/readback, R4 genuine independent refreshes,
+OPENTIX lawful robots/native Body ticket field authority, cross-source session HOLD.
+HARD_HOLD_NO_PUBLICATION for all future unapproved formal writes and automation.
+```
