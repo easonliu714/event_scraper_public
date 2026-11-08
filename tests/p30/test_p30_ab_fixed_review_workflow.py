@@ -163,6 +163,54 @@ class FixedABWorkflowTests(unittest.TestCase):
                              "REVIEW_ONLY_NOT_NATIVE")
             self.assertFalse((root / "docs").exists())
 
+    def test_immutable_pair_receipt_binds_both_source_snapshots(self):
+        """A/B same-ID LKG has a durable source-bound pair receipt."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root, "A_ACCUPASS")
+            out = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(out["decision"], "REVIEW_ONLY_NOT_NATIVE")
+            path = root / out["pair_receipt_path"]
+            sealed = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(sealed["sha256"], out["pair_receipt_sha256"])
+            self.assertEqual(hashlib.sha256(bridge._canonical(
+                sealed["payload"])).hexdigest(), sealed["sha256"])
+            self.assertEqual(set(sealed["payload"]["lines"]), {"A", "B"})
+            for line in ("A", "B"):
+                evidence = sealed["payload"]["lines"][line]
+                self.assertEqual(evidence["snapshot_sha256"],
+                                 out["lines"][line]["snapshot_sha256"])
+                self.assertEqual(evidence["source_event_id"],
+                                 out["lines"][line]["source_event_id"])
+                self.assertEqual(evidence["source_attestation"],
+                                 "CALLER_SUPPLIED_NOT_NATIVE")
+                inputs[line]["expected_sha"] = out["lines"][line]["snapshot_sha256"]
+            self.assertEqual(sealed["payload"]["native_get"], 0)
+            self.assertEqual(sealed["payload"]["formal_accepted_fields"], 0)
+            self.assertEqual(sealed["payload"]["golden"], 0)
+            self.assertEqual(sealed["payload"]["published"], 0)
+            again = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(again["pair_receipt_sha256"], sealed["sha256"])
+            self.assertEqual(path.read_bytes(), bridge._canonical(sealed) + b"\n")
+            self.assertFalse((root / "docs").exists())
+
+    def test_tampered_pair_receipt_holds_without_publication(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root)
+            first = workflow.run_fixed_ab(root, inputs)
+            path = root / first["pair_receipt_path"]
+            path.write_bytes(b"tampered historical receipt\n")
+            for line in ("A", "B"):
+                inputs[line]["expected_sha"] = first["lines"][line]["snapshot_sha256"]
+            result = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(result["decision"], "PARTIAL_HOLD")
+            self.assertIn("AB_FIXED_PAIR_RECEIPT_COLLISION_HOLD",
+                          result["first_failure"])
+            self.assertEqual(path.read_bytes(), b"tampered historical receipt\n")
+            self.assertFalse((root / "docs").exists())
+
+
 
 if __name__ == "__main__":
     unittest.main()

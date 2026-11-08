@@ -10,7 +10,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import tempfile
 from pathlib import Path
 
 from scripts import p30_review_bridge as bridge
@@ -90,6 +92,87 @@ def _prepare_line(root, line, supplied):
     return manifest, listing, detail, expected
 
 
+def _write_pair_receipt(root, ready, results):
+    """Seal historical A+B REVIEW LKG readbacks without claiming native source.
+
+    A content-addressed receipt is immutable, binds both exact source IDs,
+    manifests, body digests, role names and snapshot SHAs, and never asserts
+    atomic two-slot publication. Any collision or drift is fail-closed.
+    """
+    isolation = root / "_isolated_review"
+    directory = isolation / "_pair_receipts"
+    if (isolation.is_symlink() or directory.is_symlink() or
+            not directory.resolve().is_relative_to(root)):
+        raise ValueError("AB_FIXED_PAIR_TARGET_ISOLATION_HOLD")
+    evidence = {}
+    for line in ("A", "B"):
+        manifest, _, _, _ = ready[line]
+        target = isolation / line / manifest["adapter_key"] / "review_snapshot.json"
+        if (target.is_symlink() or
+                not target.parent.resolve().is_relative_to(root)):
+            raise ValueError("AB_FIXED_PAIR_TARGET_ISOLATION_HOLD")
+        snapshot = json.loads(target.read_text(encoding="utf-8"))
+        if bridge._validate_snapshot(snapshot) != results[line]["snapshot_sha256"]:
+            raise ValueError("AB_FIXED_PAIR_READBACK_DRIFT_HOLD")
+        payload = snapshot["payload"]
+        identity = ("line", "adapter_key", "source_id", "source_event_id",
+                    "list_url", "detail_url", "observed_at_utc",
+                    "source_attestation")
+        if (any(payload.get(key) != manifest[key] for key in identity) or
+                payload.get("body_digests") != {
+                    "list_sha256": manifest["list_sha256"],
+                    "detail_sha256": manifest["detail_sha256"]}):
+            raise ValueError("AB_FIXED_PAIR_MANIFEST_PARITY_HOLD")
+        evidence[line] = {
+            **{key: manifest[key] for key in identity},
+            "body_digests": payload["body_digests"],
+            "snapshot_sha256": results[line]["snapshot_sha256"],
+            "roles": [item["role"] for item in payload["role_receipts"]],
+        }
+    payload = {
+        "kind": "P30_AB_FIXED_IMMUTABLE_PAIR_RECEIPT_V1",
+        "decision": "REVIEW_ONLY_NOT_NATIVE",
+        "lines": evidence, "native_get": 0, "native_body_lkg": 0,
+        "formal_accepted_fields": 0, "golden": 0, "published": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+    digest = hashlib.sha256(bridge._canonical(payload)).hexdigest()
+    blob = bridge._canonical({"payload": payload, "sha256": digest}) + b"\n"
+    directory.mkdir(parents=True, exist_ok=True)
+    if directory.is_symlink():
+        raise ValueError("AB_FIXED_PAIR_TARGET_ISOLATION_HOLD")
+    destination = directory / (digest + ".json")
+    if destination.is_symlink():
+        raise ValueError("AB_FIXED_PAIR_RECEIPT_COLLISION_HOLD")
+    fd, temporary = tempfile.mkstemp(prefix=".pair-", dir=str(directory))
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(blob)
+            stream.flush()
+            os.fsync(stream.fileno())
+        try:
+            os.link(temporary, destination)
+        except FileExistsError:
+            if destination.is_symlink() or destination.read_bytes() != blob:
+                raise ValueError("AB_FIXED_PAIR_RECEIPT_COLLISION_HOLD")
+    finally:
+        os.unlink(temporary)
+    if destination.read_bytes() != blob:
+        raise ValueError("AB_FIXED_PAIR_RECEIPT_READBACK_HOLD")
+    # Concurrent post-seal slot drift cannot be represented as a coherent pair.
+    for line in ("A", "B"):
+        manifest = ready[line][0]
+        target = isolation / line / manifest["adapter_key"] / "review_snapshot.json"
+        if (target.is_symlink() or bridge._validate_snapshot(json.loads(
+                target.read_text(encoding="utf-8"))) !=
+                results[line]["snapshot_sha256"]):
+            raise ValueError("AB_FIXED_PAIR_POST_SEAL_DRIFT_HOLD")
+    return {"pair_receipt_sha256": digest,
+            "pair_receipt_path": str(destination.relative_to(root))}
+
+
+
+
 def run_fixed_ab(repo_root, inputs):
     """Execute two exact-ID adapters; preflight both, then independent CAS writes.
 
@@ -125,9 +208,18 @@ def run_fixed_ab(repo_root, inputs):
             "role_receipts": result["role_receipts"],
             "native_get": 0, "native_body_lkg": 0,
         }
+    try:
+        pair_receipt = _write_pair_receipt(root, ready, results)
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        return {"kind": "P30_AB_FIXED_REVIEW_WORKFLOW_V1",
+                "decision": "PARTIAL_HOLD",
+                "first_failure": type(exc).__name__ + ":" + str(exc),
+                "lines": results, "native_get": 0, "native_body_lkg": 0,
+                "formal_accepted_fields": 0, "golden": 0, "published": 0,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
     return {"kind": "P30_AB_FIXED_REVIEW_WORKFLOW_V1",
             "decision": "REVIEW_ONLY_NOT_NATIVE", "lines": results,
-            "native_get": 0, "native_body_lkg": 0,
+            **pair_receipt, "native_get": 0, "native_body_lkg": 0,
             "formal_accepted_fields": 0, "golden": 0, "published": 0,
             "release_state": "HARD_HOLD_NO_PUBLICATION"}
 
