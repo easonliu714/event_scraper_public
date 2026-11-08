@@ -25,7 +25,8 @@ ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
 # Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
 ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A", "A_OPENTIX": "A",
                  "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B",
-                 "B_TPAC_EVENT2072": "B", "B_CLOUDGATE": "B"}
+                 "B_TPAC_EVENT2072": "B", "B_CLOUDGATE": "B",
+                 "B_TAINEX": "B"}
 DEFAULT_ADAPTER = {"A": "A_KIMU", "B": "B_NTPC"}
 
 
@@ -94,6 +95,9 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
             "A_ACCUPASS": ("ACCUPASS", "活動"),
             "B_CERAMICS": ("鶯歌陶瓷博物館", "展覽"),
             "B_ZEPP_TAKASE": ("Zepp New Taipei", "活動"),
+            # Reuse the proven first-party exact-/event/691 parser; this is
+            # caller-body REVIEW only, not the prior one-shot native receipt.
+            "B_TAINEX": ("南港展覽館", "展覽"),
         }[adapter_key]
     elif adapter_key == "B_CLOUDGATE":
         # Reuse the existing official exact-1680 parser; the postponement

@@ -42,6 +42,17 @@ class FixedABWorkflowTests(unittest.TestCase):
                   ('<main><article><h1>' + tpac.TITLE +
                    '</h1><p>2026-11-11 - 2026-11-13</p></article></main>').encode()),
         }
+        if b_adapter == "B_TAINEX":
+            # Existing source-owned parser and exact event ID; no re-GET.
+            src = tickets.SOURCES["B_TAINEX"]
+            pairs["B"] = (
+                b_adapter,
+                ('<main><article><a href="/event/691">2026 11/13 - 11/16 ' +
+                 src["title"] + ' 一樓展場 四樓展場</a></article></main>').encode(),
+                ('<main><article><h1>' + src["title"] + '</h1>'
+                 '<p>2026 11.13 (五) - 2026 11.16 (一)</p>'
+                 '<p>一樓展場 四樓展場</p></article></main>').encode(),
+            )
         inputs = {}
         for line, (key, listing, detail) in pairs.items():
             envelope = bridge.build_review_envelope(
@@ -114,6 +125,61 @@ class FixedABWorkflowTests(unittest.TestCase):
             second = workflow.run_fixed_ab(root, inputs)
             self.assertEqual(second["lines"]["B"]["snapshot_sha256"],
                              result["lines"]["B"]["snapshot_sha256"])
+
+    def test_opentix_and_tainex_691_fixed_review_cas_and_readback(self):
+        # This executes both existing adapters through the durable pair
+        # workflow. The real TaiNEX native one-shot receipt is NOT replayed
+        # as a body or upgraded to a native/accepted-field claim.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root, b_adapter="B_TAINEX")
+            out = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(out["decision"], "REVIEW_ONLY_NOT_NATIVE")
+            self.assertEqual((out["native_get"], out["native_body_lkg"],
+                              out["formal_accepted_fields"], out["golden"],
+                              out["published"]), (0, 0, 0, 0, 0))
+            self.assertEqual(out["lines"]["A"]["adapter_key"], "A_OPENTIX")
+            self.assertEqual(out["lines"]["B"]["source_event_id"], "691")
+            self.assertEqual(out["lines"]["B"]["role_receipts"], 2)
+            bpath = (root / "_isolated_review" / "B" / "B_TAINEX" /
+                     "review_snapshot.json")
+            saved = json.loads(bpath.read_text(encoding="utf-8"))
+            bridge._validate_snapshot(saved)
+            self.assertEqual(saved["sha256"],
+                             out["lines"]["B"]["snapshot_sha256"])
+            self.assertEqual(saved["payload"]["source_id"],
+                             tickets.SOURCES["B_TAINEX"]["source_id"])
+            self.assertEqual(saved["payload"]["source_attestation"],
+                             "CALLER_SUPPLIED_NOT_NATIVE")
+            self.assertEqual(saved["payload"]["candidate"]["date"], "未確認")
+            self.assertEqual(saved["payload"]["candidate"]["location"], "未確認")
+            self.assertEqual(saved["payload"]["candidate"]["price"], "未確認")
+            self.assertEqual({r["role"] for r in saved["payload"]["role_receipts"]},
+                             {"VENUE_EXHIBITION_RANGE_REVIEW_NOT_SESSION",
+                              "VENUE_FLOORS_REVIEW"})
+            for line in ("A", "B"):
+                inputs[line]["expected_sha"] = out["lines"][line]["snapshot_sha256"]
+            replay = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(replay["lines"]["B"]["snapshot_sha256"],
+                             out["lines"]["B"]["snapshot_sha256"])
+            self.assertTrue(workflow.verify_pair_receipt(
+                root, out["pair_receipt_sha256"])["verified"])
+            self.assertFalse((root / "docs").exists())
+
+    def test_tainex_identity_tamper_preflight_preserves_a_and_b(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root, b_adapter="B_TAINEX")
+            manifest = inputs["B"]["manifest"]
+            content = json.loads(manifest.read_text(encoding="utf-8"))
+            content["source_event_id"] = "690"
+            manifest.write_text(json.dumps(content), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "AB_FIXED_EXACT_IDENTITY_HOLD"):
+                workflow.run_fixed_ab(root, inputs)
+            self.assertFalse((root / "_isolated_review" / "A" /
+                              "A_OPENTIX" / "review_snapshot.json").exists())
+            self.assertFalse((root / "_isolated_review" / "B" /
+                              "B_TAINEX" / "review_snapshot.json").exists())
 
     def test_prior_accupass_fixed_pair_remains_covered(self):
         """OPENTIX integration must not regress the accepted ACCUPASS path."""
