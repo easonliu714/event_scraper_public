@@ -424,6 +424,34 @@ class Zepp160667DistinctNativeGate(unittest.TestCase):
         no_show = detail.replace("活動時間", "其他時間")
         self.assertEqual(len(m.inspect_zepp_earendel_pair(listing, no_show)["roles"]), 2)
 
+    def test_scope_hold_emits_structural_diagnosis_without_acceptance(self):
+        cfg = m.ZEPP_EARENDEL
+        listing = ('<main><a href="' + cfg["detail"] + '">' +
+                   cfg["title"] + '</a></main>')
+        # A global MAIN heading is not an event-owned ARTICLE/SECTION.
+        main_only = ('<main><div><h2>' + cfg["title"] +
+                     '</h2><p>演出地點：Zepp New Taipei</p></div></main>')
+        result = m.inspect_zepp_earendel_pair(listing, main_only)
+        self.assertEqual(result["reason"], "ZEPP_160667_EVENT_SCOPE_HOLD")
+        self.assertEqual(result["identity"], 0)
+        audit = result["scope_diagnostics"]
+        self.assertEqual(audit["detail_exact_heading_count"], 1)
+        self.assertEqual(audit["title_owned_container_counts"],
+                         {"main": 1, "article": 0, "section": 0})
+        self.assertFalse(audit["identity_attested"])
+        self.assertFalse(audit["raw_html_saved"])
+        self.assertNotIn(cfg["title"], str(audit))
+        self.assertNotIn("Zepp New Taipei", str(audit))
+        # Nested title-owned SECTIONs remain ambiguous, not promoted.
+        nested = ('<main><section><section><h2>' + cfg["title"] +
+                  '</h2><p>演出地點：Zepp New Taipei</p>'
+                  '</section></section></main>')
+        second = m.inspect_zepp_earendel_pair(listing, nested)
+        self.assertEqual(second["reason"], "ZEPP_160667_EVENT_SCOPE_HOLD")
+        self.assertEqual(second["scope_diagnostics"]
+                         ["title_owned_container_counts"]["section"], 2)
+        self.assertEqual(second["identity"], 0)
+
     def test_sibling_venue_and_foreign_title_fail_closed(self):
         cfg = m.ZEPP_EARENDEL
         listing = '<main><article><a href="' + cfg["detail"] + '">' + cfg["title"] + '</a></article></main>'

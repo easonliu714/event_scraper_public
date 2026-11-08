@@ -752,6 +752,33 @@ ZEPP_EARENDEL = {
 }
 
 
+def diagnose_zepp_event_scope(parsed, title):
+    """Bounded structural root-cause receipt; never raw HTML or identity proof.
+
+    Native Zepp 160667 had an exact LIST->DETAIL edge but failed ARTICLE/
+    SECTION ownership.  Record only tag/count diagnostics so future legal
+    one-shot sources can distinguish absent versus ambiguous event containers.
+    This diagnostic NEVER upgrades a HOLD or authorizes another GET.
+    """
+    expected = norm(title)
+    counts = {"main": 0, "article": 0, "section": 0}
+    matched = {"main": 0, "article": 0, "section": 0}
+    for scope in parsed.scopes:
+        tag = scope["tag"]
+        if tag in counts:
+            counts[tag] += 1
+            if expected in scope["headings"]:
+                matched[tag] += 1
+    return {
+        "scope_policy": "EXACTLY_ONE_TITLE_OWNED_ARTICLE_OR_SECTION",
+        "detail_exact_heading_count": parsed.headings.count(expected),
+        "container_counts": counts,
+        "title_owned_container_counts": matched,
+        "raw_html_saved": False,
+        "identity_attested": False,
+    }
+
+
 def inspect_zepp_earendel_pair(list_html, detail_html):
     """Exact source-owned rid, event-local title/venue, distinct date roles."""
     cfg = ZEPP_EARENDEL
@@ -775,9 +802,10 @@ def inspect_zepp_earendel_pair(list_html, detail_html):
     if len(edges) != 1 or norm(cfg["title"]) not in edges[0][1]:
         return dict(decision="HOLD", reason="ZEPP_160667_LIST_EXACT_EDGE_HOLD",
                     identity=0, roles=[])
+    scope_audit = diagnose_zepp_event_scope(detail, cfg["title"])
     if detail.headings.count(norm(cfg["title"])) != 1:
         return dict(decision="HOLD", reason="ZEPP_160667_DETAIL_TITLE_HOLD",
-                    identity=0, roles=[])
+                    identity=0, roles=[], scope_diagnostics=scope_audit)
     owned = [scope for scope in detail.scopes
              if scope["tag"] in ("article", "section")
              and norm(cfg["title"]) in scope["headings"]]
@@ -785,18 +813,20 @@ def inspect_zepp_earendel_pair(list_html, detail_html):
     owned = articles or owned
     if len(owned) != 1:
         return dict(decision="HOLD", reason="ZEPP_160667_EVENT_SCOPE_HOLD",
-                    identity=0, roles=[])
+                    identity=0, roles=[], scope_diagnostics=scope_audit)
     local = norm(" ".join(owned[0]["texts"]))
     if not re.search(r"演出地點\s*[:：]\s*Zepp New Taipei\b", local):
         return dict(decision="HOLD", reason="ZEPP_160667_LOCAL_VENUE_HOLD",
-                    identity=1, roles=["SOURCE_EVENT_TITLE_REVIEW"])
+                    identity=1, roles=["SOURCE_EVENT_TITLE_REVIEW"],
+                    scope_diagnostics=scope_audit)
     roles = ["SOURCE_EVENT_TITLE_REVIEW", "SOURCE_VENUE_REVIEW"]
     if (len(re.findall(r"活動時間\s*[:：]\s*2026年11月14日\s*\(?六\)?\s*19:00", local)) == 1
             and len(re.findall(r"啟售時間\s*[:：]\s*2026年9月19日\s*\(?六\)?\s*(?:PM\s*)?13:00",
                                local, flags=re.I)) == 1):
         roles += ["EVENT_START_REVIEW_NOT_SESSION", "SALE_START_NOT_SHOW"]
     return dict(decision="REVIEW_NON_SESSION_ONLY",
-                reason="INDEPENDENT_FIELD_AUTHORITY_HOLD", identity=1, roles=roles)
+                reason="INDEPENDENT_FIELD_AUTHORITY_HOLD", identity=1, roles=roles,
+                scope_diagnostics=scope_audit)
 
 
 def run_zepp_earendel_native_once():
@@ -848,6 +878,7 @@ def run_zepp_earendel_native_once():
         verdict = inspect_zepp_earendel_pair(listing, detail)
         out["decision"], out["first_failure"] = verdict["decision"], verdict["reason"]
         out["native_identity"] = verdict["identity"]
+        out["scope_diagnostics"] = verdict.get("scope_diagnostics", {})
         if verdict["decision"] == "REVIEW_NON_SESSION_ONLY":
             out["roles"] = [
                 dict(role=role, source_url=cfg["detail"], source_event_id=cfg["id"],
