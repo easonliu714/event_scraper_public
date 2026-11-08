@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - scripts/p30_tpac_multi_event_refresh.py
+      - scripts/p30_tpac_catalog_topology.py
+      - tests/p30/test_p30_tpac_catalog_topology.py
       - tests/p30/test_p30_tpac_multi_event_refresh.py
       - .github/workflows/eventradar_tpac_multi_event_refresh.yml
 permissions:
@@ -31,7 +33,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
       - uses: actions/setup-python@v5
@@ -42,7 +44,8 @@ jobs:
           set -euo pipefail
           python -m pip install 'beautifulsoup4==4.15.0'
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_multi_event_refresh.py' -v
-          python -m py_compile scripts/p30_tpac_multi_event_refresh.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_catalog_topology.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
       - name: Produce two-ID isolated LKG fixture evidence, never native HTTP
         run: |
@@ -73,12 +76,32 @@ jobs:
                       'next_real_gate':'2 distinct independently evidenced TPAC native list/detail ID pairs'}
               Path('evidence/tpac_multi_event_offline_demo.json').write_text(
                   json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          # /program and /event are different official LIST/DETAIL namespaces.
+          from test_p30_tpac_catalog_topology import listing as catalog_listing, receipt as catalog_receipt
+          from scripts.p30_tpac_catalog_topology import discover_catalog,safe_union
+          p_raw=catalog_listing('program','1301','測試節目A')
+          e_raw=catalog_listing('event','1301','測試活動B')
+          programs=discover_catalog('program',p_raw,catalog_receipt('program',p_raw),NOW)
+          events=discover_catalog('event',e_raw,catalog_receipt('event',e_raw),NOW)
+          joined=safe_union(programs,events)
+          assert sorted(joined)==['tpac:event:1301','tpac:program:1301']
+          assert all(v['accepted_show_start'] is None for v in joined.values())
+          Path('evidence/tpac_catalog_topology_fixture.json').write_text(
+              json.dumps({'kind':'TPAC_DUAL_OFFICIAL_CATALOG_SCHEMATIC_NOT_NATIVE',
+                         'source_uris':['https://tpac.org.taipei/program',
+                                       'https://tpac.org.taipei/event'],
+                         'synthetic_only':True,'distinct_identity_keys':sorted(joined),
+                         'new_native_http':0,'formal_published':0,
+                         'event_list_date_role':'ACTIVITY_LIST_PERIOD_NOT_SHOW_START',
+                         'program_list_date_role':'PERFORMANCE_LIST_PERIOD_NOT_SHOW_START'},
+                         ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          print('PASS_DUAL_CATALOG_NONMERGE_DATE_ROLES_FIXTURE_NOT_NATIVE')
           print('PASS_REUSABLE_2_ID_OFFLINE_REVIEW_NOT_NATIVE_OR_PUBLISHED')
           PY
       - name: SHA256 evidence and formal outputs remain untouched
         run: |
           set -euo pipefail
-          (cd evidence && sha256sum tpac_multi_event_offline_demo.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd evidence && sha256sum tpac_multi_event_offline_demo.json tpac_catalog_topology_fixture.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           git diff --exit-code -- docs/data.json docs/platform_status.json docs/index.html scraper.py
           echo PASS_ZERO_FORMAL_DATA_AND_AUTOMATIC_PUBLISHER_WRITES
       - uses: actions/upload-artifact@v4
