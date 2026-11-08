@@ -18,6 +18,8 @@ from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
 
+from scripts.p30_tpac_price_reconcile import extract_tpac_price_review
+
 ROOT = "https://tpac.org.taipei/program"
 KIND = "TPAC_SOURCE_OWNED_MULTI_EVENT_REVIEW_V1"
 TIMEZONE = timezone(timedelta(hours=8))
@@ -166,7 +168,16 @@ def parse_detail(card, body, receipt, now):
         raise ValueError("TPAC_NO_FUTURE_SHOW_HOLD")
     if upcoming[0].astimezone(timezone.utc) > now + timedelta(days=370):
         raise ValueError("TPAC_FUTURE_SHOW_OUT_OF_RANGE_HOLD")
-    holds = ["PRICE_NOT_VERIFIED", "HALL_NOT_VERIFIED"]
+    # Admission price is a separate source-owned field role. Do not fail
+    # the accepted title/showtime just because price is unknown, conditional,
+    # or needs independent field publication authority.
+    admission = extract_tpac_price_review(
+        body, receipt, card["source_event_id"], card["title"])
+    holds = ["HALL_NOT_VERIFIED"]
+    if admission.get("decision") == "SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL":
+        holds.append("PRICE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE")
+    else:
+        holds.append("PRICE_NOT_VERIFIED")
     try:
         if _period(card["period"]) != detail_period:
             holds.append("LIST_DETAIL_PERIOD_CONFLICT_HOLD")
@@ -194,6 +205,19 @@ def parse_detail(card, body, receipt, now):
                            "date": {"role": "EVENT_SHOW_START", "value": upcoming[0].isoformat(), "source_url": url},
                        }},
     }
+    if admission.get("decision") == "SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL":
+        # This is useful evidence for a future governed Publisher, but it is
+        # not itself authorization to display or publish a numeric price.
+        event["_candidate"]["price_review"] = admission
+        event["_candidate"]["field_roles"]["price"] = {
+            "role": admission["role"],
+            "min_price_ntd": admission["min_price_ntd"],
+            "max_price_ntd": admission["max_price_ntd"],
+            "source_url": admission["source_url"],
+            "source_body_sha256": admission["source_body_sha256"],
+            "observed_at": admission["observed_at"],
+            "decision": "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE",
+        }
     return event
 
 
