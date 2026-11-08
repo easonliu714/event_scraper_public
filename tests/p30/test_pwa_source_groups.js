@@ -45,6 +45,7 @@ const roots = {
 const inputs = [
     {platform: "華山1914"}, {platform: "華山1914"},
     {platform: "松山文創"}, {platform: "台北世貿"}, {platform: "中正紀念堂"},
+    {platform: "臺北表演藝術中心"},
     {platform: "OPENTIX"}, {platform: "OPENTIX"}, {platform: "KKTIX"},
     {platform: "<img src=x onerror=alert(1)>"}
 ];
@@ -70,17 +71,18 @@ const names = root => root.children.map(chip => chip.children[0].textContent.tri
 const find = (root, source) =>
     root.children.find(chip => chip.children[0].textContent.trim() === source);
 
-for (const name of ["華山1914", "松山文創", "台北世貿", "中正紀念堂"]) {
+for (const name of ["華山1914", "松山文創", "台北世貿", "中正紀念堂", "臺北表演藝術中心"]) {
     assert.equal(context.sourceGroup(name), "venue", name);
 }
 for (const name of ["OPENTIX", "KKTIX", "ACCUPASS", "FamiTicket", "StrollTimes"]) {
     assert.equal(context.sourceGroup(name), "platform", name);
 }
 assert.equal(context.sourceGroup(" 華山1914 "), "venue", "trim / normalization");
+assert.equal(context.sourceGroup("台北表演藝術中心"), "venue", "normalized venue alias");
 
 context.renderSourceChips();
 assert.deepEqual(names(roots["venue-platform-chips"]).sort(),
-    ["華山1914", "松山文創", "台北世貿", "中正紀念堂"].sort());
+    ["華山1914", "松山文創", "台北世貿", "中正紀念堂", "臺北表演藝術中心"].sort());
 assert.deepEqual(names(roots["ticket-platform-chips"]).sort(),
     ["OPENTIX", "KKTIX", "<img src=x onerror=alert(1)>"].sort());
 assert.equal(find(roots["venue-platform-chips"], "華山1914").children[1].textContent, "2");
