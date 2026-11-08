@@ -7,8 +7,11 @@ on:
       - scripts/p30_tpac_publisher_source_once.py
       - tests/p30/test_p30_quality_snapshot_publisher.py
       - tests/p30/test_p30_tpac_publisher_source_once.py
+      - scripts/p30_tpac_verified_show_publisher.py
+      - tests/p30/test_p30_tpac_verified_show_publisher.py
 permissions:
   contents: read
+  actions: read
 jobs:
   single-release-eligibility:
     if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/p30-one-shot-release-preflight'
@@ -31,15 +34,19 @@ jobs:
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_one_shot_release_preflight.yml' 'scripts/p30_quality_snapshot_publisher.py' 'scripts/p30_tpac_publisher_source_once.py' 'tests/p30/test_p30_quality_snapshot_publisher.py' 'tests/p30/test_p30_tpac_publisher_source_once.py' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_one_shot_release_preflight.yml' 'scripts/p30_quality_snapshot_publisher.py' 'scripts/p30_tpac_publisher_source_once.py' 'tests/p30/test_p30_quality_snapshot_publisher.py' 'tests/p30/test_p30_tpac_publisher_source_once.py' 'scripts/p30_tpac_verified_show_publisher.py' 'tests/p30/test_p30_tpac_verified_show_publisher.py' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_SCOPE_DRIFT; exit 1; }
           echo PASS_ONE_SHOT_PREFLIGHT_READONLY_EXACT_HEAD
+      - name: Set up parser dependency (existing scraper library)
+        run: |
+          python -m pip install 'beautifulsoup4==4.15.0'
       - name: Validate fixed quality snapshot publisher negative and regression gates
         run: |
           set -euo pipefail
           python -m unittest discover -s tests/p30 -p 'test_p30_quality_snapshot_publisher.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_publisher_source_once.py' -v
-          python -m py_compile scripts/p30_quality_snapshot_publisher.py scripts/p30_tpac_publisher_source_once.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_verified_show_publisher.py' -v
+          python -m py_compile scripts/p30_quality_snapshot_publisher.py scripts/p30_tpac_publisher_source_once.py scripts/p30_tpac_verified_show_publisher.py
           echo PASS_QUALITY_PUBLISHER_STRICT_SOURCE_ROLE_AND_ZERO_FAIL_CLOSED
       - name: One-time bounded first-party TPAC 2040 raw source acquisition for independent replay (NOT PUBLISH)
         env:
@@ -52,6 +59,49 @@ jobs:
           else
             python -m scripts.p30_tpac_publisher_source_once --out evidence/native
           fi
+      - name: Independently replay consumed first-party TPAC raw bodies (NO GET / NO PUBLISH)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-one-shot-publication-attempt-hold-evidence
+          run-id: 42484103012
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: source-archive
+      - name: Reverify official SHA and source-owned showtime candidate from archived bytes
+        run: |
+          set -euo pipefail
+          (cd source-archive && sha256sum -c SHA256SUMS.txt)
+          mkdir -p evidence
+          python scripts/p30_tpac_verified_show_publisher.py --source-dir source-archive/native --out evidence/tpac_2040_candidate.json
+          python - <<'PY'
+          from pathlib import Path
+          from bs4 import BeautifulSoup
+          import json, hashlib
+          p=Path('source-archive/native')
+          r=json.loads(Path('evidence/tpac_2040_candidate.json').read_text())
+          assert r['decision']=='SOURCE_QUALIFIED_CORE_REQUIRES_INDEPENDENT_RELEASE'
+          assert r['accepted_roles']==['EVENT_TITLE','NEXT_EVENT_SHOW_START']
+          assert r['record']['date']=='2026-11-20 19:30'
+          assert r['future_showtimes']==8
+          assert r['record']['published'] is False
+          assert r['record']['golden_accepted'] is False
+          assert 'LIST_DETAIL_EVENT_PERIOD_RANGE_CONFLICT_HOLD' in r['hold_fields']
+          assert 'HALL_SPECIFIC_ROOM_NOT_ACCEPTED' in r['hold_fields']
+          receipt=json.loads((p/'tpac_2040_source_receipt.json').read_text())
+          assert receipt['source_native_get']==3 and receipt['exact_list_edges']==1
+          listing=BeautifulSoup((p/'tpac_2040_list.html').read_bytes(),'html.parser')
+          detail=BeautifulSoup((p/'tpac_2040_detail.html').read_bytes(),'html.parser')
+          links=[a for a in listing.select('a.card-program[href][title]') if a.get('href')=='/program/2040']
+          assert len(links)==1
+          h1=detail.select('article.page-program__article > h1')
+          assert len(h1)==1 and h1[0].get_text(' ',strip=True)==links[0]['title']
+          sessions=detail.select('.page-program__aside-place-showtimes ul > li > p')
+          assert len(sessions)==8 and sessions[0].get_text(' ',strip=True)=='2026-11-20 (五) 19:30'
+          assert sessions[-1].get_text(' ',strip=True)=='2026-11-29 (日) 12:30'
+          assert receipt['list_sha256']==hashlib.sha256((p/'tpac_2040_list.html').read_bytes()).hexdigest()
+          assert receipt['detail_sha256']==hashlib.sha256((p/'tpac_2040_detail.html').read_bytes()).hexdigest()
+          print('PASS_ARCHIVED_NATIVE_TPAC_SAME_ID_CORE_2_ROLES_8_SHOWS_PERIOD_HOLD_NO_PUBLISH')
+          PY
       - name: Execute one-shot release qualification against actual formal JSON
         run: |
           set -euo pipefail
