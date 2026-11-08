@@ -573,6 +573,40 @@
         return VENUE_SOURCE_NAMES.has(name) ? 'venue' : 'platform';
     }
 
+    // 地區缺值時，僅對「官方來源 + 明確場地 + 官方活動 ID」的交集套用場館地址。
+    // TPAC 官方地址：臺北市士林區劍潭路1號，https://tpac.org.taipei/traffic-drive
+    // 注意：平台所在地不等於活動舉辦地；外部場地或衝突的 region 一律 UNKNOWN。
+    const VERIFIED_VENUE_REGIONS = new Map([
+        ['台北表演藝術中心', { region: 'north', city: '臺北市', district: '士林區',
+            address: '臺北市士林區劍潭路1號', authority: 'https://tpac.org.taipei/traffic-drive' }]
+    ]);
+    const KNOWN_EVENT_REGIONS = new Set(['north', 'central', 'south', 'east', 'islands']);
+
+    function eventRegion(event) {
+        const raw = typeof event?.region === 'string' ? event.region.trim().toLowerCase() : '';
+        const normalizeVenue = value => String(value || '').normalize('NFKC')
+            .replace(/臺/g, '台').replace(/[\s\u3000]+/g, '');
+        const venueName = normalizeVenue(event?.location);
+        const officialPlatform = normalizeVenue(event?.platform) === '台北表演藝術中心';
+        let eligibleVenue = null;
+        if (officialPlatform && VERIFIED_VENUE_REGIONS.has(venueName)) {
+            try {
+                const url = new URL(event.url);
+                if (url.origin === 'https://tpac.org.taipei'
+                    && /^\/(?:program|event)\/[1-9]\d*$/.test(url.pathname)
+                    && !url.search && !url.hash && !url.username && !url.password) {
+                    eligibleVenue = VERIFIED_VENUE_REGIONS.get(venueName);
+                }
+            } catch (_) { /* 無效官方 URL：不可推定地區 */ }
+        }
+        if (KNOWN_EVENT_REGIONS.has(raw)) {
+            // 明確地區與經驗證場地衝突時，不默默覆寫其中任一方。
+            return eligibleVenue && eligibleVenue.region !== raw ? 'unknown' : raw;
+        }
+        if (raw && !['unknown', 'unverified', '未確認'].includes(raw)) return 'unknown';
+        return eligibleVenue ? eligibleVenue.region : 'unknown';
+    }
+
     // 本次修改：原單一平台 chips 改為售票／活動資訊與活動場地兩組。
     // 安全性：使用 text node，不將來源名稱拼接為 HTML 或內聯 onclick。
     function renderSourceChips() {
@@ -619,10 +653,8 @@
         // 計算各地區數量
         const rStats = { 'north': 0, 'central': 0, 'south': 0, 'east': 0, 'islands': 0 };
         allEvents.forEach(e => {
-            if (e.region) {
-                const r = e.region.toLowerCase();
-                if (rStats.hasOwnProperty(r)) rStats[r]++;
-            }
+            const r = eventRegion(e);
+            if (Object.prototype.hasOwnProperty.call(rStats, r)) rStats[r]++;
         });
 
         // 生成 HTML
@@ -690,8 +722,7 @@
 
             // 地區篩選邏輯
             if (filters.regions.size > 0) {
-                const rawRegion = e.region || 'unknown'; 
-                const region = rawRegion.toLowerCase(); 
+                const region = eventRegion(e); 
                 const knownRegions = ['north', 'central', 'south', 'east', 'islands'];
 
                 // 邏輯：
@@ -711,8 +742,8 @@
             // (A) 地區優先排序
             // 當有篩選地區時，將「明確符合該地區」的活動排在前面，「Unknown」排在後面
             if (filters.regions.size > 0) {
-                const regionA = (a.region || 'unknown').toLowerCase();
-                const regionB = (b.region || 'unknown').toLowerCase();
+                const regionA = eventRegion(a);
+                const regionB = eventRegion(b);
                 
                 const aIsSelected = filters.regions.has(regionA);
                 const bIsSelected = filters.regions.has(regionB);
@@ -825,11 +856,11 @@
 
         // [新增] 地區代碼轉中文名稱的對照表
         const regionLabelMap = {
-            'North': '北區', 
-            'Central': '中區', 
-            'South': '南區', 
-            'East': '東區', 
-            'Islands': '離島'
+            'north': '北區',
+            'central': '中區',
+            'south': '南區',
+            'east': '東區',
+            'islands': '離島'
             // Unknown 會回傳 undefined，下方邏輯會自動處理為不顯示
         };
 
@@ -838,7 +869,7 @@
             const isNew = !readEvents.includes(e.url);
             
             // [新增] 取得該活動的地區中文標籤 (若無 region 或 region 為 Unknown，則為空字串)
-            const regionLabel = regionLabelMap[e.region] || '';
+            const regionLabel = regionLabelMap[eventRegion(e)] || '';
 
             return `<div class="card ${!isNew ? 'read' : ''}" onclick="openDetail('${e.url}')">
                     ${e.img_url ? `<img src="${e.img_url}" class="card-img" loading="lazy">` : ''}
