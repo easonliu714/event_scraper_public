@@ -107,4 +107,81 @@ find(roots["venue-platform-chips"], "華山1914").handlers.click();
 assert.equal(filters.platforms.has("華山1914"), false);
 assert.equal(filters.platforms.has("OPENTIX"), true);
 assert.equal(inputs[0].platform, "華山1914", "original event source identity must not change");
+
+// [新增] 地區回歸：正式 JSON 缺 region 時，官方來源 + 明確場地 + 活動 ID
+// 才能使用經官方地址核實的 North；全部地區統計/篩選/卡片必共用同一函數。
+const formal = JSON.parse(fs.readFileSync("docs/data.json", "utf8"));
+assert.equal(formal.length, 1, "unchanged Owner-authorized formal feed");
+const tpac = formal[0];
+assert.equal(tpac.region, undefined, "regression source row intentionally has no region");
+assert.equal(context.eventRegion(tpac), "north", "verified Taipei Shilin source venue");
+assert.equal(context.eventRegion({ ...tpac, region: "North" }), "north", "explicit case normalized");
+assert.equal(context.eventRegion({ ...tpac, region: "South" }), "unknown",
+    "explicit conflicting region quarantined, not silently overwritten");
+assert.equal(context.eventRegion({ ...tpac, location: "外部場地" }), "unknown",
+    "organizing platform is not automatically the event venue");
+assert.equal(context.eventRegion({ ...tpac, platform: "OPENTIX" }), "unknown",
+    "ticket seller source cannot inherit organizer building address");
+assert.equal(context.eventRegion({ ...tpac, url: "https://tpac.org.taipei.evil.org/program/2040" }), "unknown",
+    "spoofed official host never accepted");
+assert.equal(context.eventRegion({ ...tpac, url: "https://tpac.org.taipei/program/2040?session=1" }), "unknown",
+    "ticket/session sub-identity not official event key");
+assert.equal(context.eventRegion({ ...tpac, location: "台北表演藝術中心" }), "north",
+    "official venue name alias normalization");
+assert.equal(context.eventRegion({ ...tpac, location: "外部場地", region: "Central" }), "central",
+    "already accepted explicit region remains usable for other venues");
+assert.equal(context.eventRegion({ ...tpac, location: "外部場地", region: "Unknown" }), "unknown",
+    "unknown never invents a location");
+
+assert.match(script, /const r = eventRegion\(e\);/, "region chip count uses canonical event region");
+assert.match(script, /const region = eventRegion\(e\);/, "region filtering uses same region");
+assert.match(script, /const regionA = eventRegion\(a\);/, "region sorting uses same region");
+assert.match(script, /regionLabelMap\[eventRegion\(e\)\]/,
+    "formal card region badge uses same region");
+
+const regionalRoots = {
+    "region-chips": { innerHTML: "" },
+    "type-chips": { innerHTML: "" },
+    "result-count": { textContent: "" },
+    "search": { value: "" }
+};
+const regional = {
+    allEvents: formal,
+    filters: { platforms: new Set(), regions: new Set(), status: new Set(), types: new Set() },
+    document: { getElementById: id => regionalRoots[id] },
+    renderSourceChips() {},
+    updateStatusCounts() {},
+    readEvents: [],
+    checkIsFav: () => false,
+    renderList() {},
+    renderPagination() {}
+};
+vm.createContext(regional);
+vm.runInContext(code.slice(0, code.indexOf("    function renderSourceChips() {")), regional);
+const renderChipsBegin = script.indexOf("    function renderChips() {");
+const renderChipsEnd = script.indexOf("    function updateStatusCounts() {", renderChipsBegin);
+assert.ok(renderChipsBegin > 0 && renderChipsEnd > renderChipsBegin);
+vm.runInContext(script.slice(renderChipsBegin, renderChipsEnd), regional);
+regional.renderChips();
+assert.match(regionalRoots["region-chips"].innerHTML, /北區 <span>1<\/span>/,
+    "formal mobile North chip must show 1, not 0");
+assert.match(regionalRoots["region-chips"].innerHTML, /南區 <span>0<\/span>/,
+    "unrelated region still zero");
+
+const applyBegin = script.indexOf("    function applyFilters() {");
+const applyEnd = script.indexOf("    function formalCardPriceSummary(", applyBegin);
+assert.ok(applyBegin > 0 && applyEnd > applyBegin);
+vm.runInContext("let filteredEvents = [];\n" + script.slice(applyBegin, applyEnd), regional);
+regional.filters.regions.add("north");
+regional.applyFilters();
+assert.equal(vm.runInContext("filteredEvents.length", regional), 1,
+    "select North keeps TPAC official activity");
+regional.filters.regions.clear();
+regional.filters.regions.add("south");
+regional.applyFilters();
+assert.equal(vm.runInContext("filteredEvents.length", regional), 0,
+    "select South excludes known North event, not unknown fallback");
+
 console.log("PASS PWA source-category UI groups, mobile buttons, OR filters, counts, safe labels");
+console.log("PASS PWA official TPAC region North=1, unknown/remote/conflict HOLD, counts and filters");
+
