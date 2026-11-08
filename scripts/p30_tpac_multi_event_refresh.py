@@ -563,6 +563,39 @@ def restore_isolated_version(repo_root, archived_sha, expected_current_sha):
     return dict(result, decision="ISOLATED_REVIEW_ROLLBACK_NOT_FORMAL")
 
 
+
+def load_isolated_prior(repo_root):
+    """Read exact current isolated LKG and its CAS SHA for repeatable refresh.
+
+    Never trust a manifest-supplied prior in this mode. A later concurrent
+    writer is caught by write_isolated_plan's expected-SHA lock check.
+    Historical receipts remain historical; this helper does not attest GET.
+    """
+    root = Path(repo_root).resolve()
+    isolation = root / "_isolated_review"
+    folder = isolation / "tpac"
+    target = folder / "tpac_multi_event_lkg.json"
+    if any(p.is_symlink() for p in (isolation, folder, target)):
+        raise ValueError("TPAC_AUTO_PRIOR_SYMLINK_HOLD")
+    if not target.exists():
+        return {"kind": KIND, "events": {}}, None
+    if not target.is_file() or not 0 < target.stat().st_size <= 16 * 1024 * 1024:
+        raise ValueError("TPAC_AUTO_PRIOR_SIZE_OR_TYPE_HOLD")
+    raw = target.read_bytes()
+    try:
+        document = json.loads(raw)
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError("TPAC_AUTO_PRIOR_JSON_HOLD") from error
+    if (not isinstance(document, dict)
+            or set(document) != {"kind", "events"}
+            or document["kind"] != KIND
+            or not isinstance(document["events"], dict)):
+        raise ValueError("TPAC_AUTO_PRIOR_SCHEMA_HOLD")
+    if _canonical(document) != raw:
+        raise ValueError("TPAC_AUTO_PRIOR_NONCANONICAL_HOLD")
+    return document, _sha(raw)
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description="TPAC multi-event offline REVIEW refresh; no GET or PUBLISH")
@@ -572,17 +605,25 @@ def main(argv=None):
     ap.add_argument("--input", type=Path, required=True)
     ap.add_argument("--repo-root", type=Path, required=True)
     ap.add_argument("--expected-sha")
+    ap.add_argument("--prior-from-lkg", action="store_true",
+                    help="CAS-load the current isolated LKG instead of a manifest prior")
     args = ap.parse_args(argv)
     data = json.loads(args.input.read_text(encoding="utf-8"))
     if data.get("catalog", "program") != args.catalog:
         raise ValueError("TPAC_MANIFEST_CATALOG_MISMATCH_HOLD")
+    if args.prior_from_lkg:
+        if "prior" in data or args.expected_sha is not None:
+            raise ValueError("TPAC_AUTO_PRIOR_AMBIGUOUS_HOLD")
+        prior, expected_sha = load_isolated_prior(args.repo_root)
+    else:
+        prior, expected_sha = data["prior"], args.expected_sha
     pairs = {sid: {"body": Path(row["detail_file"]).read_bytes(), "receipt": row["receipt"]}
              for sid, row in data["details"].items()}
     planner = refresh_event_plan if args.catalog == "event" else refresh_plan
     plan = planner(Path(data["list_file"]).read_bytes(), data["list_receipt"],
-                   pairs, data["prior"], _time(data["now"]))
+                   pairs, prior, _time(data["now"]))
     if plan["decision"] == "REVIEW_SNAPSHOT_READY_NOT_FORMAL":
-        result = write_isolated_plan(plan, args.repo_root, args.expected_sha)
+        result = write_isolated_plan(plan, args.repo_root, expected_sha)
     else:
         result = {"decision": plan["decision"], "sha256": None, "rows": plan["new_count"]}
     print(json.dumps({"result": result,

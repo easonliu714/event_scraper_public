@@ -429,5 +429,81 @@ class MultiEventRefreshTests(unittest.TestCase):
             self.assertEqual(target.read_bytes(), before)
 
 
+    def test_auto_prior_two_realizable_cycles_without_manifest_state(self):
+        # A fixed caller can replay two separately supplied source snapshots
+        # into the same isolated CAS LKG without manually injecting prior/SHA.
+        # Fixture bytes are NOT independent native GET or formal acceptance.
+        from scripts.p30_tpac_multi_event_refresh import main as refresh_cli
+        from contextlib import redirect_stdout
+        from io import StringIO
+        raw, rr, details = inputs()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "list.html").write_bytes(raw)
+            rows = {}
+            for sid, item in details.items():
+                file = root / (sid + ".html")
+                file.write_bytes(item["body"])
+                rows[sid] = {"detail_file": str(file), "receipt": item["receipt"]}
+            manifest = {"catalog": "program", "list_file": str(root / "list.html"),
+                        "list_receipt": rr, "details": rows, "now": NOW.isoformat()}
+            path = root / "manifest.json"
+            path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            stage = root / "stage"
+            args = ["--catalog", "program", "--input", str(path),
+                    "--repo-root", str(stage), "--prior-from-lkg"]
+            with redirect_stdout(StringIO()) as out:
+                self.assertEqual(refresh_cli(args), 0)
+            first = json.loads(out.getvalue())
+            self.assertEqual(first["counts"]["added"], 2)
+            self.assertEqual(first["published"], 0)
+            target = stage / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            with redirect_stdout(StringIO()) as out:
+                self.assertEqual(refresh_cli(args), 0)
+            second = json.loads(out.getvalue())
+            self.assertEqual(second["counts"]["unchanged"], 2)
+            self.assertEqual(second["result"]["sha256"], first["result"]["sha256"])
+            self.assertEqual(target.read_bytes(), original)
+            self.assertFalse((stage / "docs/data.json").exists())
+            self.assertFalse((stage / "docs/platform_status.json").exists())
+
+            manifest["prior"] = empty_prior()
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_AMBIGUOUS_HOLD"):
+                refresh_cli(args)
+            del manifest["prior"]
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_AMBIGUOUS_HOLD"):
+                refresh_cli(args + ["--expected-sha", first["result"]["sha256"]])
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_auto_prior_tamper_noncanonical_and_symlink_hold(self):
+        from scripts.p30_tpac_multi_event_refresh import load_isolated_prior
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            prior, sha = load_isolated_prior(root)
+            self.assertEqual(sha, first["sha256"])
+            self.assertEqual(prior["kind"], KIND)
+            target.write_bytes(json.dumps(prior, indent=2).encode())
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_NONCANONICAL_HOLD"):
+                load_isolated_prior(root)
+            target.write_bytes(b"not json")
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_JSON_HOLD"):
+                load_isolated_prior(root)
+            target.unlink()
+            outside = root / "foreign.json"
+            outside.write_bytes(original)
+            target.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_SYMLINK_HOLD"):
+                load_isolated_prior(root)
+            self.assertEqual(outside.read_bytes(), original)
+
+
 if __name__ == "__main__":
     unittest.main()
