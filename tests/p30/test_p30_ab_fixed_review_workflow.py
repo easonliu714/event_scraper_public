@@ -162,8 +162,9 @@ class FixedABWorkflowTests(unittest.TestCase):
             replay = workflow.run_fixed_ab(root, inputs)
             self.assertEqual(replay["lines"]["B"]["snapshot_sha256"],
                              out["lines"]["B"]["snapshot_sha256"])
-            self.assertTrue(workflow.verify_pair_receipt(
-                root, out["pair_receipt_sha256"])["verified"])
+            self.assertEqual(workflow.verify_pair_receipt(
+                root, out["pair_receipt_sha256"])["decision"],
+                             "VERIFIED_REVIEW_ONLY_NOT_NATIVE")
             self.assertFalse((root / "docs").exists())
 
     def test_tainex_identity_tamper_preflight_preserves_a_and_b(self):
