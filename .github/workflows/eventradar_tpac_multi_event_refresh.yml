@@ -110,6 +110,54 @@ jobs:
               assert hashlib.sha256((p/('event_'+key+'_detail.html')).read_bytes()).hexdigest()==raw['source_receipts'][key]['body_sha256']
           print('PASS_ARCHIVED_OFFICIAL_EVENT_2_IDS_EXHIBITION_VS_TOUR_ROLES_PERIOD_CONFLICT_HOLD_NO_PUBLISH')
           PY
+      - name: Read prior pinned TPAC programme native body (NO NEW GET)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-one-shot-publication-attempt-hold-evidence
+          repository: easonliu714/event_scraper_public
+          run-id: 42484103012
+          github-token: ${{ github.token }}
+          path: pinned-program
+      - name: Diagnose exact native TPAC price section and first-party ticket links
+        run: |
+          set -euo pipefail
+          (cd pinned-program && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          from bs4 import BeautifulSoup
+          root=Path("pinned-program/native")
+          receipt=json.loads((root/"tpac_2040_source_receipt.json").read_text())
+          data=(root/"tpac_2040_detail.html").read_bytes()
+          assert receipt['detail_sha256']==hashlib.sha256(data).hexdigest()
+          soup=BeautifulSoup(data,"html.parser")
+          nodes=[]
+          for e in soup.select("h1,h2,h3,h4,span,p,div,strong,dt,small"):
+              if e.string and e.string.strip() in ("票價","票價：","票價:","Ticket Price"):
+                  anc=e.parent
+                  for depth in range(3):
+                      if anc is None: break
+                      txt=anc.get_text(" ",strip=True)
+                      if len(txt)<400:
+                          nodes.append({'tag':e.name,'cls':e.get('class',[]),'ancestor':anc.name,
+                                        'ancestor_class':anc.get('class',[]),'depth':depth,
+                                        'text':txt[:330]})
+                      anc=anc.parent
+          links=[{'href':a.get('href',''), 'text':a.get_text(' ',strip=True)[:55]}
+                 for a in soup.select('a[href]')
+                 if 'opentix.life/event/' in a.get('href','')]
+          out={'kind':'TPAC_ARCHIVED_FIRST_PARTY_PRICE_DOM_DIAGNOSTIC',
+               'source_sha256':receipt['detail_sha256'],
+               'price_nodes':nodes[:24],
+               'opentix_direct_links':links[:12],
+               'new_http_requests':0,'published':0}
+          Path('evidence/tpac_2040_native_price_dom.json').write_text(
+              json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          print('TPAC_PRICE_NODE_COUNT='+str(len(nodes)))
+          print('TPAC_PRICE_MATCHES='+json.dumps(nodes[:12],ensure_ascii=False))
+          print('TPAC_TICKET_LINKS='+json.dumps(links[:8],ensure_ascii=False))
+          print('PASS_PINNED_OFFICIAL_DETAIL_PRICE_DOM_AUDIT_NO_NEW_GET')
+          PY
       - name: Produce two-ID isolated LKG fixture evidence, never native HTTP
         run: |
           set -euo pipefail
