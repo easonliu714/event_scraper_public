@@ -24,10 +24,10 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          base=b7e04a8501f12df56677c833166e7038c4a6702b
+          base=4f0577e493ed84a04357d096a7f7717a53f13731
           git merge-base --is-ancestor "$base" HEAD
-          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
-          test "$(git rev-parse HEAD:docs/platform_status.json)" = 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd
+          test "$(git rev-parse HEAD:docs/data.json)" = 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           test "$(git rev-parse HEAD:docs/platform-status.html)" = 1abaec4d47fcba809430e24b8ff9312a08bc3de5
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
