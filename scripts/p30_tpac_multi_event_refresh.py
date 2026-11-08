@@ -548,6 +548,10 @@ def restore_isolated_version(repo_root, archived_sha, expected_current_sha):
         raise ValueError("TPAC_ROLLBACK_ARCHIVE_JSON_HOLD") from error
     if document.get("kind") != KIND or not isinstance(document.get("events"), dict):
         raise ValueError("TPAC_ROLLBACK_ARCHIVE_SCHEMA_HOLD")
+    # Check canonical bytes BEFORE calling the writer: a noncanonical but
+    # self-consistently hashed archive must never mutate LKG then raise HOLD.
+    if _canonical(document) != raw:
+        raise ValueError("TPAC_ROLLBACK_NONCANONICAL_ARCHIVE_HOLD")
     plan = {"decision": "REVIEW_SNAPSHOT_READY_NOT_FORMAL",
             "release_state": "HARD_HOLD_NO_PUBLICATION",
             "native_attestation": "REQUIRES_INDEPENDENT_READBACK",

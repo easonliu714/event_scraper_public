@@ -409,6 +409,25 @@ class MultiEventRefreshTests(unittest.TestCase):
                 restore_isolated_version(root, first["sha256"], repeated["sha256"])
             self.assertEqual(target.read_bytes(), original)
 
+    def test_noncanonical_archive_cannot_write_then_fail(self):
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            before = target.read_bytes()
+            noncanonical = json.dumps(json.loads(before), ensure_ascii=False,
+                                      indent=2).encode("utf-8")
+            self.assertNotEqual(noncanonical, before)
+            digest = hashlib.sha256(noncanonical).hexdigest()
+            versions = target.parent / "versions"
+            versions.mkdir(exist_ok=True)
+            (versions / (digest + ".json")).write_bytes(noncanonical)
+            with self.assertRaisesRegex(ValueError, "NONCANONICAL_ARCHIVE_HOLD"):
+                restore_isolated_version(root, digest, first["sha256"])
+            self.assertEqual(target.read_bytes(), before)
+
 
 if __name__ == "__main__":
     unittest.main()
