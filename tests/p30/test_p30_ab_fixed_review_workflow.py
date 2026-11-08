@@ -212,5 +212,73 @@ class FixedABWorkflowTests(unittest.TestCase):
 
 
 
+    def test_independent_pair_verifier_and_read_only_cli(self):
+        """Independent audit verifies both exact slots without a new write."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root)
+            committed = workflow.run_fixed_ab(root, inputs)
+            receipt = root / committed["pair_receipt_path"]
+            before = receipt.read_bytes()
+            verified = workflow.verify_pair_receipt(
+                root, committed["pair_receipt_sha256"])
+            self.assertEqual(verified["decision"],
+                             "VERIFIED_REVIEW_ONLY_NOT_NATIVE")
+            self.assertEqual(set(verified["lines"]), {"A", "B"})
+            self.assertEqual(verified["native_get"], 0)
+            self.assertEqual(verified["formal_accepted_fields"], 0)
+            self.assertEqual(verified["golden"], 0)
+            self.assertEqual(verified["published"], 0)
+            with redirect_stdout(io.StringIO()) as output:
+                exit_code = workflow.main([
+                    "--repo-root", str(root), "--verify-pair-sha",
+                    committed["pair_receipt_sha256"]])
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(json.loads(output.getvalue())["decision"],
+                             "VERIFIED_REVIEW_ONLY_NOT_NATIVE")
+            self.assertEqual(receipt.read_bytes(), before)
+            self.assertFalse((root / "docs").exists())
+
+    def test_pair_verifier_rejects_tampered_slot_without_changing_receipt(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root)
+            committed = workflow.run_fixed_ab(root, inputs)
+            receipt = root / committed["pair_receipt_path"]
+            before = receipt.read_bytes()
+            target = (root / "_isolated_review" / "B" /
+                      committed["lines"]["B"]["adapter_key"] /
+                      "review_snapshot.json")
+            target.write_bytes(b'{"payload": {}, "sha256": "bad"}')
+            with self.assertRaisesRegex(
+                    ValueError, "AB_FIXED_VERIFY_SLOT_VALIDATION_HOLD"):
+                workflow.verify_pair_receipt(
+                    root, committed["pair_receipt_sha256"])
+            self.assertEqual(receipt.read_bytes(), before)
+            self.assertFalse((root / "docs").exists())
+
+    def test_pair_verifier_rejects_receipt_byte_drift_and_mixed_write_cli(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root)
+            committed = workflow.run_fixed_ab(root, inputs)
+            receipt = root / committed["pair_receipt_path"]
+            receipt.write_bytes(receipt.read_bytes() + b"\\n")
+            with self.assertRaisesRegex(
+                    ValueError, "AB_FIXED_VERIFY_RECEIPT_CANONICAL_HOLD"):
+                workflow.verify_pair_receipt(
+                    root, committed["pair_receipt_sha256"])
+            with redirect_stdout(io.StringIO()) as output:
+                code = workflow.main([
+                    "--repo-root", str(root), "--verify-pair-sha",
+                    committed["pair_receipt_sha256"],
+                    "--a-manifest", str(inputs["A"]["manifest"])])
+            self.assertEqual(code, 49)
+            self.assertIn("AB_FIXED_VERIFY_MIXED_WRITE_INPUT_HOLD",
+                          json.loads(output.getvalue())["first_failure"])
+            self.assertFalse((root / "docs").exists())
+
+
+
 if __name__ == "__main__":
     unittest.main()
