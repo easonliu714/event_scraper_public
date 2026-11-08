@@ -5,12 +5,15 @@ on:
       - scripts/p30_tpac_multi_event_refresh.py
       - scripts/p30_tpac_catalog_topology.py
       - scripts/p30_tpac_event_catalog_once.py
+      - scripts/p30_tpac_event_detail_review.py
+      - tests/p30/test_p30_tpac_event_detail_review.py
       - tests/p30/test_p30_tpac_event_catalog_once.py
       - tests/p30/test_p30_tpac_catalog_topology.py
       - tests/p30/test_p30_tpac_multi_event_refresh.py
       - .github/workflows/eventradar_tpac_multi_event_refresh.yml
 permissions:
   contents: read
+  actions: read
 jobs:
   multi-id-review-refresh:
     if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/p30-tpac-multi-event-refresh-v1'
@@ -35,7 +38,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
       - uses: actions/setup-python@v5
@@ -48,7 +51,8 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_multi_event_refresh.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_catalog_topology.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_catalog_once.py' -v
-          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_detail_review.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
       - name: TPAC /event first-party robots LIST and 2 distinct DETAIL bounded one-shot (NO PUBLISH)
         env:
@@ -63,6 +67,49 @@ jobs:
             python -m scripts.p30_tpac_event_catalog_once --output evidence/native_event
           fi
           echo 'NATIVE_DIAGNOSTIC_ONLY__DO_NOT_INTERPRET_WORKFLOW_SUCCESS_AS_SOURCE_FIELD_PASS'
+      - name: Retrieve pinned earlier first-party /event LIST and two DETAIL bodies (NO REGET)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-tpac-multi-event-review-lkg-readiness
+          repository: easonliu714/event_scraper_public
+          run-id: 42491637804
+          github-token: ${{ github.token }}
+          path: pinned-event
+      - name: Independently replay first-party two activity types and conflicting periods
+        run: |
+          set -euo pipefail
+          (cd pinned-event && sha256sum -c SHA256SUMS.txt)
+          mkdir -p evidence
+          python -m scripts.p30_tpac_event_detail_review --source-dir pinned-event/native_event --out evidence/tpac_event_two_real_role_review.json
+          python - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          p=Path('pinned-event/native_event')
+          raw=json.loads((p/'tpac_event_catalog_receipt.json').read_text())
+          rows=json.loads(Path('evidence/tpac_event_two_real_role_review.json').read_text())
+          assert rows['kind']=='TPAC_EVENT_TWO_NATIVE_REPLAY_REVIEW_NOT_PUBLICATION'
+          assert rows['historical_replay_only'] is True
+          assert rows['source_list_count']==18 and rows['detail_count']==2
+          assert rows['native_again']==0 and rows['published']==0
+          assert set(rows['records'])=={'1301','2072'}
+          exhibit=rows['records']['1301']
+          tour=rows['records']['2072']
+          assert exhibit['identity']=='tpac:event:1301'
+          assert exhibit['verified_core_roles']['EXHIBITION_PERIOD']==['2025-07-24','2026-12-31']
+          assert 'NEXT_EVENT_SHOW_START' not in exhibit['verified_core_roles']
+          assert 'LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD' in exhibit['held_fields']
+          assert tour['identity']=='tpac:event:2072'
+          assert tour['verified_core_roles']['NEXT_EVENT_SHOW_START']=='2026-11-11T19:00:00+08:00'
+          assert tour['verified_core_roles']['EXACT_EVENT_SHOW_COUNT']==3
+          assert 'LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD' in tour['held_fields']
+          for key in ('1301','2072'):
+              assert rows['records'][key]['published'] is False
+              assert rows['records'][key]['formal_field_pass'] is False
+              assert rows['records'][key]['golden_accepted'] is False
+              assert rows['records'][key]['detail_body_sha256']==raw['source_receipts'][key]['body_sha256']
+              assert hashlib.sha256((p/('event_'+key+'_detail.html')).read_bytes()).hexdigest()==raw['source_receipts'][key]['body_sha256']
+          print('PASS_ARCHIVED_OFFICIAL_EVENT_2_IDS_EXHIBITION_VS_TOUR_ROLES_PERIOD_CONFLICT_HOLD_NO_PUBLISH')
+          PY
       - name: Produce two-ID isolated LKG fixture evidence, never native HTTP
         run: |
           set -euo pipefail
