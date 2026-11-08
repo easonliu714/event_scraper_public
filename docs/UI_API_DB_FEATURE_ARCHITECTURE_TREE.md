@@ -8322,3 +8322,48 @@ A OPENTIX /o/ntch and NTCH /programs live JS-only
 - **Real archived receipt readback:** A OPENTIX historical DETAIL observed 2026-11-07T15:01:50.577416Z, SHA `bea4041161561e44879fc6231028ad8d05c0ee35ff4d01b618edb111b7dcab14`, read-only age ~21h58m at this round: `fresh_within_24h=true`, still `INDEPENDENT_FIELD_AUTHORITY_MISSING`. B Zepp rid=160668 historical DETAIL observed 2026-11-06T10:04:43.822457Z, SHA `d78ae5cedcd1089619b28c55b4fadff1ac1b66946de79551c52fa7bc6d93a4f6`, age ~50h55m: `SOURCE_STALE_OR_FUTURE_HOLD`. Both remain **receipt-only identity LKG=1**, native Body LKG=0, independently accepted FIELD=0. Use-time freshness is not native provenance or cross-source identity proof.
 - **CAS/CI/artifact:** Engineering #236 `c923a3385cd0c2ca307cdc8fd1f6d6c5dac86ed0 → 399aca7796a37093c3743f416e9c8e600ef303f0`, only existing source/test modules changed; remote blob readback `ece8e676421edd88ea4aec789895ae94c2e23846` / `601220bb2ce76933cc15470113e68646acb8d799`. CI [#42482904534](https://github.com/easonliu714/event_scraper_public/actions/runs/42482904534) exact-head SUCCESS, job 128738513541, 312 tests PASS; Artifact 13618445878 SHA256 `fe97f23788577d63e04a751b7cd8931bed80af2a9d994d161b2b7ee763d9897f`, independent CRC 37/37 / manifest 36/36 PASS. No new native GET, no one-shot consumption, no new Body/receipt-only LKG.
 - **Formal baseline:** Source main `285e2af7f9dd784e798a9a0baaea572698618eb4` after independently Owner-authorized status-only PR #239; `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4` frozen, status blob `720cac528faacc9560a5ab41ce725bf8cc183166` (19 platforms, 11/08 19:55 engineering snapshot). Pages CI #42482296202 SUCCESS but direct HTTP UNVERIFIED. A/B new native HTTP/LIST/DETAIL/identity 0/0/0/0, new Body/receipt LKG 0/0, accepted FIELD/Golden/Published 0/0/0; HARD_HOLD_NO_PUBLICATION. Android historical PASS preserved, cross-group OR Android UNVERIFIED. NEXT A unconsumed exact ticket LIST edge + field authority; NEXT B Taipei Dome exact event-local identity/robots preflight or rotate another P0.
+
+## 2026-11-08 21:55 Asia/Taipei — Formal single-shot TPAC #2040 release / UI venue grouping / next reusable Adapter architecture
+
+```text
+Source main 5c744607ab4d9d1c1493377018c282982acac227 [verified; fresh-read every cycle]
+  PR #240 MERGED f5db15b0894ae68d6da211a9530b472868b61a23
+    scripts/p30_tpac_publisher_source_once.py  [bounded historical one-shot native receipt; consumed]
+    scripts/p30_tpac_verified_show_publisher.py [strict frozen LIST -> exact same ID DETAIL -> role parser]
+    scripts/p30_quality_snapshot_publisher.py  [fail-closed qualification planning, not automatic publication]
+    exact-head CI #42484914726 SUCCESS / job 128744578979
+  PR #241 MERGED 4f0577e493ed84a04357d096a7f7717a53f13731 [Owner-authorized one-shot]
+    docs/data.json blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 [CURRENT, one row]
+    event: TPAC /program/2040 沉浸式劇場《士林YES！》
+    accepted roles: TITLE + SHOW_START (2026-11-20 19:30)
+    HOLD: PRICE / HALL-specific / LIST-DETAIL period conflict
+    golden_accepted=false; old 8,436-row blob 7fc4fe... is rollback-only
+    exact-head CI #42485788274 SUCCESS / job 128747230238
+  PR #242 MERGED 5c744607ab4d9d1c1493377018c282982acac227 [UI-only]
+    docs/index.html blob 18c14a92288f7bc2aa1ed8bc57b62107957b851d
+    source group: 臺北表演藝術中心 -> 活動場地
+    exact-head CI #42486420268 SUCCESS / job 128749181852
+  Pages #42486512248 build/deploy/report SUCCESS; live HTTP / new Android UNVERIFIED
+  docs/platform_status.json blob 720cac528faacc9560a5ab41ce725bf8cc183166 [19 platforms, unchanged]
+  scraper.py / formal Golden / Publisher / Scheduler / Notifier unchanged
+  HARD_HOLD_NO_PUBLICATION = DEFAULT; #241 only isolated Owner-authorized exception
+
+Engineering Draft #236 [UNMERGED] 399aca7796a37093c3743f416e9c8e600ef303f0
+  legacy base d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
+  old formal data SHA guard 7fc4fe... [STALE; cannot be release authority]
+  reuse p30_review_bridge.build_review_envelope / _validate_snapshot
+  reuse p30_ab_fixed_review_workflow.run_fixed_ab and isolated CAS/atomic LKG
+  never copy branch's old docs/data.json onto current main
+
+NEXT (nonpublication only):
+  per-event official source receipt [robots, one-shot register, HTTP/status/URL, observed_at, raw SHA]
+    -> reusable TPAC / other canonical source Adapter
+    -> LIST exact event-local href -> DETAIL exact ID + TITLE
+    -> role-level SHOW / HALL / DATE / PRICE (HOLD if ambiguous, no Session inference)
+    -> source-owned REVIEW + provenance + independently accepted partial FIELD
+    -> isolated checksum/CAS/atomic fail-closed safe snapshot
+    -> distinct Owner-authorized formal publication Gate (NOT automatic)
+  A ticket + B P0 Taipei/New Taipei venue same Writer; no repeated consumed #2040 / Zepp / Cloud Gate GET.
+  Preserve CKSMH5/TWTC39, Android L8 5/5, 11/06 homepage USER_ATTESTED_PASS;
+  cross-group OR Android and new published TPAC Android remain UNVERIFIED.
+```
