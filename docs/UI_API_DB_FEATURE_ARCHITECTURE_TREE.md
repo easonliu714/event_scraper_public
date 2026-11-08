@@ -8508,3 +8508,51 @@ TPAC-R3 CLI namespace integration (NO GET / NO FORMAL WRITE)
 - **Delta and boundaries:** New native HTTP/LIST/DETAIL/identity = **0/0/0/0**; new formally accepted FIELD/Golden/published = **0/0/0**, existing formal published **1**. New real archived-source-to-maintainable CLI-to-safe-snapshot path **1** (engineering PASS). TPAC-R3 integration PASS; TPAC-R4 two distinct genuine future refresh cycles **HOLD**, OPENTIX native robots/body **UNKNOWN/HOLD**, OPENTIX 10 vs TPAC 8 session parity **CONFLICT_HOLD**. TPAC price 1500–3500 remains source REVIEW; UI-only Draft #245 not merged and formal price unknown. Owner Android #244 North region and single TPAC card USER_ATTESTED_PASS retained; cross-group OR Android and direct Pages HTTP remain UNVERIFIED.
 - **NEXT:** lawful unconsumed source/robots/frequency authority for independently observed TPAC LIST→multiple DETAIL refreshes (two distinct cycles), exact role/identity/partial-field conflict, durable diff/rollback and 403/429/empty-list preserve LKG. Only after source evidence and separate Owner authorization consider #245 UI merge, price-only DATA, stale status-only correction or recurring Publisher; no parallel Writer, no unapproved formal publication.
 
+
+
+### 2026-11-09 02:55 Asia/Taipei — TPAC-R3 isolated snapshot version history and event-owned location authority
+
+```text
+Source main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8 [NO WRITE]
+  docs/data.json 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+    -> 1 Owner-published TPAC /program/2040; price blank
+  status 720cac528faacc9560a5ab41ce725bf8cc183166
+    -> 19 platforms; stale old data pointer HOLD
+Engineering Draft #243 expected-head CAS
+  b86488e0e6c6380b958fed59462650ce0c61f192
+  -> a8a249921eb50ccb2ff5c2272faea2e6f5470bef
+  3 files: multi_event_refresh.py + matching tests + existing workflow
+parse_detail(card, body, receipt, now)
+  BEFORE: location = "臺北表演藝術中心" despite HALL_NOT_VERIFIED
+  AFTER: location = "" and LOCATION_NOT_EVENT_VERIFIED
+    -> event-specific venue/address proof needed; no platform-based North inference
+write_isolated_plan(plan, repo_root, expected_sha, allow_archived_rollback=False)
+  BEFORE: atomic/CAS current LKG only, no durable prior-version archive/diff
+  AFTER: exact previous SHA bytes -> versions/<sha>.json under lock BEFORE replace
+    -> added/changed/unchanged/removed diff
+    -> unapproved removed keys -> UNAUTHORIZED_REMOVAL_EXPIRY_GATE_HOLD
+restore_isolated_version(repo_root, archived_sha, expected_current_sha)
+  -> SHA verified prior archive -> CAS/atomic isolated LKG restore
+  -> stale expected SHA / missing or tampered archive -> HOLD
+  -> no docs/data, status, Golden, Publisher, Scheduler writes
+Archived native /event LIST 18; DETAIL 1301/2072 2; 16 missing HOLD
+  -> same source replay, 2 unchanged, 0 changed/added/removed
+  -> snapshot/archive SHA 20a7bfd8f8930a53e7f7849571c712fb822c6167373211aa3cb1b07ca8be054d
+  -> 0 NEW GET; NOT two genuine refreshes
+Exact-head CI #42512496346 SUCCESS job 128828383622
+  43/43 tests, no first FAIL
+  Artifact #13630430066 SHA256 91fefaf2fc4b07cf6c5558c924c12405a312f355cd6137d3ed17c0f36b680c9f
+  independent ZIP CRC 14/14, manifest 13/13 PASS
+  source/test/workflow blobs 232db794... / 6d30ca2b... / d0dd7b40...
+Delta: new native IDs 0, accepted formal FIELD 0, Golden 0, Published 0
+  formal published existing 1; TPAC-R3 durable versioned CAS PASS
+TPAC-R4 genuine independent refresh cycles HOLD
+OPENTIX native robots/body UNKNOWN; 10 vs 8 sessions CONFLICT_HOLD
+#245 price UI Draft unmerged; formal price unknown
+#244 North-region Android USER_ATTESTED_PASS; L8 5/5 retained
+HARD_HOLD_NO_PUBLICATION; no new Publisher task or Writer
+NEXT: lawful fresh two-cycle TPAC multi-ID LIST/DETAIL receipts, role/location
+  proof, conflict isolation, 403/429/empty fail closed, versioned diff/rollback
+Owner approval separate for #245, price-only DATA, status-only, recurring publish.
+```
+
