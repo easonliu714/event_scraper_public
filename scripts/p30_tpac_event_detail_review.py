@@ -124,7 +124,9 @@ def review_pinned_native(source_dir, now):
         receipt = native["source_receipts"][event_id]
         rows[event_id] = inspect_event_detail(card, data, receipt, now)
     return {"kind": "TPAC_EVENT_TWO_NATIVE_REPLAY_REVIEW_NOT_PUBLICATION",
-            "checked_at": now.isoformat(), "source_list_count": len(cards),
+            "replay_observed_at": now.isoformat(),
+            "historical_replay_only": True,
+            "source_list_count": len(cards),
             "detail_count": len(rows), "records": rows,
             "native_again": 0, "published": 0,
             "release_state": "HARD_HOLD_NO_PUBLICATION"}
@@ -136,7 +138,13 @@ if __name__ == "__main__":
     ap.add_argument("--source-dir", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
-    result = review_pinned_native(args.source_dir, datetime.now(timezone.utc))
+    # Pinned native bytes are *historical* regression evidence. Replay at
+    # their own observed timestamp; never claim they are current fresh data.
+    native = json.loads((args.source_dir / "tpac_event_catalog_receipt.json").read_text())
+    observed = datetime.fromisoformat(
+        native["source_receipts"]["2072"]["observed_at"].replace("Z", "+00:00"))
+    result = review_pinned_native(args.source_dir, observed + timedelta(seconds=1))
+    result["actual_replay_run_at"] = datetime.now(timezone.utc).isoformat()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2) + "\n")
     print(json.dumps({key: value for key, value in result.items() if key != "records"},
