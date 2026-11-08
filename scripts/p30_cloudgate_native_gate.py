@@ -117,7 +117,7 @@ def exact_list_direct_event_edge(list_html):
     listing.feed(list_html)
     accepted = []
     label_pattern = (re.escape(norm(TITLE))
-                     + r"(?:\\s*2026\\.10\\.17\\s*[-–]\\s*12\\.19)?")
+                     + r"(?:\s*2026\.10\.17\s*[-–]\s*12\.19)?")
     for href, label in listing.anchors:
         target = exact_detail(href)
         if target is None:
