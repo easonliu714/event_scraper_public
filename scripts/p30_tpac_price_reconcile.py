@@ -43,7 +43,7 @@ def _validated_receipt(body, detail_url, source_event_id, receipt):
             or url.username or url.password
             or url.path.rsplit("/", 1)[-1] != str(source_event_id)):
         raise ValueError("TPAC_PRICE_SOURCE_EVENT_ID_HOLD")
-    observed = receipt.get("started_at")
+    observed = receipt.get("started_at") if "started_at" in receipt else receipt.get("observed_at")
     try:
         dt = datetime.fromisoformat(observed.replace("Z", "+00:00"))
     except (AttributeError, ValueError) as e:
@@ -51,11 +51,24 @@ def _validated_receipt(body, detail_url, source_event_id, receipt):
     if dt.tzinfo is None or dt.utcoffset() is None:
         raise ValueError("TPAC_PRICE_OBSERVED_TZ_HOLD")
     sha = hashlib.sha256(body).hexdigest()
-    if (receipt.get("detail_sha256") != sha
-            or receipt.get("detail_bytes") != len(body)
-            or receipt.get("detail_url") != detail_url
-            or receipt.get("decision") != "RAW_SOURCE_SAVED_FOR_INDEPENDENT_REPLAY_ONLY"
-            or receipt.get("source_native_get") != 3):
+    # Accept both archived single-event native receipt and the reusable
+    # per-detail Source Adapter receipt. Neither is an independent publication
+    # attestation: exact original bytes must be independently replayed by CI.
+    archived = (
+        receipt.get("detail_sha256") == sha
+        and receipt.get("detail_bytes") == len(body)
+        and receipt.get("detail_url") == detail_url
+        and receipt.get("decision") == "RAW_SOURCE_SAVED_FOR_INDEPENDENT_REPLAY_ONLY"
+        and receipt.get("source_native_get") == 3
+    )
+    fresh_detail = (
+        receipt.get("body_sha256") == sha
+        and receipt.get("body_bytes") == len(body)
+        and receipt.get("final_url") == detail_url
+        and receipt.get("http_status") == 200
+        and receipt.get("robots_allowed") is True
+    )
+    if not archived and not fresh_detail:
         raise ValueError("TPAC_PRICE_BODY_PROVENANCE_HOLD")
     return dt.astimezone(timezone.utc).isoformat(), sha
 
