@@ -248,10 +248,11 @@ def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
     if valid == 0:
         report["decision"] = "HOLD_NO_QUALIFIED_DETAILS_PRESERVE_LKG"
         return report
+    qualified_ids = {"tpac:" + sid for sid in cards if sid not in report["rejected"]}
     report.update({"decision": "REVIEW_SNAPSHOT_READY_NOT_FORMAL",
                    "events": updated, "new_count": len(updated),
                    "added": adds, "changed": changes, "unchanged": same,
-                   "retained_previous": sum(k not in {"tpac:" + sid for sid in cards} for k in old),
+                   "retained_previous": sum(k not in qualified_ids for k in old),
                    "qualified": valid,
                    "source_coverage_complete": len(report["rejected"]) == 0 and valid == len(cards)})
     # Any unobserved/failed former event is retained; a separate verified
@@ -267,9 +268,30 @@ def write_isolated_plan(plan, repo_root, expected_sha=None):
     """Atomic/CAS isolated REVIEW snapshot; no formal output paths."""
     if plan.get("decision") != "REVIEW_SNAPSHOT_READY_NOT_FORMAL":
         raise ValueError("TPAC_UNQUALIFIED_PLAN_WRITE_HOLD")
+    if (plan.get("release_state") != "HARD_HOLD_NO_PUBLICATION" or
+            plan.get("published") != 0 or
+            plan.get("native_attestation") != "REQUIRES_INDEPENDENT_READBACK"):
+        raise ValueError("TPAC_UNAUTHORIZED_PUBLICATION_CLAIM_HOLD")
+    rows = plan.get("events")
+    if not isinstance(rows, dict) or not rows:
+        raise ValueError("TPAC_EMPTY_REVIEW_SNAPSHOT_HOLD")
+    for key, event in rows.items():
+        if (not isinstance(key, str) or not re.fullmatch(r"tpac:[1-9]\d{0,9}", key)
+                or not isinstance(event, dict)
+                or event.get("source_event_id") != key.split(":", 1)[1]
+                or event.get("url") != ROOT + "/" + key.split(":", 1)[1]
+                or event.get("published") is not False
+                or event.get("golden_accepted") is not False
+                or event.get("formal_field_pass") is not False
+                or not isinstance(event.get("_candidate"), dict)
+                or event["_candidate"].get("decision") != "REVIEW"):
+            raise ValueError("TPAC_REVIEW_ROW_AUTHORITY_HOLD")
     root = Path(repo_root).resolve()
     root.mkdir(parents=True, exist_ok=True)
-    dest_dir = root / "_isolated_review" / "tpac"
+    isolation_root = root / "_isolated_review"
+    if isolation_root.exists() and isolation_root.is_symlink():
+        raise ValueError("TPAC_ISOLATION_ROOT_SYMLINK_HOLD")
+    dest_dir = isolation_root / "tpac"
     if dest_dir.exists() and dest_dir.is_symlink():
         raise ValueError("TPAC_ISOLATED_SYMLINK_HOLD")
     dest_dir.mkdir(parents=True, exist_ok=True)
