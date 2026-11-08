@@ -8592,3 +8592,22 @@ Engineering #243 head `0c428c7d7941dea2e8464d8f909bf4bdbe5e1384`; changed only `
 - **Tests:** Existing tests/p30/test_p30_tpac_event_catalog_once.py +5 no-network tests: dynamic IDs and receipts/manifest/one-shot; missing policy; robots denial; detail 403; excessive Crawl-delay. Exact-head [CI #42522337523](https://github.com/easonliu714/event_scraper_public/actions/runs/42522337523) SUCCESS job 128858350000, 51/51 tests. [Artifact #13633597287](https://github.com/easonliu714/event_scraper_public/actions/runs/42522337523/artifacts/13633597287) SHA256 7474582b23d5ca675427903edd98cdc7ee9455693eb140bef3670f10c28aab2b, independent ZIP 10,997 bytes, CRC 14/14, SHA256SUMS 13/13 PASS.
 - **Boundaries:** Source main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8 unchanged; formal data blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 (1 existing TPAC #2040, price blank), status 720cac528faacc9560a5ab41ce725bf8cc183166 (stale pointer HOLD). New native GET 0, new independent cycles 0, formal FIELD/Golden/published 0. TPAC-R3 LKG/CAS PASS, TPAC-R4 genuine two-cycle HOLD, OPENTIX 10 vs TPAC 8 sessions CONFLICT_HOLD, price NT$1,500 REVIEW, #245 UI Draft unmerged, #244 Android North USER_ATTESTED_PASS retained.
 - **NEXT:** Separate Owner-authorized robots/frequency policy and durable cross-run one-shot registry, then two independent native LIST/DETAIL cycles and isolated replay/CAS/diff/rollback. No automatic Publisher/Scheduler.
+
+
+### 2026-11-09 05:55 Asia/Taipei — TPAC-R4 durable local claim topology (NO HTTP in CI)
+
+\`\`\`text
+Owner-approved source policy + unique cycle ID + existing non-symlink registry_dir
+  -> collect_bounded_review_cycle(..., registry_dir=...)
+  -> validate authority/cycle ID/output not already claimed
+  -> os.open(registry_dir/<cycle_id>.claim.json, O_CREAT|O_EXCL|O_WRONLY)
+       fsync JSON tombstone: CONSUMED_BEFORE_NETWORK
+       duplicate ID / alternate output dir / crash replay -> HOLD before GET
+  -> exclusive output directory -> robots -> bounded LIST -> <=2 exact DETAIL
+  -> forensic receipt; success -> isolated replay manifest
+  -> prior-from-LKG CAS/atomic/versioned diff, NO formal data writes
+  -> global_one_shot_registry_verified=false (LOCAL only)
+  -> cross-host/global lease and Owner robots/frequency approval: STILL HOLD
+\`\`\`
+
+Draft [#243](https://github.com/easonliu714/event_scraper_public/pull/243) final exact HEAD \`978df2e524d751b41df39d97f2a1ace23237463e\`; source blob \`4c63cae44206682680b4475eed2374ddc1cee384\`, test blob \`d185c71556427a9311a13237b17759de789fbe2c\`; modified \`collect_bounded_review_cycle\`, CLI \`--registry-dir\`, and two new no-network regression cases (same cycle across output directories after robots denial, missing/symlink registry). Initial CI #42527405203 failed due double-escaped robots test fixture; corrected by follow-up test-only commit, no production guard relaxation. Final [exact-head CI #42527458162](https://github.com/easonliu714/event_scraper_public/actions/runs/42527458162) SUCCESS job 128874121618, 53/53 tests; Artifact 13635682197 GitHub digest SHA256 d10e91790c42d421e771d09b9b780357050163e40947a50dff7f83f625416148; independent ZIP CRC not checked. CI source probe consumed HOLD (no new GET), pinned native body replay and zero formal write checks PASS. Durable local registry is NOT cross-run GitHub/cross-host authority, and CLI operator flag is NOT Owner authorization. R4 independent native cycles 0/2, new official IDs 0, formal FIELD 0, new publish 0; existing formal 1 with price blank. Preserve #244 Android North USER_ATTESTED_PASS, #245 price UI Draft unmerged, TPAC 1500 REVIEW, OPENTIX 10-vs-8 session conflict HOLD, stale status pointer and HARD_HOLD_NO_PUBLICATION. Next: shared registry source-claim design + independently authorized fresh native cycles, then isolated LKG/CAS diff/rollback; no new Scheduler/Publisher.
