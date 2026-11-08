@@ -1,0 +1,77 @@
+name: EventRadar TPAC source-accepted minimum-price UI exact-head NO PUBLISH
+on:
+  pull_request:
+    paths:
+      - docs/index.html
+      - tests/p30/test_pwa_verified_min_price.js
+      - .github/workflows/eventradar_pwa_min_price_review.yml
+permissions:
+  contents: read
+jobs:
+  price-ui-only:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'fix/p30-tpac-verified-min-price-ui'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact HEAD, only three UI files, preserve formal activity and publisher
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PR_HEAD"
+          base=4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse "$base:docs/index.html")" = 489edb5615584458387e0caa853702d278f6ca1f
+          test "$(git rev-parse HEAD:docs/data.json)" = 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_min_price_review.yml' 'docs/index.html' 'tests/p30/test_pwa_verified_min_price.js' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_SCOPE_DRIFT; exit 1; }
+          echo PASS_EXACT_HEAD_PRICE_UI_ONLY_FROZEN_FORMAL_DATA
+      - name: Run existing Golden/source/regional UI tests plus strict min-price contract
+        run: |
+          set -euo pipefail
+          node tests/p30/test_formal_card_role_summary.js
+          node tests/p30/test_pwa_source_groups.js
+          node tests/p30/test_pwa_verified_min_price.js
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess,re
+          previous=subprocess.check_output(['git','show','4d207948526cd6a6e8ecd79ecd1251dcf44b31e8:docs/index.html']).decode()
+          revised=Path('docs/index.html').read_text()
+          start='    function formalCardPriceSummary(ev) {'
+          fixed='        // P30-L8 reconciliation: plain legacy price text is NOT admission proof.'
+          assert previous.count(start)==revised.count(start)==1
+          assert previous.count(fixed)==revised.count(fixed)==1
+          a=previous.index(start);b=revised.index(start)
+          ta=previous.index(fixed,a);tb=revised.index(fixed,b)
+          assert previous[:a]==revised[:b], 'UI_CHANGE_OUTSIDE_PRICE_FUNCTION_PREFIX'
+          assert previous[ta:]==revised[tb:], 'UI_CHANGE_OUTSIDE_PRICE_FUNCTION_SUFFIX'
+          scripts=re.findall(r'<script>(.*?)</script>',revised,re.S)
+          assert len(scripts)==1
+          Path('/tmp/tpac_min_price_ui.js').write_text(scripts[0])
+          print('PASS_LEGACY_GOLDEN_REGION_AND_OTHER_UI_BYTE_IDENTICAL')
+          PY
+          node --check /tmp/tpac_min_price_ui.js
+          echo PASS_GOLDEN_AND_NEW_PRICE_UI_REGRESSION
+      - name: Build review evidence with immutable input hashes
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          printf 'kind=TPAC_MIN_PRICE_FIELD_ACCEPTED_UI_ONLY_NOT_PUBLISHED\nhead=%s\nformal_data_mutated=0\nnew_price_displayed_currently=0\nregression_golden_changed=0\nformal_publisher_enabled=0\n' "$(git rev-parse HEAD)" > evidence/price_ui_review.txt
+          sha256sum docs/index.html tests/p30/test_pwa_verified_min_price.js > evidence/SOURCE_SHA256SUMS.txt
+          (cd evidence && sha256sum price_ui_review.txt SOURCE_SHA256SUMS.txt > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          git diff --exit-code -- docs/data.json docs/platform_status.json scraper.py
+          echo PASS_NO_FORMAL_ACTIVITY_OR_GOLDEN_PUBLICATION
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-tpac-strict-min-price-ui-review
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30

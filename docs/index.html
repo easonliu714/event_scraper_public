@@ -781,6 +781,39 @@
     // A price amount is shown only for a single unqualified general admission
     // amount (not sale date, VIP add-on, discounted membership, service charge).
     function formalCardPriceSummary(ev) {
+        // P30 TPAC field-level publication: verified general minimum does not
+        // require per-activity Golden modification. This branch is mutually
+        // exclusive with the existing GOLDEN_ACCEPTED legacy admission gate.
+        // Publisher must independently confirm original body SHA, event ID,
+        // general-price role and exact minimum BEFORE writing this receipt.
+        if (ev && !ev._candidate && ev.published === true
+            && ev.formal_field_pass === true && isCandidateOfficialUrl(ev.url)
+            && typeof ev.price === 'string') {
+            const proof = ev._formal_field_evidence && ev._formal_field_evidence.price;
+            const priceMatch = /^NT\$\s*(\d{1,3}(?:,\d{3})*|\d{3,6})\s*起$/u.exec(ev.price.trim());
+            const amount = priceMatch ? Number(priceMatch[1].replace(/,/g, '')) : NaN;
+            const nativeHash = ev._publication && ev._publication.source_body_sha256
+                && ev._publication.source_body_sha256.detail;
+            if (proof && proof.accepted === true
+                && proof.decision === 'FIELD_ACCEPTED'
+                && proof.role === 'EVENT_GENERAL_ADMISSION_MIN_PRICE'
+                && proof.price_kind === 'GENERAL_NON_DISCOUNTED'
+                && proof.source === ev.url && proof.source_url === ev.url
+                && proof.event_id === ev.source_event_id
+                && proof.value === ev.price
+                && proof.source_body_sha256 === nativeHash
+                && /^[a-f0-9]{64}$/i.test(String(nativeHash || ''))
+                && typeof proof.observed_at === 'string'
+                && /(Z|[+-]\d{2}:\d{2})$/i.test(proof.observed_at)
+                && !Number.isNaN(Date.parse(proof.observed_at))
+                && Number.isSafeInteger(amount) && amount >= 100
+                && amount <= 100000
+                && proof.min_price_ntd === amount
+                && Number.isSafeInteger(proof.max_price_ntd)
+                && proof.max_price_ntd >= amount && proof.max_price_ntd <= 100000) {
+                return 'NT$' + amount.toLocaleString('en-US') + ' 起（詳官方）';
+            }
+        }
         // P30-L8 reconciliation: plain legacy price text is NOT admission proof.
         // A receipt is an opt-in display gate, not an independent Golden audit.
         if (!ev || ev._candidate || ev.formal_field_pass !== true
