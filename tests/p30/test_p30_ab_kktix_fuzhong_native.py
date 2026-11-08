@@ -575,6 +575,29 @@ class EventLocalSiblingOwnershipTests(unittest.TestCase):
                           out["golden"], out["published"]), (0, 0, 0, 0))
 
 
+    def test_tainex_distinct_p0_exact_691_and_no_session_promotion(self):
+        src = m.SOURCES["B_TAINEX"]
+        listing = ('<main><a href="/event/691">2026 11/13 - 11/16 '
+                   + src["title"] + ' 一樓展場 四樓展場</a></main>')
+        detail = ('<main><article><h1>' + src["title"] + '</h1>'
+                  '<p>2026 11.13 (五) - 2026 11.16 (一)</p>'
+                  '<p>一樓展場 四樓展場</p></article></main>')
+        result = m.inspect_pair("B_TAINEX", listing, detail)
+        self.assertEqual(result["same_id_review"], 1)
+        self.assertEqual(set(result["field_roles"]), {
+            "VENUE_EXHIBITION_RANGE_REVIEW_NOT_SESSION",
+            "VENUE_FLOORS_REVIEW"})
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        for bad in ("/event/690", "/event/691?session=1",
+                    "https://evil.example/event/691", "/event/691#checkout"):
+            self.assertIsNone(m.exact_detail("B_TAINEX", bad))
+        self.assertEqual(m.inspect_pair("B_TAINEX",
+            listing.replace("/event/691", "/event/690"),
+            detail)["same_id_review"], 0)
+        self.assertEqual(m.inspect_pair("B_TAINEX",
+            listing, detail.replace("<h1>", "<p>").replace("</h1>", "</p>")
+            )["same_id_review"], 0)
+
 
 class RobotsPolicyAuthorityTests(unittest.TestCase):
     def test_applicable_group_and_both_urls_required(self):

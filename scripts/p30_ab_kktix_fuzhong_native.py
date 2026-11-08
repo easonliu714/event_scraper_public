@@ -57,6 +57,16 @@ SOURCES = {
         "title": "2026資訊月x臺灣教育科技展 ： 數位遊戲主題論壇",
         "origin": "https://kimu.kktix.cc",
     },
+    "B_TAINEX": {
+        # Distinct Taipei P0 official venue; NOT a new formal platform.
+        # Indexed event/691 discovery alone does not attest native HTML.
+        "source_id": "TAINEX_TAIPEI_OFFICIAL_NOT_FORMAL_19_PLATFORM",
+        "event_id": "691",
+        "list": "https://www.tainex.com.tw/event",
+        "detail": "https://www.tainex.com.tw/event/691",
+        "title": "2026臺灣國際食品暨設備展",
+        "origin": "https://www.tainex.com.tw",
+    },
     "B_NTCAM": {
         # New Taipei City Art Museum official public event; not platform #20.
         # A dynamic JS-only index must HOLD rather than invent a LIST edge.
@@ -231,7 +241,9 @@ def exact_list_edges(line, listing):
     return [(exact_detail(line, href), label) for href, label in p.anchors
             if exact_detail(line, href) and
             (label == title or (line == "A_UDN" and label.startswith(title + " ")) or
-             (line == "B_ZEPP_TAKASE" and label.count(title) == 1
+             (line == "B_TAINEX" and label.count(title) == 1
+               and len(label) <= len(title) + 160) or
+              (line == "B_ZEPP_TAKASE" and label.count(title) == 1
               and "2026 11.7" in label and "18:00" in label))]
 
 def b_list_row_roles(listing):
@@ -356,6 +368,13 @@ def inspect_pair(line, listing, detail):
             result["field_roles"].append("FORUM_TIME_RANGE_REVIEW_NOT_TICKET_SESSION")
         if local.count("世貿展覽館一館 / 1F數發部數產署主題館舞台區") == 1:
             result["field_roles"].append("VENUE_TWTC_HALL1_STAGE_REVIEW")
+    elif line == "B_TAINEX":
+        # Strict title-owned DETAIL scope; range/floor are non-Session roles.
+        if len(re.findall(
+                r"2026\\s+11\\.13\\s*\\(五\\)\\s*[-–]\\s*2026\\s+11\\.16\\s*\\(一\\)", local)) == 1:
+            result["field_roles"].append("VENUE_EXHIBITION_RANGE_REVIEW_NOT_SESSION")
+        if local.count("一樓展場 四樓展場") == 1:
+            result["field_roles"].append("VENUE_FLOORS_REVIEW")
     elif line == "B_NTCAM":
         # Museum indexed page may be client-rendered. Identity is REVIEW
         # only if a unique exact native LIST edge and DETAIL heading exist.

@@ -2198,6 +2198,39 @@ jobs:
           assert x['release_state']=='HARD_HOLD_NO_PUBLICATION'
           print('B_NTCH_NATIVE',x['decision'],x['first_failure'])
           PY
+      - name: One-shot B TaiNEX P0 official exhibition LIST exact-691 DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New distinct host. One robots read; LIST/DETAIL only if explicit ALLOW.
+          # Never reuse the marker, retry a denial, or infer ticket Sessions.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[b-tainex-native-once]'; then
+            echo 'B_TAINEX_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once, SOURCES
+          x = run_native_once("B_TAINEX")
+          assert x["source_id"] == SOURCES["B_TAINEX"]["source_id"]
+          assert x["source_event_id"] == "691"
+          assert 0 <= x["native_get_attempted"] <= 3
+          assert 0 <= x["native_http200"] <= 2
+          assert x["native_list"] <= 1 and x["native_detail"] <= 1
+          assert x["native_same_id_review"] <= x["native_detail"]
+          assert x["native_lkg"] == x["formal_accepted_fields"] == x["golden"] == x["published"] == 0
+          assert x["raw_html_saved"] is False
+          assert x["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/b_tainex_native_once.json").write_text(
+              json.dumps(x, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8")
+          print("B_TAINEX_NATIVE", x["native_get_attempted"],
+                x["native_http200"], x["native_list"], x["native_detail"],
+                x["native_same_id_review"], x["field_roles"],
+                x["first_failure"], flush=True)
+          PY
       - name: Exact-head evidence SHA256 manifest
         shell: bash
         run: |
@@ -2231,6 +2264,7 @@ jobs:
           if [ -f evidence/tixcraft03_native_once.json ]; then sha256sum evidence/tixcraft03_native_once.json >> evidence/SHA256SUMS.txt; fi
           for f in evidence/kimu_native_once.json evidence/ntcam_native_once.json; do if [ -f "$f" ]; then sha256sum "$f" >> evidence/SHA256SUMS.txt; fi; done
           if [ -f evidence/zepp_takase_160668_native_once.json ]; then sha256sum evidence/zepp_takase_160668_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/b_tainex_native_once.json ]; then sha256sum evidence/b_tainex_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/native_probe_consumption_guard.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/canonical_field_authority_contract.json >> evidence/SHA256SUMS.txt
@@ -2281,6 +2315,7 @@ jobs:
             scripts/p30_ntch_native_once.py
             tests/p30/test_p30_ntch_native_once.py
             evidence/b_ntch_native_once.json
+            evidence/b_tainex_native_once.json
             evidence/ab_opentix_ticc_native_once.json
             evidence/tpac_event2072_native_once.json
             tests/p30/fixtures/p30_l7_prince_field_readiness.json
