@@ -146,9 +146,12 @@ def run_native_once():
             raise ValueError("CLOUDGATE_ROBOTS_MISSING_DIRECTIVE_HOLD")
         policy = urllib.robotparser.RobotFileParser()
         policy.parse(robots.splitlines())
-        if not policy.can_fetch(UA,LIST_URL) or not policy.can_fetch(UA,DETAIL_URL):
-            raise ValueError("CLOUDGATE_ROBOTS_DISALLOW_HOLD")
-        out["policy_decision"]="ALLOW_ROBOTS_200"
+        # Only the LIST is known before acquisition. The DETAIL path must
+        # be selected by its exact source-owned href, not a hardcoded /cgt
+        # alias. Checking /cgt here would wrongly authorize an /cg GET.
+        if not policy.can_fetch(UA, LIST_URL):
+            raise ValueError("CLOUDGATE_ROBOTS_LIST_DISALLOW_HOLD")
+        out["policy_decision"]="LIST_ALLOW_DETAIL_PENDING"
         out["native_get_attempted"] += 1
         listing, lr = read_public(opener,LIST_URL,"text/html")
         if rr["body_sha256"] == lr["body_sha256"]:
@@ -162,6 +165,11 @@ def run_native_once():
         if len(edges)!=1 or not edges[0][1].startswith(norm(TITLE)):
             raise ValueError("CLOUDGATE_NATIVE_LIST_EXACT_EDGE_HOLD")
         out["list_derived_detail_url"] = edges[0][0]
+        # Point-of-use policy: a first-party /cg mirror is NOT covered by
+        # a robots decision for /cgt. Fail closed before DETAIL network I/O.
+        if not policy.can_fetch(UA, edges[0][0]):
+            raise ValueError("CLOUDGATE_ROBOTS_EXACT_DETAIL_DISALLOW_HOLD")
+        out["policy_decision"]="LIST_AND_EXACT_DETAIL_ALLOW_ROBOTS_200"
         out["native_get_attempted"] += 1
         detail, dr = read_public(opener,edges[0][0],"text/html")
         out["native_http200"] += 1

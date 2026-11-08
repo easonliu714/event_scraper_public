@@ -37,6 +37,61 @@ class CloudGateTests(unittest.TestCase):
             self.list_html + mirror_list, self.detail_html)[
                 "first_failure"], "CLOUDGATE_LIST_EXACT_ID_TITLE_HOLD")
 
+    def test_native_mirror_robots_denial_blocks_detail_io(self):
+        # End-to-end native acquisition safety: an allowed /cgt LIST does
+        # not authorize its exact /cg detail mirror. No network is used.
+        from unittest.mock import patch
+        mirror_list = self.list_html.replace(
+            "/cgt/theater-event/1680", "/cg/theater-event/1680")
+        calls = []
+        def supplied(_opener, url, mime):
+            calls.append(url)
+            if url.endswith("/robots.txt"):
+                return ("User-agent: *\\nDisallow: /cg/\\nAllow: /cgt/\\n",
+                        {"body_sha256": "a" * 64})
+            if url == m.LIST_URL:
+                return (mirror_list, {"body_sha256": "b" * 64})
+            raise AssertionError("DETAIL_IO_MUST_NOT_OCCUR")
+        with patch.object(m, "read_public", side_effect=supplied):
+            result = m.run_native_once()
+        self.assertEqual(calls, [
+            "https://www.cloudgate.org.tw/robots.txt", m.LIST_URL])
+        self.assertEqual(result["native_detail"], 0)
+        self.assertEqual(result["native_get_attempted"], 2)
+        self.assertEqual(result["list_derived_detail_url"], m.DETAIL_MIRROR_URL)
+        self.assertIn("CLOUDGATE_ROBOTS_EXACT_DETAIL_DISALLOW_HOLD",
+                      result["first_failure"])
+
+    def test_native_mirror_robots_allow_reaches_exact_detail_only(self):
+        # Integrated robots/list/identity/detail path with caller bytes:
+        # successful fixture never claims an actual official GET or FIELD.
+        from unittest.mock import patch
+        mirror_list = self.list_html.replace(
+            "/cgt/theater-event/1680", "/cg/theater-event/1680")
+        calls = []
+        def supplied(_opener, url, mime):
+            calls.append(url)
+            if url.endswith("/robots.txt"):
+                return ("User-agent: *\\nAllow: /cg/\\nAllow: /cgt/\\n",
+                        {"body_sha256": "a" * 64})
+            if url == m.LIST_URL:
+                return (mirror_list, {"body_sha256": "b" * 64})
+            if url == m.DETAIL_MIRROR_URL:
+                return (self.detail_html, {"body_sha256": "c" * 64})
+            raise AssertionError("UNEXPECTED_NATIVE_URL")
+        with patch.object(m, "read_public", side_effect=supplied):
+            result = m.run_native_once()
+        self.assertEqual(calls, [
+            "https://www.cloudgate.org.tw/robots.txt",
+            m.LIST_URL, m.DETAIL_MIRROR_URL])
+        self.assertEqual(result["native_detail"], 1)
+        self.assertEqual(result["native_same_id_review"], 1)
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["golden"], 0)
+        self.assertEqual(result["published"], 0)
+        self.assertEqual(result["policy_decision"],
+                         "LIST_AND_EXACT_DETAIL_ALLOW_ROBOTS_200")
+
     def test_foreign_id_query_checkout_hold(self):
         for bad in ("/cgt/theater-event/1681",
                     "/cgt/theater-event/1680?session=1",
