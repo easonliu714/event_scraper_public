@@ -11,6 +11,7 @@ from scripts import p30_ab_kktix_fuzhong_native as a
 from scripts import p30_ntpc_artcenter_source as b
 from scripts import p30_review_bridge as bridge
 from scripts import p30_ab_opentix_ticc_native_once as opentix
+from scripts import p30_cloudgate_native_gate as cloudgate
 
 STAMP = "2026-11-07T01:00:00+00:00"
 
@@ -27,6 +28,57 @@ class ReviewBridgeTests(unittest.TestCase):
         self.b_detail = ('<main><article><h3>' + b.TITLE +
                          '</h3><p>展覽地點：' + b.VENUE +
                          '</p></article></main>').encode()
+
+
+    def test_b_cloudgate_exact_1680_postponement_fixed_review_lkg(self):
+        # Caller-supplied HTML exercises the existing source-owned adapter.
+        # This is NOT a new official native GET or a formal show-date claim.
+        listing = ('<main><article><a href="/cgt/theater-event/1680">'
+                   + cloudgate.TITLE +
+                   '2026.10.17 - 12.19</a></article></main>').encode()
+        detail = ('<main><article><h1>' + cloudgate.TITLE +
+                  '</h1><p>12月19日(六) 13:30</p>'
+                  '<p>原11/14兩場講座延期至12/19</p>'
+                  '</article></main>').encode()
+        env = bridge.build_review_envelope(
+            "B", listing, detail, STAMP, adapter_key="B_CLOUDGATE")
+        self.assertEqual((env["source_event_id"], env["decision"]),
+                         ("1680", "REVIEW_ONLY_NOT_NATIVE"))
+        self.assertEqual({x["role"] for x in env["role_receipts"]},
+                         {"EVENT_LOCAL_TITLE_REVIEW",
+                          "VENUE_POSTPONEMENT_REVIEW_NOT_SESSION"})
+        self.assertEqual((env["native_get"], env["native_body_lkg"],
+                          env["formal_accepted_fields"], env["golden"],
+                          env["published"]), (0, 0, 0, 0, 0))
+        self.assertEqual(env["candidate"]["date"], "未確認")
+        self.assertEqual(env["candidate"]["price"], "未確認")
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = {k: env[k] for k in (
+                "line", "adapter_key", "source_id", "source_event_id",
+                "list_url", "detail_url", "observed_at_utc",
+                "source_attestation")}
+            manifest.update(env["body_digests"])
+            saved = bridge.replay_manifest_to_isolated_lkg(
+                manifest, listing, detail, root)
+            target = root / "_isolated_review" / "B" / "B_CLOUDGATE" / "review_snapshot.json"
+            self.assertEqual(json.loads(target.read_text())["sha256"],
+                             saved["snapshot_sha256"])
+            self.assertFalse((root / "docs").exists())
+        foreign = listing.replace(b"/1680", b"/1584")
+        denied = bridge.build_review_envelope(
+            "B", foreign, detail, STAMP, adapter_key="B_CLOUDGATE")
+        self.assertEqual(denied["decision"], "HOLD")
+        self.assertIsNone(denied["candidate"])
+        sibling = ('<main><article><h1>' + cloudgate.TITLE +
+                   '</h1></article><article><p>12月19日</p>'
+                   '<p>原11/14兩場講座延期至12/19</p></article></main>').encode()
+        held = bridge.build_review_envelope(
+            "B", listing, sibling, STAMP, adapter_key="B_CLOUDGATE")
+        self.assertEqual(held["decision"], "REVIEW_ONLY_NOT_NATIVE")
+        self.assertEqual([x["role"] for x in held["role_receipts"]],
+                         ["EVENT_LOCAL_TITLE_REVIEW"])
+        self.assertEqual(held["candidate"]["date"], "未確認")
 
     def test_opentix_exact_id_review_to_isolated_cas_lkg(self):
         src = opentix.SOURCES["A"]

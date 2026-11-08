@@ -12,12 +12,13 @@ from scripts import p30_tpac_event_source as tpac
 from scripts import p30_review_bridge as bridge
 from scripts import p30_ab_fixed_review_workflow as workflow
 from scripts import p30_ab_opentix_ticc_native_once as opentix
+from scripts import p30_cloudgate_native_gate as cloudgate
 
 STAMP = "2026-11-07T11:55:00+00:00"
 
 
 class FixedABWorkflowTests(unittest.TestCase):
-    def _inbox(self, root, a_adapter="A_OPENTIX"):
+    def _inbox(self, root, a_adapter="A_OPENTIX", b_adapter="B_TPAC_EVENT2072"):
         inbox = root / "_isolated_review" / "inbox"
         inbox.mkdir(parents=True)
         a = (opentix.SOURCES["A"] if a_adapter == "A_OPENTIX"
@@ -28,9 +29,16 @@ class FixedABWorkflowTests(unittest.TestCase):
                    a["title"] + '</a></article></main>').encode(),
                   ('<main><article><h1>' + a["title"] +
                    '</h1><p>官方公開活動介紹</p></article></main>').encode()),
-            "B": ("B_TPAC_EVENT2072",
+            "B": (b_adapter,
+                  ('<main><article><a href="/cgt/theater-event/1680">' +
+                   cloudgate.TITLE + '2026.10.17 - 12.19</a></article></main>').encode()
+                  if b_adapter == "B_CLOUDGATE" else
                   ('<main><article><a href="/event/2072">' + tpac.TITLE +
                    '</a><p>2026-11-10 - 2026-11-12</p></article></main>').encode(),
+                  ('<main><article><h1>' + cloudgate.TITLE +
+                   '</h1><p>12月19日(六) 13:30</p>'
+                   '<p>原11/14兩場講座延期至12/19</p></article></main>').encode()
+                  if b_adapter == "B_CLOUDGATE" else
                   ('<main><article><h1>' + tpac.TITLE +
                    '</h1><p>2026-11-11 - 2026-11-13</p></article></main>').encode()),
         }
@@ -81,6 +89,31 @@ class FixedABWorkflowTests(unittest.TestCase):
             self.assertEqual(again["lines"]["B"]["snapshot_sha256"],
                              out["lines"]["B"]["snapshot_sha256"])
             self.assertFalse((root / "docs" / "data.json").exists())
+
+
+    def test_fixed_a_opentix_b_cloudgate_1680_pair_readback(self):
+        # Real executable A+B pair workflow, caller bytes only, NO native GET.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            inputs = self._inbox(root, b_adapter="B_CLOUDGATE")
+            result = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(result["decision"], "REVIEW_ONLY_NOT_NATIVE")
+            self.assertEqual(result["lines"]["B"]["source_event_id"], "1680")
+            self.assertEqual(result["lines"]["B"]["role_receipts"], 2)
+            self.assertEqual((result["native_get"], result["native_body_lkg"],
+                              result["formal_accepted_fields"], result["golden"],
+                              result["published"]), (0, 0, 0, 0, 0))
+            b = root / "_isolated_review" / "B" / "B_CLOUDGATE" / "review_snapshot.json"
+            snapshot = json.loads(b.read_text())
+            self.assertEqual(snapshot["sha256"],
+                             result["lines"]["B"]["snapshot_sha256"])
+            self.assertEqual(snapshot["payload"]["candidate"]["date"], "未確認")
+            self.assertFalse((root / "docs").exists())
+            for line in ("A", "B"):
+                inputs[line]["expected_sha"] = result["lines"][line]["snapshot_sha256"]
+            second = workflow.run_fixed_ab(root, inputs)
+            self.assertEqual(second["lines"]["B"]["snapshot_sha256"],
+                             result["lines"]["B"]["snapshot_sha256"])
 
     def test_prior_accupass_fixed_pair_remains_covered(self):
         """OPENTIX integration must not regress the accepted ACCUPASS path."""

@@ -16,6 +16,7 @@ from pathlib import Path
 from scripts import p30_ab_kktix_fuzhong_native as ticket
 from scripts import p30_ntpc_artcenter_source as venue
 from scripts import p30_tpac_event_source as tpac_event
+from scripts import p30_cloudgate_native_gate as cloudgate
 from scripts import p30_ab_opentix_ticc_native_once as opentix
 from scripts import p30_candidate_review_pipeline as preview
 
@@ -24,7 +25,7 @@ ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
 # Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
 ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A", "A_OPENTIX": "A",
                  "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B",
-                 "B_TPAC_EVENT2072": "B"}
+                 "B_TPAC_EVENT2072": "B", "B_CLOUDGATE": "B"}
 DEFAULT_ADAPTER = {"A": "A_KIMU", "B": "B_NTPC"}
 
 
@@ -94,6 +95,19 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
             "B_CERAMICS": ("鶯歌陶瓷博物館", "展覽"),
             "B_ZEPP_TAKASE": ("Zepp New Taipei", "活動"),
         }[adapter_key]
+    elif adapter_key == "B_CLOUDGATE":
+        # Reuse the existing official exact-1680 parser; the postponement
+        # remains a REVIEW role, never a verified performance Session/date.
+        verdict = cloudgate.inspect_pair(listing, detail)
+        list_url, detail_url = cloudgate.LIST_URL, cloudgate.DETAIL_URL
+        title, source_id, event_id = (
+            cloudgate.TITLE,
+            "CLOUDGATE_THEATER_OFFICIAL_NOT_FORMAL_19_PLATFORM",
+            cloudgate.SOURCE_EVENT_ID)
+        roles = ["EVENT_LOCAL_TITLE_REVIEW"] if verdict["same_id_review"] else []
+        if verdict.get("postponement_review") == 1:
+            roles.append("VENUE_POSTPONEMENT_REVIEW_NOT_SESSION")
+        platform, kind = "雲門劇場", "活動"
     elif adapter_key == "B_TPAC_EVENT2072":
         verdict = tpac_event.inspect_caller_html(listing, detail)
         list_url, detail_url = tpac_event.LIST_URL, tpac_event.DETAIL_URL
@@ -147,8 +161,8 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
             "published": False,
         },
     }
-    if adapter_key == "B_TPAC_EVENT2072":
-        # Indexed LIST and DETAIL disagree on dates: preserve identity only.
+    if adapter_key in ("B_TPAC_EVENT2072", "B_CLOUDGATE"):
+        # Source-owned conflict or postponement remains REVIEW, never a Session.
         # The disagreement is a HOLD, not a Session/date/price receipt.
         raw["_candidate"]["hold_reasons"].append(verdict["first_failure"])
     candidate, reasons = preview.normalize_record(raw)
@@ -178,7 +192,7 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         }
     envelope["decision"] = "REVIEW_ONLY_NOT_NATIVE"
     envelope["first_failure"] = (verdict["first_failure"]
-        if adapter_key == "B_TPAC_EVENT2072"
+        if adapter_key in ("B_TPAC_EVENT2072", "B_CLOUDGATE")
         else "NATIVE_ATTESTATION_AND_FIELD_AUTHORITY_PENDING")
     return envelope
 
@@ -201,6 +215,10 @@ def _validate_snapshot(snapshot):
             "/artcenter_chi/xmdoc/cont?sid=" + venue.SID +
             "&sq=&xsmsid=" + venue.XSMSID),
             "NTPC_ARTCENTER_OFFICIAL_NOT_FORMAL_19_PLATFORM", venue.SID)
+    elif adapter == "B_CLOUDGATE":
+        expected = (cloudgate.LIST_URL, cloudgate.DETAIL_URL,
+                    "CLOUDGATE_THEATER_OFFICIAL_NOT_FORMAL_19_PLATFORM",
+                    cloudgate.SOURCE_EVENT_ID)
     elif adapter == "B_TPAC_EVENT2072":
         expected = (tpac_event.LIST_URL, tpac_event.DETAIL_URL,
                     tpac_event.SOURCE_ID, tpac_event.EVENT_ID)
@@ -247,6 +265,7 @@ def _validate_snapshot(snapshot):
         opentix.SOURCES["A"]["title"] if adapter == "A_OPENTIX" else
         venue.TITLE if adapter == "B_NTPC" else
         tpac_event.TITLE if adapter == "B_TPAC_EVENT2072" else
+        cloudgate.TITLE if adapter == "B_CLOUDGATE" else
         ticket.SOURCES[adapter]["title"]
     )
     if (set(candidate) != allowed_preview_keys or
