@@ -205,7 +205,7 @@ class EventSourceOnceTests(unittest.TestCase):
         calls = []
         def denied(url):
             calls.append(url)
-            return b"User-agent: *\\nDisallow: /event\\n"
+            return b"User-agent: *\nDisallow: /event\n"
         with tempfile.TemporaryDirectory() as root:
             registry = Path(root) / "registry"
             registry.mkdir()
