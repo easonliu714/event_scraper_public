@@ -1,0 +1,89 @@
+name: EventRadar TPAC first-source multi-event REVIEW refresh exact-head (NO PUBLISH)
+on:
+  pull_request:
+    paths:
+      - scripts/p30_tpac_multi_event_refresh.py
+      - tests/p30/test_p30_tpac_multi_event_refresh.py
+      - .github/workflows/eventradar_tpac_multi_event_refresh.yml
+permissions:
+  contents: read
+jobs:
+  multi-id-review-refresh:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/p30-tpac-multi-event-refresh-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact PR HEAD and immutable released data / Golden / Publisher controls
+        env:
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PR_SHA"
+          base=5c744607ab4d9d1c1493377018c282982acac227
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
+          echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline multi-event parsing, positive, negative, CAS and retention
+        run: |
+          set -euo pipefail
+          python -m pip install 'beautifulsoup4==4.15.0'
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_multi_event_refresh.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py
+          echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
+      - name: Produce two-ID isolated LKG fixture evidence, never native HTTP
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json,subprocess,sys,tempfile
+          sys.path.insert(0,'tests/p30')
+          from test_p30_tpac_multi_event_refresh import inputs,empty_prior,NOW
+          from scripts.p30_tpac_multi_event_refresh import refresh_plan,write_isolated_plan
+          listing,receipt,details=inputs()
+          plan=refresh_plan(listing,receipt,details,empty_prior(),NOW)
+          assert plan['decision']=='REVIEW_SNAPSHOT_READY_NOT_FORMAL'
+          assert plan['qualified']==2 and plan['source_cards']==2 and plan['added']==2
+          assert plan['published']==0 and plan['source_coverage_complete']
+          with tempfile.TemporaryDirectory() as d:
+              persisted=write_isolated_plan(plan,d,expected_sha=None)
+              assert persisted['rows']==2
+              saved=json.loads((Path(d)/'_isolated_review'/'tpac'/'tpac_multi_event_lkg.json').read_text())
+              assert all(r['published'] is False for r in saved['events'].values())
+              report={'kind':'TPAC_MULTI_EVENT_OFFLINE_FIXTURE_DEMO_NOT_NATIVE',
+                      'exact_head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+                      'synthetic_only':True, 'source_cards':2,'qualified':2,
+                      'added':2,'published':0,'release_state':'HARD_HOLD_NO_PUBLICATION',
+                      'snapshot_sha256':persisted['sha256'],
+                      'candidate_keys':sorted(saved['events']), 'native_http_new':0,
+                      'next_real_gate':'2 distinct independently evidenced TPAC native list/detail ID pairs'}
+              Path('evidence/tpac_multi_event_offline_demo.json').write_text(
+                  json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          print('PASS_REUSABLE_2_ID_OFFLINE_REVIEW_NOT_NATIVE_OR_PUBLISHED')
+          PY
+      - name: SHA256 evidence and formal outputs remain untouched
+        run: |
+          set -euo pipefail
+          (cd evidence && sha256sum tpac_multi_event_offline_demo.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          git diff --exit-code -- docs/data.json docs/platform_status.json docs/index.html scraper.py
+          echo PASS_ZERO_FORMAL_DATA_AND_AUTOMATIC_PUBLISHER_WRITES
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-tpac-multi-event-review-lkg-readiness
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
