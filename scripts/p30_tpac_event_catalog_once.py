@@ -134,14 +134,98 @@ def collect_once(out, *, fetch=bounded_fetch):
 
 
 
+
+class GitHubAtomicClaimRegistry:
+    """Cross-host atomic one-shot source claim via unique GitHub Git tag refs.
+
+    A tag creation is an atomic uniqueness check across runners. A tag can be
+    deleted by a privileged actor: this is NOT immutable retention authority.
+    Requires separate Owner source-frequency approval; it never publishes data.
+    No automatic CI execution, no retries, and no HTTP source GET on failure.
+    """
+
+    API = "https://api.github.com/repos/easonliu714/event_scraper_public"
+
+    def __init__(self, token, expected_main_sha, *, opener=None):
+        if not isinstance(token, str) or not token.strip():
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_TOKEN_REQUIRED_HOLD")
+        if not isinstance(expected_main_sha, str) or not re.fullmatch(
+                r"[0-9a-f]{40}", expected_main_sha):
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_MAIN_SHA_HOLD")
+        self._token = token
+        self.expected_main_sha = expected_main_sha
+        self._opener = opener or build_opener(NoRedirect())
+
+    def _request(self, method, url, *, payload=None, status=200):
+        raw_payload = (json.dumps(payload, sort_keys=True).encode("utf-8")
+                       if payload is not None else None)
+        request = Request(
+            url, data=raw_payload, method=method,
+            headers={
+                "Authorization": "Bearer " + self._token,
+                "Accept": "application/vnd.github+json",
+                "Content-Type": "application/json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": AGENT,
+            })
+        try:
+            with self._opener.open(request, timeout=15) as response:
+                if response.status != status or response.geturl() != url:
+                    raise ValueError("TPAC_R4_GLOBAL_CLAIM_REDIRECT_OR_STATUS_HOLD")
+                raw = response.read(65537)
+                if not 0 < len(raw) <= 65536:
+                    raise ValueError("TPAC_R4_GLOBAL_CLAIM_RESPONSE_CAP_HOLD")
+                value = json.loads(raw.decode("utf-8", "strict"))
+                if not isinstance(value, dict):
+                    raise ValueError("TPAC_R4_GLOBAL_CLAIM_JSON_OBJECT_HOLD")
+                return value
+        except HTTPError as exc:
+            if exc.code == 422:
+                raise ValueError("TPAC_R4_GLOBAL_CYCLE_ALREADY_CLAIMED_OR_REJECTED_HOLD") from exc
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_HTTP_HOLD") from exc
+        except (URLError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_HTTP_OR_JSON_HOLD") from exc
+
+    def claim(self, cycle_id):
+        if not isinstance(cycle_id, str) or not re.fullmatch(
+                r"tpac-r4-[a-z0-9-]{8,72}", cycle_id):
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_CYCLE_ID_HOLD")
+        main = self._request("GET", self.API + "/git/ref/heads/main")
+        if (main.get("ref") != "refs/heads/main"
+                or not isinstance(main.get("object"), dict)
+                or main["object"].get("sha") != self.expected_main_sha):
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_MAIN_HEAD_DRIFT_HOLD")
+        ref = "refs/tags/eventradar-tpac-r4-claims/" + cycle_id
+        url = self.API + "/git/ref/tags/eventradar-tpac-r4-claims/" + cycle_id
+        created = self._request(
+            "POST", self.API + "/git/refs",
+            payload={"ref": ref, "sha": self.expected_main_sha}, status=201)
+        if (created.get("ref") != ref
+                or not isinstance(created.get("object"), dict)
+                or created["object"].get("sha") != self.expected_main_sha):
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_CREATE_PARITY_HOLD")
+        readback = self._request("GET", url)
+        if (readback.get("ref") != ref
+                or not isinstance(readback.get("object"), dict)
+                or readback["object"].get("sha") != self.expected_main_sha):
+            raise ValueError("TPAC_R4_GLOBAL_CLAIM_READBACK_PARITY_HOLD")
+        return {
+            "ref": ref, "main_sha": self.expected_main_sha,
+            "global_atomic_claim_created": True,
+            "global_immutable_registry_verified": False,
+        }
+
+
+
 def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
                                  fetch=None, clock=None, pause=None,
-                                 registry_dir=None):
+                                 registry_dir=None, global_registry=None):
     """Bounded /event native cycle for a separately approved, isolated R4 attempt.
 
-    A fresh, exclusive output directory is a LOCAL one-shot claim, not a
-    cross-run GitHub registry. Neither successful capture nor a second replay
-    proves two independent source cycles or authorizes a formal Publisher.
+    Requires both a local crash-persistent tombstone and a GitHub atomic tag
+    claim, created/read back before source GET. Tags can be deleted by admins,
+    so this does not prove immutable global registry retention. No automatic
+    Publisher or two-independent-native-cycle attestation.
     No automatic workflow calls this function.
     """
     if source_policy_approved is not True:
@@ -160,6 +244,13 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
     if registry.is_symlink() or not registry.is_dir():
         raise ValueError("TPAC_R4_DURABLE_REGISTRY_UNTRUSTED_HOLD")
     claim = registry / (cycle_id + ".claim.json")
+    if claim.exists() or claim.is_symlink():
+        raise ValueError("TPAC_R4_DURABLE_CYCLE_REUSE_HOLD")
+    # Never trust a caller-provided boolean or dict as a global claim. Only
+    this concrete client can create and independently read back an atomic ref.
+    if type(global_registry) is not GitHubAtomicClaimRegistry:
+        raise ValueError("TPAC_R4_GLOBAL_ATOMIC_REGISTRY_REQUIRED_HOLD")
+    global_claim = global_registry.claim(cycle_id)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -170,7 +261,9 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump({"cycle_id": cycle_id, "catalog": "event",
                    "output": str(out.resolve()), "state": "CONSUMED_BEFORE_NETWORK",
-                   "global_registry_verified": False}, handle, sort_keys=True)
+                   "global_registry_verified": False,
+                   "global_claim_ref": global_claim["ref"],
+                   "global_atomic_claim_created": True}, handle, sort_keys=True)
         handle.write(chr(10))
         handle.flush()
         os.fsync(handle.fileno())
@@ -188,6 +281,10 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
         "request_gap_seconds": None,
         "local_one_shot_claim": True, "durable_local_registry_claimed": True,
         "global_one_shot_registry_verified": False,
+        "global_atomic_claim_created": True,
+        "global_claim_ref": global_claim["ref"],
+        "global_claim_main_sha": global_claim["main_sha"],
+        "global_immutable_registry_verified": False,
         "independent_cycle_verified": False, "native_official_attestation": False,
         "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
@@ -282,14 +379,23 @@ if __name__ == "__main__":
     parser.add_argument("--cycle-id", help="unique approved isolated TPAC-R4 cycle identifier")
     parser.add_argument("--registry-dir", type=Path,
                         help="pre-existing durable local claim directory; NOT cross-host")
+    parser.add_argument("--global-github-ref-claim", action="store_true",
+                        help="create a unique GitHub tag ref before source GET; needs dedicated token")
+    parser.add_argument("--global-expected-main-sha",
+                        help="fresh exact main SHA to compare before atomic tag creation")
     parser.add_argument("--authorize-isolated-cycle", action="store_true",
                         help="explicit operator confirmation of separately approved source policy")
     args = parser.parse_args()
     if args.cycle_id is not None or args.authorize_isolated_cycle:
+        global_registry = None
+        if args.global_github_ref_claim:
+            global_registry = GitHubAtomicClaimRegistry(
+                os.environ.get("EVENTRADAR_SOURCE_CLAIM_GITHUB_TOKEN"),
+                args.global_expected_main_sha)
         report = collect_bounded_review_cycle(
             args.output, args.cycle_id,
             source_policy_approved=args.authorize_isolated_cycle,
-            registry_dir=args.registry_dir)
+            registry_dir=args.registry_dir, global_registry=global_registry)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True))
         raise SystemExit(0 if report["decision"] == "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED" else 49)
     report = collect_once(args.output)

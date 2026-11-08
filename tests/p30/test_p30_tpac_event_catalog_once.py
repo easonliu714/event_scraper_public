@@ -1,5 +1,6 @@
 """No-network TPAC /event robots + LIST + two distinct DETAIL one-shot tests."""
 import hashlib
+from urllib.error import HTTPError
 import json
 import tempfile
 import unittest
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from scripts.p30_tpac_event_catalog_once import (
     ROOT, ROBOTS, SOURCE_IDS, bounded_fetch, collect_once,
-    collect_bounded_review_cycle,
+    collect_bounded_review_cycle, GitHubAtomicClaimRegistry,
 )
 
 ROBOTS_OK = b"User-agent: *\nAllow: /event\n"
@@ -15,6 +16,64 @@ LIST = (b'<main><a href="/event/1301" title="Exhibition">Exhibition</a>'
         b'<a href="/event/2072" title="Tour">Tour</a></main>')
 ONE = b"<main><h1>Exhibition</h1><p>Opening hours</p></main>"
 TWO = b"<main><h1>Tour</h1><p>Showtimes</p></main>"
+
+
+
+
+class FakeGitHubOpener:
+    """No-network REST double with shared tag state across simulated hosts."""
+    SHA = "a" * 40
+    API = GitHubAtomicClaimRegistry.API
+
+    def __init__(self, claimed=None, *, main_sha=None, corrupt_readback=False):
+        self.claimed = claimed if claimed is not None else set()
+        self.main_sha = main_sha or self.SHA
+        self.corrupt_readback = corrupt_readback
+        self.calls = []
+
+    def open(self, req, timeout=None):
+        url = req.full_url
+        method = req.get_method()
+        self.calls.append((method, url))
+        class Response:
+            def __init__(self, url, status, body):
+                self.url, self.status = url, status
+                self.body = json.dumps(body).encode()
+            def geturl(self):
+                return self.url
+            def read(self, cap):
+                return self.body[:cap]
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+        if method == "GET" and url == self.API + "/git/ref/heads/main":
+            return Response(url, 200, {
+                "ref": "refs/heads/main", "object": {"sha": self.main_sha}})
+        prefix = "refs/tags/eventradar-tpac-r4-claims/"
+        if method == "POST" and url == self.API + "/git/refs":
+            value = json.loads(req.data.decode())
+            ref = value["ref"]
+            if ref in self.claimed:
+                raise HTTPError(url, 422, "already exists", {}, None)
+            self.claimed.add(ref)
+            return Response(url, 201, {
+                "ref": ref, "object": {"sha": value["sha"]}})
+        if method == "GET" and url.startswith(
+                self.API + "/git/ref/tags/eventradar-tpac-r4-claims/"):
+            ref = "refs/tags/" + url.split("/git/ref/tags/", 1)[1]
+            if ref not in self.claimed:
+                raise HTTPError(url, 404, "missing", {}, None)
+            return Response(url, 200, {
+                "ref": ref,
+                "object": {"sha": ("b" * 40 if self.corrupt_readback else self.SHA)}})
+        raise AssertionError("unexpected GitHub request " + method + " " + url)
+
+
+def fake_global_registry(shared=None, **kwargs):
+    opener = FakeGitHubOpener(shared, **kwargs)
+    return GitHubAtomicClaimRegistry("no-network-unit-test-token", opener.SHA,
+                                     opener=opener)
 
 
 class EventSourceOnceTests(unittest.TestCase):
@@ -103,7 +162,7 @@ class EventSourceOnceTests(unittest.TestCase):
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-010000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fake,
-                clock=clock, pause=sleeps.append, registry_dir=registry)
+                clock=clock, pause=sleeps.append, registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(report["decision"], "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED")
             self.assertEqual(report["selected_ids"], ["3456", "9876"])
             self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/3456", ROOT + "/9876"])
@@ -123,7 +182,7 @@ class EventSourceOnceTests(unittest.TestCase):
                 collect_bounded_review_cycle(
                     out, "tpac-r4-20261109-010000z-a1b2c3d4",
                     source_policy_approved=True, fetch=fake, pause=sleeps.append,
-                    registry_dir=registry)
+                    registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(len(calls), 4)
 
     def test_r4_requires_explicit_source_policy_before_any_request(self):
@@ -151,7 +210,7 @@ class EventSourceOnceTests(unittest.TestCase):
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-020000z-a1b2c3d4",
                 source_policy_approved=True, fetch=denied, pause=lambda n: None,
-                registry_dir=registry)
+                registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("ROBOTS_LIST_DISALLOW_HOLD", report["first_failure"])
@@ -174,7 +233,7 @@ class EventSourceOnceTests(unittest.TestCase):
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-030000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fail_first_detail,
-                pause=lambda n: None, registry_dir=registry)
+                pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/3456"])
             self.assertEqual(report["successful_get"], 2)
             self.assertEqual(report["decision"], "HOLD")
@@ -194,7 +253,7 @@ class EventSourceOnceTests(unittest.TestCase):
                 out, "tpac-r4-20261109-040000z-a1b2c3d4",
                 source_policy_approved=True, fetch=slow,
                 pause=lambda n: self.fail("unexpected delay"),
-                registry_dir=registry)
+                registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("CRAWL_DELAY_OVER_BUDGET_HOLD", report["first_failure"])
@@ -214,14 +273,14 @@ class EventSourceOnceTests(unittest.TestCase):
             cycle = "tpac-r4-20261109-050000z-a1b2c3d4"
             report = collect_bounded_review_cycle(
                 first, cycle, source_policy_approved=True, fetch=denied,
-                pause=lambda n: None, registry_dir=registry)
+                pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(report["decision"], "HOLD")
             self.assertEqual(calls, [ROBOTS])
             self.assertTrue((registry / (cycle + ".claim.json")).is_file())
             with self.assertRaisesRegex(ValueError, "DURABLE_CYCLE_REUSE_HOLD"):
                 collect_bounded_review_cycle(
                     second, cycle, source_policy_approved=True, fetch=denied,
-                    pause=lambda n: None, registry_dir=registry)
+                    pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
             self.assertFalse(second.exists())
             self.assertEqual(calls, [ROBOTS])
 
@@ -246,6 +305,67 @@ class EventSourceOnceTests(unittest.TestCase):
                     out, cycle, source_policy_approved=True,
                     fetch=no_get, registry_dir=alias)
             self.assertFalse(out.exists())
+
+
+    def test_r4_global_registry_required_before_source_get(self):
+        with tempfile.TemporaryDirectory() as root:
+            registry = Path(root) / "registry"
+            registry.mkdir()
+            out = Path(root) / "no-global"
+            with self.assertRaisesRegex(ValueError, "GLOBAL_ATOMIC_REGISTRY_REQUIRED_HOLD"):
+                collect_bounded_review_cycle(
+                    out, "tpac-r4-20261109-065500z-a1b2c3d4",
+                    source_policy_approved=True, registry_dir=registry,
+                    fetch=lambda url: self.fail("network attempted"))
+            self.assertFalse(out.exists())
+            self.assertEqual(list(registry.iterdir()), [])
+
+    def test_r4_two_hosts_same_cycle_global_atomic_ref_rejects_second(self):
+        calls, shared = [], set()
+        def denied(url):
+            calls.append(url)
+            return b"User-agent: *\\nDisallow: /event\\n"
+        with tempfile.TemporaryDirectory() as root:
+            cycle = "tpac-r4-20261109-065500z-a1b2c3d4"
+            registry_a, registry_b = Path(root)/"a", Path(root)/"b"
+            registry_a.mkdir()
+            registry_b.mkdir()
+            first = collect_bounded_review_cycle(
+                Path(root)/"first", cycle, source_policy_approved=True,
+                registry_dir=registry_a, global_registry=fake_global_registry(shared),
+                fetch=denied, pause=lambda _: None)
+            self.assertEqual(first["decision"], "HOLD")
+            self.assertTrue(first["global_atomic_claim_created"])
+            self.assertFalse(first["global_immutable_registry_verified"])
+            self.assertEqual(len(calls), 1)
+            with self.assertRaisesRegex(ValueError, "GLOBAL_CYCLE_ALREADY_CLAIMED"):
+                collect_bounded_review_cycle(
+                    Path(root)/"second", cycle, source_policy_approved=True,
+                    registry_dir=registry_b, global_registry=fake_global_registry(shared),
+                    fetch=denied, pause=lambda _: None)
+            self.assertEqual(len(calls), 1)
+            self.assertFalse((Path(root)/"second").exists())
+            self.assertEqual(list(registry_b.iterdir()), [])
+
+    def test_r4_global_claim_main_drift_and_readback_mismatch_fail_closed(self):
+        with tempfile.TemporaryDirectory() as root:
+            reg = Path(root)/"registry"
+            reg.mkdir()
+            cycle = "tpac-r4-20261109-065500z-a1b2c3d4"
+            for name, opts, reason in (
+                ("drift", {"main_sha":"c"*40}, "MAIN_HEAD_DRIFT_HOLD"),
+                ("readback", {"corrupt_readback":True}, "READBACK_PARITY_HOLD"),
+            ):
+                with self.subTest(name=name):
+                    out = Path(root)/name
+                    with self.assertRaisesRegex(ValueError, reason):
+                        collect_bounded_review_cycle(
+                            out, cycle, source_policy_approved=True,
+                            registry_dir=reg, global_registry=fake_global_registry(**opts),
+                            fetch=lambda url: self.fail("network attempted"))
+                    self.assertFalse(out.exists())
+                    self.assertEqual(list(reg.iterdir()), [])
+
 
 
 if __name__ == "__main__":
