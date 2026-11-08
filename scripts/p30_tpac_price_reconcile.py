@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
@@ -157,10 +157,77 @@ def extract_tpac_price_review(detail_body, receipt, expected_event_id, expected_
         }
 
 
+def inspect_opentix_native_body(body, receipt, *, event_url, expected_title, now):
+    """Check caller-supplied ticket bytes against a bounded source receipt.
+
+    This is an identity/provenance preflight, NOT independent artifact readback,
+    ticket-price attestation, session parity, inventory, or publication.
+    No network I/O. A boolean claim of native verification is never authority.
+    """
+    try:
+        if type(body) is not bytes or not 0 < len(body) <= MAX_HTML_BYTES:
+            raise ValueError("OPENTIX_BODY_MISSING_OR_CAP_HOLD")
+        if not isinstance(receipt, dict):
+            raise ValueError("OPENTIX_RECEIPT_MISSING_HOLD")
+        u = urlparse(event_url)
+        if (u.scheme + "://" + u.netloc != TICKET_ORIGIN
+                or not OPENTIX_URL.fullmatch(u.path)
+                or u.params or u.query or u.fragment
+                or u.username or u.password):
+            raise ValueError("OPENTIX_EXACT_EVENT_URL_HOLD")
+        if (receipt.get("final_url") != event_url
+                or receipt.get("http_status") != 200
+                or receipt.get("robots_allowed") is not True
+                or receipt.get("body_bytes") != len(body)
+                or receipt.get("body_sha256") != hashlib.sha256(body).hexdigest()):
+            raise ValueError("OPENTIX_NATIVE_RECEIPT_PARITY_HOLD")
+        if (type(receipt.get("source_run_id")) is not int
+                or receipt["source_run_id"] <= 0
+                or not isinstance(receipt.get("artifact_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", receipt["artifact_sha256"])):
+            raise ValueError("OPENTIX_ARTIFACT_PROVENANCE_MISSING_HOLD")
+        try:
+            observed = datetime.fromisoformat(
+                receipt["observed_at"].replace("Z", "+00:00"))
+        except (KeyError, AttributeError, ValueError) as e:
+            raise ValueError("OPENTIX_OBSERVED_AT_HOLD") from e
+        if observed.tzinfo is None or observed.utcoffset() is None:
+            raise ValueError("OPENTIX_OBSERVED_TIMEZONE_HOLD")
+        if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
+            raise ValueError("OPENTIX_EVALUATION_CLOCK_HOLD")
+        age = now.astimezone(timezone.utc) - observed.astimezone(timezone.utc)
+        if age < timedelta(0) or age > timedelta(hours=24):
+            raise ValueError("OPENTIX_SOURCE_FRESHNESS_HOLD")
+        soup = BeautifulSoup(body.decode("utf-8", "strict"), "html.parser")
+        mains = soup.select("main")
+        if len(mains) != 1:
+            raise ValueError("OPENTIX_EVENT_LOCAL_MAIN_HOLD")
+        headings = mains[0].select("h1")
+        if len(headings) != 1 or _plain(headings[0]) != expected_title:
+            raise ValueError("OPENTIX_EVENT_LOCAL_TITLE_HOLD")
+        return {
+            "decision": "TICKET_BODY_IDENTITY_REVIEW_NOT_FIELD_AUTHORITY",
+            "ticket_event_id": u.path.rsplit("/", 1)[-1],
+            "ticket_event_url": event_url,
+            "event_title": expected_title,
+            "source_body_sha256": hashlib.sha256(body).hexdigest(),
+            "observed_at": observed.astimezone(timezone.utc).isoformat(),
+            "source_run_id": receipt["source_run_id"],
+            "artifact_sha256_claim": receipt["artifact_sha256"],
+            "independent_artifact_readback": False,
+            "ticket_tiers_body_attested": False,
+            "ticket_sessions_body_attested": False,
+            "published": False,
+        }
+    except (ValueError, TypeError, UnicodeError, OverflowError) as error:
+        return {"decision": "HOLD", "reason": str(error), "published": False}
+
+
 def reconcile_opentix_price(venue_offer, *, ticket_event_url, title,
                             venue_name, normal_ticket_tiers, sessions,
                             independent_ticket_receipt_verified=False,
-                            venue_sessions=None):
+                            venue_sessions=None, ticket_body=None,
+                            ticket_receipt=None, now=None):
     """Compare separate price and session roles; never elevate untrusted tiers.
 
     Ticket session prices and venue event prices are separate evidence roles.
@@ -192,9 +259,26 @@ def reconcile_opentix_price(venue_offer, *, ticket_event_url, title,
     hold = []
     if ticket_set != venue_set:
         hold.append("CROSS_SOURCE_SESSION_SET_CONFLICT_HOLD")
-    if independent_ticket_receipt_verified is not True:
+    # The old boolean could clear the receipt HOLD without any ticket bytes.
+    # Never trust caller-asserted verification, even with matching price tiers.
+    native = None
+    if ticket_body is not None or ticket_receipt is not None:
+        native = inspect_opentix_native_body(
+            ticket_body, ticket_receipt, event_url=ticket_event_url,
+            expected_title=title, now=now)
+    if native is None or native["decision"] == "HOLD":
         hold.append("INDEPENDENT_TICKET_BODY_RECEIPT_REQUIRED_HOLD")
+    else:
+        # Even genuine ticket bytes + a claimed artifact digest prove only
+        # source-bound event identity until an independent artifact readback
+        # and event-local tier/session parser establish each separate role.
+        hold.extend(["TICKET_ARTIFACT_INDEPENDENT_READBACK_REQUIRED_HOLD",
+                     "TICKET_TIERS_NOT_NATIVE_FIELD_ATTESTED_HOLD",
+                     "TICKET_SESSIONS_NOT_NATIVE_FIELD_ATTESTED_HOLD"])
+    if independent_ticket_receipt_verified is True:
+        hold.append("UNTRUSTED_BOOLEAN_TICKET_ATTESTATION_HOLD")
     return {
+        "ticket_native_identity_review": native,
         "decision": "PRICE_RANGE_MATCH_REVIEW_NOT_FORMAL",
         "min_price_ntd": venue_offer["min_price_ntd"],
         "max_price_ntd": venue_offer["max_price_ntd"],

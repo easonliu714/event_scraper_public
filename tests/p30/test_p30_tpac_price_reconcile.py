@@ -1,10 +1,12 @@
 """Only synthetic negative/positive fixtures here; CI replays sealed real TPAC HTML."""
 import hashlib
 import unittest
+from datetime import datetime, timedelta, timezone
 from copy import deepcopy
 
 from scripts.p30_tpac_price_reconcile import (
     extract_tpac_price_review, reconcile_opentix_price,
+    inspect_opentix_native_body,
 )
 
 TITLE = "沉浸式劇場《士林YES！》"
@@ -159,9 +161,81 @@ class TPACAdmissionReviewTests(unittest.TestCase):
              sessions=VENUE_SESSIONS,venue_sessions=VENUE_SESSIONS,
              independent_ticket_receipt_verified=True)
         self.assertEqual(result["decision"],"PRICE_RANGE_MATCH_REVIEW_NOT_FORMAL")
-        self.assertEqual(result["held_fields"],[])
+        self.assertIn("INDEPENDENT_TICKET_BODY_RECEIPT_REQUIRED_HOLD", result["held_fields"])
+        self.assertIn("UNTRUSTED_BOOLEAN_TICKET_ATTESTATION_HOLD", result["held_fields"])
         self.assertFalse(result["accepted_for_formal_publish"])
 
+
+    def test_pinned_ticket_body_identity_never_promotes_caller_tiers_or_sessions(self):
+        html, tpac_receipt = sample()
+        offer = extract_tpac_price_review(html, tpac_receipt, "2040", TITLE)
+        ticket_body = (f"<main><h1>{TITLE}</h1><p>選擇場次</p></main>").encode()
+        observed = datetime(2026, 11, 8, 13, 20, tzinfo=timezone.utc)
+        receipt = {
+            "final_url": OPENTIX, "http_status": 200, "robots_allowed": True,
+            "body_bytes": len(ticket_body),
+            "body_sha256": hashlib.sha256(ticket_body).hexdigest(),
+            "observed_at": observed.isoformat(),
+            "source_run_id": 42490000000, "artifact_sha256": "a" * 64,
+        }
+        now = observed + timedelta(minutes=5)
+        identity = inspect_opentix_native_body(
+            ticket_body, receipt, event_url=OPENTIX,
+            expected_title=TITLE, now=now)
+        self.assertEqual(identity["decision"],
+                         "TICKET_BODY_IDENTITY_REVIEW_NOT_FIELD_AUTHORITY")
+        self.assertFalse(identity["independent_artifact_readback"])
+        result = reconcile_opentix_price(
+            offer, ticket_event_url=OPENTIX, title=TITLE,
+            venue_name="臺北表演藝術中心",
+            normal_ticket_tiers=[1500, 2000, 2500, 3000, 3500],
+            sessions=TICKET_SESSIONS, venue_sessions=VENUE_SESSIONS,
+            ticket_body=ticket_body, ticket_receipt=receipt, now=now)
+        self.assertEqual(result["ticket_native_identity_review"]["source_body_sha256"],
+                         receipt["body_sha256"])
+        self.assertIn("CROSS_SOURCE_SESSION_SET_CONFLICT_HOLD", result["held_fields"])
+        self.assertIn("TICKET_ARTIFACT_INDEPENDENT_READBACK_REQUIRED_HOLD",
+                      result["held_fields"])
+        self.assertIn("TICKET_TIERS_NOT_NATIVE_FIELD_ATTESTED_HOLD", result["held_fields"])
+        self.assertIn("TICKET_SESSIONS_NOT_NATIVE_FIELD_ATTESTED_HOLD", result["held_fields"])
+        self.assertFalse(result["accepted_for_formal_publish"])
+
+    def test_ticket_native_provenance_rejects_spoof_tamper_stale_and_robots(self):
+        body = (f"<main><h1>{TITLE}</h1></main>").encode()
+        now = datetime(2026, 11, 8, 14, tzinfo=timezone.utc)
+        receipt = {
+            "final_url": OPENTIX, "http_status": 200, "robots_allowed": True,
+            "body_bytes": len(body), "body_sha256": hashlib.sha256(body).hexdigest(),
+            "observed_at": (now - timedelta(hours=1)).isoformat(),
+            "source_run_id": 42490000000, "artifact_sha256": "b" * 64,
+        }
+        cases = [
+            (body+b"!", receipt, OPENTIX, TITLE, now,
+             "OPENTIX_NATIVE_RECEIPT_PARITY_HOLD"),
+            (body, dict(receipt, robots_allowed=False), OPENTIX, TITLE, now,
+             "OPENTIX_NATIVE_RECEIPT_PARITY_HOLD"),
+            (body, dict(receipt, http_status=302), OPENTIX, TITLE, now,
+             "OPENTIX_NATIVE_RECEIPT_PARITY_HOLD"),
+            (body, dict(receipt, final_url=OPENTIX+"?x=1"), OPENTIX, TITLE, now,
+             "OPENTIX_NATIVE_RECEIPT_PARITY_HOLD"),
+            (body, receipt, OPENTIX+"?session=1", TITLE, now,
+             "OPENTIX_EXACT_EVENT_URL_HOLD"),
+            (body, receipt, OPENTIX, "其他節目", now,
+             "OPENTIX_EVENT_LOCAL_TITLE_HOLD"),
+            (body, dict(receipt, observed_at=(now-timedelta(hours=25)).isoformat()),
+             OPENTIX, TITLE, now, "OPENTIX_SOURCE_FRESHNESS_HOLD"),
+            (body, dict(receipt, source_run_id=None), OPENTIX, TITLE, now,
+             "OPENTIX_ARTIFACT_PROVENANCE_MISSING_HOLD"),
+            (body, dict(receipt, artifact_sha256="fake"), OPENTIX, TITLE, now,
+             "OPENTIX_ARTIFACT_PROVENANCE_MISSING_HOLD"),
+            (body, receipt, OPENTIX, TITLE, None,
+             "OPENTIX_EVALUATION_CLOCK_HOLD"),
+        ]
+        for raw, source, url, title, clock, expected in cases:
+            with self.subTest(reason=expected, url=url):
+                result = inspect_opentix_native_body(
+                    raw, source, event_url=url, expected_title=title, now=clock)
+                self.assertEqual(result, {"decision":"HOLD","reason":expected,"published":False})
 
 if __name__=="__main__":
     unittest.main()
