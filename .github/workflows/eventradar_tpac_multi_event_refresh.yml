@@ -171,7 +171,7 @@ jobs:
                       'accepted_formal_field_delta':0,'published_delta':0,
                       'release_state':'HARD_HOLD_NO_PUBLICATION'}
               Path('evidence/tpac_event_archived_to_cas_lkg.json').write_text(
-                  json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\\n')
+                  json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n')
           print('PASS_ARCHIVED_NATIVE_2_EVENT_IDS_TO_REVIEW_CAS_LKG_TWO_REPLAYS_NO_GET')
           PY
       - name: Read prior pinned TPAC programme native body (NO NEW GET)

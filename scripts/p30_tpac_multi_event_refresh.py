@@ -407,8 +407,8 @@ def write_isolated_plan(plan, repo_root, expected_sha=None):
     for key, event in rows.items():
         if not isinstance(key, str) or not isinstance(event, dict):
             raise ValueError("TPAC_REVIEW_ROW_AUTHORITY_HOLD")
-        event_match = re.fullmatch(r"tpac:event:([1-9]\\d{0,9})", key)
-        program_match = re.fullmatch(r"tpac:([1-9]\\d{0,9})", key)
+        event_match = re.fullmatch(r"tpac:event:([1-9]\d{0,9})", key)
+        program_match = re.fullmatch(r"tpac:([1-9]\d{0,9})", key)
         if not event_match and not program_match:
             raise ValueError("TPAC_REVIEW_NAMESPACE_IDENTITY_HOLD")
         sid = (event_match or program_match)[1]
