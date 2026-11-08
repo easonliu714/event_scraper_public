@@ -113,6 +113,67 @@ jobs:
               assert hashlib.sha256((p/('event_'+key+'_detail.html')).read_bytes()).hexdigest()==raw['source_receipts'][key]['body_sha256']
           print('PASS_ARCHIVED_OFFICIAL_EVENT_2_IDS_EXHIBITION_VS_TOUR_ROLES_PERIOD_CONFLICT_HOLD_NO_PUBLISH')
           PY
+      - name: Replay sealed native /event two IDs into two-cycle isolated CAS LKG (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, tempfile
+          from datetime import datetime, timedelta
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import (
+              KIND, refresh_event_plan, write_isolated_plan,
+          )
+          root = Path('pinned-event/native_event')
+          native = json.loads((root/'tpac_event_catalog_receipt.json').read_text())
+          source = native['source_receipts']
+          observed = datetime.fromisoformat(source['2072']['observed_at'].replace('Z','+00:00'))
+          now = observed + timedelta(seconds=1)
+          raw = (root/'event_list.html').read_bytes()
+          details = {
+              sid: {'body': (root/('event_'+sid+'_detail.html')).read_bytes(),
+                    'receipt': source[sid]}
+              for sid in ('1301','2072')
+          }
+          plan = refresh_event_plan(raw, source['list'], details,
+                                    {'kind':KIND,'events':{}}, now)
+          assert plan['decision']=='REVIEW_SNAPSHOT_READY_NOT_FORMAL',plan
+          assert plan['source_cards']==18 and plan['qualified']==2
+          assert plan['added']==2 and len(plan['rejected'])==16
+          assert not plan['source_coverage_complete']
+          assert set(plan['events'])=={'tpac:event:1301','tpac:event:2072'}
+          exhibition=plan['events']['tpac:event:1301']
+          tour=plan['events']['tpac:event:2072']
+          assert exhibition['date']=='' and exhibition['location']==''
+          assert 'EXHIBITION_PERIOD' in exhibition['_candidate']['field_roles']
+          assert 'NEXT_EVENT_SHOW_START' not in exhibition['_candidate']['field_roles']
+          assert tour['date']=='2026-11-11 19:00'
+          assert 'LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD' in tour['_candidate']['hold_reasons']
+          assert all(not e['published'] and not e['formal_field_pass']
+                     and not e['golden_accepted'] for e in plan['events'].values())
+          with tempfile.TemporaryDirectory() as directory:
+              first=write_isolated_plan(plan,directory,expected_sha=None)
+              prior={'kind':KIND,'events':plan['events']}
+              second=refresh_event_plan(raw,source['list'],details,prior,now)
+              assert (second['added'],second['changed'],second['unchanged'])==(0,0,2)
+              saved=write_isolated_plan(second,directory,expected_sha=first['sha256'])
+              assert saved['sha256']==first['sha256']
+              assert not (Path(directory)/'docs'/'data.json').exists()
+              details['2072']['receipt']=dict(details['2072']['receipt'],http_status=403)
+              partial=refresh_event_plan(raw,source['list'],details,prior,now)
+              assert partial['qualified']==1 and '2072' in partial['rejected']
+              assert 'tpac:event:2072' in partial['events']
+              report={'kind':'TPAC_EVENT_NATIVE_ARCHIVE_TO_ISOLATED_CAS_LKG',
+                      'archived_source_not_fresh_get':True,'native_http_new':0,
+                      'source_list_count':18,'native_detail_replayed':2,
+                      'qualified_review_rows':2,'rejected_missing_detail':16,
+                      'snapshot_sha256':saved['sha256'],
+                      'two_replay_cycles_not_independent_refresh':True,
+                      'accepted_formal_field_delta':0,'published_delta':0,
+                      'release_state':'HARD_HOLD_NO_PUBLICATION'}
+              Path('evidence/tpac_event_archived_to_cas_lkg.json').write_text(
+                  json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\\n')
+          print('PASS_ARCHIVED_NATIVE_2_EVENT_IDS_TO_REVIEW_CAS_LKG_TWO_REPLAYS_NO_GET')
+          PY
       - name: Read prior pinned TPAC programme native body (NO NEW GET)
         uses: actions/download-artifact@v4
         with:

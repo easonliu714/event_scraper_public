@@ -284,6 +284,111 @@ def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
     return report
 
 
+
+def refresh_event_plan(list_body, list_receipt, detail_pairs, prior, now):
+    """Replay TPAC /event LIST + exact-ID DETAIL into nonpublication CAS LKG.
+
+    /event activities have a separate identity namespace from /program shows.
+    A missing DETAIL, conflicting period, or exhibition hours cannot create a
+    fabricated performance date. Archived source receipts are not fresh GETs.
+    """
+    from scripts.p30_tpac_catalog_topology import discover_catalog
+    from scripts.p30_tpac_event_detail_review import inspect_event_detail
+
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("TPAC_EVENT_CLOCK_TIMEZONE_HOLD")
+    now = now.astimezone(timezone.utc)
+    if (not isinstance(prior, dict) or prior.get("kind") != KIND
+            or not isinstance(prior.get("events"), dict)):
+        raise ValueError("TPAC_EVENT_PRIOR_LKG_SCHEMA_HOLD")
+    if not isinstance(detail_pairs, dict) or len(detail_pairs) > MAX_DETAILS:
+        raise ValueError("TPAC_EVENT_DETAIL_INPUT_CAP_HOLD")
+    old = prior["events"]
+    report = {"kind": KIND, "decision": "HOLD", "previous_count": len(old),
+              "new_count": len(old), "added": 0, "changed": 0, "unchanged": 0,
+              "retained_previous": len(old), "source_cards": 0,
+              "qualified": 0, "rejected": {}, "events": dict(old),
+              "release_state": "HARD_HOLD_NO_PUBLICATION",
+              "published": 0, "native_attestation": "REQUIRES_INDEPENDENT_READBACK"}
+    try:
+        cards = discover_catalog("event", list_body, list_receipt, now)
+    except (ValueError, KeyError, TypeError, OverflowError) as error:
+        report["decision"] = "HOLD_EVENT_LIST_" + str(error)
+        return report
+    report["source_cards"] = len(cards)
+    updated = dict(old)
+    adds = changes = same = valid = 0
+    for sid, card in cards.items():
+        item = detail_pairs.get(sid)
+        if not isinstance(item, dict):
+            report["rejected"][sid] = "DETAIL_NOT_PROVIDED_HOLD"
+            continue
+        try:
+            owned = dict(card)
+            owned["list_sha256"] = _sha(list_body)
+            review = inspect_event_detail(owned, item["body"], item["receipt"], now)
+            identity = "tpac:event:" + sid
+            if (review["identity"] != identity
+                    or review["source_event_id"] != sid
+                    or review["url"] != "https://tpac.org.taipei/event/" + sid
+                    or review["detail_body_sha256"] != _sha(item["body"])
+                    or review["decision"] != "SOURCE_OWNED_PARTIAL_FIELDS_REQUIRE_INDEPENDENT_ACCEPTANCE"):
+                raise ValueError("TPAC_EVENT_ROLE_IDENTITY_PROVENANCE_HOLD")
+            roles = {}
+            for role, value in review["verified_core_roles"].items():
+                roles[role] = {"role": role, "value": value,
+                               "source_url": review["url"],
+                               "source_body_sha256": review["detail_body_sha256"],
+                               "observed_at": review["observed_at"],
+                               "decision": "REVIEW_NOT_FORMAL"}
+            start = review["verified_core_roles"].get("NEXT_EVENT_SHOW_START")
+            event = {
+                "source_namespace": "event", "identity": identity,
+                "source_event_id": sid, "url": review["url"],
+                "title": review["title"], "platform": "臺北表演藝術中心",
+                "type": review["activity_kind"],
+                "date": datetime.fromisoformat(start).strftime("%Y-%m-%d %H:%M") if start else "",
+                "location": "", "price": "", "img_url": None,
+                "scraped_at": _time(review["observed_at"]).astimezone(TIMEZONE).isoformat(),
+                "description": "官方活動詳情與場次請參閱來源；尚未正式接受欄位。",
+                "published": False, "formal_field_pass": False, "golden_accepted": False,
+                "_candidate": {
+                    "scope": "ARCHIVED_SOURCE_REPLAY_REVIEW_ONLY",
+                    "decision": "REVIEW",
+                    "event_id": sid, "identity": identity,
+                    "hold_reasons": list(review["held_fields"]),
+                    "source_list_sha256": _sha(list_body),
+                    "source_detail_sha256": review["detail_body_sha256"],
+                    "observed_at": review["observed_at"],
+                    "list_period": review["list_period"],
+                    "detail_period": review["detail_period"],
+                    "field_roles": roles,
+                },
+            }
+        except (ValueError, KeyError, TypeError, AttributeError, OverflowError) as error:
+            report["rejected"][sid] = str(error)
+            continue
+        valid += 1
+        if identity not in updated:
+            adds += 1
+        elif updated[identity] == event:
+            same += 1
+        else:
+            changes += 1
+        updated[identity] = event
+    if valid == 0:
+        report["decision"] = "HOLD_NO_QUALIFIED_EVENT_DETAILS_PRESERVE_LKG"
+        return report
+    qualified = {"tpac:event:" + sid for sid in cards if sid not in report["rejected"]}
+    report.update({"decision": "REVIEW_SNAPSHOT_READY_NOT_FORMAL",
+                   "events": updated, "new_count": len(updated),
+                   "added": adds, "changed": changes, "unchanged": same,
+                   "retained_previous": sum(k not in qualified for k in old),
+                   "qualified": valid,
+                   "source_coverage_complete": valid == len(cards) and not report["rejected"]})
+    return report
+
+
 def _canonical(obj):
     return (json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
 
@@ -300,10 +405,19 @@ def write_isolated_plan(plan, repo_root, expected_sha=None):
     if not isinstance(rows, dict) or not rows:
         raise ValueError("TPAC_EMPTY_REVIEW_SNAPSHOT_HOLD")
     for key, event in rows.items():
-        if (not isinstance(key, str) or not re.fullmatch(r"tpac:[1-9]\d{0,9}", key)
-                or not isinstance(event, dict)
-                or event.get("source_event_id") != key.split(":", 1)[1]
-                or event.get("url") != ROOT + "/" + key.split(":", 1)[1]
+        if not isinstance(key, str) or not isinstance(event, dict):
+            raise ValueError("TPAC_REVIEW_ROW_AUTHORITY_HOLD")
+        event_match = re.fullmatch(r"tpac:event:([1-9]\\d{0,9})", key)
+        program_match = re.fullmatch(r"tpac:([1-9]\\d{0,9})", key)
+        if not event_match and not program_match:
+            raise ValueError("TPAC_REVIEW_NAMESPACE_IDENTITY_HOLD")
+        sid = (event_match or program_match)[1]
+        url = ("https://tpac.org.taipei/event/" if event_match else ROOT + "/") + sid
+        if (event.get("source_event_id") != sid
+                or event.get("url") != url
+                or (event_match and (event.get("source_namespace") != "event"
+                                     or event.get("identity") != key))
+                or (program_match and event.get("source_namespace") == "event")
                 or event.get("published") is not False
                 or event.get("golden_accepted") is not False
                 or event.get("formal_field_pass") is not False

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.p30_tpac_multi_event_refresh import (
-    KIND, ROOT, discover_list, refresh_plan, write_isolated_plan,
+    KIND, ROOT, discover_list, refresh_plan, refresh_event_plan, write_isolated_plan,
 )
 
 NOW = datetime(2026, 11, 8, 14, 0, tzinfo=timezone.utc)
@@ -207,6 +207,86 @@ class MultiEventRefreshTests(unittest.TestCase):
             again = write_isolated_plan(plan, root, expected_sha=report["sha256"])
             self.assertEqual(again["sha256"], report["sha256"])
             self.assertFalse((root / "docs" / "data.json").exists())
+
+
+    def test_event_namespace_real_role_shape_and_two_cycle_cas(self):
+        # Synthetic structure exercises the same code used for sealed native
+        # archive replay; no HTTP and no formal field acceptance.
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        observed = datetime(2026, 11, 8, 14, 54, tzinfo=timezone.utc)
+        names = {"1301": "「親．建築」計畫：高德亮《晚風》",
+                 "2072": "2026北藝夜遊：Beats到天臺"}
+        categories = {"1301": "展覽", "2072": "專題導覽"}
+        periods = {"1301": "2025-07-23 - 2026-12-30",
+                   "2072": "2026-11-10 - 2026-11-12"}
+        raw = "".join(
+            '<a class="card-event" title="連結到' + names[sid] +
+            '" href="/event/' + sid + '"><div class="card-event__text-title">' +
+            names[sid] + '</div><div class="card-event__text-datecate"><p>' +
+            periods[sid] + '</p><p>' + categories[sid] + '</p></div></a>'
+            for sid in names
+        ).encode()
+        details = {}
+        for sid in names:
+            data = event_detail(
+                names[sid], categories[sid],
+                "2025-07-24 - 2026-12-31" if sid == "1301"
+                else "2026-11-11 - 2026-11-13",
+                [] if sid == "1301" else [
+                    "2026-11-11 (三) 19:00", "2026-11-12 (四) 19:00",
+                    "2026-11-13 (五) 19:00"])
+            details[sid] = {"body": data,
+                            "receipt": event_receipt(
+                                "https://tpac.org.taipei/event/" + sid, data)}
+        listing_receipt = event_receipt("https://tpac.org.taipei/event", raw)
+        plan = refresh_event_plan(raw, listing_receipt, details, empty_prior(), observed)
+        self.assertEqual((plan["qualified"], plan["added"]), (2, 2))
+        self.assertEqual(set(plan["events"]), {"tpac:event:1301", "tpac:event:2072"})
+        self.assertEqual(plan["events"]["tpac:event:1301"]["date"], "")
+        self.assertEqual(plan["events"]["tpac:event:2072"]["date"], "2026-11-11 19:00")
+        self.assertIn("LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD",
+                      plan["events"]["tpac:event:1301"]["_candidate"]["hold_reasons"])
+        self.assertFalse(plan["events"]["tpac:event:2072"]["formal_field_pass"])
+        with tempfile.TemporaryDirectory() as root:
+            first = write_isolated_plan(plan, root, expected_sha=None)
+            second_plan = refresh_event_plan(
+                raw, listing_receipt, details,
+                {"kind": KIND, "events": plan["events"]}, observed)
+            self.assertEqual((second_plan["added"], second_plan["changed"],
+                              second_plan["unchanged"]), (0, 0, 2))
+            second = write_isolated_plan(second_plan, root, expected_sha=first["sha256"])
+            self.assertEqual(first["sha256"], second["sha256"])
+            self.assertFalse((Path(root) / "docs" / "data.json").exists())
+        details["2072"]["receipt"]["http_status"] = 403
+        partial = refresh_event_plan(raw, listing_receipt, details,
+                                     {"kind": KIND, "events": plan["events"]}, observed)
+        self.assertEqual(partial["qualified"], 1)
+        self.assertIn("2072", partial["rejected"])
+        self.assertIn("tpac:event:2072", partial["events"])
+
+    def test_event_and_program_numeric_ids_do_not_collide(self):
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        observed = datetime(2026, 11, 8, 14, 54, tzinfo=timezone.utc)
+        name = "2026北藝夜遊：Beats到天臺"
+        raw = ('<a class="card-event" title="連結到' + name +
+               '" href="/event/2072"><div class="card-event__text-title">' +
+               name + '</div><div class="card-event__text-datecate"><p>'
+               '2026-11-10 - 2026-11-12</p><p>專題導覽</p></div></a>').encode()
+        data = event_detail(name, "專題導覽", "2026-11-11 - 2026-11-13",
+                            ["2026-11-11 (三) 19:00"])
+        previous = {"kind": KIND, "events": {"tpac:2072": {"legacy_program": True}}}
+        plan = refresh_event_plan(raw, event_receipt("https://tpac.org.taipei/event", raw),
+                                  {"2072": {"body": data, "receipt": event_receipt(
+                                      "https://tpac.org.taipei/event/2072", data)}},
+                                  previous, observed)
+        self.assertEqual(plan["qualified"], 1)
+        self.assertIn("tpac:2072", plan["events"])
+        self.assertIn("tpac:event:2072", plan["events"])
+
 
     def test_nonqualified_writes_and_foreign_symlink_rejected(self):
         body, rr, details = inputs()
