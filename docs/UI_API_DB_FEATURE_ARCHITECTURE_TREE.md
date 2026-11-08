@@ -8180,3 +8180,26 @@ A OPENTIX #05 existing exact-ID adapter [caller HTML; no fresh native GET]
 - **Function before/after:** `build_review_envelope` previously sent unknown `B_CLOUDGATE` through generic ticket `SOURCES` (first CI `KeyError`); now explicitly dispatches the existing B Cloud Gate source-owned parser before the generic ticket branch and excludes it from that branch. `_validate_snapshot` previously rejected unregistered Cloud Gate identity; now pins exact official `1680` URL/ID/title and forbids preview date/price/venue elevation. Existing `run_fixed_ab` was unchanged; tests now execute A OPENTIX + B Cloud Gate through it, validating dual-slot CAS/readback. No production code path was altered.
 - **Exact-head evidence:** Engineering Draft [#236](https://github.com/easonliu714/event_scraper_public/pull/236) `0f3fa78b5cbb97f267d3ff219cbd57354091dcbf`, CI [#42440781793](https://github.com/easonliu714/event_scraper_public/actions/runs/42440781793) SUCCESS **297/297**, job `128609364816`, Artifact `13601318348` SHA256 `a372c5340371886283cbc399471f240aa4e958c0ec5095c34d6a44ec2ff8ec7c`, independent ZIP 35 CRC/34 manifest SHA PASS. First failed run `42440749562` generic ticket dispatch bug corrected. A/B new native HTTP/LIST/DETAIL/identity/role REVIEW/formal accepted FIELD each `0/0/0/0/0/0`; new Body/receipt LKG each `0/0`. Historical TMC Body=1, A OPENTIX receipt-only=1, B Zepp receipt-only=1 remain distinct.
 - **Governance and release:** Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`; formal data/status blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`/`645f68c3db1b0fa06527d73f8dae4a36fadcbbdd`; 19 platforms unchanged. Formal accepted FIELD/Golden/Published `0/0/0`; `HARD_HOLD_NO_PUBLICATION`, no main/status-only merge. CKSMH5/TWTC39 and Android L8 5/5 PASS retained; cross-group OR Android UNVERIFIED.
+
+### 2026-11-08 11:55 Asia/Taipei — B TaiNEX real robots-gated native exact-ID source; A NTCH indexed organizer cross-authority
+
+```text
+A #05 OPENTIX event/2070446724700692480 historical native receipt-only LKG=1
+  + independent NTCH official programs indexed title + 2026/11/13–15 range
+  -> cross-source TITLE/RANGE discovery only; no exact OPENTIX ID href, no
+     native NTCH body SHA/observed_at, no Session, FIELD ACCEPT=0
+  -> CROSS_SOURCE_EXACT_ID_EDGE_AND_FRESHNESS_HOLD
+
+B P0 TaiNEX [distinct first-party domain, not formal platform #20]
+  robots.txt HTTP200 -> explicit applicable ALLOW both /event and /event/691
+  -> native LIST /event HTTP200 SHA 33a8d824... same exact event URL edge
+  -> native DETAIL /event/691 HTTP200 SHA fde63b40... exact H title
+  -> SOURCE_EXACT_TITLE_REVIEW receipt [detail body SHA, UTC, ID=691]
+  -> AB_EVENT_LOCAL_FIELD_SCOPE_HOLD [no local date/floor role promotion]
+  -> native Body LKG=0, receipt-only LKG +0, FIELD/Golden/Published=0
+  -> immutable CI Artifact + independent ZIP 36 CRC/35 SHA256SUMS PASS
+```
+
+- **Function-level change:** `p30_ab_kktix_fuzhong_native.SOURCES` before lacked TaiNEX → now pins `B_TAINEX` official HTTPS LIST/DETAIL, ID 691, exact title and source identity. `exact_list_edges` before only accepted title-exact anchor or existing A_UDN/Zepp variants → now accepts one bounded TaiNEX anchor with exactly one title occurrence and exact URL, no foreign ID/query/fragment. `inspect_pair` before no TaiNEX event-local field role → now only considers date/floors inside unique exact-title ARTICLE/SECTION with no foreign same-origin event edge; actual native response did not meet scope, so date/floors **HOLD**. `run_native_once` unchanged, reused to enforce explicit robots rules, no redirect/retry, bounded UTF-8 HTML, receipt SHA/UTC and non-publication. CI adds unique first-use `[b-tainex-regexfix-native-once]`, bounded output and immutable artifact; no production scraper/JSON/Publisher change.
+- **First true CI FAIL and correction:** candidate HEAD `0e2d531babc005e745109c0424c973e6cf4fd140` CI `42444530189` failed new test due regex literal `\\s` instead of whitespace class `\s` before native step. Final HEAD `c3b66618ade9eff6ad6b64f715deed5d24f9f323`, exact-head CI `42444587223` SUCCESS job `128620734168`; original one-shot marker was not executed, a unique new marker was used once, consumption guard PASS. Artifact `13603201243` SHA `a63207f9a6b2611b5379b9dd57baa07c573d59a55a50d07517ff28e7eab5f9fa`, independent 36/36 CRC, 35/35 manifest.
+- **Source quality:** A current native HTTP/LIST/DETAIL/identity/field REVIEW/accepted FIELD `0/0/0/0/0/0`; B `2/1/1/1/1/0` with native event GET2 + robots GET1. B original raw HTML intentionally not saved, so Body LKG=0; prior Zepp receipt-only LKG=1. A historical TMC Body LKG=1 and OPENTIX receipt-only LKG=1 unchanged. B Cloud Gate historical native LIST1 and no exact edge is consumed, do not repeat. `HARD_HOLD_NO_PUBLICATION` and formal FIELD/Golden/Published `0/0/0`; main data/status/19 platforms unchanged; Android L8 5/5 and CKSMH5/TWTC39 USER_ATTESTED_PASS, cross-group OR/Pages HTTP UNVERIFIED.
