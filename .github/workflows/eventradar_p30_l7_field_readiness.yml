@@ -2237,7 +2237,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py tests/p30/test_p30_next_source_fixed_integration.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py scripts/p30_ab_opentix_ticc_native_once.py tests/p30/test_p30_ab_opentix_ticc_native_once.py scripts/p30_ntch_native_once.py tests/p30/test_p30_ntch_native_once.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
+          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_candidate_review_pipeline.py scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py tests/p30/test_p30_next_source_fixed_integration.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py scripts/p30_ab_opentix_ticc_native_once.py tests/p30/test_p30_ab_opentix_ticc_native_once.py scripts/p30_ntch_native_once.py tests/p30/test_p30_ntch_native_once.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
           printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce > evidence/readiness.txt
           sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
           if [ -f evidence/tpac_event2072_native_once.json ]; then sha256sum evidence/tpac_event2072_native_once.json >> evidence/SHA256SUMS.txt; fi
@@ -2290,6 +2290,7 @@ jobs:
           path: |
             evidence/
             .github/workflows/eventradar_p30_l7_field_readiness.yml
+            scripts/p30_candidate_review_pipeline.py
             scripts/p30_l7_field_golden_readiness.py
             scripts/p30_source_stream_gate.py
             tests/p30/test_p30_l7_field_golden_readiness.py
