@@ -21,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          main=d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
+          main=599fb16f98c2b27e13a5226be7efd899e42a2b9f
           git merge-base --is-ancestor "$main" HEAD
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           for path in docs/index.html docs/platform-status.html scraper.py docs/manifest.json; do
@@ -36,7 +36,7 @@ jobs:
           python - <<'PY'
           import json,subprocess
           from pathlib import Path
-          main='d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce'
+          main='599fb16f98c2b27e13a5226be7efd899e42a2b9f'
           old=subprocess.check_output(['git','show',main+':docs/platform_status.json']).decode()
           new=Path('docs/platform_status.json').read_text()
           marker='  "latestEngineering": {'
@@ -50,8 +50,8 @@ jobs:
           assert snap['releaseState']=='HARD_HOLD_NO_PUBLICATION'
           assert (snap['acceptedFieldsNew'],snap['goldenNew'],snap['publishedEventsNew'])==(0,0,0)
           assert (snap['candidateReviewFields'],snap['candidateIdentityDependencies'],snap['independentFormalAdjudicatedFields'])==(5,2,0)
-          assert snap['nativeOfficialGetThisSnapshot']==1
-          assert snap['statusOnlyReleaseAuthorization']=='NOT_GRANTED'
+          assert snap['nativeOfficialGetThisSnapshot']==0
+          assert snap['statusOnlyReleaseAuthorization']=='OWNER_APPROVED_STATUS_ONLY_2026_11_08'
           assert snap['priorVerifiedNativeGet']['successfulOfficialGet']==3
           assert [x['id'] for x in snap['lines']]==['A','B']
           assert all(x['draftPR']==236 and x['acceptedFields']==0 and x['decision'] in ('REVIEW_WITH_HOLD','HOLD') for x in snap['lines'])
