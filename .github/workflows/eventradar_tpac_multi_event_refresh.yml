@@ -4,6 +4,8 @@ on:
     paths:
       - scripts/p30_tpac_multi_event_refresh.py
       - scripts/p30_tpac_catalog_topology.py
+      - scripts/p30_tpac_event_catalog_once.py
+      - tests/p30/test_p30_tpac_event_catalog_once.py
       - tests/p30/test_p30_tpac_catalog_topology.py
       - tests/p30/test_p30_tpac_multi_event_refresh.py
       - .github/workflows/eventradar_tpac_multi_event_refresh.yml
@@ -33,7 +35,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
       - uses: actions/setup-python@v5
@@ -45,8 +47,22 @@ jobs:
           python -m pip install 'beautifulsoup4==4.15.0'
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_multi_event_refresh.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_catalog_topology.py' -v
-          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_catalog_once.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
+      - name: TPAC /event first-party robots LIST and 2 distinct DETAIL bounded one-shot (NO PUBLISH)
+        env:
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/native_event
+          if [ "$RUN_ATTEMPT" != "1" ] || git log --format=%s HEAD^ | grep -F '[tpac-event-catalog-once]'; then
+            echo 'TPAC_EVENT_SOURCE_PROBE_ALREADY_CONSUMED_OR_RERUN_HOLD'
+            printf '{"kind":"TPAC_EVENT_ONESHOT_ALREADY_CONSUMED","decision":"HOLD_DO_NOT_REPEAT","published":0}\n' > evidence/native_event/tpac_event_catalog_receipt.json
+          else
+            python -m scripts.p30_tpac_event_catalog_once --output evidence/native_event
+          fi
+          echo 'NATIVE_DIAGNOSTIC_ONLY__DO_NOT_INTERPRET_WORKFLOW_SUCCESS_AS_SOURCE_FIELD_PASS'
       - name: Produce two-ID isolated LKG fixture evidence, never native HTTP
         run: |
           set -euo pipefail
@@ -101,7 +117,7 @@ jobs:
       - name: SHA256 evidence and formal outputs remain untouched
         run: |
           set -euo pipefail
-          (cd evidence && sha256sum tpac_multi_event_offline_demo.json tpac_catalog_topology_fixture.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd evidence && find . -type f ! -name SHA256SUMS.txt -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           git diff --exit-code -- docs/data.json docs/platform_status.json docs/index.html scraper.py
           echo PASS_ZERO_FORMAL_DATA_AND_AUTOMATIC_PUBLISHER_WRITES
       - uses: actions/upload-artifact@v4
