@@ -8103,3 +8103,25 @@ A existing ticket source Adapter (e.g. A_OPENTIX/A_ACCUPASS)
 - A/B each new native HTTP/LIST/DETAIL/identity/role REVIEW/accepted FIELD 0/0/0/0/0/0; new Body/receipt-only LKG 0/0; formal Golden/Published 0/0. Historical A TMC Body LKG=1 and B Zepp receipt-only LKG=1 unchanged. A ROBOTS_UNVERIFIED_HOLD; B TPAC /event/2072 DATE_CONFLICT_HOLD; Taipei Dome event-local ID edge unverified. Next source-first bounded legal discovery or alternative source rotation, no duplicate fixture Gate.
 - Source main 599fb16f98c2b27e13a5226be7efd899e42a2b9f, Preview main 03e515d65e827d5ed67fe341d079907a96bf784a, ShowNews main 85fed3e85ff5deff479a85b8d692aa9e6d2bdcad. Main formal data/status blobs unchanged 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4 / 645f68c3db1b0fa06527d73f8dae4a36fadcbbdd; 19 platforms, status snapshot stale. L8 5/5, CKSMH5/TWTC39 and homepage source grouping PASS retained; cross-group OR Android and new direct Pages runtime UNVERIFIED. HARD_HOLD_NO_PUBLICATION; no merge or production release.
 
+
+
+### 2026-11-08 09:01 Asia/Taipei — Read-only independent A/B pair receipt verifier (engineering only)
+
+```text
+A ticket Adapter caller LIST/DETAIL + B P0 venue Adapter caller LIST/DETAIL
+  -> run_fixed_ab: BOTH strict preflight, independent per-slot CAS/lease/atomic REVIEW LKG
+  -> _write_pair_receipt: immutable content-addressed historical A+B seal
+  -> NEW verify_pair_receipt(repo_root, pair_receipt_sha256) [READ-ONLY]
+       exact canonical receipt bytes + receipt SHA256 + no-release authority
+       A/B adapter/source/event ID, URLs, UTC timestamp, caller body digests
+       both nested REVIEW snapshot checksums, role receipts and identity parity
+       no symlink/path escape; second read detects concurrent drift
+  -> CLI --verify-pair-sha (reject mixed write arguments)
+  -> VERIFIED_REVIEW_ONLY_NOT_NATIVE or strict HOLD
+  -> native GET/accepted FIELD/Golden/Published = 0/0/0/0
+```
+
+- **Before → after:** `_write_pair_receipt` already sealed two historical LKG snapshots, but there was no separate callable or CLI to independently verify a sealed receipt against the currently durable pair. New `verify_pair_receipt` adds independent immutable receipt and both-slot parity verification without invoking source GET or modifying either LKG. `main` now has a mutually exclusive read-only verification mode; normal write mode still requires both complete A/B manifest/body inputs. Tampered JSON, slot bytes, mismatched source identity, symlink, mixed read/write intent and drift fail closed.
+- **Exact HEAD and tests:** Engineering #236 `7a1898bb806cf937e89481dd7a551936f1791bd2`, [CI #42432264218](https://github.com/easonliu714/event_scraper_public/actions/runs/42432264218) SUCCESS 294/294, job #128583550747; Artifact #13598485866 SHA256 `ee40c163b50e09ba223c58be27bf37231b7e0a0da13b96c672fbc10a608927d9` independently downloaded, ZIP 34/34 CRC, SHA256SUMS 33/33. First CI FAIL #42432226486 was test newline-vs-literal-escape mismatch, corrected without safety relaxation.
+- **Provenance boundary:** new A/B native HTTP/LIST/DETAIL/identity/role REVIEW/formal accepted FIELD each 0/0/0/0/0/0; new Body/receipt-only LKG each 0/0; Golden/Published each 0/0. Probe register 33 markers `PASS_NO_NATIVE_MARKER`. A ACCUPASS robots allow unverified, B TPAC event2072 date conflict 11/10–12 vs 11/11–13 and Taipei Dome local ID edge unverified. Caller-supplied body SHA remains **NOT native source proof**. Next Gate source-first legal unconsumed exact-ID rotation; no repeat consumed probes.
+- **Production isolation:** Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`; formal data/status blobs `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`/`645f68c3db1b0fa06527d73f8dae4a36fadcbbdd`, 19 platforms unchanged. L8 Android 5/5, CKSMH5/TWTC39, homepage grouping PASS retained; cross-group OR Android and fresh Pages runtime UNVERIFIED. `HARD_HOLD_NO_PUBLICATION`; no main/Golden/data/status/Publisher write or release authorization.
