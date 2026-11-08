@@ -8367,3 +8367,5 @@ NEXT (nonpublication only):
   Preserve CKSMH5/TWTC39, Android L8 5/5, 11/06 homepage USER_ATTESTED_PASS;
   cross-group OR Android and new published TPAC Android remain UNVERIFIED.
 ```
+
+**Readback guard (2026-11-08 21:56):** `docs/platform_status.json.production.sourceMainEventDataSHA256GitBlob` still carries old `7fc4fe...` as a historical status snapshot. Do not resolve this stale diagnostic pointer by restoring 8,436 events: authoritative current `docs/data.json` Git blob is `342eb7c101115b05dbc6ff90de7bd97d5bd63d59`, row count 1. Mark `STALE_STATUS_METADATA_HOLD`; status-only remediation, if requested, is separately Owner-gated. `HARD_HOLD_NO_PUBLICATION` is default for *future* releases and compatible with authorized #241.
