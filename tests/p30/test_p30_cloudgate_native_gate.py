@@ -47,7 +47,7 @@ class CloudGateTests(unittest.TestCase):
         def supplied(_opener, url, mime):
             calls.append(url)
             if url.endswith("/robots.txt"):
-                return ("User-agent: *\\nDisallow: /cg/\\nAllow: /cgt/\\n",
+                return ("User-agent: *\nDisallow: /cg/\nAllow: /cgt/\n",
                         {"body_sha256": "a" * 64})
             if url == m.LIST_URL:
                 return (mirror_list, {"body_sha256": "b" * 64})
@@ -72,7 +72,7 @@ class CloudGateTests(unittest.TestCase):
         def supplied(_opener, url, mime):
             calls.append(url)
             if url.endswith("/robots.txt"):
-                return ("User-agent: *\\nAllow: /cg/\\nAllow: /cgt/\\n",
+                return ("User-agent: *\nAllow: /cg/\nAllow: /cgt/\n",
                         {"body_sha256": "a" * 64})
             if url == m.LIST_URL:
                 return (mirror_list, {"body_sha256": "b" * 64})
