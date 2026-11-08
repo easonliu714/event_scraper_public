@@ -8471,3 +8471,40 @@ HARD_HOLD_NO_PUBLICATION for future unauthorized formal writes.
 
 Owner Android North region #244 and TPAC single-card, L8 5/5, CKSMH5/TWTC39, 11/06 PASS preserved; cross-group OR Android and direct Pages HTTP UNVERIFIED. #245 UI-only merge and price-only DATA need separate Owner authorization.
 
+
+
+### 2026-11-09 01:55 Asia/Taipei — TPAC-R3 reusable /event CLI archived-native→CAS LKG
+
+```text
+TPAC-R3 CLI namespace integration (NO GET / NO FORMAL WRITE)
+  #243 HEAD 65b1067140f4366861594add06cdf6d99896c5b4
+       -> b86488e0e6c6380b958fed59462650ce0c61f192 [CAS]
+  main(argv) --catalog event|program
+    manifest.catalog must equal explicit CLI catalog
+    /event -> refresh_event_plan; /program -> refresh_plan (legacy default)
+    -> write_isolated_plan (same checksum/atomic/CAS)
+  archived /event native LIST 18 -> DETAIL 1301/2072 2 -> REVIEW 2
+    1301 EXHIBITION_PERIOD, date blank; 2072 NEXT_EVENT_SHOW_START
+    16 missing-detail HOLD; stable tpac:event:<id> keys
+    snapshot SHA256 20a7bfd8f8930a53e7f7849571c712fb822c6167373211aa3cb1b07ca8be054d
+    two historical replays != two independent new refreshes
+  CI #42507260333 SUCCESS job 128812467312 tests 41/41
+  Artifact #13627897721 SHA256 87c1a731205b92984e019583635ffda7533391f0cd0fe56a0571df9f01c7041f
+    independent ZIP CRC 11/11 manifest 10/10 PASS
+  new native HTTP/identity 0; accepted formal FIELD 0; published delta 0
+  formal published existing 1, data blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+  R3 reusable CLI archived-native CAS integration PASS
+  R4 fresh two independent TPAC refreshes HOLD
+  OPENTIX native robots/body UNKNOWN; 10 vs 8 sessions conflict HOLD
+  #245 UI Draft unmerged; formal price blank; #244 Android region USER_ATTESTED_PASS
+  HARD_HOLD_NO_PUBLICATION; R5 Owner recurring authorization absent
+```
+
+
+- Fresh Source main `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`; Preview `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal data blob `342eb7c101115b05dbc6ff90de7bd97d5bd63d59` = **one** Owner-authorized TPAC /program/2040 (price blank), formal status `720cac528faacc9560a5ab41ce725bf8cc183166` = 19 platforms with stale old-data metadata HOLD. No main/data/status/index/Golden/Publisher/Scheduler/Notifier write; future publication still `HARD_HOLD_NO_PUBLICATION`.
+- Engineering [Draft #243](https://github.com/easonliu714/event_scraper_public/pull/243) exact expected-head CAS `65b1067140f4366861594add06cdf6d99896c5b4` → `b86488e0e6c6380b958fed59462650ce0c61f192`, **only three paths**: `scripts/p30_tpac_multi_event_refresh.py`, `tests/p30/test_p30_tpac_multi_event_refresh.py`, `.github/workflows/eventradar_tpac_multi_event_refresh.yml`. No merge. Before, `main()` always called `refresh_plan` (/program), so genuine archived /event LIST/DETAIL could only reach `refresh_event_plan` through bespoke in-workflow Python. After, the same production candidate CLI explicitly dispatches `--catalog event|program`, rejects manifest/CLI namespace mismatch before writing, preserves legacy program default and uses the same atomic/checksum/CAS LKG writer.
+- **Real archived native integration:** Reused already sealed first-party run `42491637804` (not new GET), `/event` LIST **18** and same-ID DETAIL `1301` exhibition + `2072` guide **2**. The **actual CLI** now replays archived bytes and source receipts into `_isolated_review/tpac/tpac_multi_event_lkg.json`, stable keys `tpac:event:1301` and `tpac:event:2072`, qualified REVIEW **2**, missing-detail HOLD **16**, archived exhibition date blank (not fabricated SHOW), guide next SHOW `2026-11-11 19:00`; snapshot SHA256 `20a7bfd8f8930a53e7f7849571c712fb822c6167373211aa3cb1b07ca8be054d`. Same digest as prior direct-function replay is expected, **not** a second independent refresh.
+- [Exact-head CI #42507260333](https://github.com/easonliu714/event_scraper_public/actions/runs/42507260333) **SUCCESS**, job `128812467312`, **41/41** Python tests (14+7+5+5+10), no first FAIL; workflow confirms one-shot consumed `TPAC_EVENT_SOURCE_PROBE_ALREADY_CONSUMED_OR_RERUN_HOLD`, CLI native-archive replay PASS and zero formal writes. [Artifact #13627897721](https://github.com/easonliu714/event_scraper_public/actions/runs/42507260333/artifacts/13627897721) independently downloaded ZIP SHA256 `87c1a731205b92984e019583635ffda7533391f0cd0fe56a0571df9f01c7041f` = GitHub digest, ZIP CRC **11/11**, SHA256SUMS **10/10** PASS. Remote source/test/workflow blob readback `5d3ae37f29211c20de6ae5fb709cc3c9fc642e40` / `cf9c769a905f4a0f970cc2a0f695cedaee11d361` / `7d58104b0b9c64c999194e33f3ab223837c77a9f` PASS.
+- **Delta and boundaries:** New native HTTP/LIST/DETAIL/identity = **0/0/0/0**; new formally accepted FIELD/Golden/published = **0/0/0**, existing formal published **1**. New real archived-source-to-maintainable CLI-to-safe-snapshot path **1** (engineering PASS). TPAC-R3 integration PASS; TPAC-R4 two distinct genuine future refresh cycles **HOLD**, OPENTIX native robots/body **UNKNOWN/HOLD**, OPENTIX 10 vs TPAC 8 session parity **CONFLICT_HOLD**. TPAC price 1500–3500 remains source REVIEW; UI-only Draft #245 not merged and formal price unknown. Owner Android #244 North region and single TPAC card USER_ATTESTED_PASS retained; cross-group OR Android and direct Pages HTTP remain UNVERIFIED.
+- **NEXT:** lawful unconsumed source/robots/frequency authority for independently observed TPAC LIST→multiple DETAIL refreshes (two distinct cycles), exact role/identity/partial-field conflict, durable diff/rollback and 403/429/empty-list preserve LKG. Only after source evidence and separate Owner authorization consider #245 UI merge, price-only DATA, stale status-only correction or recurring Publisher; no parallel Writer, no unapproved formal publication.
+
