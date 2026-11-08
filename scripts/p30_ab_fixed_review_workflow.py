@@ -201,7 +201,7 @@ def verify_pair_receipt(repo_root, receipt_sha256):
         raise ValueError("AB_FIXED_VERIFY_RECEIPT_JSON_HOLD") from exc
     if (not isinstance(sealed, dict) or
             set(sealed) != {"payload", "sha256"} or
-            raw != bridge._canonical(sealed) + b"\\n"):
+            raw != bridge._canonical(sealed) + b"\n"):
         raise ValueError("AB_FIXED_VERIFY_RECEIPT_CANONICAL_HOLD")
     payload = sealed["payload"]
     if (not isinstance(payload, dict) or
