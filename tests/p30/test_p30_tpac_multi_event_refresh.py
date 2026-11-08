@@ -8,6 +8,7 @@ from pathlib import Path
 
 from scripts.p30_tpac_multi_event_refresh import (
     KIND, ROOT, discover_list, refresh_plan, refresh_event_plan, write_isolated_plan,
+    restore_isolated_version,
 )
 
 NOW = datetime(2026, 11, 8, 14, 0, tzinfo=timezone.utc)
@@ -360,6 +361,53 @@ class MultiEventRefreshTests(unittest.TestCase):
                                   result["result"]["sha256"]])
             self.assertEqual(rc, 0)
             self.assertEqual(json.loads(captured.getvalue())["counts"]["unchanged"], 1)
+
+
+    def test_durable_version_diff_rollback_and_no_unverified_location(self):
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["events"]["tpac:2111"]["location"], "")
+        self.assertIn("LOCATION_NOT_EVENT_VERIFIED",
+                      plan["events"]["tpac:2111"]["_candidate"]["hold_reasons"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            changed = json.loads(original)["events"]
+            changed["tpac:2111"]["description"] += " isolated version"
+            second = write_isolated_plan(dict(plan, events=changed), root, first["sha256"])
+            self.assertEqual(second["diff"]["changed"], ["tpac:2111"])
+            self.assertEqual(second["diff"]["removed"], [])
+            archive = root / "_isolated_review/tpac/versions" / (first["sha256"] + ".json")
+            self.assertEqual(archive.read_bytes(), original)
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                restore_isolated_version(root, first["sha256"], first["sha256"])
+            restored = restore_isolated_version(root, first["sha256"], second["sha256"])
+            self.assertEqual(restored["sha256"], first["sha256"])
+            self.assertEqual(target.read_bytes(), original)
+            self.assertTrue((root / "_isolated_review/tpac/versions" /
+                             (second["sha256"] + ".json")).exists())
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_unapproved_expiry_and_tampered_rollback_fail_closed(self):
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            partial = dict(plan, events={"tpac:2111": plan["events"]["tpac:2111"]})
+            with self.assertRaisesRegex(ValueError, "UNAUTHORIZED_REMOVAL"):
+                write_isolated_plan(partial, root, first["sha256"])
+            self.assertEqual(target.read_bytes(), original)
+            repeated = write_isolated_plan(plan, root, first["sha256"])
+            archive = root / "_isolated_review/tpac/versions" / (first["sha256"] + ".json")
+            archive.write_bytes(b"tampered")
+            with self.assertRaisesRegex(ValueError, "ROLLBACK_ARCHIVE_SHA_HOLD"):
+                restore_isolated_version(root, first["sha256"], repeated["sha256"])
+            self.assertEqual(target.read_bytes(), original)
 
 
 if __name__ == "__main__":

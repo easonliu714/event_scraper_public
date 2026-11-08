@@ -173,7 +173,7 @@ def parse_detail(card, body, receipt, now):
     # or needs independent field publication authority.
     admission = extract_tpac_price_review(
         body, receipt, card["source_event_id"], card["title"])
-    holds = ["HALL_NOT_VERIFIED"]
+    holds = ["HALL_NOT_VERIFIED", "LOCATION_NOT_EVENT_VERIFIED"]
     if admission.get("decision") == "SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL":
         holds.append("PRICE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE")
     else:
@@ -188,7 +188,9 @@ def parse_detail(card, body, receipt, now):
         "title": card["title"], "url": url,
         "platform": "臺北表演藝術中心", "type": "戲劇",
         "date": upcoming[0].strftime("%Y-%m-%d %H:%M"),
-        "location": "臺北表演藝術中心", "price": "",
+        # Publisher identity does not prove the event-owned physical venue.
+        # Keep location unknown until independent same-event venue evidence.
+        "location": "", "price": "",
         "img_url": None,
         "scraped_at": observed.astimezone(TIMEZONE).isoformat(),
         "description": "官方場次：" + "、".join(t.strftime("%m/%d %H:%M") for t in upcoming) + "。票價與詳情以官方資訊為準。",
@@ -393,7 +395,7 @@ def _canonical(obj):
     return (json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
 
 
-def write_isolated_plan(plan, repo_root, expected_sha=None):
+def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollback=False):
     """Atomic/CAS isolated REVIEW snapshot; no formal output paths."""
     if plan.get("decision") != "REVIEW_SNAPSHOT_READY_NOT_FORMAL":
         raise ValueError("TPAC_UNQUALIFIED_PLAN_WRITE_HOLD")
@@ -447,8 +449,55 @@ def write_isolated_plan(plan, repo_root, expected_sha=None):
         actual = _sha(prior) if prior is not None else None
         if actual != expected_sha:
             raise ValueError("TPAC_LKG_EXPECTED_SHA_CAS_HOLD")
+        old_rows = {}
+        if prior is not None:
+            try:
+                old_doc = json.loads(prior)
+                if old_doc.get("kind") != KIND or not isinstance(old_doc.get("events"), dict):
+                    raise ValueError("TPAC_PRIOR_SCHEMA_HOLD")
+                old_rows = old_doc["events"]
+            except (TypeError, json.JSONDecodeError) as error:
+                raise ValueError("TPAC_PRIOR_SCHEMA_HOLD") from error
+        removed = sorted(set(old_rows) - set(rows))
+        if removed and not allow_archived_rollback:
+            raise ValueError("TPAC_UNAUTHORIZED_REMOVAL_EXPIRY_GATE_HOLD")
+        diff = {"added": sorted(set(rows) - set(old_rows)),
+                "changed": sorted(k for k in set(rows) & set(old_rows)
+                                  if rows[k] != old_rows[k]),
+                "unchanged": sorted(k for k in set(rows) & set(old_rows)
+                                    if rows[k] == old_rows[k]),
+                "removed": removed}
         payload = _canonical({"kind": KIND, "events": plan["events"]})
         new_sha = _sha(payload)
+        # Archive the prior exact bytes under CAS lock BEFORE replacing LKG.
+        # This version is a REVIEW-only rollback source, never formal data.
+        if prior is not None:
+            versions = dest_dir / "versions"
+            if versions.is_symlink():
+                raise ValueError("TPAC_VERSION_DIRECTORY_SYMLINK_HOLD")
+            versions.mkdir(exist_ok=True)
+            archive = versions / (actual + ".json")
+            if archive.is_symlink():
+                raise ValueError("TPAC_VERSION_SYMLINK_HOLD")
+            if archive.exists():
+                if archive.read_bytes() != prior:
+                    raise ValueError("TPAC_VERSION_COLLISION_HOLD")
+            else:
+                version_temp = None
+                try:
+                    with tempfile.NamedTemporaryFile(mode="wb", dir=versions,
+                                                     prefix=".tpac-version-", delete=False) as v:
+                        version_temp = Path(v.name)
+                        v.write(prior)
+                        v.flush()
+                        os.fsync(v.fileno())
+                    os.replace(version_temp, archive)
+                    version_temp = None
+                    if _sha(archive.read_bytes()) != actual:
+                        raise ValueError("TPAC_VERSION_READBACK_HOLD")
+                finally:
+                    if version_temp is not None:
+                        version_temp.unlink(missing_ok=True)
         tmp = None
         try:
             with tempfile.NamedTemporaryFile(mode="wb", dir=dest_dir, prefix=".tpac-stage-",
@@ -464,12 +513,50 @@ def write_isolated_plan(plan, repo_root, expected_sha=None):
             if _sha(target.read_bytes()) != new_sha:
                 raise ValueError("TPAC_LKG_ATOMIC_READBACK_HOLD")
             return {"decision": "ISOLATED_REVIEW_LKG_COMMITTED_NOT_FORMAL",
-                    "sha256": new_sha, "rows": len(plan["events"])}
+                    "sha256": new_sha, "rows": len(plan["events"]),
+                    "previous_sha256": actual, "diff": diff,
+                    "rollback_available": prior is not None}
         finally:
             if tmp is not None:
                 tmp.unlink(missing_ok=True)
     finally:
         lock.unlink(missing_ok=True)
+
+
+def restore_isolated_version(repo_root, archived_sha, expected_current_sha):
+    """Restore a sealed REVIEW version by CAS; never touch formal data/Golden."""
+    if (not isinstance(archived_sha, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", archived_sha)
+            or not isinstance(expected_current_sha, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_current_sha)):
+        raise ValueError("TPAC_ROLLBACK_SHA_ARGUMENT_HOLD")
+    root = Path(repo_root).resolve()
+    isolation = root / "_isolated_review"
+    folder = isolation / "tpac"
+    versions = folder / "versions"
+    archive = versions / (archived_sha + ".json")
+    if any(p.is_symlink() for p in (isolation, folder, versions, archive)):
+        raise ValueError("TPAC_ROLLBACK_SYMLINK_HOLD")
+    if not archive.is_file():
+        raise ValueError("TPAC_ROLLBACK_ARCHIVE_MISSING_HOLD")
+    raw = archive.read_bytes()
+    if _sha(raw) != archived_sha:
+        raise ValueError("TPAC_ROLLBACK_ARCHIVE_SHA_HOLD")
+    try:
+        document = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise ValueError("TPAC_ROLLBACK_ARCHIVE_JSON_HOLD") from error
+    if document.get("kind") != KIND or not isinstance(document.get("events"), dict):
+        raise ValueError("TPAC_ROLLBACK_ARCHIVE_SCHEMA_HOLD")
+    plan = {"decision": "REVIEW_SNAPSHOT_READY_NOT_FORMAL",
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "native_attestation": "REQUIRES_INDEPENDENT_READBACK",
+            "published": 0, "events": document["events"]}
+    result = write_isolated_plan(plan, root, expected_current_sha,
+                                 allow_archived_rollback=True)
+    if result["sha256"] != archived_sha:
+        raise ValueError("TPAC_ROLLBACK_NONCANONICAL_ARCHIVE_HOLD")
+    return dict(result, decision="ISOLATED_REVIEW_ROLLBACK_NOT_FORMAL")
 
 
 def main(argv=None):

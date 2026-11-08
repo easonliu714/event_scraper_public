@@ -219,6 +219,40 @@ jobs:
           assert not Path('evidence/tpac_event_archived_cli/docs/data.json').exists()
           print('PASS_ARCHIVED_NATIVE_EVENT_TO_REAL_CLI_CAS_LKG_TWO_IDS_NO_GET_NO_PUBLISH')
           PY
+      - name: Verify real archived native event CAS version history without reGET
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import KIND, refresh_event_plan, write_isolated_plan
+          from datetime import datetime
+          source=Path('pinned-event/native_event')
+          receipts=json.loads((source/'tpac_event_catalog_receipt.json').read_text())['source_receipts']
+          manifest=json.loads(Path('evidence/tpac_event_archived_cli_manifest.json').read_text())
+          details={sid:{'body':(source/('event_'+sid+'_detail.html')).read_bytes(),
+                        'receipt':receipts[sid]} for sid in ('1301','2072')}
+          now=datetime.fromisoformat(manifest['now'])
+          raw=(source/'event_list.html').read_bytes()
+          plan=refresh_event_plan(raw,receipts['list'],details,{'kind':KIND,'events':{}},now)
+          target=Path('evidence/tpac_versioned_native_replay')
+          first=write_isolated_plan(plan,target)
+          repeat=refresh_event_plan(raw,receipts['list'],details,
+                                    {'kind':KIND,'events':plan['events']},now)
+          second=write_isolated_plan(repeat,target,first['sha256'])
+          archived=target/'_isolated_review/tpac/versions'/(first['sha256']+'.json')
+          assert hashlib.sha256(archived.read_bytes()).hexdigest()==first['sha256']
+          assert second['sha256']==first['sha256']
+          assert len(second['diff']['unchanged'])==2
+          assert second['diff']['changed']==second['diff']['removed']==[]
+          Path('evidence/tpac_native_versioned_diff.json').write_text(
+              json.dumps({'historical_replay_only':True,'new_native_get':0,
+                          'independent_refresh_cycles':0,'published':0,
+                          'snapshot_sha256':first['sha256'],
+                          'version_archive_sha256':first['sha256'],
+                          'diff':second['diff']},sort_keys=True,indent=2)+'\\n')
+          print('PASS_ARCHIVED_NATIVE_VERSIONED_DIFF_CAS_NO_NEW_GET')
+          PY
       - name: Read prior pinned TPAC programme native body (NO NEW GET)
         uses: actions/download-artifact@v4
         with:
