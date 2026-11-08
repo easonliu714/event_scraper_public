@@ -8431,3 +8431,43 @@ HARD_HOLD_NO_PUBLICATION for all future unapproved formal writes and automation.
 
 
 **2026-11-08 TPAC-R3 exact-head CI closure (independent readback after preceding PENDING checkpoint):** Engineering #243 HEAD `e7024e62f002203a0b038ad07f91e8aac9765cf6`, [CI #42497571854](https://github.com/easonliu714/event_scraper_public/actions/runs/42497571854) **SUCCESS**, job `128783136894`, 38/38 Python tests PASS (13+7+5+5+8), archived native /event 1301/2072 → namespace-safe REVIEW → two historical CAS LKG replays PASS, 18 LIST cards / 2 DETAIL receipts / 16 missing DETAIL HOLD. Artifact `13624281922`, GitHub digest SHA256 `14414dc2fe611ee57b5774cee141e6d88195413d7186b08a5855e950846747e5`; **independently downloaded ZIP SHA matches digest, CRC 8/8 and SHA256SUMS 7/7 PASS**; isolated LKG snapshot SHA256 `20a7bfd8f8930a53e7f7849571c712fb822c6167373211aa3cb1b07ca8be054d`. Initial [CI #42497545364](https://github.com/easonliu714/event_scraper_public/actions/runs/42497545364) first true FAIL was doubled-backslash namespace regex causing `TPAC_REVIEW_NAMESPACE_IDENTITY_HOLD`; exact fix and rerun PASS without bypass. Formal `docs/data.json` unchanged, no new HTTP, no new formal FIELD/Golden/published. **TPAC-R3 ARCHIVED_REPLAY_CAS_INTEGRATION=PASS; TPAC-R4 independent fresh two-cycle refresh remains HOLD.** No authorization to merge engineering #243 or publish.
+
+
+### 2026-11-09 00:55 — TPAC-R4 native-ticket provenance safety contract
+
+```text
+Formal main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8 [NO WRITE]
+  docs/data.json blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 = 1 TPAC #2040
+  status blob 720cac528faacc9560a5ab41ce725bf8cc183166 [19 platforms]
+  stale status old-data pointer = STALE_STATUS_METADATA_HOLD
+Engineering Draft #243: e7024e62f002203a0b038ad07f91e8aac9765cf6
+  -> CAS 65b1067140f4366861594add06cdf6d99896c5b4
+  scripts/p30_tpac_price_reconcile.py
+    BEFORE reconcile_opentix_price(independent_ticket_receipt_verified=True)
+      -> could clear ticket native body HOLD without original bytes
+    AFTER inspect_opentix_native_body(raw,receipt,event_url,expected_title,now)
+      -> bounded raw SHA/bytes + exact OPENTIX URL/Event ID + HTTP200/robots
+      -> source run/artifact digest + offset-aware 24h freshness + exact main H1
+      -> ticket identity REVIEW ONLY, independent artifact readback=false
+      -> no tier/session/stock/Golden/formal FIELD attestation
+    AFTER reconcile_opentix_price:
+      -> boolean cannot clear HOLD
+      -> even claimed native receipt retains artifact/tier/session field HOLD
+      -> 10 ticket vs 8 TPAC SHOW SESSION_SET_CONFLICT_HOLD
+  tests/p30/test_p30_tpac_price_reconcile.py
+    -> boolean bypass regression + native receipt identity/tamper/clock/robots tests
+  exact-head CI #42502354181 SUCCESS / job 128797640357 / 40/40
+  artifact 13626251327 SHA256 0f4f93e6c0010b614f8006dee446010324079c2868c9dd2bfff0c22e5ba58489
+    independent ZIP CRC 8/8 + SHA256SUMS 7/7 PASS
+  native GET delta 0, TPAC event one-shot marker consumed and skipped
+  new accepted FIELD 0, Golden 0, Published 0; existing formal published 1
+  OPENTIX robots/native ticket Body UNKNOWN/HOLD (rendered != original bytes)
+NEXT TPAC-R4: lawful unconsumed OPENTIX public event body + independent artifact
+  readback, exact event-local ticket price/session role parser, two distinct
+  genuine TPAC multi-event refresh cycles, CAS diff/rollback; NO checkout.
+TPAC-R5 recurring Publisher/Scheduler remains OWNER-LOCKED.
+HARD_HOLD_NO_PUBLICATION for future unauthorized formal writes.
+```
+
+Owner Android North region #244 and TPAC single-card, L8 5/5, CKSMH5/TWTC39, 11/06 PASS preserved; cross-group OR Android and direct Pages HTTP UNVERIFIED. #245 UI-only merge and price-only DATA need separate Owner authorization.
+
