@@ -8154,3 +8154,29 @@ B P0 source root cause:
 - **A delta:** new native HTTP/LIST/DETAIL/identity/role REVIEW/accepted FIELD 0/0/0/0/0/0; new receipt-only LKG **+1**, Body LKG +0. **B delta:** 0/0/0/0/0/0; receipt-only/Body LKG +0/+0; historical Zepp receipt-only LKG=1, B native Body LKG=0. A prior TMC Body LKG=1 retained. No formal FIELD, Golden or Published increase. No fabricated 24h source freshness; independent field authority remains HOLD.
 - **Isolation:** Engineering Draft #236 HEAD `0ad57226c58a1c154cb9c79bd1fa63544e1420f3` (base `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce` behind main), no merge. Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`; formal data/status blobs `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`/`645f68c3db1b0fa06527d73f8dae4a36fadcbbdd` unchanged, 19 platforms, engineering snapshot stale. L8 Android 5/5, CKSMH5/TWTC39 and ticket/venue homepage grouping PASS retained; cross-group OR Android UNVERIFIED. `HARD_HOLD_NO_PUBLICATION`, no status-only merge authorization.
 
+
+### 2026-11-08 10:55 Asia/Taipei — B Cloud Gate 1680 joins existing fixed A/B REVIEW-only pipeline
+
+```text
+OFFICIAL RENDERED DISCOVERY [NOT native CI GET / no original body SHA]
+B P0 New Taipei Cloud Gate LIST /cgt/latest-program
+  -> exact local href /cgt/theater-event/1680
+  -> official DETAIL title "來雲門共學 2026系列講座"
+  -> postponement 11/14 -> 12/19 (separate event-local REVIEW role)
+  -> original 1584 workshop is FOREIGN EVENT, no join
+  -> robots policy/native body still UNVERIFIED; FIELD/Session/date/price HOLD
+
+A OPENTIX #05 existing exact-ID adapter [caller HTML; no fresh native GET]
+  + B Cloud Gate existing p30_cloudgate_native_gate.inspect_pair
+    -> p30_review_bridge.build_review_envelope(B_CLOUDGATE)
+       -> source URL/ID/title/role receipts/body digests/UTC timestamp
+       -> _validate_snapshot fail-closed: no nested formal or published fields
+    -> p30_ab_fixed_review_workflow.run_fixed_ab
+       -> preflight both A/B, per-source isolated checksum+CAS+lease+atomic
+       -> A and B durable REVIEW snapshots + immutable pair receipt
+       -> independent readback, NO PUBLISH
+```
+
+- **Function before/after:** `build_review_envelope` previously sent unknown `B_CLOUDGATE` through generic ticket `SOURCES` (first CI `KeyError`); now explicitly dispatches the existing B Cloud Gate source-owned parser before the generic ticket branch and excludes it from that branch. `_validate_snapshot` previously rejected unregistered Cloud Gate identity; now pins exact official `1680` URL/ID/title and forbids preview date/price/venue elevation. Existing `run_fixed_ab` was unchanged; tests now execute A OPENTIX + B Cloud Gate through it, validating dual-slot CAS/readback. No production code path was altered.
+- **Exact-head evidence:** Engineering Draft [#236](https://github.com/easonliu714/event_scraper_public/pull/236) `0f3fa78b5cbb97f267d3ff219cbd57354091dcbf`, CI [#42440781793](https://github.com/easonliu714/event_scraper_public/actions/runs/42440781793) SUCCESS **297/297**, job `128609364816`, Artifact `13601318348` SHA256 `a372c5340371886283cbc399471f240aa4e958c0ec5095c34d6a44ec2ff8ec7c`, independent ZIP 35 CRC/34 manifest SHA PASS. First failed run `42440749562` generic ticket dispatch bug corrected. A/B new native HTTP/LIST/DETAIL/identity/role REVIEW/formal accepted FIELD each `0/0/0/0/0/0`; new Body/receipt LKG each `0/0`. Historical TMC Body=1, A OPENTIX receipt-only=1, B Zepp receipt-only=1 remain distinct.
+- **Governance and release:** Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`; formal data/status blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`/`645f68c3db1b0fa06527d73f8dae4a36fadcbbdd`; 19 platforms unchanged. Formal accepted FIELD/Golden/Published `0/0/0`; `HARD_HOLD_NO_PUBLICATION`, no main/status-only merge. CKSMH5/TWTC39 and Android L8 5/5 PASS retained; cross-group OR Android UNVERIFIED.
