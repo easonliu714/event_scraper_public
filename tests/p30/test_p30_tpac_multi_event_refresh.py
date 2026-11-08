@@ -90,6 +90,32 @@ class MultiEventRefreshTests(unittest.TestCase):
         self.assertEqual(again["changed"], 0)
         self.assertEqual(again["unchanged"], 2)
 
+    def test_general_admission_price_is_reusable_review_field_not_formal(self):
+        body, rr, details = inputs()
+        price_html = (
+            '<div class="page-program__aside-ticket">'
+            '<div class="page-program__aside-ticket-price">'
+            '<span>票價</span><strong>3500-1500 元</strong></div>'
+            '<a href="https://www.opentix.life/event/2065059039769808896">購票去</a>'
+            '</div>'
+        ).encode()
+        raw = details["2111"]["body"].replace(b"</main>", price_html + b"</main>")
+        details["2111"] = {"body": raw, "receipt": receipt(ROOT + "/2111", raw)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(plan["qualified"], 2)
+        entry = plan["events"]["tpac:2111"]
+        self.assertIn("PRICE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE", entry["_candidate"]["hold_reasons"])
+        self.assertEqual(entry["_candidate"]["price_review"]["min_price_ntd"], 1500)
+        self.assertEqual(entry["_candidate"]["price_review"]["max_price_ntd"], 3500)
+        self.assertEqual(entry["_candidate"]["field_roles"]["price"]["decision"],
+                         "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE")
+        self.assertEqual(entry["price"], "")
+        self.assertFalse(entry["formal_field_pass"])
+        self.assertFalse(entry["published"])
+        self.assertIn("PRICE_NOT_VERIFIED",
+                      plan["events"]["tpac:2112"]["_candidate"]["hold_reasons"])
+
     def test_partial_detail_failure_retains_prior_and_stages_good_id(self):
         body, rr, details = inputs()
         details["2112"]["receipt"]["http_status"] = 403
