@@ -8559,3 +8559,24 @@ Owner approval separate for #245, price-only DATA, status-only, recurring publis
 
 
 **2026-11-09 02:59 TPAC-R3 rollback safety closure:** Engineering #243 exact CAS `a8a249921eb50ccb2ff5c2272faea2e6f5470bef` → `ffee14a8726b6bc4dad58ed0592044a91fef0f92` (source/test only). `restore_isolated_version` now rejects SHA-consistent but noncanonical archive **before** `write_isolated_plan`, preserving current isolated LKG on HOLD. [CI #42512620990](https://github.com/easonliu714/event_scraper_public/actions/runs/42512620990) SUCCESS 44/44 job 128828769901; [Artifact 13630091645](https://github.com/easonliu714/event_scraper_public/actions/runs/42512620990/artifacts/13630091645) SHA256 `8ded8048c8bc5ac5d79e87fd8f71a3e9b106d5a63c31ef44997fcb6490df0ce0`, ZIP CRC 14/14, manifest 13/13 PASS. New native GET/accepted formal FIELD/Golden/Published all 0, formal existing 1; TPAC-R4 two genuine refreshes HOLD; #245 unmerged, Owner Android region PASS, future formal publication HARD_HOLD.
+
+
+**2026-11-09 03:55 TPAC-R4 isolated refresh current-LKG CAS binding — executable topology delta (no formal publication):**
+
+```text
+TPAC /program or /event archived/future independently authorized source manifest
+  -> main(--catalog program|event --input <manifest> --repo-root <stage> --prior-from-lkg)
+  -> load_isolated_prior(stage)
+       current _isolated_review/tpac/tpac_multi_event_lkg.json
+       canonical JSON + exact SHA + symlink/size/schema fail-closed
+       reject conflicting manifest.prior or --expected-sha
+  -> existing refresh_plan / refresh_event_plan (same-ID, role, receipt, HOLD)
+  -> existing write_isolated_plan(plan, stage, expected_sha)
+       atomic lock + CAS + versioned prior archive + diff + rollback
+       no formal docs/data.json, status, Golden or Publisher writes
+  -> subsequent refresh automatically reloads latest LKG + SHA
+       stale concurrent write -> TPAC_LKG_EXPECTED_SHA_CAS_HOLD
+  -> historical native body replay != fresh GET, != formal FIELD
+```
+
+Engineering #243 head `0c428c7d7941dea2e8464d8f909bf4bdbe5e1384`; changed only `scripts/p30_tpac_multi_event_refresh.py` (`load_isolated_prior`, `main`) and `tests/p30/test_p30_tpac_multi_event_refresh.py` (two tests); source/test blobs `ae941d58283cb15f3ff92ef60c9018f23ded3b78` / `cfce35b4c2da826a483241a9d730f2e110f95c80`. [CI #42517679196](https://github.com/easonliu714/event_scraper_public/actions/runs/42517679196) SUCCESS job 128844173343, 46/46 tests, Artifact 13631868437 GitHub SHA256 digest `71a8826c85fa855e8ac0e7922e45b795f2e8a3b31a785ec949286423f54aad5c`; CI archived evidence SHA checks PASS, independent ZIP CRC not verified. One-shot consumed marker explicitly HOLD (no new native GET). TPAC-R3 integration PASS; TPAC-R4 genuine two independent multi-ID refresh cycles HOLD; formal existing 1, new 0. Preserve Android North USER_ATTESTED_PASS, #245 unmerged and price-only REVIEW, OPENTIX session conflict, HARD_HOLD_NO_PUBLICATION, status pointer stale; no main or production changes.
