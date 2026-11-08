@@ -740,6 +740,125 @@ def run_tixfun_native_once():
         out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:160]
     return out
 
+
+# Distinct event from the consumed rid=167511/160668 probes. The new marker
+# authorizes at most one first-attempt native robots/LIST/exact-DETAIL sequence.
+ZEPP_EARENDEL = {
+    "id": "160667",
+    "list": "https://www.zepp.co.jp/hall/newtaipei/schedule/",
+    "detail": "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160667",
+    "title": "厄倫蒂兒 Earendel 《THE SIGNAL》首場個人演唱會",
+    "venue": "Zepp New Taipei",
+}
+
+
+def inspect_zepp_earendel_pair(list_html, detail_html):
+    """Exact source-owned rid, event-local title/venue, distinct date roles."""
+    cfg = ZEPP_EARENDEL
+    listing, detail = NextScoped(), NextScoped()
+    listing.feed(list_html)
+    detail.feed(detail_html)
+    from urllib.parse import parse_qsl
+    def exact(href):
+        if not isinstance(href, str):
+            return False
+        try:
+            url = urljoin(cfg["list"], href)
+            p, e = urlsplit(url), urlsplit(cfg["detail"])
+            return (p.scheme == "https" and p.netloc == e.netloc
+                    and p.path == e.path and not p.fragment
+                    and not p.username and not p.password and p.port is None
+                    and parse_qsl(p.query, keep_blank_values=True) == [("rid", cfg["id"])])
+        except (TypeError, ValueError):
+            return False
+    edges = [(h, norm(label)) for h, label in listing.anchors if exact(h)]
+    if len(edges) != 1 or norm(cfg["title"]) not in edges[0][1]:
+        return dict(decision="HOLD", reason="ZEPP_160667_LIST_EXACT_EDGE_HOLD",
+                    identity=0, roles=[])
+    if detail.headings.count(norm(cfg["title"])) != 1:
+        return dict(decision="HOLD", reason="ZEPP_160667_DETAIL_TITLE_HOLD",
+                    identity=0, roles=[])
+    owned = [scope for scope in detail.scopes
+             if scope["tag"] in ("article", "section")
+             and norm(cfg["title"]) in scope["headings"]]
+    articles = [scope for scope in owned if scope["tag"] == "article"]
+    owned = articles or owned
+    if len(owned) != 1:
+        return dict(decision="HOLD", reason="ZEPP_160667_EVENT_SCOPE_HOLD",
+                    identity=0, roles=[])
+    local = norm(" ".join(owned[0]["texts"]))
+    if not re.search(r"演出地點\s*[:：]\s*Zepp New Taipei\b", local):
+        return dict(decision="HOLD", reason="ZEPP_160667_LOCAL_VENUE_HOLD",
+                    identity=1, roles=["SOURCE_EVENT_TITLE_REVIEW"])
+    roles = ["SOURCE_EVENT_TITLE_REVIEW", "SOURCE_VENUE_REVIEW"]
+    if (len(re.findall(r"活動時間\s*[:：]\s*2026年11月14日\s*\(?六\)?\s*19:00", local)) == 1
+            and len(re.findall(r"啟售時間\s*[:：]\s*2026年9月19日\s*\(?六\)?\s*(?:PM\s*)?13:00",
+                               local, flags=re.I)) == 1):
+        roles += ["EVENT_START_REVIEW_NOT_SESSION", "SALE_START_NOT_SHOW"]
+    return dict(decision="REVIEW_NON_SESSION_ONLY",
+                reason="INDEPENDENT_FIELD_AUTHORITY_HOLD", identity=1, roles=roles)
+
+
+def run_zepp_earendel_native_once():
+    """Robots-gated, bounded, no redirect/retry, no raw HTML or publication."""
+    cfg = ZEPP_EARENDEL
+    out = dict(kind="P30_B_ZEPP_160667_NATIVE_ONESHOT_V1",
+               source_id="ZEPP_NEWTAIPEI_OFFICIAL", event_id=cfg["id"],
+               attempted=0, http200=0, native_list=0, native_detail=0,
+               native_identity=0, roles=[], source_receipts=[],
+               native_body_lkg=0, receipt_only_lkg=0, formal_fields=0,
+               golden=0, published=0, raw_html_saved=False,
+               release_state="HARD_HOLD_NO_PUBLICATION", decision="HOLD",
+               first_failure="NOT_STARTED")
+    opener = urllib.request.build_opener(NoRedirect())
+    try:
+        out["attempted"] += 1
+        robots, rr = read_public(opener, "https://www.zepp.co.jp/robots.txt", "text/plain")
+        out["robots_receipt"] = rr
+        if (not re.search(r"(?im)^\s*user-agent\s*:\s*[^\s#]+", robots)
+                or re.search(r"(?i)<(?:!doctype\s+html|html|head|body)(?:\s|>)",
+                             robots[:2048])):
+            raise ValueError("ZEPP_160667_ROBOTS_INVALID_HOLD")
+        policy = urllib.robotparser.RobotFileParser()
+        policy.parse(robots.splitlines())
+        if not policy.can_fetch(UA, cfg["list"]):
+            raise ValueError("ZEPP_160667_ROBOTS_LIST_DISALLOW_HOLD")
+        out["attempted"] += 1
+        listing, lr = read_public(opener, cfg["list"], "text/html")
+        if rr["body_sha256"] == lr["body_sha256"]:
+            raise ValueError("ZEPP_160667_ROBOTS_LIST_COLLISION_HOLD")
+        out["http200"] += 1
+        out["native_list"] = 1
+        out["source_receipts"].append(lr)
+        parsed = NextScoped()
+        parsed.feed(listing)
+        # Identity check BEFORE the detail GET: never fetch a guessed rid.
+        candidates = [h for h, label in parsed.anchors
+                      if urljoin(cfg["list"], h) == cfg["detail"]
+                      and norm(cfg["title"]) in norm(label)]
+        if len(candidates) != 1:
+            raise ValueError("ZEPP_160667_NATIVE_DIRECT_EDGE_HOLD")
+        if not policy.can_fetch(UA, cfg["detail"]):
+            raise ValueError("ZEPP_160667_ROBOTS_DETAIL_DISALLOW_HOLD")
+        out["attempted"] += 1
+        detail, dr = read_public(opener, cfg["detail"], "text/html")
+        out["http200"] += 1
+        out["native_detail"] = 1
+        out["source_receipts"].append(dr)
+        verdict = inspect_zepp_earendel_pair(listing, detail)
+        out["decision"], out["first_failure"] = verdict["decision"], verdict["reason"]
+        out["native_identity"] = verdict["identity"]
+        if verdict["decision"] == "REVIEW_NON_SESSION_ONLY":
+            out["roles"] = [
+                dict(role=role, source_url=cfg["detail"], source_event_id=cfg["id"],
+                     observed_at_utc=dr["observed_at_utc"],
+                     body_sha256=dr["body_sha256"], decision="REVIEW_NOT_FORMAL")
+                for role in verdict["roles"]]
+    except (ValueError, UnicodeError, OSError, TimeoutError,
+            urllib.error.URLError) as exc:
+        out["first_failure"] = type(exc).__name__ + ":" + str(exc)[:180]
+    return out
+
 if __name__ == "__main__":
     for line in ("A", "B"):
         print(json.dumps(run_native_once(line), ensure_ascii=False, sort_keys=True))

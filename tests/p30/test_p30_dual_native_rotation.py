@@ -404,3 +404,33 @@ class TestTixfun09DistinctNative(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Zepp160667DistinctNativeGate(unittest.TestCase):
+    def test_source_owned_id_and_distinct_roles(self):
+        cfg = rotation.ZEPP_EARENDEL
+        listing = '<main><article><a href="' + cfg["detail"] + '">' + cfg["title"] + '</a></article></main>'
+        detail = ('<main><article><h2>' + cfg["title"] + '</h2>'
+                  '<p>演出地點：Zepp New Taipei</p>'
+                  '<p>活動時間 : 2026年11月14日（六）19:00</p>'
+                  '<p>啟售時間：2026年9月19日（六）PM 13:00</p>'
+                  '</article></main>')
+        verdict = rotation.inspect_zepp_earendel_pair(listing, detail)
+        self.assertEqual(verdict["identity"], 1)
+        self.assertEqual(verdict["decision"], "REVIEW_NON_SESSION_ONLY")
+        self.assertEqual(len(verdict["roles"]), 4)
+        bad = listing.replace("160667", "160668")
+        self.assertEqual(rotation.inspect_zepp_earendel_pair(bad, detail)["identity"], 0)
+        no_show = detail.replace("活動時間", "其他時間")
+        self.assertEqual(len(rotation.inspect_zepp_earendel_pair(listing, no_show)["roles"]), 2)
+
+    def test_sibling_venue_and_foreign_title_fail_closed(self):
+        cfg = rotation.ZEPP_EARENDEL
+        listing = '<main><article><a href="' + cfg["detail"] + '">' + cfg["title"] + '</a></article></main>'
+        sibling = ('<main><article><h2>' + cfg["title"] + '</h2></article>'
+                   '<article><p>演出地點：Zepp New Taipei</p></article></main>')
+        self.assertEqual(rotation.inspect_zepp_earendel_pair(listing, sibling)["reason"],
+                         "ZEPP_160667_LOCAL_VENUE_HOLD")
+        self.assertEqual(rotation.inspect_zepp_earendel_pair(
+            listing, sibling.replace(cfg["title"], "FOREIGN"))["identity"], 0)
+
