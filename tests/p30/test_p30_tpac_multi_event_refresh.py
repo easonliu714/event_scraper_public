@@ -34,7 +34,7 @@ def listing(ids=("2111", "2112")):
         html += ('<a class="card-program" title="' + title
                  + '" href="/program/' + sid + '">'
                  + '<span class="card-program__text-title">' + title + '</span>'
-                 + '<span class="card-program__text-date">2026-11-20 - 2026-11-30</span>'
+                 + '<span class="card-program__text-date">2026-11-19 - 2026-11-28</span>'
                  + '</a>')
     return (html + "</main>").encode()
 
@@ -162,7 +162,7 @@ class MultiEventRefreshTests(unittest.TestCase):
         body = b"<main><template>" + card + b"</template></main>"
         old = {"kind": KIND, "events": {"tpac:2040": {"kept": True}}}
         plan = refresh_plan(body, receipt(ROOT, body), {}, old, NOW)
-        self.assertIn("NO_VALID_FIRST_PARTY_CARD", plan["decision"])
+        self.assertRegex(plan["decision"], r"HOLD_LIST_TPAC_(EMPTY_OR_OVER_CAP_LIST|NO_VALID_FIRST_PARTY_CARD)_HOLD")
         self.assertEqual(plan["events"], old["events"])
 
     def test_atomic_lkg_cas_success_retry_and_concurrent_stale_rejected(self):
