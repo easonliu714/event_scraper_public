@@ -4,7 +4,6 @@ on:
     branches: [main]
     paths:
       - docs/data.json
-      - docs/index.html
       - .github/workflows/eventradar_owner_one_shot_publish.yml
 permissions:
   contents: read
@@ -32,36 +31,26 @@ jobs:
           test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_owner_one_shot_publish.yml' 'docs/data.json' 'docs/index.html' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_owner_one_shot_publish.yml' 'docs/data.json' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_ONE_SHOT_SCOPE_GOLDEN_SCHEDULER_IMMUTABLE
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Offline quality parser and formal PWA source-group regression
+      - name: Offline quality parser regression without UI mutation
         run: |
           set -euo pipefail
           python -m pip install 'beautifulsoup4==4.15.0'
           python -m unittest discover -s tests/p30 -p 'test_p30_quality_snapshot_publisher.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_publisher_source_once.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_verified_show_publisher.py' -v
-          node tests/p30/test_pwa_source_groups.js
           python - <<'PY'
           from pathlib import Path
-          import subprocess,re
+          import subprocess
           base='f5db15b0894ae68d6da211a9530b472868b61a23'
-          old=subprocess.check_output(['git','show',base+':docs/index.html']).decode()
-          new=Path('docs/index.html').read_text()
-          marker="        '中正紀念堂', '國立中正紀念堂'"
-          assert old.count(marker)==1
-          exact=old.replace(marker,marker+",\n        '臺北表演藝術中心', '台北表演藝術中心'")
-          assert exact==new,'UI_DRIFT'
-          scripts=re.findall(r'<script>(.*?)</script>',new,re.S)
-          assert len(scripts)==1
-          Path('/tmp/eventradar_p30_single_release_ui.js').write_text(scripts[0])
-          print('PASS_EXACT_ONE_VENUE_SOURCE_GROUP_EXTENSION')
+          assert Path('docs/index.html').read_bytes()==subprocess.check_output(['git','show',base+':docs/index.html'])
+          print('PASS_BYTE_IDENTICAL_EXISTING_PWA_UI_UNCHANGED')
           PY
-          node --check /tmp/eventradar_p30_single_release_ui.js
       - name: Independently download pinned first-party native raw and candidate artifacts
         uses: actions/download-artifact@v4
         with:
