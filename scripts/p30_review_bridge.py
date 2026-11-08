@@ -79,7 +79,7 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         # from caller-provided HTML.
         roles = list(verdict.get("field_roles", []))
         platform, kind = "OPENTIX", "活動"
-    elif adapter_key not in ("B_NTPC", "B_TPAC_EVENT2072"):
+    elif adapter_key not in ("B_NTPC", "B_TPAC_EVENT2072", "B_CLOUDGATE"):
         # The same source-local parser also handles alternate A/B official
         # LIST→DETAIL identities. Never promote LIST roles as DETAIL receipts.
         source = ticket.SOURCES[adapter_key]
