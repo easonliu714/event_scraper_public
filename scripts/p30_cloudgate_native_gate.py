@@ -51,6 +51,11 @@ class LocalEvent(HTMLParser):
         attrs = dict(attrs)
         if tag not in ("img", "br", "meta", "link", "input", "hr", "source"):
             self.stack.append(tag)
+        # A hidden TEMPLATE/NOSCRIPT node is not an official visible LIST
+        # edge.  Inert descendants must never create anchors or headings.
+        if any(t in ("script", "style", "noscript", "template")
+               for t in self.stack):
+            return
         if tag in ("article", "section"):
             if len(self.scopes) >= 128:
                 raise ValueError("CLOUDGATE_EVENT_SCOPE_CAP_HOLD")
@@ -64,6 +69,9 @@ class LocalEvent(HTMLParser):
             self.heading = [tag, []]
 
     def handle_data(self, value):
+        if any(t in ("script", "style", "noscript", "template")
+               for t in self.stack):
+            return
         if self.anchor is not None:
             self.anchor[1].append(value)
         if self.heading is not None:
@@ -75,6 +83,13 @@ class LocalEvent(HTMLParser):
                 self.scopes[index]["texts"].append(value)
 
     def handle_endtag(self, tag):
+        if any(t in ("script", "style", "noscript", "template")
+               for t in self.stack):
+            if tag in self.stack:
+                while self.stack:
+                    if self.stack.pop() == tag:
+                        break
+            return
         if tag == "a" and self.anchor is not None:
             self.anchors.append((self.anchor[0], norm("".join(self.anchor[1]))))
             self.anchor = None
@@ -91,13 +106,33 @@ class LocalEvent(HTMLParser):
         self.active_scopes = [index for index in self.active_scopes
                               if self.scopes[index]["depth"] <= len(self.stack)]
 
-def inspect_pair(list_html, detail_html):
-    listing, detail = LocalEvent(), LocalEvent()
+def exact_list_direct_event_edge(list_html):
+    """One visible first-party same-ID anchor must OWN the exact event label.
+
+    Neither a page-global heading nor an arbitrary title prefix authorizes a
+    DETAIL request. The only accepted optional suffix is the first-party
+    2026.10.17 - 12.19 index range, NOT a ticket Session.
+    """
+    listing = LocalEvent()
     listing.feed(list_html)
+    accepted = []
+    label_pattern = (re.escape(norm(TITLE))
+                     + r"(?:\\s*2026\\.10\\.17\\s*[-–]\\s*12\\.19)?")
+    for href, label in listing.anchors:
+        target = exact_detail(href)
+        if target is None:
+            continue
+        if re.fullmatch(label_pattern, label) is None:
+            return None
+        accepted.append(target)
+    return accepted[0] if len(accepted) == 1 else None
+
+
+def inspect_pair(list_html, detail_html):
+    detail = LocalEvent()
     detail.feed(detail_html)
-    edges = [(exact_detail(href), label) for href, label in listing.anchors
-             if exact_detail(href)]
-    if len(edges) != 1 or not edges[0][1].startswith(norm(TITLE)):
+    direct_edge = exact_list_direct_event_edge(list_html)
+    if direct_edge is None:
         return {"decision":"HOLD","first_failure":"CLOUDGATE_LIST_EXACT_ID_TITLE_HOLD",
                 "same_id_review":0,"postponement_review":0}
     if detail.headings.count(norm(TITLE)) != 1:
@@ -118,11 +153,11 @@ def inspect_pair(list_html, detail_html):
             and "12月19日" in local):
         return {"decision":"HOLD","first_failure":"CLOUDGATE_POSTPONEMENT_LOCAL_AUTHORITY_HOLD",
                 "same_id_review":1,"postponement_review":0,
-                "list_derived_detail_url":edges[0][0]}
+                "list_derived_detail_url":direct_edge}
     return {"decision":"REVIEW_NON_SESSION_ONLY",
             "first_failure":"INDEPENDENT_FIELD_ADJUDICATION_PENDING",
             "same_id_review":1,"postponement_review":1,
-            "list_derived_detail_url":edges[0][0],
+            "list_derived_detail_url":direct_edge,
             "date_role":"POSTPONED_SHOW_DATE_REVIEW_NOT_TICKET_SESSION",
             "formal_accepted_fields":0}
 
@@ -159,19 +194,17 @@ def run_native_once():
         out["native_http200"] += 1
         out["native_list"] = 1
         out["source_receipts"].append(lr)
-        lp = LocalEvent()
-        lp.feed(listing)
-        edges = [(exact_detail(h), t) for h,t in lp.anchors if exact_detail(h)]
-        if len(edges)!=1 or not edges[0][1].startswith(norm(TITLE)):
+        direct_edge = exact_list_direct_event_edge(listing)
+        if direct_edge is None:
             raise ValueError("CLOUDGATE_NATIVE_LIST_EXACT_EDGE_HOLD")
-        out["list_derived_detail_url"] = edges[0][0]
+        out["list_derived_detail_url"] = direct_edge
         # Point-of-use policy: a first-party /cg mirror is NOT covered by
         # a robots decision for /cgt. Fail closed before DETAIL network I/O.
-        if not policy.can_fetch(UA, edges[0][0]):
+        if not policy.can_fetch(UA, direct_edge):
             raise ValueError("CLOUDGATE_ROBOTS_EXACT_DETAIL_DISALLOW_HOLD")
         out["policy_decision"]="LIST_AND_EXACT_DETAIL_ALLOW_ROBOTS_200"
         out["native_get_attempted"] += 1
-        detail, dr = read_public(opener,edges[0][0],"text/html")
+        detail, dr = read_public(opener,direct_edge,"text/html")
         out["native_http200"] += 1
         out["native_detail"] = 1
         out["source_receipts"].append(dr)

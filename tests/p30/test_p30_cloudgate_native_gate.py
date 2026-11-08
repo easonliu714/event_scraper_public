@@ -151,5 +151,26 @@ class CloudGateTests(unittest.TestCase):
         self.assertEqual(m.inspect_pair(self.list_html+self.list_html,
             self.detail_html)["same_id_review"],0)
 
+    def test_event_local_visible_direct_edge_and_inert_markup(self):
+        # Root cause: page-wide title prefix and inert duplicate anchors
+        # must not be mistaken for an independently owned event LIST edge.
+        href = "/cgt/theater-event/1680"
+        hidden = ('<main><template><a href="' + href + '">' + m.TITLE
+                  + '</a></template></main>')
+        self.assertIsNone(m.exact_list_direct_event_edge(hidden))
+        self.assertEqual(m.inspect_pair(hidden, self.detail_html)["same_id_review"], 0)
+        self.assertEqual(m.exact_list_direct_event_edge(
+            self.list_html + hidden), m.DETAIL_URL)
+        for bad_label in (m.TITLE + ' 另一場演出',
+                          m.TITLE + '2026.10.17 - 12.19 其他活動',
+                          '其他活動 ' + m.TITLE):
+            listing = '<main><a href="' + href + '">' + bad_label + '</a></main>'
+            self.assertIsNone(m.exact_list_direct_event_edge(listing))
+            self.assertEqual(m.inspect_pair(listing, self.detail_html)["same_id_review"], 0)
+        foreign_scope = ('<main><article><h1>' + m.TITLE
+                         + '</h1><a href="' + href
+                         + '">其他活動</a></article></main>')
+        self.assertIsNone(m.exact_list_direct_event_edge(foreign_scope))
+
 if __name__=="__main__":
     unittest.main()
