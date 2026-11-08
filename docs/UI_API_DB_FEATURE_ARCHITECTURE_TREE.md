@@ -8125,3 +8125,32 @@ A ticket Adapter caller LIST/DETAIL + B P0 venue Adapter caller LIST/DETAIL
 - **Exact HEAD and tests:** Engineering #236 `7a1898bb806cf937e89481dd7a551936f1791bd2`, [CI #42432264218](https://github.com/easonliu714/event_scraper_public/actions/runs/42432264218) SUCCESS 294/294, job #128583550747; Artifact #13598485866 SHA256 `ee40c163b50e09ba223c58be27bf37231b7e0a0da13b96c672fbc10a608927d9` independently downloaded, ZIP 34/34 CRC, SHA256SUMS 33/33. First CI FAIL #42432226486 was test newline-vs-literal-escape mismatch, corrected without safety relaxation.
 - **Provenance boundary:** new A/B native HTTP/LIST/DETAIL/identity/role REVIEW/formal accepted FIELD each 0/0/0/0/0/0; new Body/receipt-only LKG each 0/0; Golden/Published each 0/0. Probe register 33 markers `PASS_NO_NATIVE_MARKER`. A ACCUPASS robots allow unverified, B TPAC event2072 date conflict 11/10–12 vs 11/11–13 and Taipei Dome local ID edge unverified. Caller-supplied body SHA remains **NOT native source proof**. Next Gate source-first legal unconsumed exact-ID rotation; no repeat consumed probes.
 - **Production isolation:** Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`; formal data/status blobs `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`/`645f68c3db1b0fa06527d73f8dae4a36fadcbbdd`, 19 platforms unchanged. L8 Android 5/5, CKSMH5/TWTC39, homepage grouping PASS retained; cross-group OR Android and fresh Pages runtime UNVERIFIED. `HARD_HOLD_NO_PUBLICATION`; no main/Golden/data/status/Publisher write or release authorization.
+
+
+### 2026-11-08 09:55 Asia/Taipei — Pinned native A receipt-only durable handoff, B identity hold
+
+```text
+Historical A OPENTIX #05 native robots + HOME LIST + exact event/2070446724700692480 DETAIL
+  -> sealed prior CI #42384342638 / Artifact #13578708475 (ZIP SHA pinned)
+  -> NEW audit_opentix_native_sealed_archive [READ-ONLY, NO GET]
+       ZIP 32 unique / CRC / SHA256SUMS 31, pinned native receipt SHA
+       source ID 05 + exact URL + 3 response SHA/bytes/UTC + same-ID REVIEW
+       SOURCE_EXACT_TITLE_REVIEW only; sealed clock NOT current freshness
+  -> NEW persist_opentix_2070_receipt_lkg
+       REUSE persist_sealed_receipt_review_lkg [existing shared CAS/atomic/fsync]
+       isolated external-runner file, double-run idempotent readback
+       A receipt-only identity LKG=1, A Body LKG=0, formal FIELD=0
+  -> CI #42436553885 SUCCESS 295/295, job #128596527514
+       Artifact #13598854175 ZIP SHA e0526e087d8dc67e6147a9063dab612f466e01fc7af7f4282f7bfa3aff8f3859
+       independent CRC 35/35 + SHA256SUMS 34/34; native probe PASS_NO_NATIVE_MARKER
+B P0 source root cause:
+  TPAC /event?page=1 indexed date 11/10–12 != /event/2072 detail 11/11–13
+  TICC bId=7806 robots HTTP404 consumed
+  CloudGate /cgt/latest-program index token 1584 != proved /cg/theater-event/1680 ID
+  -> CLOUDGATE_CROSS_PATH_IDENTITY_HOLD; no new native LIST/DETAIL/Body LKG
+```
+
+- **Before → after:** prior A OPENTIX exact native receipt was sealed in GitHub CI artifact but not persisted in an A durable source-native receipt-only LKG; new pinned archive validator and shared CAS persistence bridge add one real historical native-provenance REVIEW receipt without raw HTML or re-fetch. `p30_source_stream_gate.audit_opentix_native_sealed_archive` and `persist_opentix_2070_receipt_lkg` are new; existing `persist_sealed_receipt_review_lkg` reused unchanged. `tests/p30/test_p30_source_stream_gate.py` adds unpinned-byte rejection; existing exact-head workflow adds pinned GitHub artifact readback and manifest evidence.
+- **A delta:** new native HTTP/LIST/DETAIL/identity/role REVIEW/accepted FIELD 0/0/0/0/0/0; new receipt-only LKG **+1**, Body LKG +0. **B delta:** 0/0/0/0/0/0; receipt-only/Body LKG +0/+0; historical Zepp receipt-only LKG=1, B native Body LKG=0. A prior TMC Body LKG=1 retained. No formal FIELD, Golden or Published increase. No fabricated 24h source freshness; independent field authority remains HOLD.
+- **Isolation:** Engineering Draft #236 HEAD `0ad57226c58a1c154cb9c79bd1fa63544e1420f3` (base `d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce` behind main), no merge. Source main `599fb16f98c2b27e13a5226be7efd899e42a2b9f`; formal data/status blobs `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`/`645f68c3db1b0fa06527d73f8dae4a36fadcbbdd` unchanged, 19 platforms, engineering snapshot stale. L8 Android 5/5, CKSMH5/TWTC39 and ticket/venue homepage grouping PASS retained; cross-group OR Android UNVERIFIED. `HARD_HOLD_NO_PUBLICATION`, no status-only merge authorization.
+
