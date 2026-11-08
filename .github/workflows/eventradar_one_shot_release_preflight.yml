@@ -1,0 +1,148 @@
+name: EventRadar one-shot owner-authorized publication eligibility preflight (NO WRITE)
+on:
+  pull_request:
+    paths:
+      - .github/workflows/eventradar_one_shot_release_preflight.yml
+permissions:
+  contents: read
+jobs:
+  single-release-eligibility:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/p30-one-shot-release-preflight'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD and no formal feed or publication-control mutation
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          base=285e2af7f9dd784e798a9a0baaea572698618eb4
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git diff --name-only "$base" HEAD)" = '.github/workflows/eventradar_one_shot_release_preflight.yml'
+          echo PASS_ONE_SHOT_PREFLIGHT_READONLY_EXACT_HEAD
+      - name: Execute one-shot release qualification against actual formal JSON
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          from collections import Counter
+          from datetime import datetime, timezone
+          from pathlib import Path
+          import hashlib, json, subprocess, urllib.parse
+          p=Path('docs/data.json')
+          before=p.read_bytes()
+          feed_sha=hashlib.sha256(before).hexdigest()
+          feed=json.loads(before)
+          status=json.loads(Path('docs/platform_status.json').read_text())
+          snap=status['latestEngineering']
+          prod=status['production']
+          if isinstance(feed,list):
+              rows=feed
+              feed_shape='array'
+          elif isinstance(feed,dict):
+              choices=[(k,feed[k]) for k in ('events','data','items','activities') if isinstance(feed.get(k),list)]
+              rows=choices[0][1] if len(choices)==1 else []
+              feed_shape='object:'+(','.join(k for k,_ in choices) if choices else 'unknown')
+          else:
+              rows=[]
+              feed_shape=type(feed).__name__
+          safe_rows=[r for r in rows if isinstance(r,dict)]
+          hosts=Counter()
+          titles=0
+          https_sources=0
+          candidate_review=0
+          explicit_accepted=0
+          for row in safe_rows:
+              if isinstance(row.get('title'),str) and row['title'].strip():
+                  titles+=1
+              u=row.get('url')
+              if isinstance(u,str):
+                  parsed=urllib.parse.urlparse(u)
+                  if parsed.scheme=='https' and parsed.hostname and not parsed.username and not parsed.password:
+                      https_sources+=1
+                      hosts[parsed.hostname]+=1
+              m=row.get('_candidate')
+              if isinstance(m,dict):
+                  if m.get('decision') in ('REVIEW','REVIEW_WITH_HOLD'):
+                      candidate_review+=1
+                  # These flags are necessary but not sufficient; independent authority is also required.
+                  if m.get('formal_field_pass') is True and m.get('golden_accepted') is True and m.get('identity_accepted') is True:
+                      explicit_accepted+=1
+          independent_field_count=int(snap.get('independentFormalAdjudicatedFields',0))
+          new_accepted_fields=int(snap.get('acceptedFieldsNew',0))
+          golden_count=int(snap.get('goldenNew',0))
+          publication_state=snap.get('releaseState')
+          frozen=prod.get('eventFeedReleaseState')=='HARD_HOLD_NO_PUBLICATION' and publication_state=='HARD_HOLD_NO_PUBLICATION'
+          if not frozen:
+              decision='FAIL_UNEXPECTED_RELEASE_STATE'
+          elif independent_field_count==0 or new_accepted_fields==0 or golden_count==0:
+              decision='HOLD_NO_INDEPENDENT_FIELD_GOLDEN_AUTHORITY'
+          else:
+              # Even when fields become accepted, release remains blocked until its own
+              # independently passing publication Gate authorizes exact candidates.
+              decision='HOLD_SEPARATE_PUBLICATION_GATE_REQUIRED'
+          report={
+              'kind':'EVENTRADAR_SINGLE_OWNER_REQUESTED_PUBLICATION_ATTEMPT_V1',
+              'checked_at_utc':datetime.now(timezone.utc).isoformat(),
+              'owner_authorization':'ONE_SHOT_REQUESTED_2026_11_08_NO_SCHEDULER',
+              'formal_main_before':'285e2af7f9dd784e798a9a0baaea572698618eb4',
+              'formal_feed_git_blob':subprocess.check_output(['git','rev-parse','HEAD:docs/data.json'],text=True).strip(),
+              'formal_feed_sha256':feed_sha,
+              'formal_feed_bytes':len(before),
+              'feed_shape':feed_shape,
+              'existing_rows_in_formal_feed':len(rows),
+              'object_rows':len(safe_rows),
+              'rows_with_titles':titles,
+              'rows_with_https_official_candidate_urls':https_sources,
+              'review_flagged_rows':candidate_review,
+              'rows_with_all_three_explicit_flags_unverified':explicit_accepted,
+              'unique_https_hosts':len(hosts),
+              'latest_engineering_snapshot':snap.get('snapshotAtTaipei'),
+              'latest_engineering_accepted_fields':new_accepted_fields,
+              'independent_adjudicated_fields':independent_field_count,
+              'new_golden':golden_count,
+              'engineered_review_candidate_fields':snap.get('candidateReviewFields'),
+              'production_release_state':publication_state,
+              'one_shot_new_published_events':0,
+              'data_modified':False,
+              'decision':decision,
+              'why':'Owner authorized one attempt but source/identity/field/Golden quality evidence is insufficient. Do not replace legacy formal feed or promote REVIEW to published.'
+          }
+          Path('evidence/one_shot_publication_attempt.json').write_text(
+              json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+          assert p.read_bytes()==before,'FAIL_FORMAL_FEED_CHANGED'
+          assert report['one_shot_new_published_events']==0
+          assert decision=='HOLD_NO_INDEPENDENT_FIELD_GOLDEN_AUTHORITY',decision
+          assert snap['acceptedFieldsNew']==snap['goldenNew']==snap['publishedEventsNew']==0
+          assert len(status['platforms'])==19
+          print('PASS_ONE_SHOT_ATTEMPT_EXECUTED_FAIL_CLOSED')
+          print('FORMAL_FEED_SHAPE='+feed_shape)
+          print('FORMAL_FEED_EXISTING_ROWS='+str(len(rows)))
+          print('FORMAL_FEED_HTTPS_SOURCE_ROWS='+str(https_sources))
+          print('FORMAL_FEED_TITLE_ROWS='+str(titles))
+          print('FORMAL_ACCEPTED_FIELD='+str(new_accepted_fields))
+          print('NEW_GOLDEN='+str(golden_count))
+          print('ELIGIBLE_NEW_RELEASE=0')
+          print('DECISION='+decision)
+          PY
+      - name: Verify artifact checksum and zero formal feed mutation
+        run: |
+          set -euo pipefail
+          (cd evidence && sha256sum one_shot_publication_attempt.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          git diff --exit-code -- docs/data.json docs/platform_status.json
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          echo PASS_FAIL_CLOSED_PUBLICATION_ATTEMPT_NO_DATA_WRITE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-one-shot-publication-attempt-hold-evidence
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
