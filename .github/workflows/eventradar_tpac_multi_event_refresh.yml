@@ -6,6 +6,8 @@ on:
       - scripts/p30_tpac_catalog_topology.py
       - scripts/p30_tpac_event_catalog_once.py
       - scripts/p30_tpac_event_detail_review.py
+      - scripts/p30_tpac_price_reconcile.py
+      - tests/p30/test_p30_tpac_price_reconcile.py
       - tests/p30/test_p30_tpac_event_detail_review.py
       - tests/p30/test_p30_tpac_event_catalog_once.py
       - tests/p30/test_p30_tpac_catalog_topology.py
@@ -38,7 +40,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
       - uses: actions/setup-python@v5
@@ -52,7 +54,8 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_catalog_topology.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_catalog_once.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_detail_review.py' -v
-          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_price_reconcile.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
       - name: TPAC /event first-party robots LIST and 2 distinct DETAIL bounded one-shot (NO PUBLISH)
         env:
@@ -157,6 +160,30 @@ jobs:
           print('TPAC_PRICE_MATCHES='+json.dumps(nodes[:12],ensure_ascii=False))
           print('TPAC_TICKET_LINKS='+json.dumps(links[:8],ensure_ascii=False))
           print('PASS_PINNED_OFFICIAL_DETAIL_PRICE_DOM_AUDIT_NO_NEW_GET')
+          PY
+      - name: Replay native TPAC admission price and official OPENTIX direct link (REVIEW ONLY)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from scripts.p30_tpac_price_reconcile import extract_tpac_price_review
+          p=Path('pinned-program/native')
+          receipt=json.loads((p/'tpac_2040_source_receipt.json').read_text(encoding='utf-8'))
+          original=(p/'tpac_2040_detail.html').read_bytes()
+          price=extract_tpac_price_review(original,receipt,'2040','沉浸式劇場《士林YES！》')
+          Path('evidence/tpac_2040_native_price_review.json').write_text(
+              json.dumps(price,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          assert price['decision']=='SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL',price
+          assert (price['min_price_ntd'],price['max_price_ntd'])==(1500,3500)
+          assert price['display_suggestion']=='NT$1,500 起（詳官方）'
+          assert price['linked_ticket']['ticket_event_id']=='2065059039769808896'
+          assert price['linked_ticket']['ticket_event_url']=='https://www.opentix.life/event/2065059039769808896'
+          assert price['source_body_sha256']==receipt['detail_sha256']
+          assert price['golden_accepted'] is False and price['published'] is False
+          assert price['formal_field_pass'] is False
+          print('PASS_NATIVE_TPAC_PRICE_MIN_1500_AND_EXPLICIT_SAME_EVENT_OPENTIX_LINK_REVIEW')
+          print('HOLD_TICKET_NATIVE_PRICE_TIERS_AND_SESSION_PARITY_REQUIRED')
           PY
       - name: Produce two-ID isolated LKG fixture evidence, never native HTTP
         run: |
