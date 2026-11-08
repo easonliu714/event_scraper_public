@@ -98,10 +98,12 @@ class EventSourceOnceTests(unittest.TestCase):
             return datetime(2026, 11, 9, 1, 0, tzinfo=timezone.utc)
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "cycle-01"
+            registry = Path(root) / "registry"
+            registry.mkdir()
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-010000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fake,
-                clock=clock, pause=sleeps.append)
+                clock=clock, pause=sleeps.append, registry_dir=registry)
             self.assertEqual(report["decision"], "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED")
             self.assertEqual(report["selected_ids"], ["3456", "9876"])
             self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/3456", ROOT + "/9876"])
@@ -120,7 +122,8 @@ class EventSourceOnceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "ALREADY_CLAIMED_HOLD"):
                 collect_bounded_review_cycle(
                     out, "tpac-r4-20261109-010000z-a1b2c3d4",
-                    source_policy_approved=True, fetch=fake, pause=sleeps.append)
+                    source_policy_approved=True, fetch=fake, pause=sleeps.append,
+                    registry_dir=registry)
             self.assertEqual(len(calls), 4)
 
     def test_r4_requires_explicit_source_policy_before_any_request(self):
@@ -143,9 +146,12 @@ class EventSourceOnceTests(unittest.TestCase):
             return b"User-agent: *\nDisallow: /event\n"
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "denied"
+            registry = Path(root) / "registry"
+            registry.mkdir()
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-020000z-a1b2c3d4",
-                source_policy_approved=True, fetch=denied, pause=lambda n: None)
+                source_policy_approved=True, fetch=denied, pause=lambda n: None,
+                registry_dir=registry)
             self.assertEqual(calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("ROBOTS_LIST_DISALLOW_HOLD", report["first_failure"])
@@ -163,10 +169,12 @@ class EventSourceOnceTests(unittest.TestCase):
             return ROBOTS_OK if url == ROBOTS else listing
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "forensic"
+            registry = Path(root) / "registry"
+            registry.mkdir()
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-030000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fail_first_detail,
-                pause=lambda n: None)
+                pause=lambda n: None, registry_dir=registry)
             self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/3456"])
             self.assertEqual(report["successful_get"], 2)
             self.assertEqual(report["decision"], "HOLD")
@@ -180,14 +188,64 @@ class EventSourceOnceTests(unittest.TestCase):
             return b"User-agent: *\nCrawl-delay: 120\nAllow: /event\n"
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "slow"
+            registry = Path(root) / "registry"
+            registry.mkdir()
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-040000z-a1b2c3d4",
                 source_policy_approved=True, fetch=slow,
-                pause=lambda n: self.fail("unexpected delay"))
+                pause=lambda n: self.fail("unexpected delay"),
+                registry_dir=registry)
             self.assertEqual(calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("CRAWL_DELAY_OVER_BUDGET_HOLD", report["first_failure"])
             self.assertFalse((out / "tpac_r4_refresh_manifest.json").exists())
+
+
+    def test_r4_durable_registry_blocks_same_id_across_distinct_outputs_after_denial(self):
+        calls = []
+        def denied(url):
+            calls.append(url)
+            return b"User-agent: *\\nDisallow: /event\\n"
+        with tempfile.TemporaryDirectory() as root:
+            registry = Path(root) / "registry"
+            registry.mkdir()
+            first = Path(root) / "first"
+            second = Path(root) / "second"
+            cycle = "tpac-r4-20261109-050000z-a1b2c3d4"
+            report = collect_bounded_review_cycle(
+                first, cycle, source_policy_approved=True, fetch=denied,
+                pause=lambda n: None, registry_dir=registry)
+            self.assertEqual(report["decision"], "HOLD")
+            self.assertEqual(calls, [ROBOTS])
+            self.assertTrue((registry / (cycle + ".claim.json")).is_file())
+            with self.assertRaisesRegex(ValueError, "DURABLE_CYCLE_REUSE_HOLD"):
+                collect_bounded_review_cycle(
+                    second, cycle, source_policy_approved=True, fetch=denied,
+                    pause=lambda n: None, registry_dir=registry)
+            self.assertFalse(second.exists())
+            self.assertEqual(calls, [ROBOTS])
+
+    def test_r4_missing_or_symlink_registry_holds_before_any_request(self):
+        with tempfile.TemporaryDirectory() as root:
+            out = Path(root) / "out"
+            cycle = "tpac-r4-20261109-060000z-a1b2c3d4"
+            no_get = lambda url: self.fail("unexpected network")
+            with self.assertRaisesRegex(ValueError, "DURABLE_REGISTRY_REQUIRED_HOLD"):
+                collect_bounded_review_cycle(
+                    out, cycle, source_policy_approved=True, fetch=no_get)
+            self.assertFalse(out.exists())
+            target = Path(root) / "registry"
+            target.mkdir()
+            alias = Path(root) / "alias"
+            try:
+                alias.symlink_to(target, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                return
+            with self.assertRaisesRegex(ValueError, "DURABLE_REGISTRY_UNTRUSTED_HOLD"):
+                collect_bounded_review_cycle(
+                    out, cycle, source_policy_approved=True,
+                    fetch=no_get, registry_dir=alias)
+            self.assertFalse(out.exists())
 
 
 if __name__ == "__main__":

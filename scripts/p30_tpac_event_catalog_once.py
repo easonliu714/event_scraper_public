@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -134,7 +135,8 @@ def collect_once(out, *, fetch=bounded_fetch):
 
 
 def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
-                                 fetch=None, clock=None, pause=None):
+                                 fetch=None, clock=None, pause=None,
+                                 registry_dir=None):
     """Bounded /event native cycle for a separately approved, isolated R4 attempt.
 
     A fresh, exclusive output directory is a LOCAL one-shot claim, not a
@@ -149,6 +151,29 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
     out = Path(out)
     if out.exists() or out.is_symlink():
         raise ValueError("TPAC_R4_CYCLE_ALREADY_CLAIMED_HOLD")
+    # Persist a one-shot claim before any HTTP request. O_EXCL serializes
+    # processes on this filesystem; a crash leaves a fail-closed tombstone.
+    # This is NOT a cross-host or GitHub-global source registry.
+    if registry_dir is None:
+        raise ValueError("TPAC_R4_DURABLE_REGISTRY_REQUIRED_HOLD")
+    registry = Path(registry_dir)
+    if registry.is_symlink() or not registry.is_dir():
+        raise ValueError("TPAC_R4_DURABLE_REGISTRY_UNTRUSTED_HOLD")
+    claim = registry / (cycle_id + ".claim.json")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        fd = os.open(claim, flags, 0o600)
+    except FileExistsError as exc:
+        raise ValueError("TPAC_R4_DURABLE_CYCLE_REUSE_HOLD") from exc
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump({"cycle_id": cycle_id, "catalog": "event",
+                   "output": str(out.resolve()), "state": "CONSUMED_BEFORE_NETWORK",
+                   "global_registry_verified": False}, handle, sort_keys=True)
+        handle.write(chr(10))
+        handle.flush()
+        os.fsync(handle.fileno())
     out.mkdir(parents=True, exist_ok=False)
     clock = clock or (lambda: datetime.now(timezone.utc))
     pause = pause or time.sleep
@@ -161,7 +186,8 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
         "source_receipts": {}, "selected_ids": [],
         "robots_allowed": False, "robots_sha256": None,
         "request_gap_seconds": None,
-        "local_one_shot_claim": True, "global_one_shot_registry_verified": False,
+        "local_one_shot_claim": True, "durable_local_registry_claimed": True,
+        "global_one_shot_registry_verified": False,
         "independent_cycle_verified": False, "native_official_attestation": False,
         "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
@@ -254,13 +280,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--cycle-id", help="unique approved isolated TPAC-R4 cycle identifier")
+    parser.add_argument("--registry-dir", type=Path,
+                        help="pre-existing durable local claim directory; NOT cross-host")
     parser.add_argument("--authorize-isolated-cycle", action="store_true",
                         help="explicit operator confirmation of separately approved source policy")
     args = parser.parse_args()
     if args.cycle_id is not None or args.authorize_isolated_cycle:
         report = collect_bounded_review_cycle(
             args.output, args.cycle_id,
-            source_policy_approved=args.authorize_isolated_cycle)
+            source_policy_approved=args.authorize_isolated_cycle,
+            registry_dir=args.registry_dir)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True))
         raise SystemExit(0 if report["decision"] == "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED" else 49)
     report = collect_once(args.output)
