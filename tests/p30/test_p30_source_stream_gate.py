@@ -822,5 +822,18 @@ class TestSourceStreamGate(unittest.TestCase):
                 m.inspect_kktix_takase_event_scope(bad)
 
 
+
+class TestPinnedOpentixReceipt(unittest.TestCase):
+    """The pinned A source receipt is not fresh native GET or formal FIELD."""
+
+    def test_unpinned_bytes_fail_closed_before_any_lkg(self):
+        self.assertEqual(len(m.OPENTIX_2070_ARTIFACT_SHA256), 64)
+        for raw in (b"", b"not a native CI artifact", b"PK\x03\x04"):
+            with self.subTest(raw=raw):
+                with self.assertRaisesRegex(ValueError, "OPENTIX_ARTIFACT_SHA_HOLD"):
+                    m.audit_opentix_native_sealed_archive(raw)
+
+
+
 if __name__ == "__main__":
     unittest.main()

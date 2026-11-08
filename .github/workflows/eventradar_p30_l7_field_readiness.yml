@@ -2077,6 +2077,57 @@ jobs:
           print("PASS_PINNED_ZEPP_160668_RECEIPT_ONLY_DURABLE_LKG",
                 first["snapshot_sha256"], "NO_NATIVE_GET_NO_FORMAL_FIELD", flush=True)
           PY
+      - name: Pinned A OPENTIX native receipt to isolated CAS LKG (NO SOURCE GET)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/eventradar_opentix_prior" evidence
+          curl --fail --silent --show-error --location --max-redirs 2 --max-time 30 \
+            --retry 0 --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/13578708475/zip" \
+            --output "$RUNNER_TEMP/eventradar_opentix_prior/pinned.zip"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          from scripts.p30_source_stream_gate import (
+              OPENTIX_2070_ARTIFACT_SHA256, audit_opentix_native_sealed_archive,
+              persist_opentix_2070_receipt_lkg)
+          prior = Path(os.environ["RUNNER_TEMP"]) / "eventradar_opentix_prior"
+          archive = (prior / "pinned.zip").read_bytes()
+          assert hashlib.sha256(archive).hexdigest() == OPENTIX_2070_ARTIFACT_SHA256
+          target = prior / "opentix_2070446724700692480_receipt_lkg.json"
+          first = persist_opentix_2070_receipt_lkg(archive, target, Path.cwd())
+          assert first["persisted"] and not first["idempotent"]
+          second = persist_opentix_2070_receipt_lkg(archive, target, Path.cwd())
+          assert second["idempotent"] and not second["persisted"]
+          sealed = json.loads(target.read_text(encoding="utf-8"))
+          snapshot = sealed["snapshot"]
+          assert sealed["kind"] == "P30_A_OPENTIX_2070_DURABLE_RECEIPT_LKG_V1"
+          assert snapshot["source_id"] == "05"
+          assert snapshot["source_event_id"] == "2070446724700692480"
+          assert snapshot["historical_native_http200"] == 2
+          assert snapshot["receipt_only_identity_lkg"] == 1
+          assert snapshot["body_review_lkg"] == snapshot["native_get_this_call"] == 0
+          assert snapshot["formal_accepted_fields"] == 0
+          assert snapshot["golden_accepted_events"] == snapshot["published_events"] == 0
+          assert snapshot["sealed_field_conflict_audit"]["formal_accepted_fields"] == 0
+          assert snapshot["sealed_field_conflict_audit"]["wall_clock_freshness"] == "NOT_ASSESSED"
+          assert snapshot["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          try:
+              audit_opentix_native_sealed_archive(archive[:-1] + b"0")
+          except ValueError as exc:
+              assert str(exc) == "OPENTIX_ARTIFACT_SHA_HOLD"
+          else:
+              raise AssertionError("tampered archive accepted")
+          Path("evidence/opentix_2070_receipt_only_lkg.json").write_text(
+              json.dumps(sealed, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8")
+          print("PASS_PINNED_A_OPENTIX_RECEIPT_ONLY_LKG", first["snapshot_sha256"],
+                "NO_NATIVE_GET_NO_BODY_LKG_NO_FORMAL_FIELD", flush=True)
+          PY
       - name: Single-use TPAC event2072 robots-gated native LIST DETAIL receipt (NO PUBLISH)
         shell: bash
         run: |
@@ -2194,6 +2245,7 @@ jobs:
           if [ -f evidence/kktix_day1_native_once.json ]; then sha256sum evidence/kktix_day1_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
           sha256sum evidence/zepp_takase_receipt_only_lkg.json >> evidence/SHA256SUMS.txt
+          sha256sum evidence/opentix_2070_receipt_only_lkg.json >> evidence/SHA256SUMS.txt
           if [ -f evidence/kktix_takase_public_native_once.json ]; then sha256sum evidence/kktix_takase_public_native_once.json >> evidence/SHA256SUMS.txt; fi
           if [ -f evidence/b_ntch_native_once.json ]; then sha256sum evidence/b_ntch_native_once.json >> evidence/SHA256SUMS.txt; fi
           sha256sum -c evidence/SHA256SUMS.txt

@@ -1567,6 +1567,141 @@ def probe_kktix_takase_native_once():
     return out
 
 
+
+# This is a pinned historical A native receipt, NOT a new GET or body replay.
+OPENTIX_2070_ARTIFACT_SHA256 = "92bc3c7119b69f9d782d3a3deef442a0337c32178a811ea57d6e5b0a394a0237"
+OPENTIX_2070_RECEIPT_SHA256 = "82b6ac7498060023c7912a3db0d400275c4ba0bc172f417516df8f2b85528aa2"
+
+
+def audit_opentix_native_sealed_archive(archive_bytes):
+    """Pin a real CI artifact and native same-ID receipt; hold independent FIELD."""
+    import io
+    import zipfile
+    from scripts.p30_ab_opentix_ticc_native_once import SOURCES
+    source = SOURCES["A"]
+    if (not isinstance(archive_bytes, bytes) or
+            not 0 < len(archive_bytes) <= 512 * 1024 or
+            hashlib.sha256(archive_bytes).hexdigest() != OPENTIX_2070_ARTIFACT_SHA256):
+        raise ValueError("OPENTIX_ARTIFACT_SHA_HOLD")
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as z:
+        names = z.namelist()
+        manifest_name = "evidence/SHA256SUMS.txt"
+        if (len(names) != 32 or len(set(names)) != 32 or
+                manifest_name not in names or z.testzip() is not None or
+                any(n.startswith("/") or ".." in n.split("/") or
+                    z.getinfo(n).is_dir() or
+                    not 0 < z.getinfo(n).file_size <= 2 * 1024 * 1024
+                    for n in names)):
+            raise ValueError("OPENTIX_ARCHIVE_MEMBERS_CRC_HOLD")
+        rows = [x.split("  ", 1) for x in
+                z.read(manifest_name).decode("ascii", "strict").splitlines()]
+        if (len(rows) != 31 or any(len(x) != 2 or
+                re.fullmatch(r"[0-9a-f]{64}", x[0]) is None for x in rows)
+                or {x[1] for x in rows} != set(names) - {manifest_name}
+                or any(hashlib.sha256(z.read(name)).hexdigest() != digest
+                       for digest, name in rows)):
+            raise ValueError("OPENTIX_ARCHIVE_MANIFEST_SHA_HOLD")
+        raw = z.read("evidence/ab_opentix_ticc_native_once.json")
+    receipt_sha = hashlib.sha256(raw).hexdigest()
+    if receipt_sha != OPENTIX_2070_RECEIPT_SHA256:
+        raise ValueError("OPENTIX_PINNED_RECEIPT_SHA_HOLD")
+    data = json.loads(raw)
+    if not isinstance(data, dict) or set(data) != {"A", "B"}:
+        raise ValueError("OPENTIX_RECEIPT_LINES_HOLD")
+    a = data["A"]
+    required = {"line": "A", "kind": "P30_AB_OPENTIX_TICC_NATIVE_ONESHOT_V1",
+                "source_id": source["source_id"],
+                "source_event_id": source["event_id"],
+                "list_url": source["list"], "detail_url": source["detail"],
+                "decision": "NATIVE_SAME_ID_REVIEW_ONLY",
+                "first_failure": "INDEPENDENT_FIELD_AUTHORITY_PENDING",
+                "robots_get_attempted": 1, "native_event_get_attempted": 2,
+                "native_list": 1, "native_detail": 1,
+                "native_same_id_review": 1, "native_role_review": 1,
+                "native_body_lkg": 0, "receipt_only_lkg": 0,
+                "formal_accepted_fields": 0, "golden": 0, "published": 0,
+                "raw_html_saved": False,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    if (not isinstance(a, dict) or
+            any(type(a.get(k)) is not type(v) or a[k] != v
+                for k, v in required.items())):
+        raise ValueError("OPENTIX_NATIVE_IDENTITY_AUTHORITY_HOLD")
+    receipts = a.get("receipts")
+    expected = (
+        (source["robots"], "text/plain", 74,
+         "7077acb0317f11d6169d994697767ac3afae07f1ad38c6cce03cfc99eadd20f7"),
+        (source["list"], "text/html", 476333,
+         "9af2a826c1053383dda50008cf94438268ed6dcf33710bbda989daad98094deb"),
+        (source["detail"], "text/html", 533011,
+         "bea4041161561e44879fc6231028ad8d05c0ee35ff4d01b618edb111b7dcab14"))
+    if not isinstance(receipts, list) or len(receipts) != 3:
+        raise ValueError("OPENTIX_NATIVE_RECEIPT_COUNT_HOLD")
+    times = []
+    for item, (url, mime, count, digest) in zip(receipts, expected):
+        required_receipt = {"url": url, "http_status": 200,
+                            "content_type": mime, "body_bytes": count,
+                            "body_sha256": digest,
+                            "transport": "NATIVE_NO_REDIRECT_NO_RETRY"}
+        if (not isinstance(item, dict) or
+                any(type(item.get(k)) is not type(v) or item[k] != v
+                    for k, v in required_receipt.items())):
+            raise ValueError("OPENTIX_NATIVE_RECEIPT_SOURCE_HOLD")
+        try:
+            stamp = datetime.fromisoformat(
+                item["observed_at_utc"].replace("Z", "+00:00"))
+        except (KeyError, AttributeError, TypeError, ValueError) as exc:
+            raise ValueError("OPENTIX_NATIVE_RECEIPT_CLOCK_HOLD") from exc
+        if stamp.utcoffset() is None or stamp.utcoffset().total_seconds() != 0:
+            raise ValueError("OPENTIX_NATIVE_RECEIPT_CLOCK_HOLD")
+        times.append(stamp)
+    if not all(0 <= (times[i + 1] - times[i]).total_seconds() <= 120
+               for i in (0, 1)):
+        raise ValueError("OPENTIX_NATIVE_RECEIPT_SEQUENCE_HOLD")
+    role = {"role": "SOURCE_EXACT_TITLE_REVIEW", "value": source["title"],
+            "source_id": source["source_id"], "source_event_id": source["event_id"],
+            "source_url": source["detail"], "body_sha256": expected[2][3],
+            "observed_at_utc": receipts[2]["observed_at_utc"],
+            "formal_accepted": False}
+    matrix = adjudicate_sealed_field_roles(
+        source_id=source["source_id"], source_event_id=source["event_id"],
+        detail_url=source["detail"], detail_body_sha256=expected[2][3],
+        observed_at_utc=receipts[2]["observed_at_utc"],
+        transport=receipts[2]["transport"], role_receipts=[role],
+        now_utc=times[2])
+    matrix["clock_basis"] = "SEALED_DETAIL_OBSERVED_AT_ONLY"
+    matrix["wall_clock_freshness"] = "NOT_ASSESSED"
+    return {
+        "kind": "P30_A_OPENTIX_2070_PINNED_NATIVE_RECEIPT_REVIEW_V1",
+        "decision": "RECEIPT_ONLY_SAME_ID_REVIEW_NOT_BODY_REPLAY",
+        "source_id": source["source_id"], "source_event_id": source["event_id"],
+        "source_title_review": source["title"], "source_receipts": receipts[1:],
+        "robots_receipt": receipts[0],
+        "artifact_sha256": OPENTIX_2070_ARTIFACT_SHA256,
+        "receipt_sha256": receipt_sha,
+        "observed_at_utc": receipts[2]["observed_at_utc"],
+        "receipt_derived_role": role,
+        "sealed_field_conflict_audit": matrix,
+        "native_get_this_call": 0, "historical_native_http200": 2,
+        "historical_same_id_review": 1,
+        "receipt_only_identity_lkg": 1, "body_review_lkg": 0,
+        "field_authority": "INDEPENDENT_FIELD_AUTHORITY_PENDING",
+        "formal_accepted_fields": 0, "golden_accepted_events": 0,
+        "published_events": 0, "raw_html_saved": False,
+        "release_state": "HARD_HOLD_NO_PUBLICATION"}
+
+
+def persist_opentix_2070_receipt_lkg(archive_bytes, destination, repo_root,
+                                     expected_previous_sha256=None):
+    """Reuse isolated atomic/CAS receipt writer, with no official source GET."""
+    snapshot = audit_opentix_native_sealed_archive(archive_bytes)
+    return persist_sealed_receipt_review_lkg(
+        snapshot, destination, repo_root,
+        expected_filename="opentix_2070446724700692480_receipt_lkg.json",
+        envelope_kind="P30_A_OPENTIX_2070_DURABLE_RECEIPT_LKG_V1",
+        expected_previous_sha256=expected_previous_sha256)
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
