@@ -18,12 +18,14 @@ from scripts import p30_ntpc_artcenter_source as venue
 from scripts import p30_tpac_event_source as tpac_event
 from scripts import p30_cloudgate_native_gate as cloudgate
 from scripts import p30_ab_opentix_ticc_native_once as opentix
+from scripts import p30_dual_native_rotation as rotation
 from scripts import p30_candidate_review_pipeline as preview
 
 MAX_HTML = 2 * 1024 * 1024
 ATTESTATION = "CALLER_SUPPLIED_NOT_NATIVE"
 # Explicit reuse of existing exact-ID parsers; caller bytes never attest native GET.
 ADAPTER_LINES = {"A_KIMU": "A", "A_UDN": "A", "A_ACCUPASS": "A", "A_OPENTIX": "A",
+                 "A_TIXCRAFT_NEXT": "A", "B_ZEPP_NEXT": "B",
                  "B_NTPC": "B", "B_CERAMICS": "B", "B_ZEPP_TAKASE": "B",
                  "B_TPAC_EVENT2072": "B", "B_CLOUDGATE": "B",
                  "B_TAINEX": "B"}
@@ -80,6 +82,21 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         # from caller-provided HTML.
         roles = list(verdict.get("field_roles", []))
         platform, kind = "OPENTIX", "活動"
+    elif adapter_key in ("A_TIXCRAFT_NEXT", "B_ZEPP_NEXT"):
+        # Real integration of existing source-owned NEXT parsers with the
+        # fixed REVIEW -> checksum/CAS -> durable A+B pair-receipt pipeline.
+        # Caller HTML cannot claim new native GET, Body LKG or FIELD PASS.
+        cfg = rotation.NEXT[line]
+        parsed = rotation.inspect_next_pair(line, listing, detail)
+        complete = parsed["decision"] == "REVIEW_NON_SESSION_ONLY"
+        verdict = {"same_id_review": int(complete),
+                   "first_failure": parsed["reason"],
+                   "field_roles": parsed.get("roles", []) if complete else []}
+        list_url, detail_url = cfg["listing"], cfg["detail"]
+        title, source_id, event_id = cfg["title"], cfg["source"], cfg["id"]
+        roles = list(verdict["field_roles"])
+        platform, kind = (("拓元售票系統", "活動") if line == "A"
+                          else ("Zepp New Taipei", "活動"))
     elif adapter_key not in ("B_NTPC", "B_TPAC_EVENT2072", "B_CLOUDGATE"):
         # The same source-local parser also handles alternate A/B official
         # LIST→DETAIL identities. Never promote LIST roles as DETAIL receipts.
@@ -198,7 +215,8 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         }
     envelope["decision"] = "REVIEW_ONLY_NOT_NATIVE"
     envelope["first_failure"] = (verdict["first_failure"]
-        if adapter_key in ("B_TPAC_EVENT2072", "B_CLOUDGATE")
+        if adapter_key in ("B_TPAC_EVENT2072", "B_CLOUDGATE",
+                           "A_TIXCRAFT_NEXT", "B_ZEPP_NEXT")
         else "NATIVE_ATTESTATION_AND_FIELD_AUTHORITY_PENDING")
     return envelope
 
@@ -216,6 +234,9 @@ def _validate_snapshot(snapshot):
         source = opentix.SOURCES["A"]
         expected = (source["list"], source["detail"],
                     source["source_id"], source["event_id"])
+    elif adapter in ("A_TIXCRAFT_NEXT", "B_ZEPP_NEXT"):
+        cfg = rotation.NEXT[payload["line"]]
+        expected = (cfg["listing"], cfg["detail"], cfg["source"], cfg["id"])
     elif adapter == "B_NTPC":
         expected = (venue.LIST_URL, venue.exact_detail(
             "/artcenter_chi/xmdoc/cont?sid=" + venue.SID +
@@ -274,6 +295,8 @@ def _validate_snapshot(snapshot):
         venue.TITLE if adapter == "B_NTPC" else
         tpac_event.TITLE if adapter == "B_TPAC_EVENT2072" else
         cloudgate.TITLE if adapter == "B_CLOUDGATE" else
+        rotation.NEXT[payload["line"]]["title"] if adapter in
+            ("A_TIXCRAFT_NEXT", "B_ZEPP_NEXT") else
         ticket.SOURCES[adapter]["title"]
     )
     if (set(candidate) != allowed_preview_keys or
