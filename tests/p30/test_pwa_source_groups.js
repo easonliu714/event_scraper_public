@@ -51,6 +51,8 @@ const inputs = [
 ];
 const filters = {platforms: new Set()};
 const context = {
+    // Node vm sandbox does not expose browser URL by default.
+    URL,
     document: {
         getElementById: id => roots[id],
         createElement: tag => new FakeNode(tag),
@@ -146,6 +148,7 @@ const regionalRoots = {
     "search": { value: "" }
 };
 const regional = {
+    URL,
     allEvents: formal,
     filters: { platforms: new Set(), regions: new Set(), status: new Set(), types: new Set() },
     document: { getElementById: id => regionalRoots[id] },
