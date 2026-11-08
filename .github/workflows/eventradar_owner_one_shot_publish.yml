@@ -1,0 +1,183 @@
+name: EventRadar Owner single-shot quality-gated event replacement
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - docs/data.json
+      - docs/index.html
+      - .github/workflows/eventradar_owner_one_shot_publish.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  exact-source-release:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'release/owner-once-qualified-source-20261108'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact HEAD, one-shot authorization and only three changed paths
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          base=f5db15b0894ae68d6da211a9530b472868b61a23
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse "$base:docs/data.json")" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_owner_one_shot_publish.yml' 'docs/data.json' 'docs/index.html' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_SCOPE; exit 1; }
+          echo PASS_EXACT_HEAD_ONE_SHOT_SCOPE_GOLDEN_SCHEDULER_IMMUTABLE
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline quality parser and formal PWA source-group regression
+        run: |
+          set -euo pipefail
+          python -m pip install 'beautifulsoup4==4.15.0'
+          python -m unittest discover -s tests/p30 -p 'test_p30_quality_snapshot_publisher.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_publisher_source_once.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_verified_show_publisher.py' -v
+          node tests/p30/test_pwa_source_groups.js
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess,re
+          base='f5db15b0894ae68d6da211a9530b472868b61a23'
+          old=subprocess.check_output(['git','show',base+':docs/index.html']).decode()
+          new=Path('docs/index.html').read_text()
+          marker="        '中正紀念堂', '國立中正紀念堂'"
+          assert old.count(marker)==1
+          exact=old.replace(marker,marker+",\n        '臺北表演藝術中心', '台北表演藝術中心'")
+          assert exact==new,'UI_DRIFT'
+          scripts=re.findall(r'<script>(.*?)</script>',new,re.S)
+          assert len(scripts)==1
+          Path('/tmp/eventradar_p30_single_release_ui.js').write_text(scripts[0])
+          print('PASS_EXACT_ONE_VENUE_SOURCE_GROUP_EXTENSION')
+          PY
+          node --check /tmp/eventradar_p30_single_release_ui.js
+      - name: Independently download pinned first-party native raw and candidate artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-one-shot-publication-attempt-hold-evidence
+          run-id: 42484103012
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-native
+      - uses: actions/download-artifact@v4
+        with:
+          name: eventradar-one-shot-publication-attempt-hold-evidence
+          run-id: 42484914726
+          repository: easonliu714/event_scraper_public
+          github-token: ${{ github.token }}
+          path: pinned-quality
+      - name: Source-independent exact official title, future SHOW, accepted roles and field HOLD readback
+        run: |
+          set -euo pipefail
+          (cd pinned-native && sha256sum -c SHA256SUMS.txt)
+          (cd pinned-quality && sha256sum -c SHA256SUMS.txt)
+          mkdir -p evidence
+          python scripts/p30_tpac_verified_show_publisher.py --source-dir pinned-native/native --out evidence/replayed_qualified_event.json
+          python - <<'PY'
+          from pathlib import Path
+          from datetime import datetime,timezone
+          from bs4 import BeautifulSoup
+          import json,hashlib,subprocess
+          old=json.loads(subprocess.check_output(['git','show','f5db15b0894ae68d6da211a9530b472868b61a23:docs/data.json']))
+          assert isinstance(old,list) and len(old)==8436,'LEGACY_BASELINE_DRIFT'
+          new=json.loads(Path('docs/data.json').read_text())
+          assert isinstance(new,list) and len(new)==1,'UNSAFE_EMPTY_OR_MULTI_ROW_FEED'
+          e=new[0]
+          candidate=json.loads(Path('pinned-quality/tpac_2040_candidate.json').read_text())
+          replay=json.loads(Path('evidence/replayed_qualified_event.json').read_text())
+          assert candidate['decision']==replay['decision']=='SOURCE_QUALIFIED_CORE_REQUIRES_INDEPENDENT_RELEASE'
+          assert candidate['accepted_roles']==replay['accepted_roles']==['EVENT_TITLE','NEXT_EVENT_SHOW_START']
+          assert replay['future_showtimes']==8 and replay['same_source_identity'] is True
+          assert candidate['receipts']==replay['receipts']
+          assert sorted(candidate['hold_fields'])==sorted(replay['hold_fields'])
+          for key,value in candidate['record'].items():
+              if key not in ('published','formal_field_pass'):
+                  assert e[key]==value,('CANDIDATE_FORMAL_DRIFT',key)
+          assert e['published'] is True and e['formal_field_pass'] is True
+          assert e['golden_accepted'] is False
+          assert e['source_event_id']=='2040' and e['platform']=='臺北表演藝術中心'
+          assert e['url']=='https://tpac.org.taipei/program/2040'
+          assert e['date']=='2026-11-20 19:30'
+          assert datetime.fromisoformat(e['date']+'+08:00').astimezone(timezone.utc)>datetime.now(timezone.utc)
+          assert e['price']=='' and '價' in e['description']
+          fields=e['_formal_field_evidence']
+          assert set(fields)=={'title','date'}
+          for key,role in [('title','EVENT_TITLE'),('date','EVENT_SHOW_START')]:
+              v=fields[key]
+              assert v['event_id']=='2040' and v['role']==role and v['source']==e['url']
+              assert v['source_url']==e['url'] and v['decision']=='ACCEPTED'
+              assert v['value']==e[key] and v['observed_at']==candidate['receipts']['observed_at']
+          p=e['_publication']
+          assert p['mode']=='OWNER_APPROVED_SINGLE_SHOT_2026_11_08'
+          assert p['source_authority']=='OFFICIAL_TPAC_NATIVE_LIST_DETAIL'
+          assert p['native_source_run']==42484103012
+          assert p['candidate_quality_run']==42484914726
+          assert p['source_body_sha256']=={'list':candidate['receipts']['list_sha256'],'detail':candidate['receipts']['detail_sha256']}
+          assert p['published_role_count']==2
+          assert sorted(p['held_fields'])==sorted(candidate['hold_fields'])
+          assert 'LIST_DETAIL_EVENT_PERIOD_RANGE_CONFLICT_HOLD' in p['held_fields']
+          assert p['date_source']=='DETAIL_EXACT_SHOWTIME'
+          assert p['legacy_retirement_authorized'] is True
+          assert p['previous_feed_git_blob']=='7fc4fe32567a57fd504483eeb9a8b9e10b568ea4'
+          assert p['golden_baseline_modified'] is False and p['recurring_publisher_enabled'] is False
+          # Independent direct reader; record cannot invent any listed sessions.
+          native=Path('pinned-native/native')
+          receipt=json.loads((native/'tpac_2040_source_receipt.json').read_text())
+          assert receipt['source_native_get']==3 and receipt['exact_list_edges']==1
+          listing=BeautifulSoup((native/'tpac_2040_list.html').read_bytes(),'html.parser')
+          detail=BeautifulSoup((native/'tpac_2040_detail.html').read_bytes(),'html.parser')
+          links=[a for a in listing.select('a.card-program[href][title]') if a.get('href')=='/program/2040']
+          assert len(links)==1 and links[0]['title']==e['title']
+          h=detail.select('article.page-program__article > h1')
+          assert len(h)==1 and h[0].get_text(' ',strip=True)==e['title']
+          times=[n.get_text(' ',strip=True) for n in detail.select('.page-program__aside-place-showtimes ul > li > p')]
+          assert len(times)==8 and times[0]=='2026-11-20 (五) 19:30'
+          assert e['date']==times[0].replace(' (五)','')
+          assert receipt['list_sha256']==hashlib.sha256((native/'tpac_2040_list.html').read_bytes()).hexdigest()
+          assert receipt['detail_sha256']==hashlib.sha256((native/'tpac_2040_detail.html').read_bytes()).hexdigest()
+          status=json.loads(Path('docs/platform_status.json').read_text())
+          assert status['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert status['latestEngineering']['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          # One-time Owner exception does not enable recurring publication.
+          assert status['production']['writerEnabled']==False
+          assert status['production']['schedulerEnabled']==False
+          assert status['production']['notifierEnabled']==False
+          audit={'kind':'EVENTRADAR_OWNER_SINGLE_SHOT_QUALITY_PUBLISH_V1',
+                 'base':'f5db15b0894ae68d6da211a9530b472868b61a23',
+                 'previous_data_blob':'7fc4fe32567a57fd504483eeb9a8b9e10b568ea4',
+                 'new_feed_sha256':hashlib.sha256(Path('docs/data.json').read_bytes()).hexdigest(),
+                 'legacy_rows_retired':len(old),'new_published_rows':len(new),
+                 'native_source_run':42484103012,'independent_quality_run':42484914726,
+                 'accepted_event_roles':['EVENT_TITLE','EVENT_SHOW_START'],
+                 'withheld_fields':p['held_fields'],
+                 'owner_one_shot':True,'scheduler_enabled':False,'golden_modified':False,
+                 'source_native_reused_no_get':True,
+                 'decision':'PASS_ONE_SHOT_NONEMPTY_VERIFIED_SOURCE_ROLLBACK_READY'}
+          Path('evidence/one_shot_release_audit.json').write_text(json.dumps(audit,ensure_ascii=False,indent=2)+'\n')
+          print('PASS_OWNER_ONE_SHOT_NATIVE_1_EVENT_2_ROLES_8_SHOWS_3_FIELDS_HOLD')
+          print('PUBLISHED_OLD_TO_NEW=8436->1')
+          print('ROLLBACK_GIT_BLOB=7fc4fe32567a57fd504483eeb9a8b9e10b568ea4')
+          PY
+      - name: Immutable release evidence and no unrelated modification
+        run: |
+          set -euo pipefail
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          git diff --exit-code -- scraper.py docs/platform_status.json
+          echo PASS_OWNER_SINGLE_SHOT_SAFETY_NO_RECURRING_PUBLISHER_OR_GOLDEN
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-owner-one-shot-source-qualified-release-proof
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
