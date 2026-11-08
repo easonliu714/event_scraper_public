@@ -22,12 +22,18 @@ def receipt(kind, content, status=200, robots=True):
 def listing(kind, ident="1301", title="《晚風》展覽", hidden=False):
     start = "<template>" if hidden else "<main>"
     end = "</template>" if hidden else "</main>"
+    date = (
+        '<div class="card-event__text-datecate">'
+        '<p>2025-07-23 - 2026-12-30</p><p>展覽</p></div>'
+        if kind == "event" else
+        '<span class="card-program__text-date">2025-07-23 - 2026-12-30</span>'
+    )
+    link_title = "連結到" + title if kind == "event" else title
     return (start
-        + '<a class="card-' + kind + '" title="' + title
+        + '<a class="card-' + kind + '" title="' + link_title
         + '" href="/' + kind + '/' + ident + '">'
         + '<span class="card-' + kind + '__text-title">' + title + '</span>'
-        + '<span class="card-' + kind + '__text-date">2025-07-23 - 2026-12-30</span>'
-        + "</a>" + end).encode()
+        + date + "</a>" + end).encode()
 
 
 class TPACCatalogTopologyTests(unittest.TestCase):
@@ -48,6 +54,7 @@ class TPACCatalogTopologyTests(unittest.TestCase):
         self.assertEqual(event["identity"], "tpac:event:1301")
         self.assertEqual(event["detail_url"], "https://tpac.org.taipei/event/1301")
         self.assertEqual(event["list_date_label"], "2025-07-23 - 2026-12-30")
+        self.assertEqual(event["list_event_category"], "展覽")
         self.assertEqual(event["list_date_role"],
                          "ACTIVITY_LIST_PERIOD_NOT_SHOW_START")
         self.assertTrue(event["list_title_owned"])
