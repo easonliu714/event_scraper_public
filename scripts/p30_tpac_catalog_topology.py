@@ -32,6 +32,8 @@ MAX_TITLE = 180
 def _title(anchor, kind):
     """Require event-owned title evidence, never take whole card or date blob."""
     raw = anchor.get("title") or anchor.get("data-title")
+    if kind == "event" and isinstance(raw, str) and raw.startswith("連結到"):
+        raw = raw[len("連結到"):]
     labels = [
         node for selector in (
             ".card-" + kind + "__text-title",
@@ -83,17 +85,25 @@ def discover_catalog(kind, body, receipt, now):
         if number in records:
             raise ValueError("TPAC_CATALOG_DUPLICATE_ID_HOLD")
         title, title_owned = _title(anchor, kind)
-        # Canonical selector first; fallback for legacy markup only. Do not
-        # count the same node twice under equivalent selectors.
-        date_nodes = []
-        for selector in (".card-" + kind + "__text-date", ".card__text-date"):
-            matches = [n for n in anchor.select(selector) if _visible(n)]
-            if matches:
-                date_nodes = matches
-                break
-        if len(date_nodes) > 1:
-            raise ValueError("TPAC_CATALOG_DUPLICATE_PERIOD_NODES_HOLD")
-        period = _text(date_nodes[0]) if date_nodes else ""
+        # TPAC's real /event card has two separately owned <p> nodes
+        # under datecate: PERIOD and CATEGORY. Neither is SHOW_START.
+        category = ""
+        if kind == "event":
+            date_nodes = [n for n in anchor.select(".card-event__text-datecate > p")
+                          if _visible(n)]
+            if len(date_nodes) != 2:
+                raise ValueError("TPAC_EVENT_PERIOD_CATEGORY_SCOPE_HOLD")
+            period, category = _text(date_nodes[0]), _text(date_nodes[1])
+        else:
+            date_nodes = []
+            for selector in (".card-program__text-date", ".card__text-date"):
+                matches = [n for n in anchor.select(selector) if _visible(n)]
+                if matches:
+                    date_nodes = matches
+                    break
+            if len(date_nodes) > 1:
+                raise ValueError("TPAC_CATALOG_DUPLICATE_PERIOD_NODES_HOLD")
+            period = _text(date_nodes[0]) if date_nodes else ""
         records[number] = {
             "source": "TPAC",
             "kind": kind,
@@ -104,6 +114,7 @@ def discover_catalog(kind, body, receipt, now):
             "title_candidate": title,
             "list_title_owned": title_owned,
             "list_date_label": period,
+            "list_event_category": category,
             "list_date_role": catalog["role"],
             "decision": "REVIEW_DETAIL_ID_AND_FIELDS_REQUIRED",
             "accepted_show_start": None,
