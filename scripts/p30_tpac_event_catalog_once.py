@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib import robotparser
@@ -31,8 +32,8 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def bounded_fetch(url, *, opener=None):
-    allowed = {ROBOTS, ROOT, *(ROOT + "/" + sid for sid in SOURCE_IDS)}
+def bounded_fetch(url, *, opener=None, allowed_ids=SOURCE_IDS):
+    allowed = {ROBOTS, ROOT, *(ROOT + "/" + sid for sid in allowed_ids)}
     if url not in allowed:
         raise ValueError("TPAC_EVENT_UNAPPROVED_URL_HOLD")
     req = Request(url, headers={"User-Agent": AGENT, "Accept": "text/html,text/plain"})
@@ -130,12 +131,139 @@ def collect_once(out, *, fetch=bounded_fetch):
     return report
 
 
+
+
+def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
+                                 fetch=None, clock=None, pause=None):
+    """Bounded /event native cycle for a separately approved, isolated R4 attempt.
+
+    A fresh, exclusive output directory is a LOCAL one-shot claim, not a
+    cross-run GitHub registry. Neither successful capture nor a second replay
+    proves two independent source cycles or authorizes a formal Publisher.
+    No automatic workflow calls this function.
+    """
+    if source_policy_approved is not True:
+        raise ValueError("TPAC_R4_SOURCE_POLICY_AUTHORITY_HOLD")
+    if not isinstance(cycle_id, str) or not re.fullmatch(r"tpac-r4-[a-z0-9-]{8,72}", cycle_id):
+        raise ValueError("TPAC_R4_CYCLE_ID_HOLD")
+    out = Path(out)
+    if out.exists() or out.is_symlink():
+        raise ValueError("TPAC_R4_CYCLE_ALREADY_CLAIMED_HOLD")
+    out.mkdir(parents=True, exist_ok=False)
+    clock = clock or (lambda: datetime.now(timezone.utc))
+    pause = pause or time.sleep
+    selected = ()
+    report = {
+        "kind": "TPAC_R4_ISOLATED_BOUNDED_NATIVE_CYCLE_NOT_FORMAL",
+        "cycle_id": cycle_id, "catalog": "event",
+        "decision": "HOLD", "first_failure": "NOT_STARTED",
+        "attempted_urls": [], "successful_get": 0,
+        "source_receipts": {}, "selected_ids": [],
+        "robots_allowed": False, "robots_sha256": None,
+        "request_gap_seconds": None,
+        "local_one_shot_claim": True, "global_one_shot_registry_verified": False,
+        "independent_cycle_verified": False, "native_official_attestation": False,
+        "accepted_fields": 0, "published": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+    blobs = {}
+    manifest = None
+    try:
+        def observed():
+            value = clock()
+            if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("TPAC_R4_CLOCK_TIMEZONE_HOLD")
+            return value.astimezone(timezone.utc)
+
+        def take(url):
+            allowed = {ROBOTS, ROOT, *(ROOT + "/" + sid for sid in selected)}
+            if url not in allowed:
+                raise ValueError("TPAC_R4_UNAPPROVED_URL_HOLD")
+            report["attempted_urls"].append(url)
+            raw = (fetch(url) if fetch is not None
+                   else bounded_fetch(url, allowed_ids=selected))
+            if not isinstance(raw, bytes) or not 0 < len(raw) <= MAX_BODY:
+                raise ValueError("TPAC_R4_BODY_CAP_OR_TYPE_HOLD")
+            report["successful_get"] += 1
+            return raw
+
+        robots = take(ROBOTS)
+        report["robots_sha256"] = hashlib.sha256(robots).hexdigest()
+        if not re.search(rb"(?im)^\s*user-agent\s*:", robots):
+            raise ValueError("TPAC_R4_ROBOTS_POLICY_MISSING_HOLD")
+        parsed = robotparser.RobotFileParser()
+        parsed.parse(robots.decode("utf-8", "strict").splitlines())
+        if not parsed.can_fetch(AGENT, ROOT):
+            raise ValueError("TPAC_R4_ROBOTS_LIST_DISALLOW_HOLD")
+        crawl = parsed.crawl_delay(AGENT) or parsed.crawl_delay("*") or 0
+        if crawl > 60:
+            raise ValueError("TPAC_R4_ROBOTS_CRAWL_DELAY_OVER_BUDGET_HOLD")
+        gap = max(3, crawl)
+        report["request_gap_seconds"] = gap
+        pause(gap)
+        listing = take(ROOT)
+        blobs["event_list.html"] = listing
+        report["source_receipts"]["list"] = _receipt(ROOT, listing, observed())
+        found = _visible_detail_ids(listing)
+        report["listed_id_count"] = len(found)
+        if not 2 <= len(found) <= 150:
+            raise ValueError("TPAC_R4_LIST_DISTINCT_ID_COUNT_HOLD")
+        selected = tuple(found[:2])
+        report["selected_ids"] = list(selected)
+        if not all(parsed.can_fetch(AGENT, ROOT + "/" + sid) for sid in selected):
+            raise ValueError("TPAC_R4_ROBOTS_DETAIL_DISALLOW_HOLD")
+        details = {}
+        for sid in selected:
+            pause(gap)
+            url = ROOT + "/" + sid
+            raw = take(url)
+            blobs["event_" + sid + "_detail.html"] = raw
+            receipt = _receipt(url, raw, observed())
+            report["source_receipts"][sid] = receipt
+            details[sid] = {
+                "detail_file": str((out / ("event_" + sid + "_detail.html")).resolve()),
+                "receipt": receipt,
+            }
+        manifest = {
+            "catalog": "event", "cycle_id": cycle_id,
+            "list_file": str((out / "event_list.html").resolve()),
+            "list_receipt": report["source_receipts"]["list"],
+            "details": details, "now": observed().isoformat(),
+        }
+        report["decision"] = "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED"
+        report["first_failure"] = "INDEPENDENT_BODY_AND_RECEIPT_READBACK_PENDING"
+    except (HTTPError, URLError, OSError, UnicodeError, ValueError, TimeoutError) as exc:
+        report["first_failure"] = type(exc).__name__ + ":" + str(exc)
+    for name, raw in blobs.items():
+        (out / name).write_bytes(raw)
+    (out / "tpac_r4_cycle_receipt.json").write_text(
+        json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    # No consumable manifest on a partial/denied capture; keep forensic bytes.
+    if manifest is not None:
+        (out / "tpac_r4_refresh_manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return report
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--cycle-id", help="unique approved isolated TPAC-R4 cycle identifier")
+    parser.add_argument("--authorize-isolated-cycle", action="store_true",
+                        help="explicit operator confirmation of separately approved source policy")
     args = parser.parse_args()
+    if args.cycle_id is not None or args.authorize_isolated_cycle:
+        report = collect_bounded_review_cycle(
+            args.output, args.cycle_id,
+            source_policy_approved=args.authorize_isolated_cycle)
+        print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+        raise SystemExit(0 if report["decision"] == "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED" else 49)
     report = collect_once(args.output)
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-    # Site HOLD is recorded in the artifact; this workflow is diagnostic only.
+    # Legacy one-shot is already consumed; CI never reissues that GET.
     raise SystemExit(0)
