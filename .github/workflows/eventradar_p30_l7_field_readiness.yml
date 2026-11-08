@@ -2204,7 +2204,7 @@ jobs:
           set -euo pipefail
           # New distinct host. One robots read; LIST/DETAIL only if explicit ALLOW.
           # Never reuse the marker, retry a denial, or infer ticket Sessions.
-          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[b-tainex-native-once]'; then
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[b-tainex-regexfix-native-once]'; then
             echo 'B_TAINEX_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
             exit 0
           fi

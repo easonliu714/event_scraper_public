@@ -371,7 +371,7 @@ def inspect_pair(line, listing, detail):
     elif line == "B_TAINEX":
         # Strict title-owned DETAIL scope; range/floor are non-Session roles.
         if len(re.findall(
-                r"2026\\s+11\\.13\\s*\\(五\\)\\s*[-–]\\s*2026\\s+11\\.16\\s*\\(一\\)", local)) == 1:
+                r"2026\s+11\.13\s*\(五\)\s*[-–]\s*2026\s+11\.16\s*\(一\)", local)) == 1:
             result["field_roles"].append("VENUE_EXHIBITION_RANGE_REVIEW_NOT_SESSION")
         if local.count("一樓展場 四樓展場") == 1:
             result["field_roles"].append("VENUE_FLOORS_REVIEW")
