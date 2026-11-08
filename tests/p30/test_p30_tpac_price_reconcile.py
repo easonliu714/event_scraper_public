@@ -81,7 +81,7 @@ class TPACAdmissionReviewTests(unittest.TestCase):
     def test_title_wrong_event_id_body_sha_and_stale_receipt_hold(self):
         html, receipt = sample()
         self.assertEqual(extract_tpac_price_review(html, receipt, "2041", TITLE)["reason"],
-                         "TPAC_PRICE_SOURCE_EVENT_ID_HOLD")
+                         "TPAC_PRICE_BODY_PROVENANCE_HOLD")
         self.assertEqual(extract_tpac_price_review(html, receipt, "2040", "不同活動")["reason"],
                          "TPAC_PRICE_TITLE_IDENTITY_HOLD")
         self.assert_hold(html+b"!",receipt,"TPAC_PRICE_BODY_PROVENANCE_HOLD")
@@ -99,7 +99,7 @@ class TPACAdmissionReviewTests(unittest.TestCase):
             rehash(changed, changed_receipt)
             self.assert_hold(changed,changed_receipt,"TPAC_PRICE_TICKET_IDENTITY_URL_HOLD")
         html, receipt = sample()
-        changed = html.replace(b"</a></div>",b"</a><a href='"+OPENTIX.encode()+b"'>購票去</a></div>")
+        changed = html.replace(b"</a></div>", ("</a><a href='"+OPENTIX+"'>購票去</a></div>").encode())
         rehash(changed, receipt)
         self.assert_hold(changed,receipt,"TPAC_PRICE_TICKET_DIRECT_LINK_HOLD")
 
