@@ -103,7 +103,9 @@ def build_review_envelope(line, list_body, detail_body, observed_at_utc, adapter
         # Reuse the existing official exact-1680 parser; the postponement
         # remains a REVIEW role, never a verified performance Session/date.
         verdict = cloudgate.inspect_pair(listing, detail)
-        list_url, detail_url = cloudgate.LIST_URL, cloudgate.DETAIL_URL
+        list_url = cloudgate.LIST_URL
+        # Exact official LIST href owns REVIEW provenance, not a title alias.
+        detail_url = verdict.get("list_derived_detail_url", cloudgate.DETAIL_URL)
         title, source_id, event_id = (
             cloudgate.TITLE,
             "CLOUDGATE_THEATER_OFFICIAL_NOT_FORMAL_19_PLATFORM",
@@ -220,7 +222,9 @@ def _validate_snapshot(snapshot):
             "&sq=&xsmsid=" + venue.XSMSID),
             "NTPC_ARTCENTER_OFFICIAL_NOT_FORMAL_19_PLATFORM", venue.SID)
     elif adapter == "B_CLOUDGATE":
-        expected = (cloudgate.LIST_URL, cloudgate.DETAIL_URL,
+        if payload.get("detail_url") not in cloudgate.DETAIL_URLS:
+            raise ValueError("REVIEW_SNAPSHOT_SOURCE_IDENTITY_HOLD")
+        expected = (cloudgate.LIST_URL, payload["detail_url"],
                     "CLOUDGATE_THEATER_OFFICIAL_NOT_FORMAL_19_PLATFORM",
                     cloudgate.SOURCE_EVENT_ID)
     elif adapter == "B_TPAC_EVENT2072":

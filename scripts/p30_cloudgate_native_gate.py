@@ -16,6 +16,10 @@ from scripts.p30_dual_native_rotation import NoRedirect, read_public, norm, UA
 
 LIST_URL = "https://www.cloudgate.org.tw/cgt/latest-program"
 DETAIL_URL = "https://www.cloudgate.org.tw/cgt/theater-event/1680"
+# Accept the official /cg mirror ONLY when the first-party LIST has an
+# exact direct same-ID link. Never silently rewrite /cg to /cgt.
+DETAIL_MIRROR_URL = "https://www.cloudgate.org.tw/cg/theater-event/1680"
+DETAIL_URLS = frozenset((DETAIL_URL, DETAIL_MIRROR_URL))
 TITLE = "來雲門共學 2026系列講座"
 SOURCE_EVENT_ID = "1680"
 
@@ -28,7 +32,8 @@ def exact_detail(href):
         if (p.scheme == "https" and p.hostname == "www.cloudgate.org.tw"
                 and p.port is None and not p.username and not p.password
                 and not p.query and not p.fragment
-                and p.path == "/cgt/theater-event/1680"):
+                and p.path in ("/cgt/theater-event/1680",
+                               "/cg/theater-event/1680")):
             return u
     except ValueError:
         pass
@@ -112,10 +117,12 @@ def inspect_pair(list_html, detail_html):
     if not (re.search(r"原\s*11/14.*?延期至\s*12/19", local)
             and "12月19日" in local):
         return {"decision":"HOLD","first_failure":"CLOUDGATE_POSTPONEMENT_LOCAL_AUTHORITY_HOLD",
-                "same_id_review":1,"postponement_review":0}
+                "same_id_review":1,"postponement_review":0,
+                "list_derived_detail_url":edges[0][0]}
     return {"decision":"REVIEW_NON_SESSION_ONLY",
             "first_failure":"INDEPENDENT_FIELD_ADJUDICATION_PENDING",
             "same_id_review":1,"postponement_review":1,
+            "list_derived_detail_url":edges[0][0],
             "date_role":"POSTPONED_SHOW_DATE_REVIEW_NOT_TICKET_SESSION",
             "formal_accepted_fields":0}
 
@@ -154,6 +161,7 @@ def run_native_once():
         edges = [(exact_detail(h), t) for h,t in lp.anchors if exact_detail(h)]
         if len(edges)!=1 or not edges[0][1].startswith(norm(TITLE)):
             raise ValueError("CLOUDGATE_NATIVE_LIST_EXACT_EDGE_HOLD")
+        out["list_derived_detail_url"] = edges[0][0]
         out["native_get_attempted"] += 1
         detail, dr = read_public(opener,edges[0][0],"text/html")
         out["native_http200"] += 1

@@ -17,6 +17,26 @@ class CloudGateTests(unittest.TestCase):
         self.assertEqual(r["postponement_review"],1)
         self.assertEqual(r["formal_accepted_fields"],0)
 
+    def test_official_cg_mirror_requires_exact_direct_list_edge(self):
+        # The /cgt index can link to a same-ID /cg first-party mirror.
+        # Caller HTML does not prove native GET or source freshness.
+        mirror_list = self.list_html.replace(
+            "/cgt/theater-event/1680", "/cg/theater-event/1680")
+        result = m.inspect_pair(mirror_list, self.detail_html)
+        self.assertEqual((result["same_id_review"],
+                          result["list_derived_detail_url"]),
+                         (1, m.DETAIL_MIRROR_URL))
+        self.assertEqual(m.exact_detail("/cg/theater-event/1680"),
+                         m.DETAIL_MIRROR_URL)
+        for bad in ("/cg/theater-event/1681",
+                    "/cg/theater-event/1680?from=search",
+                    "https://evil.example/cg/theater-event/1680"):
+            self.assertIsNone(m.exact_detail(bad))
+        # Ambiguous dual paths must not be merged by similar titles.
+        self.assertEqual(m.inspect_pair(
+            self.list_html + mirror_list, self.detail_html)[
+                "first_failure"], "CLOUDGATE_LIST_EXACT_ID_TITLE_HOLD")
+
     def test_foreign_id_query_checkout_hold(self):
         for bad in ("/cgt/theater-event/1681",
                     "/cgt/theater-event/1680?session=1",

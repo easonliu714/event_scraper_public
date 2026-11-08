@@ -80,6 +80,49 @@ class ReviewBridgeTests(unittest.TestCase):
                          ["EVENT_LOCAL_TITLE_REVIEW"])
         self.assertEqual(held["candidate"]["date"], "未確認")
 
+    def test_cloudgate_cg_mirror_source_bound_review_snapshot(self):
+        # Exact first-party LIST href owns the URL, not a title alias.
+        # Caller HTML remains REVIEW, never native/accepted.
+        listing = ('<main><article><a href="/cg/theater-event/1680">'
+                   + cloudgate.TITLE +
+                   '2026.10.17 - 12.19</a></article></main>').encode()
+        detail = ('<main><article><h1>' + cloudgate.TITLE +
+                  '</h1><p>12月19日(六) 13:30</p>'
+                  '<p>原11/14兩場講座延期至12/19</p>'
+                  '</article></main>').encode()
+        env = bridge.build_review_envelope(
+            "B", listing, detail, STAMP, adapter_key="B_CLOUDGATE")
+        self.assertEqual(env["detail_url"], cloudgate.DETAIL_MIRROR_URL)
+        self.assertEqual(env["candidate"]["url"], cloudgate.DETAIL_MIRROR_URL)
+        self.assertEqual(env["role_receipts"][0]["source_url"],
+                         cloudgate.DETAIL_MIRROR_URL)
+        self.assertEqual((env["native_get"], env["formal_accepted_fields"],
+                          env["golden"], env["published"]), (0, 0, 0, 0))
+        manifest = {**{key: env[key] for key in (
+            "line", "adapter_key", "source_id", "source_event_id",
+            "list_url", "detail_url", "observed_at_utc",
+            "source_attestation")}, **env["body_digests"]}
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            result = bridge.replay_manifest_to_isolated_lkg(
+                manifest, listing, detail, root)
+            target = (root / "_isolated_review/B/B_CLOUDGATE/"
+                      "review_snapshot.json")
+            snapshot = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(bridge._validate_snapshot(snapshot),
+                             result["snapshot_sha256"])
+            self.assertEqual(snapshot["payload"]["detail_url"],
+                             cloudgate.DETAIL_MIRROR_URL)
+            self.assertFalse((root / "docs").exists())
+            payload = json.loads(json.dumps(snapshot["payload"]))
+            payload["detail_url"] = "https://evil.example/cg/theater-event/1680"
+            forged = {"payload": payload,
+                      "sha256": hashlib.sha256(
+                          bridge._canonical(payload)).hexdigest()}
+            with self.assertRaisesRegex(
+                    ValueError, "REVIEW_SNAPSHOT_SOURCE_IDENTITY_HOLD"):
+                bridge._validate_snapshot(forged)
+
     def test_opentix_exact_id_review_to_isolated_cas_lkg(self):
         src = opentix.SOURCES["A"]
         listing = ('<main><article><a href="' + src["detail"] + '">' +
