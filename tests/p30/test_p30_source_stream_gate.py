@@ -835,5 +835,101 @@ class TestPinnedOpentixReceipt(unittest.TestCase):
 
 
 
+class TestPinnedReceiptWallClockReassessment(unittest.TestCase):
+    """Freshness must be rechecked at use-time, never inherited from sealing."""
+
+    def fixture(self, line):
+        from scripts.p30_ab_opentix_ticc_native_once import SOURCES as opentix
+        from scripts.p30_ab_kktix_fuzhong_native import SOURCES as ticket
+        cfg = opentix["A"] if line == "A" else ticket["B_ZEPP_TAKASE"]
+        a = line == "A"
+        detail_sha = ("bea4041161561e44879fc6231028ad8d05c0ee35ff4d01b618edb111b7dcab14"
+                      if a else "d78ae5cedcd1089619b28c55b4fadff1ac1b66946de79551c52fa7bc6d93a4f6")
+        list_sha = ("9af2a826c1053383dda50008cf94438268ed6dcf33710bbda989daad98094deb"
+                    if a else "890893c79a796f222f52d4ad628edae2da273be73a7e033ef4ea95d992ebd657")
+        observed = "2026-11-07T15:01:50+00:00"
+        role = {"role": "SOURCE_EXACT_TITLE_REVIEW", "source_id": cfg["source_id"],
+                "source_url": cfg["detail"], "body_sha256": detail_sha,
+                "observed_at_utc": observed, "formal_accepted": False}
+        role["source_event_id" if a else "event_id"] = cfg["event_id"]
+        snapshot = {
+            "kind": ("P30_A_OPENTIX_2070_PINNED_NATIVE_RECEIPT_REVIEW_V1" if a
+                     else "P30_B_ZEPP_TAKASE_SEALED_RECEIPT_REVIEW_V1"),
+            "artifact_sha256": (m.OPENTIX_2070_ARTIFACT_SHA256 if a
+                                else m.ZEPP_TAKASE_ARTIFACT_SHA256),
+            "receipt_sha256": (m.OPENTIX_2070_RECEIPT_SHA256 if a
+                               else m.ZEPP_TAKASE_RECEIPT_SHA256),
+            "source_id": cfg["source_id"], "source_event_id": cfg["event_id"],
+            "source_title_review": cfg["title"],
+            "observed_at_utc": observed, "receipt_only_identity_lkg": 1,
+            "body_review_lkg": 0, "native_get_this_call": 0,
+            "raw_html_saved": False, "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "formal_accepted_fields": 0, "golden_accepted_events": 0,
+            "published_events": 0,
+            "source_receipts": [
+                {"url": cfg["list"], "body_sha256": list_sha,
+                 "http_status": 200, "content_type": "text/html",
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY",
+                 "observed_at_utc": "2026-11-07T15:01:49+00:00"},
+                {"url": cfg["detail"], "body_sha256": detail_sha,
+                 "http_status": 200, "content_type": "text/html",
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY",
+                 "observed_at_utc": observed},
+            ],
+        }
+        snapshot["receipt_derived_role" if a else "field_receipts"] = (
+            role if a else [role])
+        kind = ("P30_A_OPENTIX_2070_DURABLE_RECEIPT_LKG_V1" if a
+                else "P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1")
+        digest = hashlib.sha256(json.dumps(
+            snapshot, sort_keys=True, ensure_ascii=False,
+            separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        return {"kind": kind, "sha256": digest, "snapshot": snapshot}
+
+    def test_both_lines_fresh_then_stale_without_mutating_receipt(self):
+        from datetime import timedelta
+        for line in ("A", "B"):
+            sealed = self.fixture(line)
+            original = json.dumps(sealed, sort_keys=True)
+            stamp = datetime.fromisoformat(sealed["snapshot"]["observed_at_utc"])
+            fresh = m.reassess_pinned_receipt_lkg(
+                sealed, line, now_utc=stamp + timedelta(hours=23))
+            stale = m.reassess_pinned_receipt_lkg(
+                sealed, line, now_utc=stamp + timedelta(hours=25))
+            self.assertTrue(fresh["fresh_within_24h"])
+            self.assertFalse(stale["fresh_within_24h"])
+            self.assertEqual(stale["first_failure"], "SOURCE_STALE_OR_FUTURE_HOLD")
+            self.assertEqual((stale["native_get_this_call"], stale["native_body_lkg"],
+                              stale["formal_accepted_fields"], stale["golden"],
+                              stale["published"]), (0, 0, 0, 0, 0))
+            self.assertEqual(json.dumps(sealed, sort_keys=True), original)
+
+    def test_pinned_source_digest_role_and_clock_fail_closed(self):
+        from datetime import timedelta
+        for line in ("A", "B"):
+            for key, value in (("source_event_id", "wrong"),
+                               ("release_state", "PUBLISHED")):
+                sealed = self.fixture(line)
+                sealed["snapshot"][key] = value
+                with self.assertRaisesRegex(ValueError, "RECEIPT_REASSESS_"):
+                    m.reassess_pinned_receipt_lkg(sealed, line)
+            sealed = self.fixture(line)
+            sealed["snapshot"]["source_receipts"][1]["body_sha256"] = "0" * 64
+            sealed["sha256"] = hashlib.sha256(json.dumps(
+                sealed["snapshot"], sort_keys=True, ensure_ascii=False,
+                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+            with self.assertRaisesRegex(ValueError, "DETAIL_PROVENANCE_HOLD"):
+                m.reassess_pinned_receipt_lkg(sealed, line)
+            sealed = self.fixture(line)
+            stamp = datetime.fromisoformat(sealed["snapshot"]["observed_at_utc"])
+            future = m.reassess_pinned_receipt_lkg(
+                sealed, line, now_utc=stamp - timedelta(seconds=1))
+            self.assertFalse(future["fresh_within_24h"])
+            self.assertEqual(future["formal_accepted_fields"], 0)
+            with self.assertRaisesRegex(ValueError, "NOW_UTC_HOLD"):
+                m.reassess_pinned_receipt_lkg(sealed, line,
+                    now_utc=datetime(2026, 11, 8))
+
+
 if __name__ == "__main__":
     unittest.main()

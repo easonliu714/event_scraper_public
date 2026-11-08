@@ -1702,6 +1702,131 @@ def persist_opentix_2070_receipt_lkg(archive_bytes, destination, repo_root,
 
 
 
+def reassess_pinned_receipt_lkg(envelope, line, now_utc=None):
+    """Read-only wall-clock reassessment of the two pinned receipt-only LKGs.
+
+    Sealed-at-observation freshness is NOT current freshness. The original
+    native bodies are unavailable; neither a matching digest nor a fresh
+    receipt upgrades a field, native Body LKG, Golden, or publication.
+    """
+    from scripts.p30_ab_opentix_ticc_native_once import SOURCES as opentix_sources
+    from scripts.p30_ab_kktix_fuzhong_native import SOURCES as ticket_sources
+    if line not in ("A", "B"):
+        raise ValueError("RECEIPT_REASSESS_LINE_HOLD")
+    cfg = (opentix_sources["A"] if line == "A"
+           else ticket_sources["B_ZEPP_TAKASE"])
+    pinned = {
+        "A": ("P30_A_OPENTIX_2070_DURABLE_RECEIPT_LKG_V1",
+              "P30_A_OPENTIX_2070_PINNED_NATIVE_RECEIPT_REVIEW_V1",
+              OPENTIX_2070_ARTIFACT_SHA256, OPENTIX_2070_RECEIPT_SHA256,
+              "bea4041161561e44879fc6231028ad8d05c0ee35ff4d01b618edb111b7dcab14",
+              "9af2a826c1053383dda50008cf94438268ed6dcf33710bbda989daad98094deb"),
+        "B": ("P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1",
+              "P30_B_ZEPP_TAKASE_SEALED_RECEIPT_REVIEW_V1",
+              ZEPP_TAKASE_ARTIFACT_SHA256, ZEPP_TAKASE_RECEIPT_SHA256,
+              "d78ae5cedcd1089619b28c55b4fadff1ac1b66946de79551c52fa7bc6d93a4f6",
+              "890893c79a796f222f52d4ad628edae2da273be73a7e033ef4ea95d992ebd657"),
+    }[line]
+    if not isinstance(envelope, dict) or set(envelope) != {"kind", "sha256", "snapshot"}:
+        raise ValueError("RECEIPT_REASSESS_ENVELOPE_HOLD")
+    snapshot = envelope["snapshot"]
+    if not isinstance(snapshot, dict):
+        raise ValueError("RECEIPT_REASSESS_ENVELOPE_HOLD")
+    raw = json.dumps(snapshot, sort_keys=True, ensure_ascii=False,
+                     separators=(",", ":"), allow_nan=False).encode("utf-8")
+    if (envelope["kind"] != pinned[0] or len(raw) > 32768
+            or envelope["sha256"] != hashlib.sha256(raw).hexdigest()
+            or snapshot.get("kind") != pinned[1]
+            or snapshot.get("artifact_sha256") != pinned[2]
+            or snapshot.get("receipt_sha256") != pinned[3]
+            or snapshot.get("source_id") != cfg["source_id"]
+            or snapshot.get("source_event_id") != cfg["event_id"]
+            or snapshot.get("source_title_review") != cfg["title"]
+            or snapshot.get("receipt_only_identity_lkg") != 1
+            or snapshot.get("body_review_lkg") != 0
+            or snapshot.get("native_get_this_call") != 0
+            or snapshot.get("raw_html_saved") is not False
+            or snapshot.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+            or any(type(snapshot.get(k)) is not int or snapshot[k] != 0
+                   for k in ("formal_accepted_fields", "golden_accepted_events",
+                             "published_events"))):
+        raise ValueError("RECEIPT_REASSESS_PINNED_AUTHORITY_HOLD")
+    sources = snapshot.get("source_receipts")
+    if not isinstance(sources, list) or len(sources) != 2:
+        raise ValueError("RECEIPT_REASSESS_SOURCE_PAIR_HOLD")
+    listing, detail = sources
+    if (not isinstance(listing, dict) or listing.get("url") != cfg["list"]
+            or listing.get("body_sha256") != pinned[5]
+            or listing.get("http_status") != 200
+            or listing.get("content_type") != "text/html"
+            or listing.get("transport") != "NATIVE_NO_REDIRECT_NO_RETRY"):
+        raise ValueError("RECEIPT_REASSESS_LIST_PROVENANCE_HOLD")
+    if (not isinstance(detail, dict) or detail.get("url") != cfg["detail"]
+            or detail.get("body_sha256") != pinned[4]
+            or detail.get("http_status") != 200
+            or detail.get("content_type") != "text/html"
+            or detail.get("transport") != "NATIVE_NO_REDIRECT_NO_RETRY"
+            or detail.get("observed_at_utc") != snapshot.get("observed_at_utc")):
+        raise ValueError("RECEIPT_REASSESS_DETAIL_PROVENANCE_HOLD")
+    try:
+        list_time = datetime.fromisoformat(listing["observed_at_utc"].replace("Z", "+00:00"))
+        detail_time = datetime.fromisoformat(detail["observed_at_utc"].replace("Z", "+00:00"))
+    except (KeyError, ValueError, TypeError, AttributeError) as exc:
+        raise ValueError("RECEIPT_REASSESS_SOURCE_CLOCK_HOLD") from exc
+    if (list_time.utcoffset() is None or detail_time.utcoffset() is None
+            or list_time.utcoffset().total_seconds() != 0
+            or detail_time.utcoffset().total_seconds() != 0
+            or not 0 <= (detail_time - list_time).total_seconds() <= 120):
+        raise ValueError("RECEIPT_REASSESS_SOURCE_CLOCK_HOLD")
+    roles = ([snapshot.get("receipt_derived_role")] if line == "A"
+             else snapshot.get("field_receipts"))
+    if not isinstance(roles, list) or len(roles) != 1 or not isinstance(roles[0], dict):
+        raise ValueError("RECEIPT_REASSESS_ROLE_HOLD")
+    role = roles[0]
+    if (role.get("role") != "SOURCE_EXACT_TITLE_REVIEW"
+            or role.get("source_id") != cfg["source_id"]
+            or role.get("source_event_id", role.get("event_id")) != cfg["event_id"]
+            or role.get("source_url") != cfg["detail"]
+            or role.get("body_sha256") != pinned[4]
+            or role.get("observed_at_utc") != detail["observed_at_utc"]
+            or role.get("formal_accepted") is not False):
+        raise ValueError("RECEIPT_REASSESS_ROLE_BINDING_HOLD")
+    now = now_utc if now_utc is not None else datetime.now(timezone.utc)
+    if (not isinstance(now, datetime) or now.utcoffset() is None
+            or now.utcoffset().total_seconds() != 0):
+        raise ValueError("RECEIPT_REASSESS_NOW_UTC_HOLD")
+    matrix = adjudicate_sealed_field_roles(
+        source_id=cfg["source_id"], source_event_id=cfg["event_id"],
+        detail_url=cfg["detail"], detail_body_sha256=pinned[4],
+        observed_at_utc=detail["observed_at_utc"],
+        transport=detail["transport"], role_receipts=[{
+            "role": "SOURCE_EXACT_TITLE_REVIEW", "value": cfg["title"],
+            "source_id": cfg["source_id"], "source_event_id": cfg["event_id"],
+            "source_url": cfg["detail"], "body_sha256": pinned[4],
+            "observed_at_utc": detail["observed_at_utc"],
+            "formal_accepted": False,
+        }], now_utc=now)
+    return {
+        "kind": "P30_PINNED_RECEIPT_WALL_CLOCK_REASSESSMENT_V1",
+        "line": line, "source_id": cfg["source_id"],
+        "source_event_id": cfg["event_id"],
+        "source_url": cfg["detail"],
+        "source_body_sha256": pinned[4],
+        "observed_at_utc": detail["observed_at_utc"],
+        "source_age_seconds": matrix["source_age_seconds"],
+        "fresh_within_24h": matrix["fresh_within_24h"],
+        "decision": "REVIEW_RECEIPT_ONLY_FRESHNESS_AUDITED",
+        "first_failure": ("INDEPENDENT_FIELD_AUTHORITY_MISSING"
+                          if matrix["fresh_within_24h"] else
+                          "SOURCE_STALE_OR_FUTURE_HOLD"),
+        "native_get_this_call": 0, "native_body_lkg": 0,
+        "receipt_only_identity_lkg": 1,
+        "formal_accepted_fields": 0, "golden": 0, "published": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
+
+
 def main():
     parser = argparse.ArgumentParser(description="Offline source replay only; never HTTP")
     parser.add_argument("--tpac-html", type=Path)
@@ -1713,10 +1838,20 @@ def main():
     parser.add_argument("--ab-line", choices=("A", "B"))
     parser.add_argument("--ab-isolated-output", type=Path)
     parser.add_argument("--ab-repo-root", type=Path)
+    parser.add_argument("--reassess-receipt-lkg", type=Path)
+    parser.add_argument("--receipt-line", choices=("A", "B"))
     args = parser.parse_args()
-    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once, args.zepp_native_once, args.opentix_native_once, bool(args.ab_replay_manifest))) != 1:
+    if sum((bool(args.tpac_html), bool(args.songshan_evidence), args.tpac_native_once, args.zepp_native_once, args.opentix_native_once, bool(args.ab_replay_manifest), bool(args.reassess_receipt_lkg))) != 1:
         parser.error("supply exactly one input; native is a CI one-shot only")
-    if args.ab_replay_manifest:
+    if args.reassess_receipt_lkg:
+        if not args.receipt_line:
+            parser.error("--receipt-line A/B required for read-only receipt reassessment")
+        path = args.reassess_receipt_lkg
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 32768:
+            parser.error("RECEIPT_REASSESS_INPUT_PATH_OR_SIZE_HOLD")
+        result = reassess_pinned_receipt_lkg(
+            json.loads(path.read_text(encoding="utf-8")), args.receipt_line)
+    elif args.ab_replay_manifest:
         if not all((args.ab_line, args.ab_isolated_output, args.ab_repo_root)):
             parser.error("A/B replay requires --ab-line, --ab-isolated-output and --ab-repo-root")
         result = replay_preacquired_ab_to_review_lkg(
