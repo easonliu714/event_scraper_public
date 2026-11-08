@@ -8614,3 +8614,24 @@ Draft [#243](https://github.com/easonliu714/event_scraper_public/pull/243) final
 
 
 **2026-11-09 05:55 Asia/Taipei independent original artifact readback correction:** Downloaded exact GitHub Artifact #13635682197 original ZIP to isolated audit workspace; 10,997 bytes; original ZIP SHA256 `d10e91790c42d421e771d09b9b780357050163e40947a50dff7f83f625416148` equals GitHub artifact digest; ZIP CRC **14/14 PASS**, SHA256SUMS **13/13 PASS** (normalizing archive `./` entry prefix). This supersedes the provisional 'independent ZIP CRC not checked' statement in this same checkpoint, without rewriting prior history. No new native GET or formal publication.
+
+
+### 2026-11-09 06:55 Asia/Taipei — TPAC-R4 cross-host atomic GitHub claim preflight — source claim topology and fail-closed authority
+
+```text
+Owner-approved source policy + bounded cycle budget (STILL HOLD)
+  -> dedicated GitHub token + expected exact main SHA
+  -> GET refs/heads/main (HEAD equality)
+  -> POST unique refs/tags/eventradar-tpac-r4-claims/<cycle_id> (201 only)
+  -> GET same ref and SHA (readback)
+  -> local registry <cycle_id>.claim.json O_CREAT|O_EXCL + fsync
+  -> exclusive isolated output directory
+  -> robots -> LIST -> <=2 same-source exact DETAIL -> original receipts
+  -> offline role REVIEW + CAS LKG, NO formal Publisher
+  -> GitHub tag may be deleted: immutable global registry authority HOLD
+```
+
+- **Source authority:** [Engineering Draft #243](https://github.com/easonliu714/event_scraper_public/pull/243) exact HEAD `769b96d251644b00b9a1b70812c3fc8dc8a78405` (prior `978df2e524d751b41df39d97f2a1ace23237463e`), source blob `fd5d6894a6df0b182629109eb09a721b9ab47e8f`, test blob `796b90c74f75f5b354143870f1e3b4e36ae466ad`. Only `scripts/p30_tpac_event_catalog_once.py` and `tests/p30/test_p30_tpac_event_catalog_once.py` changed. [Exact-head CI #42532642385](https://github.com/easonliu714/event_scraper_public/actions/runs/42532642385) **SUCCESS** job 128890011947, **56/56** offline Python tests (19+7+15+5+10), [Artifact #13637264030](https://github.com/easonliu714/event_scraper_public/actions/runs/42532642385/artifacts/13637264030) GitHub digest SHA256 `5525b7314d971c800fe5db0721eb3ae3d14bfce0be46135fdc9217426767af92`, 10,999 bytes; original ZIP CRC independent readback **NOT YET VERIFIED**. Two intermediate exact-head CI runs #42532589221 and #42532606829 FAILED (fixture double-escape, then Python comment syntax), corrected in source/test-only commits; final success does not erase those historical failures.
+- **Guard delta:** `GitHubAtomicClaimRegistry.claim()` requires a dedicated nonempty token and exact expected main SHA; independently GET-checks current main, atomically POST-creates unique `refs/tags/eventradar-tpac-r4-claims/<cycle_id>` (201 required, 422 duplicate/rejected => HOLD), and GET-readbacks the exact ref/object SHA. `collect_bounded_review_cycle()` now **requires this concrete cross-host claim before local O_EXCL/fsync tombstone and before any source GET**; absent token/registry, main drift, duplicate tag, redirects, malformed JSON, or readback mismatch fail closed. CLI adds opt-in `--global-github-ref-claim --global-expected-main-sha` with `EVENTRADAR_SOURCE_CLAIM_GITHUB_TOKEN`; no workflow invokes it. A Git tag is admin-deletable: `global_immutable_registry_verified=false` and `global_one_shot_registry_verified=false`; this is an atomic claim primitive, **not** Owner policy approval or immutable retention proof.
+- **Product/Gate boundaries:** Fresh source main `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`, formal `docs/data.json` blob `342eb7c101115b05dbc6ff90de7bd97d5bd63d59` (1 existing TPAC #2040, price blank), status blob `720cac528faacc9560a5ab41ce725bf8cc183166` (stale status metadata HOLD) unchanged. New native GET/official IDs 0; genuine independent R4 cycles **0/2**, formal accepted FIELD/Golden/published delta **0**. TPAC R3 CAS/LKG and #244 North Android USER_ATTESTED_PASS retained; #245 UI-only price Draft unmerged; NT$1,500 general minimum REVIEW only, OPENTIX 10 vs TPAC 8 sessions `SESSION_SET_CONFLICT_HOLD`. `HARD_HOLD_NO_PUBLICATION` unchanged; no source/Pages merge, new Writer, recurring Publisher or Scheduler.
+- **NEXT / explicit authority gap:** Owner-approved robots/frequency/cycle budget and durable cross-run ref-retention governance (tags can be deleted) still missing. No live TPAC or OPENTIX GET authorized by this code change. After independent policy/claim acceptance, perform **two separately authorized real TPAC LIST→DETAIL cycles** with receipts and isolated CAS LKG diff/rollback; independently inspect OPENTIX robots and same-event native body/tier/session evidence without 403/429 bypass or reused one-shot markers.
