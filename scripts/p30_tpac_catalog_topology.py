@@ -83,13 +83,17 @@ def discover_catalog(kind, body, receipt, now):
         if number in records:
             raise ValueError("TPAC_CATALOG_DUPLICATE_ID_HOLD")
         title, title_owned = _title(anchor, kind)
-        date_nodes = [
-            n for sel in (".card-" + kind + "__text-date",
-                          ".card-program__text-date",
-                          ".card-event__text-date")
-            for n in anchor.select(sel) if _visible(n)
-        ]
-        period = _text(date_nodes[0]) if len(date_nodes) == 1 else ""
+        # Canonical selector first; fallback for legacy markup only. Do not
+        # count the same node twice under equivalent selectors.
+        date_nodes = []
+        for selector in (".card-" + kind + "__text-date", ".card__text-date"):
+            matches = [n for n in anchor.select(selector) if _visible(n)]
+            if matches:
+                date_nodes = matches
+                break
+        if len(date_nodes) > 1:
+            raise ValueError("TPAC_CATALOG_DUPLICATE_PERIOD_NODES_HOLD")
+        period = _text(date_nodes[0]) if date_nodes else ""
         records[number] = {
             "source": "TPAC",
             "kind": kind,
