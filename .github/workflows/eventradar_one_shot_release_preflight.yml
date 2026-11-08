@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - .github/workflows/eventradar_one_shot_release_preflight.yml
+      - scripts/p30_quality_snapshot_publisher.py
+      - scripts/p30_tpac_publisher_source_once.py
+      - tests/p30/test_p30_quality_snapshot_publisher.py
+      - tests/p30/test_p30_tpac_publisher_source_once.py
 permissions:
   contents: read
 jobs:
@@ -27,15 +31,27 @@ jobs:
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_one_shot_release_preflight.yml' 'scripts/p30_quality_snapshot_publisher.py' 'tests/p30/test_p30_quality_snapshot_publisher.py' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_one_shot_release_preflight.yml' 'scripts/p30_quality_snapshot_publisher.py' 'scripts/p30_tpac_publisher_source_once.py' 'tests/p30/test_p30_quality_snapshot_publisher.py' 'tests/p30/test_p30_tpac_publisher_source_once.py' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_SCOPE_DRIFT; exit 1; }
           echo PASS_ONE_SHOT_PREFLIGHT_READONLY_EXACT_HEAD
       - name: Validate fixed quality snapshot publisher negative and regression gates
         run: |
           set -euo pipefail
           python -m unittest discover -s tests/p30 -p 'test_p30_quality_snapshot_publisher.py' -v
-          python -m py_compile scripts/p30_quality_snapshot_publisher.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_publisher_source_once.py' -v
+          python -m py_compile scripts/p30_quality_snapshot_publisher.py scripts/p30_tpac_publisher_source_once.py
           echo PASS_QUALITY_PUBLISHER_STRICT_SOURCE_ROLE_AND_ZERO_FAIL_CLOSED
+      - name: One-time bounded first-party TPAC 2040 raw source acquisition for independent replay (NOT PUBLISH)
+        env:
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/native
+          if [ "$RUN_ATTEMPT" != "1" ] || git log --format=%s HEAD^ | grep -F '[tpac2040-pub-once]'; then
+            echo 'TPAC_2040_NATIVE_ALREADY_CONSUMED_SKIP_NO_REPEAT'
+          else
+            python -m scripts.p30_tpac_publisher_source_once --out evidence/native
+          fi
       - name: Execute one-shot release qualification against actual formal JSON
         run: |
           set -euo pipefail
@@ -144,7 +160,7 @@ jobs:
       - name: Verify artifact checksum and zero formal feed mutation
         run: |
           set -euo pipefail
-          (cd evidence && sha256sum one_shot_publication_attempt.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd evidence && find . -type f ! -name SHA256SUMS.txt -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           git diff --exit-code -- docs/data.json docs/platform_status.json
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           echo PASS_FAIL_CLOSED_PUBLICATION_ATTEMPT_NO_DATA_WRITE
