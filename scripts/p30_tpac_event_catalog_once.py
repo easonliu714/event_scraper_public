@@ -247,7 +247,7 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
     if claim.exists() or claim.is_symlink():
         raise ValueError("TPAC_R4_DURABLE_CYCLE_REUSE_HOLD")
     # Never trust a caller-provided boolean or dict as a global claim. Only
-    this concrete client can create and independently read back an atomic ref.
+    # This concrete client can create and independently read back an atomic ref.
     if type(global_registry) is not GitHubAtomicClaimRegistry:
         raise ValueError("TPAC_R4_GLOBAL_ATOMIC_REGISTRY_REQUIRED_HOLD")
     global_claim = global_registry.claim(cycle_id)
