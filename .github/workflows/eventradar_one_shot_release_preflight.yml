@@ -27,7 +27,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
           test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\\n' '.github/workflows/eventradar_one_shot_release_preflight.yml' 'scripts/p30_quality_snapshot_publisher.py' 'tests/p30/test_p30_quality_snapshot_publisher.py' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_one_shot_release_preflight.yml' 'scripts/p30_quality_snapshot_publisher.py' 'tests/p30/test_p30_quality_snapshot_publisher.py' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_SCOPE_DRIFT; exit 1; }
           echo PASS_ONE_SHOT_PREFLIGHT_READONLY_EXACT_HEAD
       - name: Validate fixed quality snapshot publisher negative and regression gates
