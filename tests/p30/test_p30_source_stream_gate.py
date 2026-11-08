@@ -1,0 +1,935 @@
+"""Offline integration of the A full-stream and B prior-receipt gates."""
+import hashlib
+import io
+import json
+import unittest
+from datetime import datetime, timezone
+from scripts import p30_source_stream_gate as m
+
+
+class TestSourceStreamGate(unittest.TestCase):
+    def setUp(self):
+        self.clock = datetime.now(timezone.utc).isoformat()
+        self.html = ('<main><section><h1>' + m.TITLE + '</h1>'
+                     '<a href="' + m.TICKET_URL + '">購票去</a>'
+                     '<p>臺北表演藝術中心 藍盒子</p></section></main>')
+        self.large = ('<script>' + 'x' * 550000 + '</script>' + self.html).encode()
+
+    def replay(self, raw, **overrides):
+        params = dict(status=200, content_type="text/html; charset=utf-8",
+                      final_url=m.TPAC_URL, observed_at_utc=self.clock)
+        params.update(overrides)
+        return m.inspect_tpac_complete_stream(io.BytesIO(raw), **params)
+
+    def test_large_complete_body_has_real_full_hash_not_prefix(self):
+        result = self.replay(self.large)
+        self.assertEqual(result["decision"], "REVIEW_DIRECT_EDGE_ONLY", result)
+        self.assertEqual(result["body_bytes"], len(self.large))
+        self.assertEqual(result["body_sha256"], hashlib.sha256(self.large).hexdigest())
+        self.assertFalse(result["body_truncated"])
+        self.assertEqual(result["native_get_this_call"], 0)
+        self.assertEqual(result["formal_accepted_fields"], 0)
+
+    def test_bound_rejects_without_full_hash(self):
+        result = self.replay(self.large, max_bytes=524289)
+        self.assertEqual(result["decision"], "HOLD")
+        self.assertEqual(result["first_failure"],
+                         "TPAC_STREAM_COMPLETE_BODY_EXCEEDS_POLICY_HOLD")
+        self.assertTrue(result["body_truncated"])
+        self.assertNotIn("body_sha256", result)
+        self.assertIn("prefix_sha256", result)
+
+    def test_wrong_title_link_room_and_unscoped_header_hold(self):
+        cases = [
+            self.html.replace(m.TITLE, "其他活動"),
+            self.html.replace(m.TICKET_URL, "https://www.opentix.life/event/0"),
+            self.html.replace("藍盒子", "其他場館"),
+            self.html.replace("<p>臺北表演藝術中心 藍盒子</p>",
+                              "</section><section><p>臺北表演藝術中心 藍盒子</p>"),
+            '<header><h1>' + m.TITLE + '</h1><a href="' + m.TICKET_URL +
+            '">票</a></header><main><p>藍盒子</p></main>',
+        ]
+        for html in cases:
+            with self.subTest(html=html[:30]):
+                self.assertEqual(self.replay(html.encode())["decision"], "HOLD")
+
+    def test_same_article_sibling_sections_are_event_local_review_only(self):
+        # Actual source-root-cause hypothesis: title, ticket and room may be
+        # separate child sections of one event article, not separate events.
+        html = ('<main><article><section><h1>' + m.TITLE + '</h1></section>'
+                '<section><a href="' + m.TICKET_URL + '">官方售票</a></section>'
+                '<section><p>臺北表演藝術中心 藍盒子</p></section>'
+                '</article></main>')
+        result = self.replay(html.encode())
+        self.assertEqual(result["decision"], "REVIEW_DIRECT_EDGE_ONLY", result)
+        self.assertEqual(result["event_local_checks"]["shared_event_ancestor_kind"],
+                         "article")
+        self.assertEqual(result["native_get_this_call"], 0)
+        self.assertEqual(result["formal_accepted_fields"], 0)
+
+    def test_distinct_articles_never_share_identity_through_parent_section(self):
+        html = ('<main><section><article><h1>' + m.TITLE + '</h1></article>'
+                '<article><a href="' + m.TICKET_URL + '">票</a>'
+                '<p>藍盒子</p></article></section></main>')
+        result = self.replay(html.encode())
+        self.assertEqual(result["decision"], "HOLD")
+        self.assertFalse(result["event_local_checks"]["article_ancestor_parity"])
+        self.assertFalse(result["event_local_checks"]["same_section_identity"])
+
+    def test_transport_and_encoding_fail_closed(self):
+        for options in ({"status": 302},
+                        {"final_url": "https://example.org/"},
+                        {"content_type": "application/json"},
+                        {"content_type": "text/html; charset=big5"}):
+            with self.subTest(options=options):
+                self.assertEqual(self.replay(self.html.encode(), **options)["decision"],
+                                 "HOLD")
+        self.assertEqual(self.replay(bytes([255, 254]))["decision"], "HOLD")
+
+    def test_songshan_historical_receipts_do_not_upgrade_identity(self):
+        evidence = {
+            "target_uuid": m.SONGSHAN_UUID, "same_uuid_review_lkg": 0,
+            "persisted": False, "native_get_200_count": 2,
+            "reason": "SONGSHAN_DETAIL_EXACT_HEADING_HOLD:h1=0,h2=0,h3=0",
+            "source_receipts": [
+                {"url": m.SONGSHAN_LIST, "http_status": 200, "bytes": 34242,
+                 "body_sha256": "de3df20bcd78e264c7f0eff8bafedbeb39aa580d7892e738bb2eb792c68e33cb",
+                 "transport": "BUILTIN_NATIVE_GET"},
+                {"url": m.SONGSHAN_DETAIL, "http_status": 200, "bytes": 26506,
+                 "body_sha256": "1226b2f61dd328c08a2ff456e4f36dcc20dd23ce9d18219e377bafa4d404e02d",
+                 "transport": "BUILTIN_NATIVE_GET"},
+            ],
+        }
+        out = m.audit_songshan_prior_native_receipt(evidence)
+        self.assertEqual(out["decision"],
+                         "PRIOR_NATIVE_HTTP_CONFIRMED_IDENTITY_STILL_HOLD")
+        self.assertEqual(out["replayed_prior_http200"], 2)
+        self.assertEqual(out["native_get_this_call"], 0)
+        self.assertEqual(out["native_same_uuid_lkg_new"], 0)
+        evidence["source_receipts"][1]["body_sha256"] = "invalid"
+        self.assertEqual(m.audit_songshan_prior_native_receipt(evidence)["decision"],
+                         "HOLD")
+
+
+    def test_native_single_get_complete_body_and_no_checkout(self):
+        from unittest.mock import patch
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/html; charset=utf-8"}
+            def geturl(self):
+                return m.TPAC_URL
+        class Opener:
+            calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                self.url = req.full_url
+                self.timeout = timeout
+                return Response(self_payload)
+        self_payload = self.large
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.acquire_tpac_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(opener.url, m.TPAC_URL)
+        self.assertEqual(opener.timeout, 8)
+        self.assertEqual(result["native_http200_this_call"], 1)
+        self.assertEqual(result["body_sha256"], hashlib.sha256(self.large).hexdigest())
+        self.assertEqual(result["decision"], "REVIEW_DIRECT_EDGE_ONLY")
+        self.assertEqual(result["native_same_id_lkg"], 0)
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["published_events"], 0)
+
+    def test_native_one_shot_http_redirect_is_not_followed(self):
+        import urllib.error
+        from unittest.mock import patch
+        class Opener:
+            calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                raise urllib.error.HTTPError(req.full_url, 302, "redirect", {}, None)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.acquire_tpac_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(result["first_failure"], "TPAC_REDIRECT_BLOCKED_HOLD")
+        self.assertEqual(result["native_http200_this_call"], 0)
+        self.assertNotIn("body_sha256", result)
+
+
+
+    def test_a_b_manifest_replay_exact_id_and_checksum(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        from scripts.p30_l7_field_golden_readiness import (
+            OPENTIX_ROTATION_LIST, OPENTIX_ROTATION_DETAIL, OPENTIX_ROTATION_TITLE,
+            load_isolated_review_lkg)
+        cases = (
+            ("A", (OPENTIX_ROTATION_LIST, OPENTIX_ROTATION_DETAIL),
+             OPENTIX_ROTATION_TITLE, "05:2072516129034670080"),
+            ("B", (m.SONGSHAN_LIST, m.SONGSHAN_DETAIL),
+             "STAR ON THE MOVE 2026 臺北採購媒合與展售會",
+             "14:" + m.SONGSHAN_UUID),
+        )
+        for line, urls, title, identity in cases:
+            with self.subTest(line=line), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                list_html = '<main><div><a href="' + urls[1] + '">' + title + '</a></div></main>'
+                detail_html = '<main><h1>' + title + '</h1>' + (
+                    '<p data-role="venue">臺北表演藝術中心 藍盒子</p>' if line == "A" else ""
+                ) + '</main>'
+                stamp = datetime.now(timezone.utc).replace(microsecond=0)
+                sources = []
+                for i, (url, html) in enumerate(zip(urls, (list_html, detail_html))):
+                    path = root / (str(i) + ".html")
+                    raw = html.encode()
+                    path.write_bytes(raw)
+                    sources.append(dict(url=url, path=str(path),
+                                        sha256=hashlib.sha256(raw).hexdigest(),
+                                        observed_at_utc=stamp.isoformat()))
+                manifest = root / "manifest.json"
+                manifest.write_text(json.dumps(dict(
+                    kind="P30_PREACQUIRED_OFFICIAL_HTML_V1",
+                    transport="CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
+                    sources=sources)), encoding="utf-8")
+                output = root / "review_lkg_snapshot.json"
+                result = m.replay_preacquired_ab_to_review_lkg(
+                    line, manifest, output, Path.cwd(), now_utc=stamp)
+                self.assertEqual(result["decision"], "REVIEW_ONLY_NONPUBLISHING", result)
+                self.assertEqual(result["native_get_this_call"], 0)
+                snap = load_isolated_review_lkg(output, Path.cwd())
+                self.assertEqual(snap["rows"][0]["_candidate"]["record_id"], identity)
+                self.assertEqual(snap["rows"][0]["scraped_at"], stamp.isoformat())
+                before = output.read_bytes()
+                sources[1]["sha256"] = "0" * 64
+                manifest.write_text(json.dumps(dict(
+                    kind="P30_PREACQUIRED_OFFICIAL_HTML_V1",
+                    transport="CALLER_SUPPLIED_NOT_NATIVE_ATTESTED",
+                    sources=sources)), encoding="utf-8")
+                self.assertEqual(m.replay_preacquired_ab_to_review_lkg(
+                    line, manifest, output, Path.cwd(), now_utc=stamp)["decision"], "HOLD")
+                self.assertEqual(output.read_bytes(), before)
+
+
+
+    def test_zepp_official_schedule_is_list_authority_not_home(self):
+        # Indexed official schedule carries the exact rid event card.
+        # Venue home is discovery only; this is NOT a native GET receipt.
+        self.assertEqual(m.ZEPP_LIST,
+                         "https://www.zepp.co.jp/hall/newtaipei/schedule/")
+        self.assertNotEqual(m.ZEPP_LIST,
+                            "https://www.zepp.co.jp/hall/newtaipei/")
+        self.assertEqual(m.ZEPP_DETAIL,
+                         "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457")
+
+    def test_zepp_exact_rid_same_anchor_and_detail_heading(self):
+        from unittest.mock import patch
+        listing = ('<main><a href="/hall/newtaipei/schedule/single/?rid=166457">'
+                   'Jony J 2026「本命」TOUR IN TAIPEI</a></main>').encode()
+        detail = ('<main><h2>Jony J 2026「本命」TOUR IN TAIPEI</h2>'
+                  '<p>2026/11/6 START 20:00</p></main>').encode()
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/html; charset=UTF-8"}
+            def __init__(self, raw, url):
+                super().__init__(raw)
+                self.url = url
+            def geturl(self):
+                return self.url
+        class Opener:
+            def __init__(self):
+                self.urls = []
+            def open(self, req, timeout):
+                self.urls.append(req.full_url)
+                assert timeout == 8
+                if req.full_url.endswith("/robots.txt"):
+                    import urllib.error
+                    raise urllib.error.HTTPError(req.full_url, 404,
+                                                 "not found", {}, None)
+                return Response((listing, detail)[len(self.urls)-2],
+                                req.full_url)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.probe_zepp_newtaipei_native_once()
+        self.assertEqual(opener.urls, ["https://www.zepp.co.jp/robots.txt",
+                                       m.ZEPP_LIST, m.ZEPP_DETAIL])
+        self.assertEqual(result["policy_decision"], "ALLOW_ROBOTS_404")
+        self.assertEqual(result["native_http200"], 2)
+        self.assertEqual(result["native_same_id_review"], 1)
+        self.assertEqual(result["same_id_review_lkg"], 0)
+        self.assertEqual(result["decision"], "REVIEW_NATIVE_SAME_ID_ONLY")
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["published_events"], 0)
+        self.assertFalse(result["raw_html_saved"])
+        self.assertEqual(result["source_receipts"][1]["body_sha256"],
+                         hashlib.sha256(detail).hexdigest())
+
+    def test_zepp_cross_card_or_unscoped_title_does_not_make_identity(self):
+        listing = ('<main><a href="/hall/newtaipei/schedule/single/?rid=166457">'
+                   'READ MORE</a><h2>Jony J 2026「本命」TOUR IN TAIPEI'
+                   '</h2></main>').encode()
+        detail = ('<main><h2>Jony J 2026「本命」TOUR IN TAIPEI'
+                  '</h2></main>').encode()
+        with self.assertRaisesRegex(ValueError, "ZEPP_LIST_EXACT_RID_TITLE_EDGE_HOLD"):
+            m.inspect_zepp_same_id_pages(listing, detail)
+        good_list = ('<a href="/hall/newtaipei/schedule/single/?rid=166457">'
+                     'Jony J 2026「本命」TOUR IN TAIPEI</a>').encode()
+        with self.assertRaisesRegex(ValueError, "ZEPP_DETAIL_EVENT_LOCAL_HEADING_HOLD"):
+            m.inspect_zepp_same_id_pages(good_list, b"<p>unrelated event</p>")
+
+    def test_zepp_redirect_stops_before_detail(self):
+        import urllib.error
+        from unittest.mock import patch
+        class Opener:
+            def __init__(self):
+                self.calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                raise urllib.error.HTTPError(req.full_url, 302,
+                                             "redirect", {}, None)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            result = m.probe_zepp_newtaipei_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(result["native_get_attempted"], 0)
+        self.assertEqual(result["policy_get_attempted"], 1)
+        self.assertEqual(result["native_http200"], 0)
+        self.assertIn("ZEPP_SITE_POLICY_HOLD", result["first_failure"])
+        self.assertEqual(result["source_receipts"], [])
+
+
+    def test_zepp_parser_reuses_same_adapter_for_new_exact_rid(self):
+        # A second official venue schedule ID must not require another adapter.
+        # These are synthetic bytes; no native provenance is implied.
+        title = "Another source-owned venue event"
+        detail_url = ("https://www.zepp.co.jp/hall/newtaipei/"
+                      "schedule/single/?rid=166458")
+        listing = ('<main><a href="' + detail_url + '">2026 11.7 ' +
+                   title + ' READ MORE</a></main>').encode()
+        detail = ('<main><h2>' + title + '</h2></main>').encode()
+        checks = m.inspect_zepp_same_id_pages(
+            listing, detail, detail_url=detail_url, expected_title=title)
+        self.assertEqual(checks["exact_rid"], "166458")
+        self.assertEqual(checks["source_key"], m.ZEPP_SOURCE_KEY)
+        self.assertEqual(checks["formal_accepted_fields"], 0)
+        self.assertEqual(checks["date_role"], "UNVERIFIED_NOT_SESSION")
+        with self.assertRaisesRegex(ValueError, "ZEPP_LIST_EXACT_RID_TITLE_EDGE_HOLD"):
+            m.inspect_zepp_same_id_pages(
+                listing, detail, detail_url=m.ZEPP_DETAIL, expected_title=title)
+
+    def test_zepp_exact_url_rejects_query_duplicates_and_foreign_host(self):
+        listing = ('<main><a href="' + m.ZEPP_DETAIL + '">' +
+                   m.ZEPP_TITLE + '</a></main>').encode()
+        detail = ('<main><h2>' + m.ZEPP_TITLE + '</h2></main>').encode()
+        invalid = (
+            m.ZEPP_DETAIL + '&rid=166458',
+            m.ZEPP_DETAIL + '&tracking=1',
+            m.ZEPP_DETAIL.replace("www.zepp.co.jp", "example.org"),
+            m.ZEPP_DETAIL.replace("rid=166457", "rid=0"),
+            m.ZEPP_DETAIL + '#fragment',
+        )
+        for url in invalid:
+            with self.subTest(url=url), self.assertRaisesRegex(
+                    ValueError, "ZEPP_TARGET_"):
+                m.inspect_zepp_same_id_pages(
+                    listing, detail, detail_url=url)
+
+    def test_zepp_global_footer_heading_never_attests_detail_identity(self):
+        listing = ('<main><a href="' + m.ZEPP_DETAIL + '">' +
+                   m.ZEPP_TITLE + '</a></main>').encode()
+        # Matching heading outside MAIN is not source-local event identity.
+        detail = ('<main><p>Unrelated activity</p></main>'
+                  '<footer><h2>' + m.ZEPP_TITLE + '</h2></footer>').encode()
+        with self.assertRaisesRegex(ValueError, "ZEPP_DETAIL_EVENT_LOCAL_HEADING_HOLD"):
+            m.inspect_zepp_same_id_pages(listing, detail)
+
+
+
+
+    def test_opentix_new_native_detail_only_no_list_or_formal(self):
+        import urllib.error
+        from unittest.mock import patch
+        html = ('<header><h1>' + m.OPENTIX_FRESH_TITLE + '</h1></header>'
+                '<main><h1>' + m.OPENTIX_FRESH_TITLE + '</h1></main>').encode()
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/html; charset=utf-8"}
+            def __init__(self, url, raw):
+                super().__init__(raw)
+                self.url = url
+            def geturl(self):
+                return self.url
+        class Opener:
+            def __init__(self):
+                self.urls = []
+            def open(self, req, timeout):
+                self.urls.append(req.full_url)
+                assert timeout == 8
+                if req.full_url.endswith("/robots.txt"):
+                    raise urllib.error.HTTPError(req.full_url, 404, "not found", {}, None)
+                return Response(req.full_url, html)
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            out = m.probe_opentix_fresh_detail_native_once()
+        self.assertEqual(opener.urls, ["https://www.opentix.life/robots.txt",
+                                       m.OPENTIX_FRESH_DETAIL])
+        self.assertEqual(out["native_http200"], 1)
+        self.assertEqual(out["decision"], "REVIEW_NATIVE_DETAIL_ONLY")
+        self.assertEqual(out["body_sha256"], hashlib.sha256(html).hexdigest())
+        self.assertEqual(out["detail_checks"]["exact_main_heading_count"], 1)
+        self.assertFalse(out["detail_checks"]["list_same_id_edge_attested"])
+        self.assertEqual(out["native_same_id_review_lkg"], 0)
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertEqual(out["golden_accepted_events"], 0)
+        self.assertEqual(out["published_events"], 0)
+        self.assertFalse(out["raw_html_saved"])
+
+    def test_opentix_global_heading_and_robots_disallow_hold(self):
+        from unittest.mock import patch
+        global_only = ('<header><h1>' + m.OPENTIX_FRESH_TITLE +
+                       '</h1></header><main><p>other event</p></main>').encode()
+        self.assertFalse(m.inspect_opentix_fresh_detail_body(
+            global_only)["event_local_title_review"])
+        with self.assertRaisesRegex(ValueError, "OPENTIX_FRESH_BODY_BOUND_HOLD"):
+            m.inspect_opentix_fresh_detail_body(b"")
+        class Response(io.BytesIO):
+            status = 200
+            headers = {"Content-Type": "text/plain"}
+            def geturl(self):
+                return "https://www.opentix.life/robots.txt"
+        class Opener:
+            calls = 0
+            def open(self, req, timeout):
+                self.calls += 1
+                return Response(b"User-agent: *\nDisallow: /event/\n")
+        opener = Opener()
+        with patch("urllib.request.build_opener", return_value=opener):
+            out = m.probe_opentix_fresh_detail_native_once()
+        self.assertEqual(opener.calls, 1)
+        self.assertEqual(out["native_get_attempted"], 0)
+        self.assertEqual(out["decision"], "HOLD")
+        self.assertIn("OPENTIX_ROBOTS_DISALLOW_HOLD", out["first_failure"])
+
+    def test_zepp_prior_native_receipt_not_raw_html_replay(self):
+        # Historical 2/2 receipt has SHA/time but no replayable body.
+        self.assertEqual(m.ZEPP_SOURCE_KEY, "venue:zepp-newtaipei")
+        self.assertEqual(m.ZEPP_DETAIL.split("rid=")[1], "166457")
+
+
+    def _zepp_synthetic_archive(self, *, source_event_id="166457",
+                                include_receipt=True):
+        # Synthetic archive is NOT the pinned historical CI artifact.
+        import zipfile
+        receipt = {
+            "kind": "P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1",
+            "line": "B", "source_key": m.ZEPP_SOURCE_KEY,
+            "source_event_id": source_event_id,
+            "policy_decision": "ALLOW_ROBOTS_200",
+            "native_get_attempted": 2, "native_http200": 2,
+            "native_list_get_attempted": 1,
+            "native_detail_get_attempted": 1,
+            "native_same_id_review": 1, "same_id_review_lkg": 0,
+            "decision": "REVIEW_NATIVE_SAME_ID_ONLY",
+            "raw_html_saved": False, "formal_accepted_fields": 0,
+            "golden_accepted_events": 0, "published_events": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "identity_checks": {
+                "exact_rid": "166457", "title": m.ZEPP_TITLE,
+                "source_key": m.ZEPP_SOURCE_KEY,
+                "list_exact_edge_count": 1,
+                "detail_exact_heading_count": 1,
+                "date_role": "UNVERIFIED_NOT_SESSION",
+                "start_role": "UNVERIFIED_NOT_SESSION"},
+            "source_receipts": [
+                {"url": m.ZEPP_LIST, "body_bytes_read": 343607,
+                 "body_sha256": "1632f6235bc4a9365c2569697e50f2612e4165dfabee16bc4134f6fddbd497bf",
+                 "http_status": 200, "observed_at_utc": "2026-11-05T18:00:18.824848Z",
+                 "transport": "BUILTIN_NATIVE_GET_NO_REDIRECT_NO_RETRY"},
+                {"url": m.ZEPP_DETAIL, "body_bytes_read": 310512,
+                 "body_sha256": "66750b7e3f39e7ec84c4de2b630517b9c39d4171bc305d7c0f7ca72e732aa67d",
+                 "http_status": 200, "observed_at_utc": "2026-11-05T18:00:20.983747Z",
+                 "transport": "BUILTIN_NATIVE_GET_NO_REDIRECT_NO_RETRY"}]}
+        payload = {
+            "readiness.txt": b"offline only",
+            "field_subset_review_proposal.json": b"{}",
+            "tmc_field_authority_contract.json": b"{}",
+            "canonical_field_authority_contract.json": b"{}"}
+        if include_receipt:
+            payload["zepp_newtaipei_native_once.json"] = json.dumps(
+                receipt, ensure_ascii=False).encode()
+        entries = [
+            hashlib.sha256(b).hexdigest() + "  evidence/" + name
+            for name, b in payload.items()]
+        entries += [
+            "0" * 64 + "  " + name for name in (
+                ".github/workflows/eventradar_p30_l7_field_readiness.yml",
+                "scripts/p30_l7_field_golden_readiness.py",
+                "scripts/p30_source_stream_gate.py",
+                "tests/p30/test_p30_l7_field_golden_readiness.py",
+                "tests/p30/test_p30_source_stream_gate.py",
+                "tests/p30/fixtures/p30_l7_prince_field_readiness.json")]
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, body in payload.items():
+                z.writestr(name, body)
+            z.writestr("SHA256SUMS.txt", "\n".join(entries) + "\n")
+        return stream.getvalue()
+
+    def test_zepp_receipt_archive_sealed_identity_not_body_lkg(self):
+        archive = self._zepp_synthetic_archive()
+        snapshot = m.audit_zepp_sealed_receipt_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        self.assertEqual(snapshot["receipt_only_identity_lkg"], 1)
+        self.assertEqual(snapshot["same_id_review_lkg"], 0)
+        self.assertEqual(snapshot["native_get_this_call"], 0)
+        self.assertEqual(snapshot["historical_native_http200"], 2)
+        self.assertEqual(snapshot["formal_accepted_fields"], 0)
+        self.assertFalse(snapshot["raw_html_saved"])
+        self.assertEqual(snapshot["release_state"], "HARD_HOLD_NO_PUBLICATION")
+        with self.assertRaisesRegex(ValueError, "ZEPP_ARTIFACT_EXACT_SHA_HOLD"):
+            m.audit_zepp_sealed_receipt_archive(archive, "0" * 64)
+
+    def test_zepp_receipt_archive_rejects_wrong_identity_and_missing_member(self):
+        for archive in (self._zepp_synthetic_archive(source_event_id="166458"),
+                        self._zepp_synthetic_archive(include_receipt=False)):
+            with self.subTest(archive_size=len(archive)):
+                with self.assertRaisesRegex(ValueError, "ZEPP_"):
+                    m.audit_zepp_sealed_receipt_archive(
+                        archive, hashlib.sha256(archive).hexdigest())
+
+    def test_zepp_receipt_durable_handoff_requires_pinned_real_artifact(self):
+        import tempfile
+        from pathlib import Path
+        archive = self._zepp_synthetic_archive()
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            isolated = Path(td) / "isolated"
+            isolated.mkdir()
+            target = isolated / "zepp_receipt_identity_lkg.json"
+            with self.assertRaisesRegex(ValueError, "ZEPP_ARTIFACT_EXACT_SHA_HOLD"):
+                m.persist_zepp_receipt_identity_lkg(archive, target, root)
+            self.assertFalse(target.exists())
+            with self.assertRaisesRegex(ValueError, "ZEPP_RECEIPT_REPOSITORY_PATH_HOLD"):
+                m.persist_zepp_receipt_identity_lkg(
+                    archive, root / "zepp_receipt_identity_lkg.json", root)
+
+
+    def _takase_synthetic_archive(self, *, mutate=None):
+        """Synthetic sealed receipt; not the pinned native CI artifact."""
+        import zipfile
+        src = {
+            "source_id": "ZEPP_NEWTAIPEI_OFFICIAL",
+            "source_event_id": "160668",
+            "list": "https://www.zepp.co.jp/hall/newtaipei/",
+            "detail": "https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=160668",
+        }
+        stamp_list = "2026-11-06T10:04:43.302880+00:00"
+        stamp_detail = "2026-11-06T10:04:43.822457+00:00"
+        sha_list = "890893c79a796f222f52d4ad628edae2da273be73a7e033ef4ea95d992ebd657"
+        sha_detail = "d78ae5cedcd1089619b28c55b4fadff1ac1b66946de79551c52fa7bc6d93a4f6"
+        receipt = {
+            "kind": "P30_AB_KKTIX_FUZHONG_NATIVE_ONESHOT_V1",
+            "line": "B_ZEPP_TAKASE", "source_id": src["source_id"],
+            "source_event_id": src["source_event_id"],
+            "decision": "REVIEW_IDENTITY_ONLY",
+            "first_failure": "AB_EVENT_LOCAL_FIELD_SCOPE_HOLD",
+            "native_get_attempted": 3, "native_http200": 2,
+            "native_list": 1, "native_detail": 1,
+            "native_same_id_review": 1, "native_lkg": 0,
+            "field_roles": [], "list_row_roles": [], "raw_html_saved": False,
+            "formal_accepted_fields": 0, "golden": 0, "published": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "robots_receipt": {
+                "url": "https://www.zepp.co.jp/robots.txt",
+                "http_status": 200, "body_bytes": 160,
+                "body_sha256": "f85c8154288b52d4d691b12fa3d0df1bec3f51cba30933d11eb9d20b3d99d6cd",
+                "transport": "NATIVE_NO_REDIRECT_NO_RETRY"},
+            "source_receipts": [
+                {"url": src["list"], "http_status": 200,
+                 "content_type": "text/html", "body_bytes": 336693,
+                 "body_sha256": sha_list, "observed_at_utc": stamp_list,
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY"},
+                {"url": src["detail"], "http_status": 200,
+                 "content_type": "text/html", "body_bytes": 313606,
+                 "body_sha256": sha_detail, "observed_at_utc": stamp_detail,
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY"}],
+            "field_receipts": [{
+                "source_id": src["source_id"], "event_id": src["source_event_id"],
+                "source_url": src["detail"], "body_sha256": sha_detail,
+                "observed_at_utc": stamp_detail, "role": "SOURCE_EXACT_TITLE_REVIEW",
+                "decision": "REVIEW", "formal_accepted": False}],
+        }
+        if mutate:
+            mutate(receipt)
+        evidence = {
+            "readiness.txt": b"review only",
+            "field_subset_review_proposal.json": b"{}",
+            "canonical_field_authority_contract.json": b"{}",
+            "tmc_field_authority_contract.json": b"{}",
+            "zepp_takase_160668_native_once.json":
+                json.dumps(receipt, ensure_ascii=False, sort_keys=True).encode("utf-8"),
+        }
+        lines = [hashlib.sha256(body).hexdigest() + "  evidence/" + name
+                 for name, body in evidence.items()]
+        lines += ["0" * 64 + "  scripts/unused_%02d.py" % i for i in range(16)]
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, body in evidence.items():
+                z.writestr(name, body)
+            z.writestr("SHA256SUMS.txt", "\n".join(lines) + "\n")
+        return stream.getvalue()
+
+    def test_takase_sealed_receipt_proves_identity_not_body_or_field(self):
+        archive = self._takase_synthetic_archive()
+        out = m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        self.assertEqual(out["source_event_id"], "160668")
+        self.assertEqual(out["historical_native_http200"], 2)
+        self.assertEqual(out["receipt_only_identity_lkg"], 1)
+        self.assertEqual(out["body_review_lkg"], 0)
+        self.assertEqual(out["native_get_this_call"], 0)
+        self.assertEqual(out["field_authority"], "EVENT_LOCAL_SCOPE_HOLD")
+        self.assertEqual(out["formal_accepted_fields"], 0)
+        self.assertEqual(out["golden_accepted_events"], 0)
+        self.assertEqual(out["published_events"], 0)
+        self.assertFalse(out["raw_html_saved"])
+
+    def test_takase_sealed_receipt_rejects_cross_id_role_and_clock(self):
+        cases = [
+            lambda r: r.update(source_event_id="160669"),
+            lambda r: r["field_receipts"][0].update(role="VENUE_ACCEPTED"),
+            lambda r: r["source_receipts"][1].update(
+                body_sha256="0" * 64),
+            lambda r: r["source_receipts"][1].update(
+                observed_at_utc="2026-11-07T10:04:43+00:00"),
+            lambda r: r.update(formal_accepted_fields=1),
+        ]
+        for mutate in cases:
+            archive = self._takase_synthetic_archive(mutate=mutate)
+            with self.subTest(case=cases.index(mutate)):
+                with self.assertRaisesRegex(ValueError, "TAKASE_"):
+                    m.audit_zepp_takase_sealed_archive(
+                        archive, hashlib.sha256(archive).hexdigest())
+
+    def test_takase_receipt_lkg_atomic_idempotent_and_cas(self):
+        import tempfile
+        from pathlib import Path
+        archive = self._takase_synthetic_archive()
+        snapshot = m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "repo"
+            root.mkdir()
+            isolated = Path(td) / "isolated"
+            isolated.mkdir()
+            dest = isolated / "zepp_takase_receipt_lkg.json"
+            kw = {"expected_filename": dest.name,
+                  "envelope_kind": "P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1"}
+            first = m.persist_sealed_receipt_review_lkg(
+                snapshot, dest, root, **kw)
+            self.assertTrue(first["persisted"])
+            again = m.persist_sealed_receipt_review_lkg(
+                snapshot, dest, root, **kw)
+            self.assertTrue(again["idempotent"])
+            modified = dict(snapshot, source_event_id="160669")
+            with self.assertRaisesRegex(ValueError, "FULL_ENVELOPE_CAS_HOLD"):
+                m.persist_sealed_receipt_review_lkg(
+                    modified, dest, root, **kw)
+            self.assertEqual(json.loads(dest.read_text())["snapshot"], snapshot)
+            with self.assertRaisesRegex(ValueError, "REPOSITORY_PATH_HOLD"):
+                m.persist_sealed_receipt_review_lkg(
+                    snapshot, root / dest.name, root, **kw)
+            with self.assertRaisesRegex(ValueError, "TAKASE_ARTIFACT_SHA_HOLD"):
+                m.persist_zepp_takase_receipt_lkg(archive, dest, root)
+
+
+
+    def test_ab_source_owned_field_authority_matrix_stays_nonpublishing(self):
+        from datetime import timedelta
+        now = datetime(2026, 11, 6, 13, 0, tzinfo=timezone.utc)
+        stamp = (now - timedelta(minutes=10)).isoformat()
+        source = {
+            "source_id": "TMC_OFFICIAL",
+            "source_event_id": "2026SungNien-Yu",
+            "detail_url": "https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu",
+            "detail_body_sha256": "a" * 64,
+            "observed_at_utc": stamp,
+            "transport": "BUILTIN_NATIVE_GET",
+            "now_utc": now,
+        }
+        roles = [
+            {"role": "VENUE_SHOW_NOT_SALE", "value": "2026/11/07 19:30"},
+            {"role": "VENUE_HALL", "value": "臺北流行音樂中心 表演廳"},
+        ]
+        for item in roles:
+            item.update(source_id=source["source_id"],
+                        source_event_id=source["source_event_id"],
+                        source_url=source["detail_url"],
+                        body_sha256=source["detail_body_sha256"],
+                        observed_at_utc=stamp, formal_accepted=False)
+        result = m.adjudicate_sealed_field_roles(
+            **source, role_receipts=roles)
+        self.assertEqual(len(result["field_matrix"]), 2)
+        self.assertEqual(result["first_failure"],
+                         "FIELD_INDEPENDENT_SEALED_AUTHORITY_MISSING")
+        self.assertEqual(result["formal_accepted_fields"], 0)
+        self.assertEqual(result["golden_accepted_events"], 0)
+        self.assertEqual(result["published_events"], 0)
+        self.assertTrue(all(not r["independent_authority"]
+                            for r in result["field_matrix"]))
+
+        # Even a same-event, same-value claim is NOT a verified sealed artifact.
+        claim = dict(role=roles[0]["role"], value=roles[0]["value"],
+                     source_id="INDEPENDENT_ORGANIZER",
+                     source_event_id="organizer-event-1",
+                     target_source_id=source["source_id"],
+                     target_source_event_id=source["source_event_id"],
+                     direct_event_link=source["detail_url"],
+                     source_url="https://organizer.example.org/event/1",
+                     body_sha256="b" * 64, observed_at_utc=stamp,
+                     formal_accepted=False)
+        concordant = m.adjudicate_sealed_field_roles(
+            **source, role_receipts=roles, independent_claims=[claim])
+        self.assertEqual(concordant["field_matrix"][0]["decision"],
+                         "REVIEW_CONCORDANT_CLAIM_NOT_ATTESTED")
+        self.assertEqual(concordant["formal_accepted_fields"], 0)
+        claim["value"] = "2026/11/08 19:30"
+        conflict = m.adjudicate_sealed_field_roles(
+            **source, role_receipts=roles, independent_claims=[claim])
+        self.assertEqual(conflict["conflict_roles"], ["VENUE_SHOW_NOT_SALE"])
+        self.assertEqual(conflict["first_failure"],
+                         "FIELD_EXPLICIT_CROSS_SOURCE_CONFLICT")
+        # Explicit cross-namespace binding must not accept a wrong target.
+        claim["target_source_event_id"] = "OTHER"
+        with self.assertRaisesRegex(ValueError,
+                                    "FIELD_INDEPENDENT_DIRECT_EDGE_HOLD"):
+            m.adjudicate_sealed_field_roles(
+                **source, role_receipts=roles, independent_claims=[claim])
+        claim["target_source_event_id"] = source["source_event_id"]
+        for field, replacement in (
+                ("target_source_id", "ANOTHER_TARGET"),
+                ("source_event_id", ""),
+                ("source_url", source["detail_url"].replace("/tw/blog/show/", "/other/")),
+                ("source_url", "https://fake@organizer.example.org/event/1"),
+                ("source_url", "https://organizer.example.org/event/1#session"),
+                ("direct_event_link", source["detail_url"] + "?checkout=1")):
+            with self.subTest(independent_field=field):
+                invalid = dict(claim, **{field: replacement})
+                with self.assertRaisesRegex(ValueError,
+                                            "FIELD_INDEPENDENT_DIRECT_EDGE_HOLD"):
+                    m.adjudicate_sealed_field_roles(
+                        **source, role_receipts=roles, independent_claims=[invalid])
+
+        for field, replacement in (
+                ("source_event_id", "OTHER"),
+                ("body_sha256", "0" * 64),
+                ("role", "TICKET_SESSION"),
+                ("formal_accepted", True)):
+            bad = [dict(r) for r in roles]
+            bad[0][field] = replacement
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError,
+                                            "FIELD_ROLE_ID_SHA_PROVENANCE_HOLD"):
+                    m.adjudicate_sealed_field_roles(
+                        **source, role_receipts=bad)
+        old = dict(source, observed_at_utc="2026-11-04T10:00:00+00:00")
+        stale_roles = [dict(r, observed_at_utc=old["observed_at_utc"])
+                       for r in roles]
+        stale = m.adjudicate_sealed_field_roles(
+            **old, role_receipts=stale_roles)
+        self.assertFalse(stale["fresh_within_24h"])
+        self.assertEqual(stale["first_failure"],
+                         "FIELD_SOURCE_NOT_NATIVE_OR_STALE")
+
+    def test_zepp_pinned_receipt_audit_includes_shared_field_conflict_gate(self):
+        archive = self._takase_synthetic_archive()
+        result = m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest())
+        audit = result["sealed_field_conflict_audit"]
+        self.assertEqual(audit["source_event_id"], "160668")
+        self.assertEqual(len(audit["field_matrix"]), 1)
+        self.assertEqual(audit["field_matrix"][0]["role"],
+                         "SOURCE_EXACT_TITLE_REVIEW")
+        self.assertFalse(audit["field_matrix"][0]["independent_authority"])
+        self.assertEqual(audit["formal_accepted_fields"], 0)
+        self.assertEqual(audit["published_events"], 0)
+        self.assertEqual(audit["clock_basis"], "SEALED_DETAIL_OBSERVED_AT_ONLY")
+        self.assertEqual(audit["wall_clock_freshness"], "NOT_ASSESSED")
+        self.assertEqual(audit["source_age_seconds"], 0)
+        self.assertEqual(result, m.audit_zepp_takase_sealed_archive(
+            archive, hashlib.sha256(archive).hexdigest()))
+
+
+    def test_kktix_native_robots_404_and_unrelated_agent_stop_before_event(self):
+        # Offline transport: missing/unrelated/HTML policy never triggers GET.
+        import urllib.error
+        from unittest.mock import patch
+
+        class PolicyResponse:
+            status = 200
+            def __init__(self, body):
+                self.body = body
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def geturl(self):
+                return "https://freeplanetml.kktix.cc/robots.txt"
+            def read(self, limit):
+                return self.body[:limit]
+
+        for policy in (None, b"User-agent: OtherBot\\nAllow: /\\n",
+                       b"<html>User-agent: *\\nAllow: /</html>"):
+            calls = []
+            class Opener:
+                def open(self, request, timeout):
+                    calls.append(request.full_url)
+                    if policy is None:
+                        raise urllib.error.HTTPError(request.full_url, 404,
+                                                     "Not Found", {}, None)
+                    return PolicyResponse(policy)
+            with self.subTest(policy=policy), patch(
+                    "urllib.request.build_opener", return_value=Opener()):
+                result = m.probe_kktix_takase_native_once()
+                self.assertEqual(calls, [
+                    "https://freeplanetml.kktix.cc/robots.txt"])
+                self.assertEqual(result["native_get_attempted"], 0)
+                self.assertEqual(result["native_http200"], 0)
+                self.assertEqual(result["decision"], "HOLD")
+                self.assertEqual(result["formal_accepted_fields"], 0)
+                self.assertEqual(result["published_events"], 0)
+                self.assertNotIn("ALLOW_EXPLICIT", str(result))
+
+    def test_kktix_takase_event_scope_two_days_fail_closed(self):
+        good = ("""<main><section><h1>TAKASE TOYA</h1>
+        <p>[DAY1] SETLIST A 日期：2026年11月7日(六)
+        時間：開場 17:00 / 開演 18:00</p>
+        <p>[DAY2] SETLIST B 日期：2026年11月8日(日)
+        時間：開場 16:00 / 開演 17:00</p>
+        <p>會場：Zepp New Taipei</p></section></main>""").encode()
+        a = m.inspect_kktix_takase_event_scope(good)
+        self.assertEqual(a["event_local_day_roles"],
+                         ["2026-11-07 18:00", "2026-11-08 17:00"])
+        self.assertFalse(a["direct_cross_source_id_edge"])
+        self.assertFalse(a["accepted_session"])
+        self.assertEqual(a["formal_accepted_fields"], 0)
+        for bad in (good.replace(b"<section>", b"<div>").replace(b"</section>", b"</div>"),
+                    good.replace(b"18:00", b"19:00"),
+                    good.replace(b"Zepp New Taipei", b"Other Hall"),
+                    good.replace(b"[DAY2]", b"[DAY1]")):
+            with self.assertRaisesRegex(ValueError, "KKTIX_EVENT_"):
+                m.inspect_kktix_takase_event_scope(bad)
+
+
+
+class TestPinnedOpentixReceipt(unittest.TestCase):
+    """The pinned A source receipt is not fresh native GET or formal FIELD."""
+
+    def test_unpinned_bytes_fail_closed_before_any_lkg(self):
+        self.assertEqual(len(m.OPENTIX_2070_ARTIFACT_SHA256), 64)
+        for raw in (b"", b"not a native CI artifact", b"PK\x03\x04"):
+            with self.subTest(raw=raw):
+                with self.assertRaisesRegex(ValueError, "OPENTIX_ARTIFACT_SHA_HOLD"):
+                    m.audit_opentix_native_sealed_archive(raw)
+
+
+
+class TestPinnedReceiptWallClockReassessment(unittest.TestCase):
+    """Freshness must be rechecked at use-time, never inherited from sealing."""
+
+    def fixture(self, line):
+        from scripts.p30_ab_opentix_ticc_native_once import SOURCES as opentix
+        from scripts.p30_ab_kktix_fuzhong_native import SOURCES as ticket
+        cfg = opentix["A"] if line == "A" else ticket["B_ZEPP_TAKASE"]
+        a = line == "A"
+        detail_sha = ("bea4041161561e44879fc6231028ad8d05c0ee35ff4d01b618edb111b7dcab14"
+                      if a else "d78ae5cedcd1089619b28c55b4fadff1ac1b66946de79551c52fa7bc6d93a4f6")
+        list_sha = ("9af2a826c1053383dda50008cf94438268ed6dcf33710bbda989daad98094deb"
+                    if a else "890893c79a796f222f52d4ad628edae2da273be73a7e033ef4ea95d992ebd657")
+        observed = "2026-11-07T15:01:50+00:00"
+        role = {"role": "SOURCE_EXACT_TITLE_REVIEW", "source_id": cfg["source_id"],
+                "source_url": cfg["detail"], "body_sha256": detail_sha,
+                "observed_at_utc": observed, "formal_accepted": False}
+        role["source_event_id" if a else "event_id"] = cfg["event_id"]
+        snapshot = {
+            "kind": ("P30_A_OPENTIX_2070_PINNED_NATIVE_RECEIPT_REVIEW_V1" if a
+                     else "P30_B_ZEPP_TAKASE_SEALED_RECEIPT_REVIEW_V1"),
+            "artifact_sha256": (m.OPENTIX_2070_ARTIFACT_SHA256 if a
+                                else m.ZEPP_TAKASE_ARTIFACT_SHA256),
+            "receipt_sha256": (m.OPENTIX_2070_RECEIPT_SHA256 if a
+                               else m.ZEPP_TAKASE_RECEIPT_SHA256),
+            "source_id": cfg["source_id"], "source_event_id": cfg["event_id"],
+            "source_title_review": cfg["title"],
+            "observed_at_utc": observed, "receipt_only_identity_lkg": 1,
+            "body_review_lkg": 0, "native_get_this_call": 0,
+            "raw_html_saved": False, "release_state": "HARD_HOLD_NO_PUBLICATION",
+            "formal_accepted_fields": 0, "golden_accepted_events": 0,
+            "published_events": 0,
+            "source_receipts": [
+                {"url": cfg["list"], "body_sha256": list_sha,
+                 "http_status": 200, "content_type": "text/html",
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY",
+                 "observed_at_utc": "2026-11-07T15:01:49+00:00"},
+                {"url": cfg["detail"], "body_sha256": detail_sha,
+                 "http_status": 200, "content_type": "text/html",
+                 "transport": "NATIVE_NO_REDIRECT_NO_RETRY",
+                 "observed_at_utc": observed},
+            ],
+        }
+        snapshot["receipt_derived_role" if a else "field_receipts"] = (
+            role if a else [role])
+        kind = ("P30_A_OPENTIX_2070_DURABLE_RECEIPT_LKG_V1" if a
+                else "P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1")
+        digest = hashlib.sha256(json.dumps(
+            snapshot, sort_keys=True, ensure_ascii=False,
+            separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        return {"kind": kind, "sha256": digest, "snapshot": snapshot}
+
+    def test_both_lines_fresh_then_stale_without_mutating_receipt(self):
+        from datetime import timedelta
+        for line in ("A", "B"):
+            sealed = self.fixture(line)
+            original = json.dumps(sealed, sort_keys=True)
+            stamp = datetime.fromisoformat(sealed["snapshot"]["observed_at_utc"])
+            fresh = m.reassess_pinned_receipt_lkg(
+                sealed, line, now_utc=stamp + timedelta(hours=23))
+            stale = m.reassess_pinned_receipt_lkg(
+                sealed, line, now_utc=stamp + timedelta(hours=25))
+            self.assertTrue(fresh["fresh_within_24h"])
+            self.assertFalse(stale["fresh_within_24h"])
+            self.assertEqual(stale["first_failure"], "SOURCE_STALE_OR_FUTURE_HOLD")
+            self.assertEqual((stale["native_get_this_call"], stale["native_body_lkg"],
+                              stale["formal_accepted_fields"], stale["golden"],
+                              stale["published"]), (0, 0, 0, 0, 0))
+            self.assertEqual(json.dumps(sealed, sort_keys=True), original)
+
+    def test_pinned_source_digest_role_and_clock_fail_closed(self):
+        from datetime import timedelta
+        for line in ("A", "B"):
+            for key, value in (("source_event_id", "wrong"),
+                               ("release_state", "PUBLISHED")):
+                sealed = self.fixture(line)
+                sealed["snapshot"][key] = value
+                with self.assertRaisesRegex(ValueError, "RECEIPT_REASSESS_"):
+                    m.reassess_pinned_receipt_lkg(sealed, line)
+            sealed = self.fixture(line)
+            sealed["snapshot"]["source_receipts"][1]["body_sha256"] = "0" * 64
+            sealed["sha256"] = hashlib.sha256(json.dumps(
+                sealed["snapshot"], sort_keys=True, ensure_ascii=False,
+                separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+            with self.assertRaisesRegex(ValueError, "DETAIL_PROVENANCE_HOLD"):
+                m.reassess_pinned_receipt_lkg(sealed, line)
+            sealed = self.fixture(line)
+            stamp = datetime.fromisoformat(sealed["snapshot"]["observed_at_utc"])
+            future = m.reassess_pinned_receipt_lkg(
+                sealed, line, now_utc=stamp - timedelta(seconds=1))
+            self.assertFalse(future["fresh_within_24h"])
+            self.assertEqual(future["formal_accepted_fields"], 0)
+            with self.assertRaisesRegex(ValueError, "NOW_UTC_HOLD"):
+                m.reassess_pinned_receipt_lkg(sealed, line,
+                    now_utc=datetime(2026, 11, 8))
+
+
+if __name__ == "__main__":
+    unittest.main()

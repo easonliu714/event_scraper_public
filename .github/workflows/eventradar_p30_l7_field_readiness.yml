@@ -1,0 +1,2352 @@
+name: EventRadar P30-L7 field Golden readiness exact-head NO PUBLISH
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  source-field-readiness:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l7-field-golden-readiness-contract'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD and immutable formal release guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l7_field_readiness.yml' 'scripts/p30_l7_field_golden_readiness.py' 'scripts/p30_source_stream_gate.py' 'tests/p30/test_p30_l7_field_golden_readiness.py' 'tests/p30/test_p30_source_stream_gate.py' 'scripts/p30_accupass_native_gate.py' 'tests/p30/test_p30_accupass_native_gate.py' 'scripts/p30_ntpc_artcenter_source.py' 'tests/p30/test_p30_ntpc_artcenter_source.py' 'scripts/p30_dual_native_rotation.py' 'tests/p30/test_p30_dual_native_rotation.py' 'scripts/p30_cloudgate_native_gate.py' 'tests/p30/test_p30_cloudgate_native_gate.py' 'scripts/p30_ab_kktix_fuzhong_native.py' 'tests/p30/test_p30_ab_kktix_fuzhong_native.py' 'scripts/p30_tpac_event_source.py' 'scripts/p30_review_bridge.py' 'tests/p30/test_p30_review_bridge.py' 'scripts/p30_ab_fixed_review_workflow.py' 'tests/p30/test_p30_ab_fixed_review_workflow.py' 'tests/p30/test_p30_next_source_fixed_integration.py' 'scripts/p30_tpac_event2072_native_once.py' 'tests/p30/test_p30_tpac_event2072_native_once.py' 'scripts/p30_ab_opentix_ticc_native_once.py' 'tests/p30/test_p30_ab_opentix_ticc_native_once.py' 'scripts/p30_ntch_native_once.py' 'tests/p30/test_p30_ntch_native_once.py' 'tests/p30/fixtures/p30_l7_prince_field_readiness.json' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 99cae0571e36e52dac360b6935c0c09f6f6bed3f
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          test "$(git rev-parse HEAD:docs/index.html)" = d284e3007d95016312385892eef4449b03946c9c
+          python - <<'PY'
+          import json,subprocess
+          d=json.loads(subprocess.check_output(['git','show','HEAD:docs/platform_status.json']))
+          assert len(d['platforms'])==19
+          assert d['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['production']['goldenAccepted']==0
+          PY
+      - name: Source-bound acceptance contract and negative tests
+        run: |
+          python -m py_compile scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py tests/p30/test_p30_next_source_fixed_integration.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py scripts/p30_ab_opentix_ticc_native_once.py tests/p30/test_p30_ab_opentix_ticc_native_once.py scripts/p30_ntch_native_once.py tests/p30/test_p30_ntch_native_once.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_l7_field_golden_readiness.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_source_stream_gate.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_accupass_native_gate.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_ntpc_artcenter_source.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_dual_native_rotation.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_cloudgate_native_gate.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_ab_kktix_fuzhong_native.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_review_bridge.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_ab_fixed_review_workflow.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_next_source_fixed_integration.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event2072_native_once.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_ab_opentix_ticc_native_once.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_ntch_native_once.py' -v
+          python scripts/p30_l7_field_golden_readiness.py
+      - name: Native A/B one-shot consumed-register preflight (NO GET)
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+          
+          def decide(subject, prior, registered, attempt):
+              markers = re.findall(r'\[[a-z0-9-]+-once\]', subject)
+              if len(markers) != len(set(markers)):
+                  return 'PROBE_DUPLICATE_CURRENT_MARKER_HOLD', markers
+              if any(m not in registered for m in markers):
+                  return 'PROBE_UNREGISTERED_MARKER_HOLD', markers
+              if markers and attempt != 1:
+                  return 'PROBE_RERUN_ATTEMPT_HOLD', markers
+              if any(m in earlier for m in markers for earlier in prior):
+                  return 'PROBE_MARKER_ALREADY_CONSUMED_HOLD', markers
+              return 'PASS_NO_NATIVE_MARKER' if not markers else 'PASS_UNCONSUMED_FIRST_ATTEMPT', markers
+          
+          known = {'[a-native-once]', '[b-native-once]'}
+          assert decide('[a-native-once] [b-native-once]', [], known, 1)[0].startswith('PASS_')
+          assert decide('[a-native-once]', ['old [a-native-once]'], known, 1)[0] == 'PROBE_MARKER_ALREADY_CONSUMED_HOLD'
+          assert decide('[b-native-once]', [], known, 2)[0] == 'PROBE_RERUN_ATTEMPT_HOLD'
+          assert decide('[c-native-once]', [], known, 1)[0] == 'PROBE_UNREGISTERED_MARKER_HOLD'
+          assert decide('[a-native-once] [a-native-once]', [], known, 1)[0] == 'PROBE_DUPLICATE_CURRENT_MARKER_HOLD'
+          assert decide('fix [no-get]', ['old [a-native-once]'], known, 2)[0] == 'PASS_NO_NATIVE_MARKER'
+          
+          workflow = Path('.github/workflows/eventradar_p30_l7_field_readiness.yml').read_text(encoding='utf-8')
+          registered = set(re.findall(r"grep\s+-Fq\s+['\"](\[[a-z0-9-]+-once\])['\"]", workflow))
+          head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          subject = subprocess.check_output(['git', 'show', '-s', '--format=%s', 'HEAD'], text=True).strip()
+          prior = subprocess.check_output(['git', 'log', '--format=%s', 'HEAD^'], text=True).splitlines()
+          attempt = int(os.environ['GITHUB_RUN_ATTEMPT'])
+          expected = os.environ['EXPECTED_HEAD_SHA']
+          if head != expected or not registered:
+              verdict, markers = 'PROBE_HEAD_OR_REGISTER_HOLD', []
+          else:
+              verdict, markers = decide(subject, prior, registered, attempt)
+          receipt = dict(kind='P30_NATIVE_PROBE_CONSUMPTION_REGISTER_V1', decision=verdict,
+                         current_markers=markers, registered_marker_count=len(registered),
+                         prior_commit_count=len(prior), head_sha=head,
+                         native_get_this_step=0, formal_accepted_fields=0, golden=0,
+                         published=0, release_state='HARD_HOLD_NO_PUBLICATION')
+          Path('evidence/native_probe_consumption_guard.json').write_text(json.dumps(receipt, sort_keys=True, indent=2)+'\n', encoding='utf-8')
+          print('PROBE_CONSUMPTION_GUARD', verdict, markers)
+          if not verdict.startswith('PASS_'):
+              raise SystemExit(49)
+          PY
+      - name: One-shot bounded official native GET acquisition diagnosis (not Golden)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[source-probe-once]'; then
+            echo 'SOURCE_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, socket, ssl, urllib.error, urllib.request
+          from pathlib import Path
+          # Exactly five official public pages. One GET per URL, no retries, login, or redirects.
+          targets = [
+              ('A', 'TMC_LIST', 'https://www.tmc.taipei/tw/blog/show', '2026SungNien-Yu'),
+              ('A', 'TMC_DETAIL', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu', '宋念宇'),
+              ('A', 'KHAM_EVENT', 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2', 'P1DF32E2'),
+              ('B', 'TWTC_LIST', 'https://twtc.com.tw/exhibition?p=home', '電器空調影音'),
+              ('B', 'TWTC_DETAIL', 'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home', '電器空調影音'),
+          ]
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect)
+          results = []
+          for line, role, url, marker in targets:
+              record = {'line': line, 'role': role, 'url': url, 'http_status': None, 'bytes': 0, 'sha256': None, 'marker_present_in_bounded_body': False, 'decision': 'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url, headers={'User-Agent': 'EventRadarSourceAudit/1.0 (read-only public evidence)', 'Accept': 'text/html,application/xhtml+xml', 'Accept-Encoding': 'identity'}, method='GET')
+                  with opener.open(req, timeout=8) as response:
+                      record['http_status'] = response.status
+                      record['content_type'] = response.headers.get('Content-Type', '')[:100]
+                      body = response.read(524289)
+                      record['bytes'] = len(body)
+                      record['sha256'] = hashlib.sha256(body).hexdigest()
+                      record['truncated'] = len(body) > 524288
+                      record['marker_present_in_bounded_body'] = marker.encode('utf-8') in body
+                      record['decision'] = 'HTTP200_ONLY_FIELD_UNVERIFIED' if response.status == 200 and not record['truncated'] else 'BODY_OR_STATUS_HOLD'
+              except urllib.error.HTTPError as exc:
+                  record['http_status'] = exc.code
+                  record['decision'] = 'REDIRECT_BLOCKED' if 300 <= exc.code < 400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as exc:
+                  reason = exc.reason
+                  record['error_type'] = type(reason).__name__
+                  record['decision'] = 'DNS_OR_EGRESS_HOLD' if isinstance(reason, socket.gaierror) else 'NETWORK_OR_TLS_HOLD'
+              except (TimeoutError, socket.timeout, ssl.SSLError, OSError) as exc:
+                  record['error_type'] = type(exc).__name__
+                  record['decision'] = 'NETWORK_OR_TLS_HOLD'
+              results.append(record)
+              print('SOURCE_PROBE', line, role, record['http_status'], record['decision'], flush=True)
+          report = {'kind': 'P30_L7_ONE_SHOT_OFFICIAL_NATIVE_ACQUISITION_DIAGNOSTIC', 'observed_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'request_count': len(targets), 'native_http_200_count': sum(x['http_status'] == 200 for x in results), 'formal_accepted_fields': 0, 'golden': 0, 'published': 0, 'no_raw_pages_saved': True, 'results': results}
+          Path('evidence/source_acquisition.json').write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print('SOURCE_PROBE_SUMMARY', json.dumps({'requests': len(targets), 'native_http_200': report['native_http_200_count'], 'formal_accepted_fields': 0, 'golden': 0, 'published': 0}), flush=True)
+          PY
+      - name: One-shot native LIST DETAIL field-role semantic receipt (not Golden)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[semantic-probe-once]'; then
+            echo 'SEMANTIC_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.parse, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+          
+          # Independent native source-field hypothesis. Public, bounded, read-only.
+          # No checkout, authentication, redirect, retry, cookies, or raw page persistence.
+          TMC_LIST = 'https://www.tmc.taipei/tw/blog/show'
+          TMC_DETAIL = 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'
+          KHAM = 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2'
+          TWTC_LIST = 'https://twtc.com.tw/exhibition?p=home'
+          TWTC_DETAIL = 'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home'
+          TARGETS = [('A','TMC_LIST',TMC_LIST),('A','TMC_DETAIL',TMC_DETAIL),
+                     ('A','KHAM_EVENT',KHAM),('B','TWTC_LIST',TWTC_LIST),
+                     ('B','TWTC_DETAIL',TWTC_DETAIL)]
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, fp, code, msg, headers, newurl):
+                  return None
+          class PublicHTML(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.texts = []
+                  self.links = []
+                  self.skip = 0
+              def handle_starttag(self, tag, attrs):
+                  if tag in ('script','style','noscript'):
+                      self.skip += 1
+                  if tag == 'a':
+                      self.links.extend(v for k,v in attrs if k == 'href' and v)
+              def handle_endtag(self, tag):
+                  if tag in ('script','style','noscript') and self.skip:
+                      self.skip -= 1
+              def handle_data(self, data):
+                  if not self.skip and data.strip():
+                      self.texts.append(data.strip())
+          def normalized(text):
+              return re.sub(r'\s+', ' ', text).strip()
+          def exact_link(page, target):
+              if not page:
+                  return False
+              return any(urllib.parse.urljoin(page['url'], h) == target for h in page['links'])
+          def match_label(page, pattern):
+              if not page:
+                  return False
+              return bool(re.search(pattern, page['text']))
+          def source(url, line, role):
+              out = {'line':line,'role':role,'url':url,'http_status':None,'bytes':0,
+                     'sha256':None,'decision':'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url, headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'
+                  }, method='GET')
+                  with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as resp:
+                      out['http_status'] = resp.status
+                      raw = resp.read(524289)
+                      out['bytes'] = len(raw)
+                      out['sha256'] = hashlib.sha256(raw).hexdigest()
+                      if resp.status != 200 or len(raw) > 524288:
+                          out['decision'] = 'HTTP_OR_BODY_SIZE_HOLD'
+                          return out, None
+                      charset = resp.headers.get_content_charset() or 'utf-8'
+                      if charset.lower() not in ('utf-8','big5','cp950'):
+                          out['decision'] = 'CHARSET_HOLD'
+                          return out, None
+                      try:
+                          decoded = raw.decode(charset, errors='strict')
+                      except (UnicodeError,LookupError):
+                          out['decision'] = 'DECODE_HOLD'
+                          return out, None
+                      parser = PublicHTML()
+                      parser.feed(decoded)
+                      out['decision'] = 'HTTP200_NATIVE_BODY_REVIEW_ONLY'
+                      return out, {'url':url,'text':normalized(' '.join(parser.texts)),
+                                   'links':parser.links}
+              except urllib.error.HTTPError as err:
+                  out['http_status'] = err.code
+                  out['decision'] = 'REDIRECT_BLOCKED' if 300 <= err.code < 400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as err:
+                  out['error_type'] = type(err.reason).__name__
+                  out['decision'] = 'DNS_OR_EGRESS_HOLD' if isinstance(err.reason,socket.gaierror) else 'NETWORK_HOLD'
+              except (OSError,TimeoutError,ssl.SSLError) as err:
+                  out['error_type'] = type(err).__name__
+                  out['decision'] = 'NETWORK_HOLD'
+              return out, None
+          
+          pages = {}
+          records = []
+          for line,role,url in TARGETS:
+              rec,page = source(url,line,role)
+              records.append(rec)
+              pages[role] = page
+              print('NATIVE_SEMANTIC_SOURCE',line,role,rec['http_status'],rec['decision'],flush=True)
+          
+          # Each field requires its own exact source/role. A literal marker is insufficient.
+          checks = [
+              ('A','tmc_list_exact_detail_href','EXACT_SAME_VENUE_DETAIL_HREF',
+               TMC_LIST,exact_link(pages['TMC_LIST'],TMC_DETAIL)),
+              ('A','tmc_detail_direct_kham_href','EXACT_TICKET_PRODUCT_HREF_NOT_SESSION',
+               TMC_DETAIL,exact_link(pages['TMC_DETAIL'],KHAM)),
+              ('A','tmc_venue_showtime','VENUE_SHOWTIME_NOT_SALE',
+               TMC_DETAIL,match_label(pages['TMC_DETAIL'],r'2026[./]11[./]07\s*19:30')),
+              ('A','tmc_venue_hall','VENUE_HALL_NOT_TICKET_SESSION',
+               TMC_DETAIL,match_label(pages['TMC_DETAIL'],r'活動地點\s*臺北流行音樂中心\s*表演廳')),
+              ('A','kham_sale_time','SALE_TIME_NOT_SHOWTIME',
+               KHAM,match_label(pages['KHAM_EVENT'],r'開賣時間\s*[：:]\s*2026年\s*08月\s*22日.{0,25}12點')),
+              ('B','twtc_list_same_id_href','EXACT_EXHIBITION_DETAIL_ID_HREF',
+               TWTC_LIST,exact_link(pages['TWTC_LIST'],TWTC_DETAIL)),
+              ('B','twtc_detail_title','EXHIBITION_TITLE_NOT_OTHER_EVENT',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'2026年電器空調影音大展')),
+              ('B','twtc_exhibition_dates','EXHIBITION_DATES_NOT_TICKET_SESSION',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'展出日期\s*[：:]\s*2026/11/06\s*[~～\-]\s*2026/11/09')),
+              ('B','twtc_daily_open_hours','EXHIBITION_OPEN_HOURS_NOT_SHOWTIME',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'展出時間\s*[：:]\s*10:00\s*[~～\-]\s*18:00')),
+              ('B','twtc_venue_hall','EXHIBITION_HALL_NOT_TICKET_VENUE_ID',
+               TWTC_DETAIL,match_label(pages['TWTC_DETAIL'],r'展覽館別\s*[：:]\s*世貿一館')),
+          ]
+          field_receipts = [
+              {'line':line,'field':name,'role':role,'source':url,'native_label_or_href_match':bool(hit),
+               'decision':'NATIVE_SOURCE_ROLE_REVIEW_ONLY' if hit else 'NATIVE_LABEL_OR_LINK_HOLD',
+               'formal_accepted':False}
+              for line,name,role,url,hit in checks
+          ]
+          report = {
+              'kind':'P30_L7_ONE_SHOT_NATIVE_SEMANTIC_FIELD_DIAGNOSTIC',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'request_count':len(records),'native_http_200_count':sum(r['http_status']==200 for r in records),
+              'field_context_review_count':sum(x['native_label_or_href_match'] for x in field_receipts),
+              'field_context_hold_count':sum(not x['native_label_or_href_match'] for x in field_receipts),
+              'sources':records,'field_receipts':field_receipts,
+              'formal_accepted_fields':0,'golden':0,'published':0,
+              'no_raw_html_saved':True,'release_state':'HARD_HOLD_NO_PUBLICATION',
+              'next_gate':'INDEPENDENT_SOURCE_IDENTITY_AND_FIELD_GOLDEN_REVIEW'
+          }
+          Path('evidence').mkdir(exist_ok=True)
+          Path('evidence/native_semantic_fields.json').write_text(
+              json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('NATIVE_SEMANTIC_SUMMARY',json.dumps({
+              'requests':report['request_count'],'http200':report['native_http_200_count'],
+              'review':report['field_context_review_count'],'hold':report['field_context_hold_count'],
+              'formal':0,'golden':0,'published':0}),flush=True)
+          PY
+      - name: One-shot A/B official DOM-local anchor identity (not Golden)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[dom-link-probe-once]'; then
+            echo 'DOM_LINK_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.parse, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          # New hypotheses: A ticket URL must belong to a locally labelled
+          # purchase anchor; B same-ID detail href must be in the title's row.
+          # One public GET per official URL, no redirects/retries/auth/cookies.
+          A_URL = 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'
+          A_TICKET = 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2'
+          B_URL = 'https://twtc.com.tw/exhibition?p=home'
+          B_TITLE = '2026年電器空調影音大展'
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          class Anchors(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.links = []
+                  self.anchor = None
+                  self.row = None
+                  self.rows = []
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if tag == 'tr':
+                      self.row = {'text': [], 'links': []}
+                  if tag == 'a':
+                      self.anchor = {'href': attrs.get('href',''), 'text': []}
+              def handle_data(self, data):
+                  if self.anchor is not None: self.anchor['text'].append(data)
+                  if self.row is not None: self.row['text'].append(data)
+              def handle_endtag(self, tag):
+                  if tag == 'a' and self.anchor is not None:
+                      a = {'href': self.anchor['href'],
+                           'text': ' '.join(' '.join(self.anchor['text']).split())}
+                      self.links.append(a)
+                      if self.row is not None: self.row['links'].append(a)
+                      self.anchor = None
+                  if tag == 'tr' and self.row is not None:
+                      self.rows.append({'text': ' '.join(' '.join(self.row['text']).split()),
+                                        'links': self.row['links']})
+                      self.row = None
+          def fetch(url):
+              rec = {'url':url,'http_status':None,'sha256':None,'bytes':0,
+                     'decision':'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url,method='GET',headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'})
+                  with urllib.request.build_opener(NoRedirect).open(req,timeout=8) as response:
+                      rec['http_status'] = response.status
+                      body = response.read(524289)
+                      rec['bytes'] = len(body)
+                      rec['sha256'] = hashlib.sha256(body).hexdigest()
+                      if response.status != 200 or len(body) > 524288:
+                          rec['decision'] = 'HTTP_OR_SIZE_HOLD'
+                          return rec,None
+                      charset = (response.headers.get_content_charset() or 'utf-8').lower()
+                      if charset not in ('utf-8','big5','cp950'):
+                          rec['decision'] = 'CHARSET_HOLD'
+                          return rec,None
+                      p = Anchors()
+                      p.feed(body.decode(charset,errors='strict'))
+                      rec['decision'] = 'NATIVE_HTML_PARSED_REVIEW_ONLY'
+                      return rec,p
+              except urllib.error.HTTPError as e:
+                  rec['http_status'] = e.code
+                  rec['decision'] = 'REDIRECT_BLOCKED' if 300 <= e.code < 400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as e:
+                  rec['error_type'] = type(e.reason).__name__
+                  rec['decision'] = 'DNS_OR_EGRESS_HOLD' if isinstance(e.reason,socket.gaierror) else 'NETWORK_HOLD'
+              except (UnicodeError,OSError,TimeoutError,ssl.SSLError) as e:
+                  rec['error_type'] = type(e).__name__
+                  rec['decision'] = 'DECODE_OR_NETWORK_HOLD'
+              return rec,None
+          def b_same_id(href):
+              try:
+                  u = urllib.parse.urlsplit(urllib.parse.urljoin(B_URL,href))
+                  if (u.scheme != 'https' or u.hostname not in ('twtc.com.tw','www.twtc.com.tw')
+                      or u.username or u.password or u.fragment
+                      or u.path.lower() != '/exhibition_more.aspx'): return False
+                  pairs = urllib.parse.parse_qsl(u.query,keep_blank_values=True,strict_parsing=True)
+                  return (sum(k.lower()=='id' for k,v in pairs)==1
+                      and any(k.lower()=='id' and v=='29418' for k,v in pairs)
+                      and all(k.lower() in ('id','p') for k,v in pairs)
+                      and all(v=='home' for k,v in pairs if k.lower()=='p'))
+              except (ValueError,TypeError): return False
+          # Synthetic negatives enforce no cross-event ID/host, no duplicate ID.
+          assert b_same_id('/exhibition_more.aspx?id=29418&p=home')
+          for bad in ('/exhibition_more.aspx?id=29419&p=home',
+                      '/exhibition_more.aspx?id=29418&id=29419',
+                      'https://other.example/exhibition_more.aspx?id=29418',
+                      '/exhibition_more.aspx?id=29418&ticket=123'):
+              assert not b_same_id(bad)
+          a,ap = fetch(A_URL)
+          b,bp = fetch(B_URL)
+          a_anchor = bool(ap and any(
+              urllib.parse.urljoin(A_URL,x['href'])==A_TICKET
+              and '購票' in x['text'] for x in ap.links))
+          b_row = bool(bp and any(
+              B_TITLE in row['text'] and any(b_same_id(x['href']) for x in row['links'])
+              for row in bp.rows))
+          b_link_any = bool(bp and any(b_same_id(x['href']) for x in bp.links))
+          checks = [
+              {'line':'A','field':'tmc_same_detail_local_purchase_anchor',
+               'source':A_URL,'role':'LOCAL_ANCHOR_TICKET_PRODUCT_NOT_SESSION',
+               'matched':a_anchor,'decision':'NATIVE_DOM_LOCAL_REVIEW_ONLY' if a_anchor else 'HOLD'},
+              {'line':'B','field':'twtc_same_title_row_exact_detail_id',
+               'source':B_URL,'role':'SAME_ROW_TITLE_AND_DETAIL_ID_NOT_TICKET_SESSION',
+               'matched':b_row,'same_id_href_elsewhere':b_link_any,
+               'decision':'NATIVE_DOM_LOCAL_REVIEW_ONLY' if b_row else 'HOLD'}]
+          report = {'kind':'P30_L7_ONE_SHOT_DOM_LOCAL_IDENTITY_DIAGNOSTIC',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'requests':2,'native_http_200':sum(x['http_status']==200 for x in (a,b)),
+              'sources':[a,b],'field_receipts':checks,'formal_accepted_fields':0,
+              'golden':0,'published':0,'release_state':'HARD_HOLD_NO_PUBLICATION',
+              'raw_html_saved':False,'next_gate':'INDEPENDENT_SAME_ID_FIELD_REVIEW'}
+          Path('evidence/native_dom_identity.json').write_text(
+              json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('NATIVE_DOM_IDENTITY',json.dumps({
+              'http200':report['native_http_200'],'A_local_anchor':a_anchor,
+              'B_same_id_any':b_link_any,'B_same_title_row':b_row,
+              'formal':0,'golden':0,'published':0}),flush=True)
+          PY
+      - name: One-shot same-session independent A/B public-field matrix (REVIEW not Golden)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[same-session-matrix-once]'; then
+            echo 'SAME_SESSION_MATRIX_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.parse, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          # Exactly three official HTTPS public GETs; same process/run, one per URL.
+          # No cookies, redirects, retries, login, ticket backend or raw HTML persistence.
+          A = 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'
+          TICKET = 'https://kham.com.tw/application/UTK02/UTK0201_.aspx?PRODUCT_ID=P1DF32E2'
+          BL = 'https://twtc.com.tw/exhibition?p=home'
+          BD = 'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home'
+          TITLE = '2026年電器空調影音大展'
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl): return None
+          class PublicDOM(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.texts=[]; self.links=[]; self.rows=[]; self.row=None; self.anchor=None
+              def handle_starttag(self, tag, attrs):
+                  attrs=dict(attrs)
+                  if tag=='tr': self.row={'text':[],'links':[]}
+                  if tag=='a': self.anchor={'href':attrs.get('href',''),'text':[]}
+              def handle_data(self, data):
+                  self.texts.append(data)
+                  if self.row is not None: self.row['text'].append(data)
+                  if self.anchor is not None: self.anchor['text'].append(data)
+              def handle_endtag(self, tag):
+                  if tag=='a' and self.anchor is not None:
+                      a={'href':self.anchor['href'],'text':' '.join(' '.join(self.anchor['text']).split())}
+                      self.links.append(a)
+                      if self.row is not None: self.row['links'].append(a)
+                      self.anchor=None
+                  if tag=='tr' and self.row is not None:
+                      self.rows.append({'text':' '.join(' '.join(self.row['text']).split()),'links':self.row['links']})
+                      self.row=None
+          def native(url):
+              r={'url':url,'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                 'http_status':None,'sha256':None,'bytes':0,'decision':'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req=urllib.request.Request(url,method='GET',headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'})
+                  with urllib.request.build_opener(NoRedirect).open(req,timeout=8) as res:
+                      r['http_status']=res.status
+                      raw=res.read(524289); r['bytes']=len(raw); r['sha256']=hashlib.sha256(raw).hexdigest()
+                      if res.status!=200 or len(raw)>524288:
+                          r['decision']='HTTP_OR_SIZE_HOLD'; return r,None
+                      charset=(res.headers.get_content_charset() or 'utf-8').lower()
+                      if charset not in ('utf-8','big5','cp950'):
+                          r['decision']='CHARSET_HOLD'; return r,None
+                      p=PublicDOM(); p.feed(raw.decode(charset,errors='strict'))
+                      r['decision']='NATIVE_PARSED_REVIEW_ONLY'
+                      return r,p
+              except urllib.error.HTTPError as e:
+                  r['http_status']=e.code
+                  r['decision']='REDIRECT_HOLD' if 300<=e.code<400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as e:
+                  r['error_type']=type(e.reason).__name__
+                  r['decision']='DNS_EGRESS_HOLD' if isinstance(e.reason,socket.gaierror) else 'NETWORK_HOLD'
+              except (UnicodeError,OSError,TimeoutError,ssl.SSLError) as e:
+                  r['error_type']=type(e).__name__; r['decision']='DECODE_NETWORK_HOLD'
+              return r,None
+          def valid_b(href):
+              try:
+                  u=urllib.parse.urlsplit(urllib.parse.urljoin(BL,href))
+                  q=urllib.parse.parse_qsl(u.query,keep_blank_values=True,strict_parsing=True)
+                  return (u.scheme=='https' and u.hostname in ('twtc.com.tw','www.twtc.com.tw')
+                      and not u.username and not u.password and not u.fragment
+                      and u.path.lower()=='/exhibition_more.aspx'
+                      and sum(k.lower()=='id' for k,v in q)==1
+                      and any(k.lower()=='id' and v=='29418' for k,v in q)
+                      and all(k.lower() in ('id','p') for k,v in q)
+                      and all(v=='home' for k,v in q if k.lower()=='p'))
+              except (ValueError,TypeError): return False
+          assert valid_b('/exhibition_more.aspx?id=29418&p=home')
+          for bad in ('/exhibition_more.aspx?id=29419&p=home',
+                      '/exhibition_more.aspx?id=29418&id=29419',
+                      'https://other.example/exhibition_more.aspx?id=29418',
+                      '/exhibition_more.aspx?id=29418&ticket=123'):
+              assert not valid_b(bad)
+          records={}; dom={}
+          for role,url in [('A_TMC_DETAIL',A),('B_TWTC_LIST',BL),('B_TWTC_DETAIL',BD)]:
+              records[role],dom[role]=native(url)
+          a=dom['A_TMC_DETAIL']; bl=dom['B_TWTC_LIST']; bd=dom['B_TWTC_DETAIL']
+          a_text=' '.join(' '.join(a.texts).split()) if a else ''
+          b_text=' '.join(' '.join(bd.texts).split()) if bd else ''
+          same_row=bool(bl and any(TITLE in row['text'] and
+              sum(valid_b(x['href']) for x in row['links'])==1 for row in bl.rows))
+          a_anchor=bool(a and any(urllib.parse.urljoin(A,x['href'])==TICKET
+              and '購票' in x['text'] for x in a.links))
+          checks=[
+              ('A','direct_ticket_product','LOCAL_PURCHASE_ANCHOR_NOT_SESSION',A,a_anchor),
+              ('A','venue_showtime','VENUE_SHOW_NOT_SALE',A,bool(re.search(r'2026[./]11[./]07\s*19:30',a_text))),
+              ('A','venue_hall','VENUE_HALL',A,bool(re.search(r'活動地點\s*臺北流行音樂中心\s*表演廳',a_text))),
+              ('B','list_detail_identity','SAME_ROW_SAME_ID',BL,same_row),
+              ('B','exhibition_title','EXACT_EVENT_TITLE',BD,TITLE in b_text),
+              ('B','exhibition_dates','EXHIBITION_DATE_NOT_SALE',BD,bool(re.search(r'展出日期\s*[：:]\s*2026/11/06\s*[~～\-]\s*2026/11/09',b_text))),
+              ('B','open_hours','DAILY_OPEN_HOURS_NOT_SHOWTIME',BD,bool(re.search(r'展出時間\s*[：:]\s*10:00\s*[~～\-]\s*18:00',b_text))),
+              ('B','venue_hall','EXHIBITION_HALL_NOT_TICKET_ID',BD,bool(re.search(r'展覽館別\s*[：:]\s*世貿一館',b_text))),
+          ]
+          # Exact observed literals: each value is emitted only when the corresponding
+          # source-local anchor or bounded label/value expression matched in THIS run.
+          # Prior boolean-only receipts could not support independent value adjudication.
+          # These are NOT formally accepted values, ticket sessions, or publication data.
+          source_bound_values={
+              ('A','direct_ticket_product'):{'product_id':'P1DF32E2','official_ticket_url':TICKET},
+              ('A','venue_showtime'):'2026/11/07 19:30',
+              ('A','venue_hall'):'臺北流行音樂中心 表演廳',
+              ('B','list_detail_identity'):{'exhibition_id':'29418','same_row_title':TITLE},
+              ('B','exhibition_title'):TITLE,
+              ('B','exhibition_dates'):{'start':'2026/11/06','end':'2026/11/09'},
+              ('B','open_hours'):{'open':'10:00','close':'18:00'},
+              ('B','venue_hall'):'世貿一館',
+          }
+          assert len(source_bound_values)==len(checks)==8
+          assert {(line,field) for line,field,_,_,_ in checks}==set(source_bound_values)
+          receipts=[]
+          for line,field,role,url,hit in checks:
+              source=next((r for r in records.values() if r['url']==url),None)
+              receipts.append({'line':line,'event_id':'P1DF32E2' if line=='A' else '29418',
+                  'field':field,'role':role,'source_url':url,
+                  'observed_at_utc':source['observed_at_utc'] if source else None,
+                  'body_sha256':source['sha256'] if source else None,
+                  'native_same_session_match':bool(hit),
+                  'observed_value':source_bound_values[(line,field)] if hit else None,
+                  'value_basis':'EXACT_SOURCE_LOCAL_PATTERN_OR_ANCHOR' if hit else 'UNVERIFIED',
+                  'independent_conflict_adjudication':'PENDING',
+                  'decision':'ACCEPTABLE_FOR_INDEPENDENT_GOLDEN_REVIEW_ONLY' if hit else 'HOLD',
+                  'formal_accepted':False,
+                  'golden_prerequisites':['independent artifact/readback','source freshness and conflict review',
+                      'field-specific Owner release authority']})
+          report={'kind':'P30_L7_NATIVE_SAME_SESSION_FIELD_MATRIX_V1',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'request_count':3,'native_http_200':sum(r['http_status']==200 for r in records.values()),
+              'sources':list(records.values()),'field_receipts':receipts,
+              'acceptability_review':sum(x['native_same_session_match'] for x in receipts),
+              'hold':sum(not x['native_same_session_match'] for x in receipts),
+              'negative_tests':4,'formal_accepted_fields':0,'golden':0,'published':0,
+              'raw_html_saved':False,'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          Path('evidence/native_same_session_field_matrix.json').write_text(
+              json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print('NATIVE_SAME_SESSION_MATRIX',json.dumps({
+              'http200':report['native_http_200'],'review':report['acceptability_review'],
+              'hold':report['hold'],'same_id':same_row,'formal':0,'golden':0,'published':0}),flush=True)
+          PY
+      - name: Build first usable non-session field subset artifact (review only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              build_independent_field_subset_proposal,
+              validate_independent_field_subset_proposal,
+          )
+          source=json.loads(Path("tests/p30/fixtures/p30_l7_prince_field_readiness.json").read_text(encoding="utf-8"))["independent_public_field_crosscheck"]
+          proposal=build_independent_field_subset_proposal(source)
+          result=validate_independent_field_subset_proposal(source,proposal)
+          assert result["formal_accepted"]==result["golden"]==result["published"]==result["formal_pwa_feed"]==0
+          Path("evidence/field_subset_review_proposal.json").write_text(
+              json.dumps(proposal,ensure_ascii=False,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+          print("FIRST_USABLE_SUBSET",json.dumps(result,sort_keys=True),flush=True)
+          PY
+      - name: One-shot independent native venue/bilingual conflict authority (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[bilingual-native-once]'; then
+            echo 'BILINGUAL_NATIVE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          # Four allowlisted public non-checkout URLs, one GET each. No retry,
+          # redirects, credentials, cookies, JavaScript circumvention or raw HTML files.
+          sources = (
+              ('A_TMC_VENUE', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'),
+              ('B_TWTC_ZH_ID29418', 'https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home'),
+              ('B_TWTC_EN_ID29418', 'https://www.twtc.com.tw/en/exhibition_More.aspx?id=29418&p=home'),
+              ('B_EXECUTOR_NO_TWTC_ID', 'https://www.sheng-dong.com.tw/activity/appliances-expo/TECO'),
+          )
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          class TextOnly(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.parts = []
+              def handle_data(self, data):
+                  self.parts.append(data)
+          opener = urllib.request.build_opener(NoRedirect)
+          receipts, texts = [], {}
+          for role, url in sources:
+              stamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
+              r = {'role':role,'url':url,'observed_at_utc':stamp,'http_status':None,
+                   'body_sha256':None,'bytes':0,'decision':'SOURCE_FRESHNESS_HOLD'}
+              try:
+                  req = urllib.request.Request(url, method='GET', headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (read-only public evidence)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'})
+                  with opener.open(req,timeout=8) as resp:
+                      r['http_status'] = resp.status
+                      ctype = resp.headers.get('Content-Type','')
+                      r['content_type'] = ctype[:100]
+                      raw = resp.read(524289)
+                      r['bytes'] = len(raw)
+                      r['body_sha256'] = hashlib.sha256(raw).hexdigest()
+                      if resp.status != 200 or len(raw)>524288 or 'html' not in ctype.lower():
+                          r['decision']='BODY_STATUS_OR_TYPE_HOLD'
+                      else:
+                          enc = 'utf-8'
+                          m = re.search(r'charset\s*=\s*["\x27]?([\w-]+)',ctype,re.I)
+                          if m:
+                              enc=m.group(1)
+                          parsed=TextOnly()
+                          parsed.feed(raw.decode(enc,errors='strict'))
+                          texts[role]=' '.join(' '.join(parsed.parts).split())
+                          r['decision']='NATIVE_HTTP200_BODY_HASH_ONLY'
+              except urllib.error.HTTPError as exc:
+                  r['http_status']=exc.code
+                  r['decision']='REDIRECT_BLOCKED' if 300<=exc.code<400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as exc:
+                  r['error_type']=type(exc.reason).__name__
+                  r['decision']='DNS_OR_EGRESS_HOLD' if isinstance(exc.reason,socket.gaierror) else 'NETWORK_OR_TLS_HOLD'
+              except (TimeoutError,socket.timeout,ssl.SSLError,OSError,UnicodeError,LookupError,ValueError) as exc:
+                  r['error_type']=type(exc).__name__
+                  r['decision']='BODY_OR_NETWORK_HOLD'
+              receipts.append(r)
+              print('BILINGUAL_NATIVE',role,r['http_status'],r['decision'],flush=True)
+
+          a=texts.get('A_TMC_VENUE','')
+          zh=texts.get('B_TWTC_ZH_ID29418','')
+          en=texts.get('B_TWTC_EN_ID29418','')
+          ex=texts.get('B_EXECUTOR_NO_TWTC_ID','')
+          checks={
+              'A_SHOW':bool(re.search(r'2026[./]11[./]07\s+19:30',a)),
+              'A_HALL':bool(re.search(r'活動地點\s*臺北流行音樂中心\s*表演廳',a)),
+              'B_ZH_ID_TITLE':bool('2026年電器空調影音大展' in zh),
+              'B_EN_ID_TITLE_CONFLICT':bool('2025 ELECTRIC APPLIANCE FAIR' in en),
+              'B_ZH_DATES':bool(re.search(r'展出日期\s*[：:]\s*2026/11/06\s*[~～-]\s*2026/11/09',zh)),
+              'B_EN_DATES':bool(re.search(r'Show Dates\s*[：:]\s*2026/11/06\s*[~～-]\s*2026/11/09',en)),
+              'B_ZH_HOURS':bool(re.search(r'展出時間\s*[：:]\s*10:00\s*[~～-]\s*18:00',zh)),
+              'B_EN_HOURS':bool(re.search(r'Show Hours\s*[：:]\s*10\s*[~～-]\s*18',en)),
+              'B_ZH_HALL':bool(re.search(r'展覽館別\s*[：:]\s*世貿一館',zh)),
+              'B_EN_HALL':bool(re.search(r'Venue\s*[：:]\s*Hall\s*1\b',en)),
+              'B_EXECUTOR_DATES':bool(re.search(r'2026/11/6\s*-\s*2026/11/9',ex)),
+              'B_EXECUTOR_HOURS':bool(re.search(r'展出時間\s*10:00\s*-\s*18:00',ex)),
+              'B_EXECUTOR_HALL':bool('台北世貿一館' in ex),
+          }
+          field_roles=(
+              ('A','venue_showtime',('A_SHOW',)),
+              ('A','venue_hall',('A_HALL',)),
+              ('B','exhibition_dates',('B_ZH_DATES','B_EN_DATES','B_EXECUTOR_DATES')),
+              ('B','open_hours',('B_ZH_HOURS','B_EN_HOURS','B_EXECUTOR_HOURS')),
+              ('B','venue_hall',('B_ZH_HALL','B_EN_HALL','B_EXECUTOR_HALL')),
+          )
+          matrix=[{'line':line,'field':field,'checks':list(keys),
+                   'native_source_consistent':all(checks[k] for k in keys),
+                   'decision':'NATIVE_ROLE_REVIEW_ONLY' if all(checks[k] for k in keys) else 'HOLD_SOURCE_OR_ROLE',
+                   'formal_accepted':False} for line,field,keys in field_roles]
+          title_conflict=checks['B_ZH_ID_TITLE'] and checks['B_EN_ID_TITLE_CONFLICT']
+          report={
+              'kind':'P30_L7_ONE_SHOT_NATIVE_BILINGUAL_AUTHORITY_CONFLICT_V1',
+              'attestation':'CI_PUBLIC_NATIVE_GET_SAME_PROCESS',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'request_count':len(sources),
+              'native_http_200_count':sum(r['http_status']==200 for r in receipts),
+              'source_receipts':receipts,'bounded_source_checks':checks,'field_matrix':matrix,
+              'title_decision':'NATIVE_TWTC_SAME_ID_TITLE_YEAR_CONFLICT_HOLD' if title_conflict else 'BILINGUAL_TITLE_NATIVE_UNVERIFIED_HOLD',
+              'a_ticket_product_identity':'HOLD_KHAM_NO_SAFE_NATIVE_GET_IN_THIS_GATE',
+              'b_executor_identity':'HOLD_NO_DIRECT_TWTC_EXHIBITION_ID_ON_EXECUTOR',
+              'source_consistent_review_fields':sum(x['native_source_consistent'] for x in matrix),
+              'formal_accepted_fields':0,'golden':0,'published':0,'formal_pwa_feed':0,
+              'raw_html_saved':False,'release_state':'HARD_HOLD_NO_PUBLICATION'
+          }
+          Path('evidence/native_bilingual_authority.json').write_text(
+              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('BILINGUAL_NATIVE_SUMMARY',json.dumps({
+              'http200':report['native_http_200_count'],
+              'source_consistent_review_fields':report['source_consistent_review_fields'],
+              'title_decision':report['title_decision'],
+              'formal':0,'golden':0,'published':0},sort_keys=True),flush=True)
+          PY
+      - name: One-shot native source-local official link edges (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[identity-native-once]'; then
+            echo 'NATIVE_LINK_EDGE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, socket, ssl, urllib.error, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import audit_native_source_link_edges
+
+          # Three exact official non-checkout pages, one normal GET per URL.
+          # The TMC->KHAM link is parsed only; the KHAM purchase flow is NEVER fetched.
+          # Recheck exact href after first native run exposed responsive/image-only label ambiguity.
+          # Partial A/B adjudication and TWTC index structure diagnostic; no raw HTML.
+          # Recheck official responsive duplicate rows after native 83-row/2-target diagnostic.
+          sources = (
+              ('A_TMC_VENUE', 'https://www.tmc.taipei/tw/blog/show/2026SungNien-Yu'),
+              ('B_TWTC_MIRROR_INDEX', 'https://twtc.org.tw/exhibition.aspx'),
+              ('B_TWTC_MIRROR_DETAIL', 'https://twtc.org.tw/exhibition_more.aspx?id=29418&p=home'),
+          )
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          opener = urllib.request.build_opener(NoRedirect)
+          receipts, htmls = [], []
+          for role, url in sources:
+              rec = {'role':role,'url':url,
+                     'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                     'http_status':None,'body_sha256':None,'bytes':0,
+                     'decision':'SOURCE_FRESHNESS_HOLD'}
+              body = ''
+              try:
+                  req = urllib.request.Request(url,method='GET',headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (read-only public evidence)',
+                      'Accept':'text/html,application/xhtml+xml','Accept-Encoding':'identity'})
+                  with opener.open(req,timeout=8) as response:
+                      rec['http_status']=response.status
+                      ctype=response.headers.get('Content-Type','')
+                      rec['content_type']=ctype[:100]
+                      raw=response.read(524289)
+                      rec['bytes']=len(raw)
+                      rec['body_sha256']=hashlib.sha256(raw).hexdigest()
+                      if response.status==200 and 0<len(raw)<=524288 and 'html' in ctype.lower():
+                          enc='utf-8'
+                          match=re.search(r'charset\s*=\s*["\x27]?([\w-]+)',ctype,re.I)
+                          if match: enc=match.group(1)
+                          body=raw.decode(enc,errors='strict')
+                          rec['decision']='NATIVE_HTTP200_BODY_HASH_ONLY'
+                      else:
+                          rec['decision']='BODY_STATUS_SIZE_OR_TYPE_HOLD'
+              except urllib.error.HTTPError as exc:
+                  rec['http_status']=exc.code
+                  rec['decision']='REDIRECT_BLOCKED' if 300<=exc.code<400 else 'HTTP_ERROR_HOLD'
+              except urllib.error.URLError as exc:
+                  rec['error_type']=type(exc.reason).__name__
+                  rec['decision']='DNS_OR_EGRESS_HOLD' if isinstance(exc.reason,socket.gaierror) else 'NETWORK_OR_TLS_HOLD'
+              except (TimeoutError,socket.timeout,ssl.SSLError,OSError,UnicodeError,LookupError,ValueError) as exc:
+                  rec['error_type']=type(exc).__name__
+                  rec['decision']='BODY_OR_NETWORK_HOLD'
+              receipts.append(rec)
+              htmls.append(body)
+              print('NATIVE_LINK_SOURCE',role,rec['http_status'],rec['decision'],flush=True)
+
+          # Structural diagnostics only: no source HTML or sensitive payload in logs/artifacts.
+          if htmls[1]:
+              import html as html_module
+              index_decoded=html_module.unescape(htmls[1])
+              print('TWTC_INDEX_STRUCTURE',json.dumps({
+                  'tr_count':len(re.findall(r'<tr\b',index_decoded,re.I)),
+                  'title_literal_count':index_decoded.count('2026年電器空調影音大展'),
+                  'target_id_count':index_decoded.count('29418'),
+                  'href_target_id_count':len(re.findall(r'<a\b[^>]{0,500}29418',index_decoded,re.I)),
+              },sort_keys=True),flush=True)
+          result=None
+          decision='HOLD_NATIVE_SOURCE_OR_IDENTITY'
+          if all(htmls) and all(r['decision']=='NATIVE_HTTP200_BODY_HASH_ONLY' for r in receipts):
+              try:
+                  result=audit_native_source_link_edges(*htmls,receipts,
+                      datetime.datetime.now(datetime.timezone.utc))
+                  decision=('REVIEW_NATIVE_SOURCE_LOCAL_LINK_EDGES_ONLY' if result['source_local_native_link_edges']==2 else 'REVIEW_A_NATIVE_LINK_B_IDENTITY_HOLD')
+              except ValueError as exc:
+                  decision='HOLD_'+str(exc)
+          report={'kind':'P30_L7_ONE_SHOT_NATIVE_OFFICIAL_LINK_EDGE_RECEIPT_V1',
+              'observed_at_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'request_count':len(sources),
+              'native_http_200':sum(r['http_status']==200 for r in receipts),
+              'source_receipts':receipts,'link_decision':decision,
+              'source_local_verified_link_edges':result['source_local_native_link_edges'] if result else 0,
+              'link_result':result,'A_KHAM_NATIVE_GET':0,
+              'B_EXECUTOR_TO_ID':'HOLD','B_TITLE_YEAR_CONFLICT':'HOLD',
+              'formal_accepted_fields':0,'golden':0,'published':0,'formal_pwa_feed':0,
+              'raw_html_saved':False,'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          Path('evidence/native_source_link_edges.json').write_text(
+              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('NATIVE_LINK_EDGE_SUMMARY',json.dumps({
+              'native_http_200':report['native_http_200'],
+              'verified_edges':report['source_local_verified_link_edges'],
+              'decision':decision,'formal':0,'golden':0,'published':0},sort_keys=True),flush=True)
+          PY
+      - name: One-shot TWTC responsive same-ID native adapter to isolated LKG (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[twtc-responsive-probe-once]'; then
+            echo 'TWTC_RESPONSIVE_PROBE_SKIPPED_NO_NEW_HYPOTHESIS_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          import tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              PUBLIC_TWTC_LIST, PUBLIC_TWTC_DETAIL,
+              run_bounded_native_source_to_review_lkg,
+          )
+          # New hypothesis: nearest semantic row + exact responsive duplicate
+          # dedup resolves same-ID LIST/DETAIL binding. No checkout, retry,
+          # redirect, authentication, raw HTML storage, or formal data write.
+          with tempfile.TemporaryDirectory(prefix="eventradar-isolated-") as tmp:
+              try:
+                  result = run_bounded_native_source_to_review_lkg(
+                      PUBLIC_TWTC_LIST, PUBLIC_TWTC_DETAIL,
+                      "2026年電器空調影音大展", "29418",
+                      Path(tmp) / "review_lkg_snapshot.json",
+                      Path.cwd(), network_authorized=True,
+                      source_hypothesis=(
+                          "Validate exact TWTC responsive same-ID row binding "
+                          "after nearest-row parser correction"))
+                  snapshot = result.get("snapshot", {})
+                  report = {
+                      "kind": "P30_L7_ONE_SHOT_TWTC_NATIVE_ADAPTER_LKG_V1",
+                      "source_receipts": result.get("source_receipts", []),
+                      "native_get_verified": result.get("native_get_verified", False),
+                      "decision": result.get("decision", snapshot.get("decision", "HOLD")),
+                      "persisted_isolated_temp_only": result.get("persisted", False),
+                      "same_id_review_candidates": (
+                          len(snapshot.get("rows", []))
+                          if result.get("persisted") else 0),
+                      "field_role_review_count": len(snapshot.get("field_receipts", [])),
+                      "first_hold_reason": result.get("reason", snapshot.get("rollback_reason")),
+                      "formal_accepted_fields": 0,
+                      "golden": 0, "published": 0, "formal_pwa_feed": 0,
+                      "no_raw_html_saved": True,
+                      "release_state": "HARD_HOLD_NO_PUBLICATION",
+                  }
+              except Exception as exc:
+                  report = {
+                      "kind": "P30_L7_ONE_SHOT_TWTC_NATIVE_ADAPTER_LKG_V1",
+                      "decision": "HOLD_RUNTIME_EXCEPTION",
+                      "first_hold_reason": type(exc).__name__ + ":" + str(exc)[:120],
+                      "native_get_verified": False, "same_id_review_candidates": 0,
+                      "formal_accepted_fields": 0, "golden": 0, "published": 0,
+                      "formal_pwa_feed": 0, "no_raw_html_saved": True,
+                      "release_state": "HARD_HOLD_NO_PUBLICATION",
+                  }
+          Path("evidence/native_twtc_adapter_lkg.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8")
+          print("TWTC_NATIVE_ADAPTER_SUMMARY", json.dumps({
+              "decision": report["decision"],
+              "same_id_review_candidates": report["same_id_review_candidates"],
+              "native_get_verified": report["native_get_verified"],
+              "formal_accepted_fields": 0, "golden": 0, "published": 0
+          }, sort_keys=True), flush=True)
+          PY
+      - name: One-shot A native adapter and B title-cell structural root cause (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[native-adapter-structural-once]'; then
+            echo 'NEW_HYPOTHESIS_PROBE_SKIPPED'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, socket, ssl, tempfile, urllib.error, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL, PUBLIC_TWTC_LIST,
+              run_bounded_native_source_to_review_lkg,
+              diagnose_twtc_title_row_structure,
+          )
+          # A: first native adapter-to-durable-REVIEW hypothesis, no KHAM GET.
+          # B: exact-title-cell ownership audit, one public LIST GET only.
+          # Neither operation can publish or independently accept a FIELD.
+          report = {
+              "kind": "P30_L7_NATIVE_A_ADAPTER_B_STRUCTURAL_DIAGNOSIS_V1",
+              "observed_at_utc": datetime.datetime.now(
+                  datetime.timezone.utc).isoformat(),
+              "A": {}, "B": {},
+              "formal_accepted_fields": 0, "golden": 0, "published": 0,
+              "no_raw_html_saved": True,
+              "release_state": "HARD_HOLD_NO_PUBLICATION",
+          }
+          with tempfile.TemporaryDirectory(prefix="eventradar-review-") as tmp:
+              try:
+                  result = run_bounded_native_source_to_review_lkg(
+                      PUBLIC_TMC_LIST, PUBLIC_TMC_DETAIL,
+                      "小宇 宋念宇 《不，完美的人》 演唱會", "P1DF32E2",
+                      Path(tmp) / "review_lkg_snapshot.json", Path.cwd(),
+                      network_authorized=True,
+                      source_hypothesis=(
+                          "First native TMC LIST to same event DETAIL to "
+                          "two non-session roles to isolated REVIEW LKG"))
+                  snap = result.get("snapshot", {})
+                  report["A"] = {
+                      "decision": result.get("decision", snap.get("decision", "HOLD")),
+                      "first_hold": result.get("reason", snap.get("rollback_reason")),
+                      "native_get_verified": result.get("native_get_verified", False),
+                      "source_receipts": result.get("source_receipts", []),
+                      "same_id_candidate": int(bool(result.get("persisted"))),
+                      "review_fields": len(snap.get("field_receipts", []))
+                          if result.get("persisted") else 0,
+                      "isolated_temp_only": bool(result.get("persisted")),
+                  }
+              except Exception as exc:
+                  report["A"] = {
+                      "decision": "HOLD_NATIVE_ADAPTER_EXCEPTION",
+                      "first_hold": type(exc).__name__ + ":" + str(exc)[:100],
+                      "same_id_candidate": 0, "review_fields": 0,
+                  }
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, url):
+                  return None
+          try:
+              req = urllib.request.Request(
+                  PUBLIC_TWTC_LIST,
+                  headers={
+                      "User-Agent": "EventRadarSourceAudit/1.0 (public read-only)",
+                      "Accept": "text/html,application/xhtml+xml",
+                      "Accept-Encoding": "identity",
+                  }, method="GET")
+              with urllib.request.build_opener(NoRedirect).open(
+                      req, timeout=8) as resp:
+                  body = resp.read(524289)
+                  content_type = resp.headers.get("Content-Type", "").lower()
+                  if (resp.status != 200 or len(body) > 524288
+                          or "text/html" not in content_type):
+                      raise ValueError("TWTC_NATIVE_STATUS_SIZE_OR_TYPE_HOLD")
+                  charset = resp.headers.get_content_charset() or "utf-8"
+                  if charset.lower() not in ("utf-8", "big5", "cp950"):
+                      raise ValueError("TWTC_NATIVE_CHARSET_HOLD")
+                  decoded = body.decode(charset, errors="strict")
+                  audit = diagnose_twtc_title_row_structure(
+                      decoded, "2026年電器空調影音大展", "29418")
+                  report["B"] = {
+                      "http_status": 200, "bytes": len(body),
+                      "body_sha256": hashlib.sha256(body).hexdigest(),
+                      "transport": "BUILTIN_NATIVE_GET",
+                      "structural_audit": audit,
+                      "native_same_id_candidate": 0,
+                  }
+          except (urllib.error.URLError, OSError, TimeoutError,
+                  UnicodeError, ValueError, ssl.SSLError) as exc:
+              report["B"] = {
+                  "decision": "TWTC_STRUCTURAL_SOURCE_HOLD",
+                  "first_hold": type(exc).__name__ + ":" + str(exc)[:100],
+                  "native_same_id_candidate": 0,
+              }
+          Path("evidence/native_adapter_structural_audit.json").write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True,
+                         indent=2) + "\n", encoding="utf-8")
+          print("A_NATIVE_ADAPTER_B_STRUCTURAL_AUDIT",
+                json.dumps({
+                    "A": report["A"].get("decision"),
+                    "A_same_id": report["A"].get("same_id_candidate", 0),
+                    "B": report["B"].get("structural_audit", {}).get(
+                        "root_cause_class", report["B"].get("decision")),
+                    "formal_fields": 0, "published": 0,
+                }, sort_keys=True), flush=True)
+          PY
+      - name: One-shot canonical CKSMH #17 native LIST to actId DETAIL (REVIEW only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[cksmh-source-probe-once]'; then
+            echo 'CKSMH_ROTATION_NATIVE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json, tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import run_cksmh_actid_review_lkg
+          with tempfile.TemporaryDirectory(prefix='eventradar_cksmh_review_') as tmp:
+              result = run_cksmh_actid_review_lkg(
+                  Path(tmp) / 'review_lkg_snapshot.json', Path.cwd(),
+                  network_authorized=True,
+                  source_hypothesis='CKSMH platform17 actId61023 canonical LIST exact anchor to DETAIL')
+          assert result['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
+          assert result['formal_accepted_fields'] == result['golden_accepted_events'] == result['published_events'] == 0
+          Path('evidence/native_cksmh_rotation.json').write_text(
+              json.dumps(result, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8')
+          print('CKSMH_NATIVE_ROTATION', result['decision'],
+                'native_http200', result['native_get_200_count'],
+                'same_id_review_lkg', result['same_id_review_lkg'],
+                'first_hold', result.get('reason', 'NONE'), flush=True)
+          PY
+      - name: A TMC independent authority contract and B Huashan one-shot native path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json, subprocess, tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              assess_tmc_non_session_field_authority, run_huashan_exact_path_review_lkg)
+          a = assess_tmc_non_session_field_authority(None)
+          assert a['formal_accepted_fields'] == 0
+          Path('evidence/tmc_field_authority_contract.json').write_text(
+              json.dumps(a, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8')
+          msg = subprocess.check_output(['git', 'log', '-1', '--format=%s'], text=True)
+          if '[huashan-source-probe-once]' not in msg:
+              print('HUASHAN_NATIVE_SKIPPED_NO_NEW_HYPOTHESIS_MARKER')
+          else:
+              with tempfile.TemporaryDirectory(prefix='eventradar_huashan_') as tmp:
+                  b = run_huashan_exact_path_review_lkg(
+                      Path(tmp) / 'review_lkg_snapshot.json', Path.cwd(),
+                      network_authorized=True,
+                      source_hypothesis='Huashan #13 exact official LIST title anchor to DETAIL canonical path')
+              assert b['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
+              assert b['formal_accepted_fields'] == b['golden_accepted_events'] == b['published_events'] == 0
+              Path('evidence/native_huashan_rotation.json').write_text(
+                  json.dumps(b, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+                  encoding='utf-8')
+              print('HUASHAN_NATIVE_ROTATION', b['decision'], b['native_get_200_count'],
+                    b['same_path_review_lkg'], b['native_same_numeric_id'],
+                    b.get('reason', 'NONE'), flush=True)
+          PY
+      - name: Fixed A TMC and B canonical CKSMH independent field gate (NO GET, NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, json, tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              CKSMH_PUBLIC_LIST, CKSMH_PUBLIC_DETAIL, CKSMH_ROTATION_TITLE,
+              run_cksmh_actid_review_lkg,
+              load_isolated_review_lkg,
+              assess_tmc_cksmh_fixed_nonpublishing_field_gate)
+          pages = {
+              CKSMH_PUBLIC_LIST: (
+                  '<a href="/mocweb/reg/CKSMH/Detail.init.ctr?actId=61023">'
+                  + CKSMH_ROTATION_TITLE + '</a>'),
+              CKSMH_PUBLIC_DETAIL: (
+                  '<h1>' + CKSMH_ROTATION_TITLE + '</h1>'
+                  '<p>場次與集合地點待獨立驗收</p>'),
+          }
+          def offline_fetch(url):
+              return (200, 'text/html; charset=utf-8',
+                      pages[url].encode('utf-8'), url)
+          now = datetime.datetime.now(datetime.timezone.utc)
+          with tempfile.TemporaryDirectory(prefix='eventradar_cksmh_offline_') as tmp:
+              dest = Path(tmp) / 'review_lkg_snapshot.json'
+              rotated = run_cksmh_actid_review_lkg(
+                  dest, Path.cwd(), fetcher=offline_fetch, now_utc=now)
+              assert rotated['decision'] == 'REVIEW_ONLY'
+              snapshot = load_isolated_review_lkg(dest, Path.cwd())
+              report = assess_tmc_cksmh_fixed_nonpublishing_field_gate(
+                  None, snapshot, now)
+          assert report['B']['platform_id'] == '17'
+          assert report['B']['decision'] == 'HOLD_NATIVE_FRESHNESS_OR_AUTHORITY'
+          assert report['formal_accepted_fields'] == report['golden_accepted_events'] == report['published_events'] == 0
+          assert report['new_native_get'] == 0
+          report['evidence_scope'] = 'OFFLINE_TEST_INJECTED_CKSMH_NOT_NATIVE'
+          report['native_get_claim'] = 0
+          Path('evidence/canonical_field_authority_contract.json').write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2)
+              + '\n', encoding='utf-8')
+          print('FIXED_CANONICAL_FIELD_GATE', report['A']['decision'],
+                report['B']['decision'], 'formal=0 native=0', flush=True)
+          PY
+      - name: One-shot Huashan event-local field role native GET (new hypothesis only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[huashan-date-token-hypothesis-once]'; then
+            echo 'HUASHAN_FIELD_ROLE_NATIVE_SKIPPED_NO_NEW_HYPOTHESIS'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime,hashlib,json,urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              HUASHAN_PUBLIC_DETAIL,adjudicate_huashan_detail_field_roles)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          report={'kind':'P30_L7_HUASHAN_NATIVE_FIELD_PROBE_V1',
+                  'source_url':HUASHAN_PUBLIC_DETAIL,'native_get_count':0,
+                  'http_status':None,'decision':'SOURCE_ACQUISITION_HOLD',
+                  'first_failure':None,'field_matrix':[],
+                  'formal_accepted_fields':0,'golden_accepted_events':0,
+                  'published_events':0,'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          try:
+              req=urllib.request.Request(HUASHAN_PUBLIC_DETAIL,method='GET',
+                  headers={'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                           'Accept':'text/html','Accept-Encoding':'identity'})
+              with urllib.request.build_opener(NoRedirect).open(req,timeout=8) as resp:
+                  report['native_get_count']=1
+                  report['http_status']=resp.status
+                  raw=resp.read(524289)
+                  if resp.status!=200 or resp.geturl()!=HUASHAN_PUBLIC_DETAIL:
+                      raise ValueError('HUASHAN_FIELD_STATUS_OR_REDIRECT_HOLD')
+                  if not 0<len(raw)<=524288: raise ValueError('HUASHAN_FIELD_BODY_SIZE_HOLD')
+                  if resp.headers.get_content_type()!='text/html':
+                      raise ValueError('HUASHAN_FIELD_CONTENT_TYPE_HOLD')
+                  if resp.headers.get_content_charset() not in (None,'utf-8'):
+                      raise ValueError('HUASHAN_FIELD_CHARSET_HOLD')
+                  html=raw.decode('utf-8',errors='strict')
+                  observed=datetime.datetime.now(datetime.timezone.utc).isoformat()
+                  report.update(adjudicate_huashan_detail_field_roles(
+                      html,HUASHAN_PUBLIC_DETAIL,observed,hashlib.sha256(raw).hexdigest()))
+                  report['native_get_count']=1
+                  report['http_status']=resp.status
+                  report['raw_body_bytes']=len(raw)
+                  report['raw_body_sha256']=hashlib.sha256(raw).hexdigest()
+          except Exception as exc:
+              report['decision']='SOURCE_ACQUISITION_OR_FIELD_HOLD'
+              report['first_failure']=type(exc).__name__+':'+str(exc)[:120]
+          assert report['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert report['formal_accepted_fields']==report['golden_accepted_events']==report['published_events']==0
+          Path('evidence/native_huashan_field_roles.json').write_text(
+              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('HUASHAN_NATIVE_FIELD_ROLE',report['decision'],
+                report['native_get_count'],len(report['field_matrix']),
+                report['first_failure'],flush=True)
+          PY
+      - name: One-shot A TMC authority and B Huashan embedded ID hypothesis (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[authority-identity-probe-once]'; then
+            echo 'AUTHORITY_IDENTITY_NATIVE_SKIPPED_NO_NEW_HYPOTHESIS'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime,hashlib,json,urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              PUBLIC_TMC_DETAIL,HUASHAN_PUBLIC_DETAIL,
+              parse_official_non_session_html,inspect_huashan_embedded_event_identity,
+              TMC_KHAM_FIELDS)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+          opener=urllib.request.build_opener(NoRedirect)
+          out={'kind':'P30_L7_A_B_NATIVE_AUTHORITY_IDENTITY_HYPOTHESIS_V1',
+               'hypotheses':{
+                   'A':'TMC same official detail has unique exact H1, SHOW/HALL event-local labels and direct KHAM PRODUCT edge, never checkout Session',
+                   'B':'Huashan exact official detail embeds schema.org Event.identifier numeric value owned by this detail URL, never infer from slug'},
+               'native_get_attempted':0,'native_http200':0,'results':[],
+               'formal_accepted_fields':0,'golden_accepted_events':0,
+               'published_events':0,'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          for line,url in (('A',PUBLIC_TMC_DETAIL),('B',HUASHAN_PUBLIC_DETAIL)):
+              record={'line':line,'url':url,'http_status':None,'body_sha256':None,
+                      'body_bytes':0,'decision':'SOURCE_ACQUISITION_HOLD',
+                      'first_failure':None,'independent_field_authority':False,
+                      'formal_accepted_fields':0}
+              out['native_get_attempted']+=1
+              try:
+                  req=urllib.request.Request(url,method='GET',headers={
+                      'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept':'text/html','Accept-Encoding':'identity'})
+                  with opener.open(req,timeout=8) as resp:
+                      record['http_status']=resp.status
+                      if resp.status!=200 or resp.geturl()!=url:
+                          raise ValueError('EXACT_HTTP200_NO_REDIRECT_HOLD')
+                      raw=resp.read(524289)
+                      if not 0<len(raw)<=524288: raise ValueError('BOUNDED_BODY_HOLD')
+                      if resp.headers.get_content_type()!='text/html':
+                          raise ValueError('HTML_CONTENT_TYPE_HOLD')
+                      if resp.headers.get_content_charset() not in (None,'utf-8'):
+                          raise ValueError('UTF8_CHARSET_HOLD')
+                      html=raw.decode('utf-8',errors='strict')
+                      record['body_bytes']=len(raw)
+                      record['body_sha256']=hashlib.sha256(raw).hexdigest()
+                      record['observed_at_utc']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+                      out['native_http200']+=1
+                  if line=='A':
+                      parsed=parse_official_non_session_html(
+                          url,html,TMC_KHAM_FIELDS['venue_title'][3],
+                          'P1DF32E2',record['observed_at_utc'])
+                      record['decision']='REVIEW_NATIVE_DETAIL_ROLES_INDEPENDENT_AUTHORITY_HOLD'
+                      record['identity_kind']='KHAM_PRODUCT_NOT_EVENT_SESSION'
+                      record['field_matrix']=[{
+                          'field':f['field'],'role':f['role'],'value':f['value'],
+                          'source_url':url,'body_sha256':record['body_sha256'],
+                          'observed_at_utc':record['observed_at_utc'],
+                          'decision':'REVIEW_NOT_FORMAL'} for f in parsed['candidate_fields']]
+                  else:
+                      result=inspect_huashan_embedded_event_identity(html,url)
+                      record['decision']=result['decision']
+                      record['first_failure']=result['first_failure']
+                      record['embedded_numeric_id_review']=result['embedded_numeric_id_review']
+                      record['same_numeric_event_id']=0
+              except Exception as exc:
+                  record['first_failure']=type(exc).__name__+':'+str(exc)[:140]
+                  if record['decision']=='SOURCE_ACQUISITION_HOLD':
+                      record['decision']='SOURCE_OR_PARSER_HOLD'
+              out['results'].append(record)
+              print('NATIVE_AUTHORITY_IDENTITY',line,record['http_status'],
+                    record['decision'],record['first_failure'],flush=True)
+          assert out['native_get_attempted']==2
+          assert out['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert out['formal_accepted_fields']==out['golden_accepted_events']==out['published_events']==0
+          Path('evidence/native_authority_identity_hypothesis.json').write_text(
+              json.dumps(out,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          PY
+      - name: One-shot B Songshan SECOND official UUID bounded LIST DETAIL (NO PUBLISH)
+        if: github.run_attempt == 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only this exact commit authorizes one normal GET per two public URLs.
+          # A rerun or later unrelated commit must never repeat this probe.
+          if ! git log -1 --format=%s | grep -Fq '[songshan-second-uuid-once]'; then
+            echo 'SONGSHAN_SECOND_UUID_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, shutil, tempfile
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import run_songshan_uuid_review_lkg
+          uuid = '3b2101fd-cbb3-48ec-b23c-496880df5626'
+          title = 'STAR ON THE MOVE 2026 臺北採購媒合與展售會'
+          with tempfile.TemporaryDirectory(prefix='eventradar_songshan_second_uuid_') as tmp:
+              isolated = Path(tmp) / 'review_lkg_snapshot.json'
+              result = run_songshan_uuid_review_lkg(
+                  isolated, Path.cwd(), network_authorized=True,
+                  source_hypothesis='New indexed official Songshan second UUID exact LIST card and DETAIL title ownership',
+                  event_uuid=uuid, event_title=title, event_type='展覽')
+              if result.get('persisted') is True:
+                  assert result.get('official_uuid') == uuid
+                  sealed = json.loads(isolated.read_text(encoding='utf-8'))
+                  assert sealed['rows'][0]['_candidate']['source_event_id'] == uuid
+                  assert sealed['rows'][0]['title'] == title
+                  assert sealed['rows'][0]['_candidate']['formal_field_pass'] is False
+                  assert sealed['rows'][0]['_candidate']['published'] is False
+                  assert sealed['last_known_good_sha256'] == result['lkg_sha256']
+                  shutil.copyfile(isolated, 'evidence/songshan_second_uuid_isolated_review_lkg.json')
+                  result['isolated_artifact_sha256'] = hashlib.sha256(
+                      Path('evidence/songshan_second_uuid_isolated_review_lkg.json').read_bytes()
+                  ).hexdigest()
+          result['target_uuid'] = uuid
+          result['expected_event_title'] = title
+          result['audit_recorded_at_utc'] = datetime.datetime.now(
+              datetime.timezone.utc).isoformat()
+          result['source_role_policy'] = {
+              'event_period': '2026-11-06..2026-11-08:INDEXED_REVIEW_ONLY',
+              'buyer_only_day': '2026-11-06:INVITATION_ONLY_NOT_PUBLIC_SESSION',
+              'public_hours': '2026-11-07..08 11:00-20:00:INDEXED_REVIEW_ONLY',
+              'venue': '北向製菸工廠:INDEXED_REVIEW_ONLY',
+              'native_independent_field_authority': False,
+          }
+          assert result['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
+          assert result['formal_accepted_fields'] == result['golden_accepted_events'] == result['published_events'] == 0
+          Path('evidence/native_songshan_second_uuid.json').write_text(
+              json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
+              encoding='utf-8')
+          print('SONGSHAN_SECOND_UUID_NATIVE',result['decision'],
+                'http200',result['native_get_200_count'],
+                'same_uuid_lkg',result['same_uuid_review_lkg'],
+                'first_failure',result.get('reason','NONE'),flush=True)
+          PY
+      - name: One-shot CKSMH event-local four-session DETAIL roles (NO PUBLISH)
+        if: github.run_attempt == 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Eq '\[cksmh-(session-roles|dom-boundary)-once\]'; then
+            echo 'CKSMH_SESSION_ROLES_SKIPPED_NO_NEW_HYPOTHESIS'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              CKSMH_PUBLIC_DETAIL, extract_cksmh_event_local_session_roles,
+              diagnose_cksmh_session_dom_boundary)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          report = {
+              'kind': 'P30_L7_CKSMH_ONE_SHOT_SESSION_ROLE_NATIVE_V1',
+              'hypothesis': 'Native server HTML may lack visible ordinals, contain responsive duplicates, or truncate the session section before four rendered-reader sessions',
+              'native_get_attempted': 1, 'native_get_200_count': 0,
+              'same_id_list_detail_new': 0, 'review_session_roles': 0,
+              'decision': 'HOLD_NATIVE_OR_SESSION_SCOPE',
+              'first_failure': None, 'no_raw_html_saved': True,
+              'formal_accepted_fields': 0, 'golden_accepted_events': 0,
+              'published_events': 0,
+              'release_state': 'HARD_HOLD_NO_PUBLICATION',
+          }
+          try:
+              request = urllib.request.Request(
+                  CKSMH_PUBLIC_DETAIL, method='GET',
+                  headers={'User-Agent': 'EventRadarSourceAudit/1.0 (public read-only)',
+                           'Accept': 'text/html', 'Accept-Encoding': 'identity'})
+              with urllib.request.build_opener(NoRedirect).open(
+                      request, timeout=8) as response:
+                  if response.status != 200 or response.geturl() != CKSMH_PUBLIC_DETAIL:
+                      raise ValueError('CKSMH_SESSION_HTTP200_EXACT_URL_HOLD')
+                  raw = response.read(524289)
+                  if not 0 < len(raw) <= 524288:
+                      raise ValueError('CKSMH_SESSION_BODY_BOUNDS_HOLD')
+                  if response.headers.get_content_type() != 'text/html':
+                      raise ValueError('CKSMH_SESSION_HTML_CONTENT_TYPE_HOLD')
+                  charset = (response.headers.get_content_charset() or 'utf-8').lower()
+                  if charset not in ('utf-8', 'big5', 'cp950'):
+                      raise ValueError('CKSMH_SESSION_CHARSET_HOLD')
+                  digest = hashlib.sha256(raw).hexdigest()
+                  report['native_get_200_count'] = 1
+                  report['detail_body_sha256'] = digest
+                  report['body_bytes'] = len(raw)
+                  report['observed_at_utc'] = datetime.datetime.now(
+                      datetime.timezone.utc).isoformat()
+                  decoded = raw.decode(charset, errors='strict')
+                  report['dom_boundary_diagnostic'] = diagnose_cksmh_session_dom_boundary(
+                      decoded, CKSMH_PUBLIC_DETAIL, digest)
+                  parsed = extract_cksmh_event_local_session_roles(
+                      decoded, CKSMH_PUBLIC_DETAIL,
+                      report['observed_at_utc'], digest)
+                  report['decision'] = parsed['decision']
+                  report['review_session_roles'] = parsed['session_count']
+                  report['sessions'] = parsed['sessions']
+                  report['independent_formal_authority'] = False
+          except Exception as exc:
+              report['first_failure'] = type(exc).__name__ + ':' + str(exc)[:140]
+          assert report['release_state'] == 'HARD_HOLD_NO_PUBLICATION'
+          assert report['formal_accepted_fields'] == report['golden_accepted_events'] == report['published_events'] == 0
+          Path('evidence/native_cksmh_session_roles.json').write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + '\n',
+              encoding='utf-8')
+          print('CKSMH_NATIVE_SESSION_ROLES', report['decision'],
+                'http200', report['native_get_200_count'],
+                'event_local_rows', report['review_session_roles'],
+                'first_failure', report['first_failure'], flush=True)
+          PY
+      - name: One-shot B Huashan official HOME card vs sealed DETAIL date (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[huashan-home-conflict-once]'; then
+            echo 'HUASHAN_HOME_PROBE_SKIPPED_NO_NEW_HYPOTHESIS'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, json, urllib.request
+          from pathlib import Path
+          from scripts.p30_l7_field_golden_readiness import (
+              HUASHAN_PUBLIC_HOME, inspect_huashan_homepage_same_path_date)
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          out = {'kind': 'P30_L7_HUASHAN_ONE_SHOT_HOME_DATE_AUTHORITY_V1',
+                 'native_get_attempted': 1, 'native_http200': 0,
+                 'first_failure': 'HUASHAN_HOME_GET_NOT_COMPLETED',
+                 'decision': 'HOLD', 'formal_accepted_fields': 0,
+                 'golden_accepted_events': 0, 'published_events': 0,
+                 'release_state': 'HARD_HOLD_NO_PUBLICATION',
+                 'no_raw_html_saved': True}
+          try:
+              req = urllib.request.Request(
+                  HUASHAN_PUBLIC_HOME, method='GET',
+                  headers={'User-Agent':'EventRadarSourceAudit/1.0 (public read-only)',
+                           'Accept':'text/html','Accept-Encoding':'identity'})
+              with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as res:
+                  raw = res.read(524289)
+                  payload = (res.status, res.headers.get('Content-Type',''),
+                             raw, res.geturl())
+              out['native_http200'] = int(payload[0] == 200)
+              parsed = inspect_huashan_homepage_same_path_date(
+                  payload, datetime.datetime.now(datetime.timezone.utc).isoformat())
+              out['home_date_gate'] = parsed
+              out['decision'] = parsed['decision']
+              out['first_failure'] = parsed['first_failure']
+          except Exception as exc:
+              out['first_failure'] = type(exc).__name__ + ':' + str(exc)[:140]
+          assert out['formal_accepted_fields'] == out['golden_accepted_events'] == out['published_events'] == 0
+          Path('evidence/native_huashan_home_date.json').write_text(
+              json.dumps(out, ensure_ascii=False, sort_keys=True, indent=2)+'\n',
+              encoding='utf-8')
+          print('HUASHAN_HOME_DATE', out['native_http200'], out['decision'],
+                out['first_failure'], flush=True)
+          PY
+      - name: One-shot A TPAC direct official OPENTIX event edge (NO PUBLISH)
+        if: github.run_attempt == 1
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This hypothesis is consumed by the first attempt of this exact commit.
+          if ! git log -1 --format=%s | grep -Fq '[tpac-opentix-edge-once]'; then
+            echo 'TPAC_OPENTIX_EDGE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import datetime, hashlib, json, re, urllib.request
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urljoin
+          TPAC = 'https://tpac.org.taipei/program/2088'
+          TICKET = 'https://www.opentix.life/event/2072516129034670080'
+          TITLE = 'C MUSICAL 音樂劇《小王子》'
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          class Scoped(HTMLParser):
+              def __init__(self):
+                  super().__init__(convert_charrefs=True)
+                  self.depth = 0
+                  self.h1 = []
+                  self.links = []
+                  self.text = []
+                  self.capture = None
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if tag == 'h1':
+                      self.depth += 1
+                      self.capture = []
+                  if tag == 'a':
+                      self.links.append(attrs.get('href', ''))
+              def handle_data(self, value):
+                  if self.capture is not None:
+                      self.capture.append(value)
+                  if len(self.text) < 30000:
+                      self.text.append(value)
+              def handle_endtag(self, tag):
+                  if tag == 'h1' and self.capture is not None:
+                      self.h1.append(' '.join(''.join(self.capture).split()))
+                      self.capture = None
+          report = {
+              'kind': 'P30_L7_A_TPAC_TO_OPENTIX_DIRECT_EDGE_NATIVE_ONCE_V1',
+              'hypothesis': 'Official TPAC program/2088 direct ticket anchor points to exact OPENTIX event ID and both source-local titles/venue agree',
+              'source_receipts': [], 'native_get_attempted': 0,
+              'native_http200': 0, 'same_event_direct_edge_review': 0,
+              'native_same_id_review_lkg': 0, 'decision': 'HOLD',
+              'first_failure': 'SOURCE_NOT_ATTEMPTED',
+              'no_raw_html_saved': True, 'ticket_session_id': None,
+              'formal_accepted_fields': 0, 'golden_accepted_events': 0,
+              'published_events': 0, 'release_state': 'HARD_HOLD_NO_PUBLICATION'}
+          parsed = {}
+          for url in (TPAC, TICKET):
+              report['native_get_attempted'] += 1
+              receipt = {'url': url, 'http_status': 0,
+                         'observed_at_utc': datetime.datetime.now(
+                             datetime.timezone.utc).isoformat()}
+              try:
+                  req = urllib.request.Request(url, method='GET', headers={
+                      'User-Agent': 'EventRadarSourceAudit/1.0 (public read-only)',
+                      'Accept': 'text/html', 'Accept-Encoding': 'identity'})
+                  with urllib.request.build_opener(NoRedirect).open(req, timeout=8) as response:
+                      receipt['http_status'] = response.status
+                      final_url = response.geturl()
+                      mime = response.headers.get_content_type()
+                      charset = (response.headers.get_content_charset() or 'utf-8').lower()
+                      raw = response.read(524289)
+                  receipt['bytes_read_capped'] = len(raw)
+                  receipt['content_type'] = mime
+                  receipt['charset'] = charset
+                  report['native_http200'] += int(receipt['http_status'] == 200)
+                  if len(raw) > 524288:
+                      # A bounded prefix hash is never a full source-body hash.
+                      receipt['prefix_sha256'] = hashlib.sha256(raw).hexdigest()
+                      receipt['body_truncated'] = True
+                      raise ValueError('EXACT_URL_BODY_EXCEEDS_524288_HOLD')
+                  receipt['body_sha256'] = hashlib.sha256(raw).hexdigest()
+                  receipt['body_truncated'] = False
+                  if (receipt['http_status'] != 200 or final_url != url or
+                      mime != 'text/html' or charset != 'utf-8' or
+                      not raw):
+                      raise ValueError('EXACT_URL_HTTP_MIME_CHARSET_OR_EMPTY_BODY_HOLD')
+                  receipt['transport'] = 'NATIVE_OFFICIAL_HTTP200_VALID_BOUNDED_BODY'
+                  dom = Scoped()
+                  dom.feed(raw.decode('utf-8', errors='strict'))
+                  parsed[url] = dom
+              except Exception as exc:
+                  report['first_failure'] = (url + ':' + type(exc).__name__ +
+                                             ':' + str(exc)[:100])
+                  report['source_receipts'].append(receipt)
+                  break
+              report['source_receipts'].append(receipt)
+          if len(parsed) == 2:
+              venue, ticket = parsed[TPAC], parsed[TICKET]
+              exact_link_count = sum(urljoin(TPAC, href) == TICKET for href in venue.links)
+              title_ok = venue.h1.count(TITLE) == 1 and ticket.h1.count(TITLE) == 1
+              venue_ok = '藍盒子' in ''.join(venue.text) and '藍盒子' in ''.join(ticket.text)
+              report['identity_checks'] = {
+                  'tpac_exact_ticket_href_count': exact_link_count,
+                  'tpac_exact_h1_count': venue.h1.count(TITLE),
+                  'opentix_exact_h1_count': ticket.h1.count(TITLE),
+                  'venue_both_sources': venue_ok,
+                  'age_min_tpac': '6+ INDEXED_REVIEW_NOT_NATIVE_ATTESTED',
+                  'age_min_opentix': '7+ INDEXED_REVIEW_NOT_NATIVE_ATTESTED',
+                  'age_conflict': 'HOLD_NEVER_AUTO_PROMOTE',
+                  'multi_show_sessions': 'NOT_FLATTENED'}
+              if exact_link_count == 1 and title_ok and venue_ok:
+                  report['same_event_direct_edge_review'] = 1
+                  report['decision'] = 'REVIEW_DIRECT_EVENT_EDGE_ONLY'
+                  report['first_failure'] = 'INDEPENDENT_FORMAL_FIELD_AUTHORITY_AND_SESSIONS_HOLD'
+              else:
+                  report['first_failure'] = 'TPAC_OPENTIX_NATIVE_DOM_EDGE_TITLE_OR_VENUE_HOLD'
+          assert report['formal_accepted_fields'] == report['golden_accepted_events'] == report['published_events'] == 0
+          assert report['native_get_attempted'] <= 2
+          Path('evidence/native_tpac_opentix_direct_edge.json').write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2)+'\n',
+              encoding='utf-8')
+          print('TPAC_OPENTIX_EDGE_NATIVE', report['native_http200'],
+                report['same_event_direct_edge_review'],
+                report['first_failure'], flush=True)
+          PY
+      - name: One-shot TPAC complete-stream native source (new 4 MiB hypothesis; NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One new root-cause hypothesis after the historic 512 KiB prefix HOLD.
+          # First attempt of exactly this commit only; never repeat on rerun or
+          # later commits. No second URL, redirect, retry, login or checkout.
+          if [ "${{ github.run_attempt }}" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tpac-stream-native-once]'; then
+            echo 'TPAC_STREAM_NATIVE_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          set +e
+          python scripts/p30_source_stream_gate.py --tpac-native-once > evidence/tpac_native_stream_once.json
+          gate_rc=$?
+          set -e
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 49 ]; then
+            echo "TPAC_STREAM_NATIVE_UNEXPECTED_EXIT=$gate_rc"
+            exit "$gate_rc"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/tpac_native_stream_once.json').read_text(encoding='utf-8'))
+          assert d['kind']=='P30_TPAC_NATIVE_COMPLETE_STREAM_ONESHOT_V1'
+          assert d['native_get_this_call']==1 and d['native_detail_get_attempted']==1
+          assert d['native_list_get_this_call']==0 and d['native_same_id_lkg']==0
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          assert d['release_state']=='HARD_HOLD_NO_PUBLICATION' and d['raw_html_saved'] is False
+          assert d['source_url']=='https://tpac.org.taipei/program/2088'
+          if 'body_sha256' in d:
+              assert d.get('body_truncated') is False
+              assert 0 < d['body_bytes'] <= 4*1024*1024
+          if d.get('body_truncated'):
+              assert 'body_sha256' not in d and 'prefix_sha256' in d
+          print('TPAC_NATIVE_ONESHOT',json.dumps({
+              'http200':d['native_http200_this_call'],
+              'full_body':bool(d.get('body_sha256')),
+              'decision':d['decision'],
+              'first_failure':d['first_failure'],
+              'native_same_id_lkg':0,'formal_field':0,'golden':0,'published':0}))
+          PY
+      - name: One-shot B Zepp New Taipei exact rid native source rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New canonical New Taipei venue, NOT a formal platform.
+          # Single-use commit marker, first CI attempt only.
+          if [ "${{ github.run_attempt }}" != "1" ] || ! git log -1 --format=%s | grep -Fq '[zepp-native-once]'; then
+            echo 'ZEPP_NATIVE_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          set +e
+          python scripts/p30_source_stream_gate.py --zepp-native-once > evidence/zepp_newtaipei_native_once.json
+          gate_rc=$?
+          set -e
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 49 ]; then
+            echo "ZEPP_NATIVE_UNEXPECTED_EXIT=$gate_rc"
+            exit "$gate_rc"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/zepp_newtaipei_native_once.json').read_text(encoding='utf-8'))
+          assert d['kind']=='P30_B_ZEPP_NEWTIPEI_NATIVE_SAME_ID_ONESHOT_V1'
+          assert d['line']=='B' and d['source_key']=='venue:zepp-newtaipei'
+          assert d['source_event_id']=='166457'
+          assert d['policy_get_attempted']==1
+          assert d['policy_decision'] in ('UNKNOWN','ALLOW_ROBOTS_200','ALLOW_ROBOTS_404')
+          assert 0 <= d['native_get_attempted'] <= 2
+          assert d['native_list_get_attempted'] <= 1
+          assert d['native_detail_get_attempted'] <= 1
+          assert d['native_http200'] <= d['native_get_attempted']
+          assert d['same_id_review_lkg']==0
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert all(r['url'] in (
+              'https://www.zepp.co.jp/hall/newtaipei/schedule/',
+              'https://www.zepp.co.jp/hall/newtaipei/schedule/single/?rid=166457'
+          ) for r in d['source_receipts'])
+          print('ZEPP_NATIVE_ONESHOT',json.dumps({
+              'attempted':d['native_get_attempted'],'http200':d['native_http200'],
+              'same_id_review':d['native_same_id_review'],
+              'same_id_lkg':0,'first_failure':d['first_failure']}))
+          PY
+      - name: One-shot A OPENTIX distinct public DETAIL native source rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New event; no checkout or ticket Session, no repeated probe.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[opentix-native-once]'; then
+            echo 'OPENTIX_FRESH_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          set +e
+          python scripts/p30_source_stream_gate.py --opentix-native-once > evidence/opentix_fresh_detail_native_once.json
+          gate_rc=$?
+          set -e
+          if [ "$gate_rc" -ne 0 ] && [ "$gate_rc" -ne 49 ]; then
+            echo "OPENTIX_FRESH_NATIVE_UNEXPECTED_EXIT=$gate_rc"
+            exit "$gate_rc"
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/opentix_fresh_detail_native_once.json').read_text(encoding='utf-8'))
+          assert d['kind']=='P30_A_OPENTIX_DISTINCT_DETAIL_NATIVE_ONESHOT_V1'
+          assert d['line']=='A' and d['platform_id']=='05'
+          assert d['source_event_id']=='2054505084713033728'
+          assert d['source_url']=='https://www.opentix.life/event/2054505084713033728'
+          assert d['policy_get_attempted']==1
+          assert d['native_get_attempted']<=1 and d['native_detail_get_attempted']<=1
+          assert d['native_list_get_attempted']==0
+          assert d['native_http200']<=d['native_get_attempted']
+          assert d['native_same_id_review_lkg']==0
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          print('OPENTIX_DISTINCT_NATIVE',json.dumps({
+              'policy':d['policy_decision'],'attempted':d['native_get_attempted'],
+              'http200':d['native_http200'],'decision':d['decision'],
+              'first_failure':d['first_failure'],'same_id_lkg':0}))
+          PY
+      - name: One-shot A ACCUPASS distinct public LIST same-ID DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New event selected from public ACCUPASS search; only once on exact marker.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[accupass-native-once]'; then
+            echo 'ACCUPASS_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python scripts/p30_accupass_native_gate.py > evidence/accupass_native_once.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/accupass_native_once.json').read_text(encoding='utf-8'))
+          assert d['platform_id']=='02' and d['source_event_id']=='2606282259461938560271'
+          assert d['formal_accepted_fields']==d['golden']==d['published']==0
+          assert d['native_same_id_lkg']==0 and d['raw_html_saved'] is False
+          assert d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert len(d['source_receipts']) <= 2
+          print('ACCUPASS_NATIVE',json.dumps({
+              'attempted':d['native_get_attempted'],'http200':d['native_http200'],
+              'list':d['native_list'],'detail':d['native_detail'],
+              'same_id_review':d['native_same_id_review'],
+              'first_failure':d['first_failure']}))
+          PY
+      - name: One-shot A FamiTicket and B NTPC native source rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.run_attempt }}" != "1" ] || ! git log -1 --format=%s | grep -Fq '[dual-rotation-once]'; then
+            echo 'DUAL_ROTATION_NATIVE_SKIPPED_EXACT_HEAD_ONE_SHOT_GUARD'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_dual_native_rotation import run_native_once
+          for line in ('A','B'):
+              result=run_native_once(line)
+              Path('evidence/native_rotation_'+line+'.json').write_text(
+                  json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
+                  encoding='utf-8')
+              print('NATIVE_ROTATION',line,result['native_http200'],
+                    result['native_list'],result['native_detail'],
+                    result['native_same_id_review'],result['first_failure'],flush=True)
+          PY
+      - name: One-shot B Cloud Gate native LIST same-ID DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.run_attempt }}" != "1" ] || ! git log -1 --format=%s | grep -Fq '[cloudgate-native-once]'; then
+            echo 'CLOUDGATE_NATIVE_SKIPPED_EXACT_HEAD_ONE_SHOT_GUARD'
+            exit 0
+          fi
+          mkdir -p evidence
+          python -m scripts.p30_cloudgate_native_gate > evidence/cloudgate_native_once.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/cloudgate_native_once.json').read_text(encoding='utf-8'))
+          assert d['kind']=='P30_B_CLOUDGATE_NEWTAIPEI_NATIVE_ONESHOT_V1'
+          assert d['source_event_id']=='1680'
+          assert d['native_get_attempted']<=3 and d['native_http200']<=2
+          assert d['native_same_id_lkg']==d['formal_accepted_fields']==d['golden']==d['published']==0
+          assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          print('CLOUDGATE_NATIVE',d['native_http200'],d['native_list'],d['native_detail'],
+                d['native_same_id_review'],d['postponement_review'],d['first_failure'])
+          PY
+      - name: One-shot distinct A ticket and B New Taipei native source (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[next-native-rotation-once]'; then
+            echo 'NEXT_NATIVE_SKIPPED_EXACT_HEAD_ONE_SHOT_GUARD'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_dual_native_rotation import run_next_native_once
+          for line in ("A","B"):
+              d=run_next_native_once(line)
+              assert d["kind"]=="P30_AB_DISTINCT_NATIVE_ONESHOT_V1"
+              assert d["attempted"]<=3 and d["http200"]<=2
+              assert d["native_lkg"]==d["formal_fields"]==d["golden"]==d["published"]==0
+              assert d["raw_html_saved"] is False and d["release_state"]=="HARD_HOLD_NO_PUBLICATION"
+              Path("evidence/next_native_"+line+".json").write_text(
+                  json.dumps(d,ensure_ascii=False,sort_keys=True)+"\n",encoding="utf-8")
+              print("NEXT_NATIVE",line,d["http200"],d["native_list"],
+                    d["native_detail"],d["native_identity"],d["first_failure"],flush=True)
+          PY
+      - name: One-shot distinct B Zepp rid 160667 exact source (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[zepp-160667-native-once]'; then
+            echo 'ZEPP_160667_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_dual_native_rotation import run_zepp_earendel_native_once
+          x=run_zepp_earendel_native_once()
+          assert x['kind']=='P30_B_ZEPP_160667_NATIVE_ONESHOT_V1'
+          assert x['event_id']=='160667' and x['attempted']<=3
+          assert x['http200']<=2 and x['native_detail']<=x['native_list']
+          assert x['native_body_lkg']==x['receipt_only_lkg']==0
+          assert x['formal_fields']==x['golden']==x['published']==0
+          assert not x['raw_html_saved'] and x['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          Path('evidence/zepp_160667_native_once.json').write_text(
+              json.dumps(x,ensure_ascii=False,sort_keys=True)+'\n',encoding='utf-8')
+          print('ZEPP_160667_NATIVE',x['http200'],x['native_list'],
+                x['native_detail'],x['native_identity'],x['first_failure'])
+          PY
+      - name: One-shot A TixFun #09 exact PRODUCT information (NO CHECKOUT, NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tixfun-native-once]'; then
+            echo 'TIXFUN_NATIVE_SKIPPED_NO_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_dual_native_rotation import run_tixfun_native_once
+          d=run_tixfun_native_once()
+          assert d["kind"]=="P30_A_TIXFUN_09_NATIVE_ONESHOT_V1"
+          assert d["source_id"]=="09" and d["source_event_id"]=="Q029NZNY"
+          assert d["attempted"]<=3 and d["http200"]<=2
+          assert d["native_lkg"]==d["formal_accepted_fields"]==d["golden"]==d["published"]==0
+          assert d["raw_html_saved"] is False and d["release_state"]=="HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/tixfun_09_native_once.json").write_text(
+              json.dumps(d,ensure_ascii=False,sort_keys=True)+"\n",encoding="utf-8")
+          print("TIXFUN_NATIVE",d["attempted"],d["http200"],d["native_list"],
+                d["native_detail"],d["native_same_id_review"],d["first_failure"],flush=True)
+          PY
+      - name: One-shot A KKTIX and B Fuzhong15 distinct public native LIST DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kktix-fuzhong-native-once]'; then
+            echo 'KKTIX_FUZHONG_NATIVE_SKIPPED_EXACT_HEAD_ONE_SHOT_GUARD'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          for line in ('A', 'B'):
+              d=run_native_once(line)
+              assert d['kind']=='P30_AB_KKTIX_FUZHONG_NATIVE_ONESHOT_V1'
+              assert d['native_get_attempted']<=3 and d['native_http200']<=2
+              assert d['native_lkg']==d['formal_accepted_fields']==d['golden']==d['published']==0
+              assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+              assert len(d['source_receipts'])<=2
+              Path('evidence/ab_kktix_fuzhong_native_'+line+'.json').write_text(
+                  json.dumps(d,ensure_ascii=False,sort_keys=True)+'\n',encoding='utf-8')
+              print('AB_KKTIX_FUZHONG_NATIVE',line,d['native_get_attempted'],
+                    d['native_http200'],d['native_list'],d['native_detail'],
+                    d['native_same_id_review'],d['field_roles'],d['first_failure'],flush=True)
+          PY
+      - name: One-shot new A UDN #06 and B Yingge official LIST DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git log -1 --format=%s | grep -Fq '[udn-yingge-probe-once]'; then
+            echo 'UDN_YINGGE_PROBE_SKIPPED_NO_ONE_SHOT_COMMIT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          for line in ("A_UDN", "B_CERAMICS"):
+              report = run_native_once(line)
+              path = Path("evidence/ab_udn_yingge_native_" + line + ".json")
+              path.write_text(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+              print("UDN_YINGGE_NATIVE", line, report["native_get_attempted"],
+                    report["native_http200"], report["native_same_id_review"],
+                    report["first_failure"], flush=True)
+          PY
+      - name: One-shot A ACCUPASS #02 new exact event search card (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[accupass02-native-once]'; then
+            echo 'ACCUPASS02_NATIVE_SKIPPED_NO_UNCONSUMED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          report = run_native_once("A_ACCUPASS")
+          assert report["source_id"] == "02"
+          assert report["source_event_id"] == "2610261742421131142843"
+          assert report["native_get_attempted"] <= 3 and report["native_http200"] <= 2
+          assert report["native_lkg"] == report["formal_accepted_fields"] == report["golden"] == report["published"] == 0
+          assert report["raw_html_saved"] is False and report["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/accupass02_native_once.json").write_text(
+              json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+          print("ACCUPASS02_NATIVE", report["native_get_attempted"], report["native_http200"],
+                report["native_list"], report["native_detail"], report["native_same_id_review"],
+                report["first_failure"], flush=True)
+          PY
+      - name: One-shot B Zepp New Taipei Takase exact rid 160668 (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[zepp-takase-native-once]'; then
+            echo 'ZEPP_TAKASE_NATIVE_SKIPPED_NO_UNCONSUMED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          report = run_native_once("B_ZEPP_TAKASE")
+          assert report["source_id"] == "ZEPP_NEWTAIPEI_OFFICIAL"
+          assert report["source_event_id"] == "160668"
+          assert report["native_get_attempted"] <= 3
+          assert report["native_http200"] <= 2
+          assert report["native_lkg"] == report["formal_accepted_fields"] == report["golden"] == report["published"] == 0
+          assert report["raw_html_saved"] is False
+          assert report["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/zepp_takase_160668_native_once.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8")
+          print("ZEPP_TAKASE_NATIVE", report["native_get_attempted"],
+                report["native_http200"], report["native_list"],
+                report["native_detail"], report["native_same_id_review"],
+                report["first_failure"], flush=True)
+          PY
+      - name: One-shot A Tixcraft #03 new indexed event exact LIST DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # First CI attempt only; prior Tixcraft events are not re-probed.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tixcraft03-native-once]'; then
+            echo 'TIXCRAFT03_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          report = run_native_once("A_TIXCRAFT")
+          assert report["kind"] == "P30_AB_KKTIX_FUZHONG_NATIVE_ONESHOT_V1"
+          assert report["line"] == "A_TIXCRAFT" and report["source_id"] == "03"
+          assert report["source_event_id"] == "26_aftp"
+          assert 0 <= report["native_get_attempted"] <= 3
+          assert 0 <= report["native_http200"] <= 2
+          assert report["native_list"] <= 1 and report["native_detail"] <= 1
+          assert report["native_same_id_review"] <= report["native_detail"]
+          assert report["native_lkg"] == report["formal_accepted_fields"] == report["golden"] == report["published"] == 0
+          assert report["raw_html_saved"] is False
+          assert report["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          assert len(report["source_receipts"]) <= 2
+          Path("evidence/tixcraft03_native_once.json").write_text(
+              json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8")
+          print("TIXCRAFT03_NATIVE", report["native_get_attempted"],
+                report["native_http200"], report["native_list"],
+                report["native_detail"], report["native_same_id_review"],
+                report["first_failure"], flush=True)
+          PY
+      - name: One-shot A KIMU public forum and B New Taipei Art Museum native rotation (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One fresh, bounded robots-gated source rotation per official site.
+          # No raw HTML, checkout, repeat GET, or automatic formal promotion.
+          # Never re-consume the probe on rerun or a later unrelated commit.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kimu-ntcam-native-once]'; then
+            echo 'KIMU_NTCAM_NATIVE_SKIPPED_NO_UNUSED_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import SOURCES, run_native_once
+          for line, filename in (("A_KIMU", "kimu_native_once.json"),
+                                 ("B_NTCAM", "ntcam_native_once.json")):
+              report = run_native_once(line)
+              assert report["source_id"] == SOURCES[line]["source_id"]
+              assert report["source_event_id"] == SOURCES[line]["event_id"]
+              assert 0 <= report["native_get_attempted"] <= 3
+              assert 0 <= report["native_http200"] <= 2
+              assert report["native_list"] <= 1 and report["native_detail"] <= 1
+              assert report["native_same_id_review"] <= report["native_detail"]
+              assert report["native_lkg"] == report["formal_accepted_fields"] == report["golden"] == report["published"] == 0
+              assert report["raw_html_saved"] is False
+              assert report["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+              assert len(report["source_receipts"]) <= 2
+              Path("evidence", filename).write_text(
+                  json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+                  encoding="utf-8")
+              print("KIMU_NTCAM_NATIVE", line, report["native_get_attempted"],
+                    report["native_http200"], report["native_list"],
+                    report["native_detail"], report["native_same_id_review"],
+                    report["first_failure"], flush=True)
+          PY
+      - name: One-shot B KKTIX public organizer DAY1/DAY2 event-local native (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kktix-takase-native-once]'; then
+            echo 'KKTIX_TAKASE_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY' > evidence/kktix_takase_public_native_once.json
+          import json
+          from scripts.p30_source_stream_gate import probe_kktix_takase_native_once
+          print(json.dumps(probe_kktix_takase_native_once(), ensure_ascii=False, sort_keys=True))
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/kktix_takase_public_native_once.json').read_text())
+          assert d['native_get_attempted'] <= 1
+          assert d['raw_html_saved'] is False
+          assert d['formal_accepted_fields']==d['golden_accepted_events']==d['published_events']==0
+          print('KKTIX_TAKASE', d['decision'], d['first_failure'])
+          PY
+      - name: B KKTIX Day1 public organizer LIST to same-ID DETAIL (one shot)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[kktix-day1-list-detail-once]'; then
+            echo 'KKTIX_DAY1_SKIPPED_NO_UNUSED_ONE_SHOT_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY' > evidence/kktix_day1_native_once.json
+          import json
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once
+          print(json.dumps(run_native_once("B_KKTIX_TAKASE_DAY1"), ensure_ascii=False, sort_keys=True))
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('evidence/kktix_day1_native_once.json').read_text())
+          assert d['source_id']=='01' and d['source_event_id']=='takasetoya202611-2'
+          assert d['native_get_attempted'] <= 3
+          assert d['native_http200'] <= 2
+          assert d['raw_html_saved'] is False
+          assert d['formal_accepted_fields']==d['golden']==d['published']==d['native_lkg']==0
+          print('KKTIX_DAY1', d['decision'], d['first_failure'])
+          PY
+      - name: Pinned Zepp 160668 native receipt -> isolated durable LKG (NO OFFICIAL GET)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/eventradar_zepp_prior" evidence
+          # Read a sealed prior CI artifact; no repeated official source GET.
+          curl --fail --silent --show-error --location --max-redirs 2 --max-time 30 \
+            --retry 0 --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/13493064500/zip" \
+            --output "$RUNNER_TEMP/eventradar_zepp_prior/pinned.zip"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          from scripts.p30_source_stream_gate import (
+              ZEPP_TAKASE_ARTIFACT_SHA256, persist_zepp_takase_receipt_lkg)
+          prior = Path(os.environ["RUNNER_TEMP"]) / "eventradar_zepp_prior"
+          archive = (prior / "pinned.zip").read_bytes()
+          assert hashlib.sha256(archive).hexdigest() == ZEPP_TAKASE_ARTIFACT_SHA256
+          target = prior / "zepp_takase_receipt_lkg.json"
+          first = persist_zepp_takase_receipt_lkg(archive, target, Path.cwd())
+          assert first["persisted"] and not first["idempotent"]
+          second = persist_zepp_takase_receipt_lkg(archive, target, Path.cwd())
+          assert second["idempotent"] and not second["persisted"]
+          envelope = json.loads(target.read_text(encoding="utf-8"))
+          snapshot = envelope["snapshot"]
+          assert envelope["kind"] == "P30_B_ZEPP_TAKASE_DURABLE_RECEIPT_LKG_V1"
+          assert snapshot["source_event_id"] == "160668"
+          assert snapshot["receipt_only_identity_lkg"] == 1
+          assert snapshot["body_review_lkg"] == 0
+          assert snapshot["native_get_this_call"] == 0
+          assert snapshot["formal_accepted_fields"] == snapshot["golden_accepted_events"] == snapshot["published_events"] == 0
+          assert snapshot["field_authority"] == "EVENT_LOCAL_SCOPE_HOLD"
+          assert snapshot["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/zepp_takase_receipt_only_lkg.json").write_text(
+              json.dumps(envelope, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8")
+          print("PASS_PINNED_ZEPP_160668_RECEIPT_ONLY_DURABLE_LKG",
+                first["snapshot_sha256"], "NO_NATIVE_GET_NO_FORMAL_FIELD", flush=True)
+          PY
+      - name: Pinned A OPENTIX native receipt to isolated CAS LKG (NO SOURCE GET)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/eventradar_opentix_prior" evidence
+          curl --fail --silent --show-error --location --max-redirs 2 --max-time 30 \
+            --retry 0 --header "Authorization: Bearer $GH_TOKEN" \
+            --header "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/13578708475/zip" \
+            --output "$RUNNER_TEMP/eventradar_opentix_prior/pinned.zip"
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          from scripts.p30_source_stream_gate import (
+              OPENTIX_2070_ARTIFACT_SHA256, audit_opentix_native_sealed_archive,
+              persist_opentix_2070_receipt_lkg)
+          prior = Path(os.environ["RUNNER_TEMP"]) / "eventradar_opentix_prior"
+          archive = (prior / "pinned.zip").read_bytes()
+          assert hashlib.sha256(archive).hexdigest() == OPENTIX_2070_ARTIFACT_SHA256
+          target = prior / "opentix_2070446724700692480_receipt_lkg.json"
+          first = persist_opentix_2070_receipt_lkg(archive, target, Path.cwd())
+          assert first["persisted"] and not first["idempotent"]
+          second = persist_opentix_2070_receipt_lkg(archive, target, Path.cwd())
+          assert second["idempotent"] and not second["persisted"]
+          sealed = json.loads(target.read_text(encoding="utf-8"))
+          snapshot = sealed["snapshot"]
+          assert sealed["kind"] == "P30_A_OPENTIX_2070_DURABLE_RECEIPT_LKG_V1"
+          assert snapshot["source_id"] == "05"
+          assert snapshot["source_event_id"] == "2070446724700692480"
+          assert snapshot["historical_native_http200"] == 2
+          assert snapshot["receipt_only_identity_lkg"] == 1
+          assert snapshot["body_review_lkg"] == snapshot["native_get_this_call"] == 0
+          assert snapshot["formal_accepted_fields"] == 0
+          assert snapshot["golden_accepted_events"] == snapshot["published_events"] == 0
+          assert snapshot["sealed_field_conflict_audit"]["formal_accepted_fields"] == 0
+          assert snapshot["sealed_field_conflict_audit"]["wall_clock_freshness"] == "NOT_ASSESSED"
+          assert snapshot["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          try:
+              audit_opentix_native_sealed_archive(archive[:-1] + b"0")
+          except ValueError as exc:
+              assert str(exc) == "OPENTIX_ARTIFACT_SHA_HOLD"
+          else:
+              raise AssertionError("tampered archive accepted")
+          Path("evidence/opentix_2070_receipt_only_lkg.json").write_text(
+              json.dumps(sealed, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8")
+          print("PASS_PINNED_A_OPENTIX_RECEIPT_ONLY_LKG", first["snapshot_sha256"],
+                "NO_NATIVE_GET_NO_BODY_LKG_NO_FORMAL_FIELD", flush=True)
+          PY
+      - name: Single-use TPAC event2072 robots-gated native LIST DETAIL receipt (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[tpac-event2072-native-importfix-once]'; then
+            echo 'TPAC_EVENT2072_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python -m scripts.p30_tpac_event2072_native_once --evidence evidence/tpac_event2072_native_once.json
+          python - <<'PY'
+          import json
+          d=json.load(open('evidence/tpac_event2072_native_once.json',encoding='utf-8'))
+          assert d['formal_accepted_fields']==d['golden']==d['published']==0
+          assert d['native_body_lkg']==d['receipt_only_lkg']==0
+          assert d['raw_html_saved'] is False and d['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['robots_get_attempted']==1 and d['native_event_get_attempted']<=2
+          assert d['native_list']<=1 and d['native_detail']<=1
+          assert d['native_same_id_review']<=d['native_detail']
+          print('TPAC_EVENT2072_NATIVE',d['decision'],d['first_failure'])
+          PY
+      - name: One-shot A OPENTIX and B TICC robots-gated public source evidence (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[ab-opentix-ticc-native-once]'; then
+            echo 'AB_OPENTIX_TICC_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python -m scripts.p30_ab_opentix_ticc_native_once --evidence evidence/ab_opentix_ticc_native_once.json
+          python - <<'PY'
+          import json
+          d=json.load(open('evidence/ab_opentix_ticc_native_once.json',encoding='utf-8'))
+          assert set(d)=={'A','B'}
+          for line in ('A','B'):
+              x=d[line]
+              assert x['line']==line and x['robots_get_attempted']==1
+              assert x['native_event_get_attempted']<=2
+              assert x['native_list']<=1 and x['native_detail']<=1
+              assert x['native_same_id_review']<=x['native_detail']
+              assert x['formal_accepted_fields']==x['golden']==x['published']==0
+              assert x['native_body_lkg']==x['receipt_only_lkg']==0
+              assert x['raw_html_saved'] is False
+              assert x['release_state']=='HARD_HOLD_NO_PUBLICATION'
+              print('AB_OFFICIAL_NATIVE',line,x['decision'],x['first_failure'])
+          PY
+      - name: B NTCH independent official LIST exact-ID DETAIL one-shot (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[b-npac-native-once]'; then
+            echo 'B_NTCH_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python -m scripts.p30_ntch_native_once --evidence evidence/b_ntch_native_once.json
+          python - <<'PY'
+          import json
+          x=json.load(open('evidence/b_ntch_native_once.json',encoding='utf-8'))
+          assert x['line']=='B' and x['robots_get_attempted']==1
+          assert x['native_event_get_attempted']<=2
+          assert x['native_list']<=1 and x['native_detail']<=1
+          assert x['native_same_id_review']<=x['native_detail']
+          assert x['native_body_lkg']==x['receipt_only_lkg']==0
+          assert x['formal_accepted_fields']==x['golden']==x['published']==0
+          assert x['raw_html_saved'] is False
+          assert x['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          print('B_NTCH_NATIVE',x['decision'],x['first_failure'])
+          PY
+      - name: One-shot B TaiNEX P0 official exhibition LIST exact-691 DETAIL (NO PUBLISH)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # New distinct host. One robots read; LIST/DETAIL only if explicit ALLOW.
+          # Never reuse the marker, retry a denial, or infer ticket Sessions.
+          if [ "$GITHUB_RUN_ATTEMPT" != "1" ] || ! git log -1 --format=%s | grep -Fq '[b-tainex-regexfix-native-once]'; then
+            echo 'B_TAINEX_NATIVE_SKIPPED_CONSUMED_OR_NO_MARKER'
+            exit 0
+          fi
+          mkdir -p evidence
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.p30_ab_kktix_fuzhong_native import run_native_once, SOURCES
+          x = run_native_once("B_TAINEX")
+          assert x["source_id"] == SOURCES["B_TAINEX"]["source_id"]
+          assert x["source_event_id"] == "691"
+          assert 0 <= x["native_get_attempted"] <= 3
+          assert 0 <= x["native_http200"] <= 2
+          assert x["native_list"] <= 1 and x["native_detail"] <= 1
+          assert x["native_same_id_review"] <= x["native_detail"]
+          assert x["native_lkg"] == x["formal_accepted_fields"] == x["golden"] == x["published"] == 0
+          assert x["raw_html_saved"] is False
+          assert x["release_state"] == "HARD_HOLD_NO_PUBLICATION"
+          Path("evidence/b_tainex_native_once.json").write_text(
+              json.dumps(x, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+              encoding="utf-8")
+          print("B_TAINEX_NATIVE", x["native_get_attempted"],
+                x["native_http200"], x["native_list"], x["native_detail"],
+                x["native_same_id_review"], x["field_roles"],
+                x["first_failure"], flush=True)
+          PY
+      - name: Exact-head evidence SHA256 manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          files=(.github/workflows/eventradar_p30_l7_field_readiness.yml scripts/p30_candidate_review_pipeline.py scripts/p30_l7_field_golden_readiness.py scripts/p30_source_stream_gate.py tests/p30/test_p30_l7_field_golden_readiness.py tests/p30/test_p30_source_stream_gate.py scripts/p30_accupass_native_gate.py tests/p30/test_p30_accupass_native_gate.py scripts/p30_ntpc_artcenter_source.py tests/p30/test_p30_ntpc_artcenter_source.py scripts/p30_dual_native_rotation.py tests/p30/test_p30_dual_native_rotation.py scripts/p30_cloudgate_native_gate.py tests/p30/test_p30_cloudgate_native_gate.py scripts/p30_ab_kktix_fuzhong_native.py tests/p30/test_p30_ab_kktix_fuzhong_native.py scripts/p30_tpac_event_source.py scripts/p30_review_bridge.py tests/p30/test_p30_review_bridge.py scripts/p30_ab_fixed_review_workflow.py tests/p30/test_p30_ab_fixed_review_workflow.py tests/p30/test_p30_next_source_fixed_integration.py scripts/p30_tpac_event2072_native_once.py tests/p30/test_p30_tpac_event2072_native_once.py scripts/p30_ab_opentix_ticc_native_once.py tests/p30/test_p30_ab_opentix_ticc_native_once.py scripts/p30_ntch_native_once.py tests/p30/test_p30_ntch_native_once.py tests/p30/fixtures/p30_l7_prince_field_readiness.json)
+          printf 'head=%s\nbase=%s\nreader=INDEXED_PUBLIC_TEXT\ncontract_native_get=0\nsource_probe=SEPARATE_ONE_SHOT_ARTIFACT\nformal_fields=0\ngolden=0\npublished=0\n' "$(git rev-parse HEAD)" d3b77cf97796ad5c7e8cf16fc847feeea2bc6dce > evidence/readiness.txt
+          sha256sum "${files[@]}" evidence/readiness.txt > evidence/SHA256SUMS.txt
+          if [ -f evidence/tpac_event2072_native_once.json ]; then sha256sum evidence/tpac_event2072_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/ab_opentix_ticc_native_once.json ]; then sha256sum evidence/ab_opentix_ticc_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/source_acquisition.json ]; then sha256sum evidence/source_acquisition.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/zepp_newtaipei_native_once.json ]; then sha256sum evidence/zepp_newtaipei_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/opentix_fresh_detail_native_once.json ]; then sha256sum evidence/opentix_fresh_detail_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/accupass_native_once.json ]; then sha256sum evidence/accupass_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_rotation_A.json ]; then sha256sum evidence/native_rotation_A.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_rotation_B.json ]; then sha256sum evidence/native_rotation_B.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/cloudgate_native_once.json ]; then sha256sum evidence/cloudgate_native_once.json >> evidence/SHA256SUMS.txt; fi
+          for line in A B; do if [ -f "evidence/ab_kktix_fuzhong_native_${line}.json" ]; then sha256sum "evidence/ab_kktix_fuzhong_native_${line}.json" >> evidence/SHA256SUMS.txt; fi; done
+          for line in A_UDN B_CERAMICS; do if [ -f "evidence/ab_udn_yingge_native_${line}.json" ]; then sha256sum "evidence/ab_udn_yingge_native_${line}.json" >> evidence/SHA256SUMS.txt; fi; done
+          if [ -f evidence/next_native_A.json ]; then sha256sum evidence/next_native_A.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/next_native_B.json ]; then sha256sum evidence/next_native_B.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/zepp_160667_native_once.json ]; then sha256sum evidence/zepp_160667_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_semantic_fields.json ]; then sha256sum evidence/native_semantic_fields.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_dom_identity.json ]; then sha256sum evidence/native_dom_identity.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_same_session_field_matrix.json ]; then sha256sum evidence/native_same_session_field_matrix.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_bilingual_authority.json ]; then sha256sum evidence/native_bilingual_authority.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_source_link_edges.json ]; then sha256sum evidence/native_source_link_edges.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_twtc_adapter_lkg.json ]; then sha256sum evidence/native_twtc_adapter_lkg.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_adapter_structural_audit.json ]; then sha256sum evidence/native_adapter_structural_audit.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_cksmh_rotation.json ]; then sha256sum evidence/native_cksmh_rotation.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/accupass02_native_once.json ]; then sha256sum evidence/accupass02_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/tixcraft03_native_once.json ]; then sha256sum evidence/tixcraft03_native_once.json >> evidence/SHA256SUMS.txt; fi
+          for f in evidence/kimu_native_once.json evidence/ntcam_native_once.json; do if [ -f "$f" ]; then sha256sum "$f" >> evidence/SHA256SUMS.txt; fi; done
+          if [ -f evidence/zepp_takase_160668_native_once.json ]; then sha256sum evidence/zepp_takase_160668_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/b_tainex_native_once.json ]; then sha256sum evidence/b_tainex_native_once.json >> evidence/SHA256SUMS.txt; fi
+          sha256sum evidence/native_probe_consumption_guard.json >> evidence/SHA256SUMS.txt
+          sha256sum evidence/tmc_field_authority_contract.json >> evidence/SHA256SUMS.txt
+          sha256sum evidence/canonical_field_authority_contract.json >> evidence/SHA256SUMS.txt
+          if [ -f evidence/native_huashan_rotation.json ]; then sha256sum evidence/native_huashan_rotation.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_huashan_field_roles.json ]; then sha256sum evidence/native_huashan_field_roles.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_authority_identity_hypothesis.json ]; then sha256sum evidence/native_authority_identity_hypothesis.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_songshan_second_uuid.json ]; then sha256sum evidence/native_songshan_second_uuid.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_tpac_opentix_direct_edge.json ]; then sha256sum evidence/native_tpac_opentix_direct_edge.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/songshan_second_uuid_isolated_review_lkg.json ]; then sha256sum evidence/songshan_second_uuid_isolated_review_lkg.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_cksmh_session_roles.json ]; then sha256sum evidence/native_cksmh_session_roles.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/native_huashan_home_date.json ]; then sha256sum evidence/native_huashan_home_date.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/kktix_day1_native_once.json ]; then sha256sum evidence/kktix_day1_native_once.json >> evidence/SHA256SUMS.txt; fi
+          sha256sum evidence/field_subset_review_proposal.json >> evidence/SHA256SUMS.txt
+          sha256sum evidence/zepp_takase_receipt_only_lkg.json >> evidence/SHA256SUMS.txt
+          sha256sum evidence/opentix_2070_receipt_only_lkg.json >> evidence/SHA256SUMS.txt
+          if [ -f evidence/kktix_takase_public_native_once.json ]; then sha256sum evidence/kktix_takase_public_native_once.json >> evidence/SHA256SUMS.txt; fi
+          if [ -f evidence/b_ntch_native_once.json ]; then sha256sum evidence/b_ntch_native_once.json >> evidence/SHA256SUMS.txt; fi
+          sha256sum -c evidence/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: p30-l7-field-golden-readiness-exact-head
+          path: |
+            evidence/
+            .github/workflows/eventradar_p30_l7_field_readiness.yml
+            scripts/p30_candidate_review_pipeline.py
+            scripts/p30_l7_field_golden_readiness.py
+            scripts/p30_source_stream_gate.py
+            tests/p30/test_p30_l7_field_golden_readiness.py
+            tests/p30/test_p30_source_stream_gate.py
+            scripts/p30_accupass_native_gate.py
+            tests/p30/test_p30_accupass_native_gate.py
+            scripts/p30_ntpc_artcenter_source.py
+            tests/p30/test_p30_ntpc_artcenter_source.py
+            scripts/p30_dual_native_rotation.py
+            tests/p30/test_p30_dual_native_rotation.py
+            scripts/p30_cloudgate_native_gate.py
+            tests/p30/test_p30_cloudgate_native_gate.py
+            scripts/p30_ab_kktix_fuzhong_native.py
+            tests/p30/test_p30_ab_kktix_fuzhong_native.py
+            scripts/p30_tpac_event_source.py
+            scripts/p30_review_bridge.py
+            tests/p30/test_p30_review_bridge.py
+            scripts/p30_ab_fixed_review_workflow.py
+            tests/p30/test_p30_ab_fixed_review_workflow.py
+            tests/p30/test_p30_next_source_fixed_integration.py
+            scripts/p30_tpac_event2072_native_once.py
+            tests/p30/test_p30_tpac_event2072_native_once.py
+            scripts/p30_ab_opentix_ticc_native_once.py
+            tests/p30/test_p30_ab_opentix_ticc_native_once.py
+            scripts/p30_ntch_native_once.py
+            tests/p30/test_p30_ntch_native_once.py
+            evidence/b_ntch_native_once.json
+            evidence/b_tainex_native_once.json
+            evidence/zepp_160667_native_once.json
+            evidence/ab_opentix_ticc_native_once.json
+            evidence/tpac_event2072_native_once.json
+            tests/p30/fixtures/p30_l7_prince_field_readiness.json
+          if-no-files-found: error
