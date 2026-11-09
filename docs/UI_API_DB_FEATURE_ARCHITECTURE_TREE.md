@@ -8798,3 +8798,40 @@ Engineering Draft #243 exact HEAD 3e63d127ddf525b48080a4c884cbec44c48425fc
 
 **Trust boundary:** local archived snapshot CAS and SHA checks prevent a direct boolean row-deletion bypass, but do not provide immutable cross-host GitHub tag retention or authorize source GET. Owner approval for robots/frequency/budget and independent immutable claim retention is still required before R4. No new one-shot marker, OPENTIX 403/429 bypass, formal data/Golden/status/Pages write or Scheduler activation.
 
+### 2026-11-09 13:00 Asia/Taipei — TPAC cross-source session instant validation
+
+```text
+Engineering Draft #243 HEAD c8c7fb1929d2073ea2518533867d76b247038a56 [SOURCE-ONLY, UNMERGED]
+  scripts/p30_tpac_price_reconcile.py
+    reconcile_opentix_price(venue_offer, ticket_event_url, title,
+                            venue_name, normal_ticket_tiers, sessions,
+                            venue_sessions, ...)
+      BEFORE: raw set(sessions), set(venue_sessions)
+        -> unhashable input could raise TypeError, not HOLD
+        -> UTC/+08:00 alias could create false conflict
+        -> duplicate same instant could pass as distinct strings
+      AFTER: _canonical_session_instants(values)
+        -> list/tuple 1..40; exact offset-aware ISO minute timestamp
+        -> datetime calendar validation; normalize to +08:00 instant
+        -> duplicate instant / malformed / naive / unhashable => HOLD
+        -> canonical sets compared, true ticket-only extra sessions remain HOLD
+        -> caller-supplied price tiers/session data remain REVIEW, not FIELD
+  tests/p30/test_p30_tpac_price_reconcile.py
+    + test_session_timestamp_inputs_fail_closed_without_exceptions
+    + test_cross_source_session_parity_normalizes_same_utc_instants
+  CI #42564708305 SUCCESS / job 128988599696 / 64/64 tests
+  Artifact #13651440036 / original ZIP 11,003 bytes
+    SHA256 db8f1c2abbb50ca9cef2439e7407be9647e54a640d364de30f477deaafb3000f
+    GitHub digest parity / independent ZIP CRC 14/14 PASS
+    SHA256SUMS.txt member parity 13/13 PASS
+  Source main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+  Formal data blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+    -> one TPAC /program/2040, formal price empty, no Golden/Publisher change
+  New native GET 0; independently refreshed TPAC-R4 0/2 HOLD
+  NT$1,500 general admission REVIEW; 10 OPENTIX vs 8 TPAC
+    -> SESSION_SET_CONFLICT_HOLD remains
+  Android North #244 USER_ATTESTED_PASS; UI-only #245 Draft unmerged
+  HARD_HOLD_NO_PUBLICATION / STALE_STATUS_METADATA_HOLD
+```
+
+**Trust boundary:** normalized caller-supplied session instants prevent false parity and unhandled input errors, but do **not** attest OPENTIX native ticket tiers, session ownership, inventory, original artifact provenance or current availability. Real R4 GET still requires independently approved robots/frequency/budget policy and immutable cross-host claim retention. This update is additive in the existing two canonical documents only; no new baseline or formal publication.
