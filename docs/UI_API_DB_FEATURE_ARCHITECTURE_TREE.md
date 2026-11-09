@@ -8686,3 +8686,40 @@ Exact source PR #243 HEAD b6ce6c46d2ecd6f4b2c5dd3ea5adcad48b44caf8
 ```
 
 Independent original artifact integrity is now VERIFIED; do not mistake archived native-body replay, an offline injected-fetch test, or a valid artifact checksum for authorization of a real new source refresh. Retain source policy/robots/frequency/budget and immutable cross-host claim-retention gaps as first blockers. Preserve Android #244 USER_ATTESTED_PASS, session-set conflict, price REVIEW, and global HARD_HOLD_NO_PUBLICATION.
+
+
+### 2026-11-09 09:56 Asia/Taipei — TPAC legacy native entrypoint isolation and exact-head readback
+
+```text
+Engineering Draft #243 exact HEAD c22d57711ef766b440cc456c0117ed146176a51e
+  scripts/p30_tpac_event_catalog_once.py
+    legacy collect_once(out, fetch=None)
+      -> absent/default bounded_fetch: TPAC_EVENT_LEGACY_NATIVE_FETCH_DISABLED_HOLD
+      -> explicit injected callable: isolated fixture contract only, NOT security boundary
+    __main__ --output (without R4 cycle)
+      -> TPAC_EVENT_LEGACY_NATIVE_GET_DISABLED_HOLD, exit 49
+      -> no native GET / no output / no token / no claim
+    __main__ --cycle-id ... --authorize-isolated-cycle
+      -> collect_bounded_review_cycle() real CLI
+      -> TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD
+      -> no tag / no local tombstone / no source GET
+  .github/workflows/eventradar_tpac_multi_event_refresh.yml
+    consumed /event native marker run #42491637804
+      -> always write HOLD_DO_NOT_REPEAT (no conditional reGET)
+      -> download sealed prior native artifact and offline replay
+  tests/p30/test_p30_tpac_event_catalog_once.py
+    + test_consumed_legacy_one_shot_no_default_native_get_or_cli_output
+    + test_ci_never_reissues_consumed_legacy_source_one_shot
+  exact-head CI #42548140365 SUCCESS, 59/59 tests
+    original Artifact #13644510937, 11002 bytes
+    SHA256 1f0c21fb7880982c51a64c92999f045da9eb8ff1001d4eb824b351c4ca3d2632
+    independent ZIP CRC 14/14, SHA256SUMS 13/13 PASS
+    isolated archived-native CAS LKG SHA256 20a7bfd8f8930a53e7f7849571c712fb822c6167373211aa3cb1b07ca8be054d
+  new native TPAC/OPENTIX GET 0; independent R4 native cycles 0/2 HOLD
+  main data 1 TPAC event /program/2040, price blank, Golden/status unchanged
+  Android North USER_ATTESTED_PASS retained; price NT$1500 REVIEW
+  TPAC 8 vs OPENTIX 10 SESSION_SET_CONFLICT_HOLD
+  HARD_HOLD_NO_PUBLICATION; STALE_STATUS_METADATA_HOLD
+```
+
+This change closes an additional *reachable legacy CLI and CI native-GET bypass* after the newer R4 live CLI guard was installed. It does not establish an immutable cross-host claim registry or grant source-fetch/publication authority; direct arbitrary Python network calls remain outside this narrow CLI contract. The next genuine Gate requires independent source-policy and retention approval, followed by two distinct real native LIST→DETAIL refreshes with separately read-back receipts and isolated CAS/LKG diffs.
