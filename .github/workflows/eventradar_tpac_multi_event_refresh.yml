@@ -7,6 +7,8 @@ on:
       - scripts/p30_tpac_event_catalog_once.py
       - scripts/p30_tpac_event_detail_review.py
       - scripts/p30_tpac_price_reconcile.py
+      - scripts/p30_tpac_r4_source_policy.py
+      - tests/p30/test_p30_tpac_r4_source_policy.py
       - tests/p30/test_p30_tpac_price_reconcile.py
       - tests/p30/test_p30_tpac_event_detail_review.py
       - tests/p30/test_p30_tpac_event_catalog_once.py
@@ -40,7 +42,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'scripts/p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
       - uses: actions/setup-python@v5
@@ -55,7 +57,8 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_catalog_once.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_detail_review.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_price_reconcile.py' -v
-          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_r4_source_policy.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py scripts/p30_tpac_r4_source_policy.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
       - name: Preserve consumed TPAC /event source one-shot (NO NETWORK)
         run: |
@@ -370,6 +373,42 @@ jobs:
                          ensure_ascii=False,indent=2,sort_keys=True)+'\n')
           print('PASS_DUAL_CATALOG_NONMERGE_DATE_ROLES_FIXTURE_NOT_NATIVE')
           print('PASS_REUSABLE_2_ID_OFFLINE_REVIEW_NOT_NATIVE_OR_PUBLISHED')
+          PY
+      - name: Owner-approved TPAC two-catalog 6-hour R4 budget (CLAIM HOLD, NO GET)
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib,json,sys
+          from pathlib import Path
+          sys.path.insert(0,"tests/p30")
+          from test_p30_tpac_r4_source_policy import inputs
+          from scripts.p30_tpac_r4_source_policy import (
+              CLAIM_HOLD,review_two_catalog_plan,assert_no_untrusted_live_authority)
+          plan=review_two_catalog_plan(**inputs())
+          assert plan['decision']==CLAIM_HOLD
+          assert plan['detail_source_identities']==['tpac:program:1301','tpac:event:1301']
+          assert plan['budget']['interval_seconds']==21600
+          assert plan['budget']['robots']==1 and plan['budget']['program_list']==1
+          assert plan['budget']['event_list']==1 and plan['budget']['detail_total']==2
+          assert plan['budget']['concurrency']==1
+          assert plan['native_get_allowed'] is False and plan['published']==0
+          try:
+              assert_no_untrusted_live_authority(plan)
+          except ValueError as e:
+              assert str(e)=="TPAC_R4_IMMUTABLE_CLAIM_PROVIDER_MISSING_HOLD"
+          else:
+              raise AssertionError('UNVERIFIED_CLAIM_MUST_NEVER_ENABLE_NATIVE_GET')
+          plan['synthetic_offline_only']=True
+          plan['no_immutable_provider_available']=True
+          plan['repository_rulesets_readback']='NONE_OBSERVED_2026_11_09'
+          plan['branch_protection_readback']='PERMISSION_DENIED_403_UNVERIFIED'
+          plan['owner_publication_authorization']=False
+          Path('evidence/tpac_r4_owner_policy_claim_hold.json').write_text(
+              json.dumps(plan,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
+              encoding='utf-8')
+          print('PASS_OWNER_POLICY_LIMITS_6H_ROBOTS1_LIST2_DETAIL2_CONCURRENCY1')
+          print('HOLD_CROSS_HOST_IMMUTABLE_CLAIM_NOT_VERIFIED_NO_NATIVE_GET')
           PY
       - name: SHA256 evidence and formal outputs remain untouched
         run: |
