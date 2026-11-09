@@ -8907,3 +8907,31 @@ Source boundary (Engineering Draft #243, exact HEAD 468d8eccc89d65feb4ff5eb54e74
 - **Final evidence:** [PR #243](https://github.com/easonliu714/event_scraper_public/pull/243) exact HEAD `468d8eccc89d65feb4ff5eb54e744289eaec026b`; [CI #42569873566](https://github.com/easonliu714/event_scraper_public/actions/runs/42569873566) SUCCESS / job `129004536301`, 66/66 tests, strict JSON 13/13. [Artifact #13652612336](https://github.com/easonliu714/event_scraper_public/actions/runs/42569873566/artifacts/13652612336) ZIP SHA256 `ab2c1954066aaec5072e28f127616926fd12e4542298e64eef29ce4d98b174fa`, GitHub digest parity, CRC 14/14, SHA256SUMS 13/13, JSON 13/13 independently PASS. Initial test-input CI #42569830106 and #42569849035 FAIL repaired, not hidden.
 - **Product / gate separation:** no native GET this cycle, R4 independent cycles 0/2, no new formal accepted FIELD/Golden or release; source main `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`, formal data blob `342eb7c101115b05dbc6ff90de7bd97d5bd63d59` still one TPAC event, price empty. TPAC minimum NT$1,500 REVIEW, 10-vs-8 ticket session conflict HOLD. Android #244 North USER_ATTESTED_PASS, UI #245 Draft, HARD_HOLD_NO_PUBLICATION and STALE_STATUS_METADATA_HOLD unchanged.
 - **Remaining architectural blocker:** immutable cross-host source-claim retention and independently approved robots/frequency/request-budget policy. A deletable Git tag, fixture byte map, offline replay or CI PASS cannot grant new native capture or Publisher/Scheduler authority. Existing Governance Draft #8 two canonical files remain the sole history.
+
+## 2026-11-09 14:56 Asia/Taipei — TPAC-R4 sealed time/delay injection boundary (NO GET)
+
+```text
+Engineering Draft #243, HEAD f7c591a3d9ffe38733ea143c5651867337ba4f7b
+  scripts/p30_tpac_event_catalog_once.py
+    OfflineFixtureTransport (previous sealed byte-only source transport)
+    OfflineFixtureClock (NEW: exact built-in aware datetime, fixed UTC normalized)
+    OfflineFixturePause (NEW: exact type, records 0..60-second simulated gaps)
+    collect_bounded_review_cycle()
+      BEFORE: arbitrary clock()/pause(seconds) callbacks could run side effects
+      AFTER: non-exact clock/pause objects fail closed BEFORE global GitHub claim
+      -> TPAC_R4_UNTRUSTED_CLOCK_CALLBACK_HOLD
+      -> TPAC_R4_UNTRUSTED_PAUSE_CALLBACK_HOLD
+      -> no local claim, output, source GET or formal data mutation
+    bounded_fetch() legacy consumed source marker remains disabled
+    GitHubAtomicClaimRegistry() deletable tag is not immutable authority
+  tests/p30/test_p30_tpac_event_catalog_once.py
+    existing deterministic fixture tests now use sealed time/delay types
+    malicious clock/pause callback injection negatives (zero side effects)
+  .github/workflows/eventradar_tpac_multi_event_refresh.yml
+    exact-head PR CI / archived body replay / source and formal blob guards
+    no live source GET / no formal Publisher / no scheduler
+```
+
+- **Verified:** [PR #243](https://github.com/easonliu714/event_scraper_public/pull/243) exact HEAD `f7c591a3d9ffe38733ea143c5651867337ba4f7b`; [CI #42576130571](https://github.com/easonliu714/event_scraper_public/actions/runs/42576130571) SUCCESS, job `129024143815`, **67/67 Python tests PASS** (21+7+22+5+12). [Artifact #13654563884](https://github.com/easonliu714/event_scraper_public/actions/runs/42576130571/artifacts/13654563884) size 10,999 bytes, GitHub metadata digest `sha256:9cd2784e1832f7b96c8bbda7b826dcdea9bf80f97f53d113990339f33338b035`; **independent artifact download/CRC not performed this turn**. The preexisting pinned native /event two-ID and /program/2040 price replay succeeded; it was not a new GET.
+- **Formal boundary:** source main `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`, formal `docs/data.json` blob `342eb7c101115b05dbc6ff90de7bd97d5bd63d59` (one TPAC card, blank price), status blob `720cac528faacc9560a5ab41ce725bf8cc183166`; new native GET 0, independent R4 refresh 0/2, accepted FIELD/Golden/published 0/0/0. Owner Android North #244 USER_ATTESTED_PASS; general minimum NT$1,500 REVIEW, OPENTIX 10 vs TPAC 8 SESSION_SET_CONFLICT_HOLD, UI #245 Draft. HARD_HOLD_NO_PUBLICATION and STALE_STATUS_METADATA_HOLD remain.
+- **Next trust boundary:** Immutable cross-host one-shot claim retention and explicit Owner source robots/frequency/request-budget authority are not yet verified; the GitHub claim opener/test-double trust surface also requires independent review before any live enablement. Only after that can two genuine bounded TPAC native refreshes and REVIEW CAS/LKG diff be assessed. No second Writer or Publisher.
