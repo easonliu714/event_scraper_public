@@ -70,6 +70,32 @@ class OfflineFixtureTransport:
         return value
 
 
+
+class OfflineFixtureClock:
+    """Sealed deterministic time source for fixture-only replay; never a callback."""
+
+    def __init__(self, observed_at):
+        if (type(observed_at) is not datetime or observed_at.tzinfo is None
+                or observed_at.utcoffset() is None):
+            raise ValueError("TPAC_R4_OFFLINE_CLOCK_AWARE_DATETIME_HOLD")
+        self._observed_at = observed_at.astimezone(timezone.utc)
+
+    def __call__(self):
+        return self._observed_at
+
+
+class OfflineFixturePause:
+    """Record simulated gaps without executing an arbitrary sleep callback."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, seconds):
+        if type(seconds) not in (int, float) or not 0 <= seconds <= 60:
+            raise ValueError("TPAC_R4_OFFLINE_GAP_BUDGET_HOLD")
+        self.calls.append(seconds)
+
+
 def bounded_fetch(url, *, opener=None, allowed_ids=SOURCE_IDS):
     """Retired direct native GET entrypoint: no caller can reconsume one-shot.
 
@@ -306,6 +332,12 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
         raise ValueError("TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD")
     if type(fetch) is not OfflineFixtureTransport:
         raise ValueError("TPAC_R4_UNTRUSTED_FETCH_CALLBACK_HOLD")
+    # Test clocks and delays are also executable injection surfaces. Only
+    # exact sealed offline fixtures are allowed before any global claim.
+    if clock is not None and type(clock) is not OfflineFixtureClock:
+        raise ValueError("TPAC_R4_UNTRUSTED_CLOCK_CALLBACK_HOLD")
+    if pause is not None and type(pause) is not OfflineFixturePause:
+        raise ValueError("TPAC_R4_UNTRUSTED_PAUSE_CALLBACK_HOLD")
     global_claim = global_registry.claim(cycle_id)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
