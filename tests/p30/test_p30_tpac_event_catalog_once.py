@@ -320,6 +320,25 @@ class EventSourceOnceTests(unittest.TestCase):
             self.assertFalse(out.exists())
             self.assertEqual(list(registry.iterdir()), [])
 
+    def test_r4_live_cli_retention_gap_holds_before_global_tag_or_source_get(self):
+        """A caller policy boolean plus deletable GitHub tag cannot authorize live GET."""
+        with tempfile.TemporaryDirectory() as root:
+            registry = Path(root) / "registry"
+            registry.mkdir()
+            out = Path(root) / "real-source-must-hold"
+            shared_tags = set()
+            global_registry = fake_global_registry(shared_tags)
+            with self.assertRaisesRegex(
+                    ValueError, "GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD"):
+                collect_bounded_review_cycle(
+                    out, "tpac-r4-20261109-075500z-a1b2c3d4",
+                    source_policy_approved=True, registry_dir=registry,
+                    global_registry=global_registry)
+            self.assertFalse(out.exists())
+            self.assertEqual(list(registry.iterdir()), [])
+            self.assertEqual(shared_tags, set())
+            self.assertEqual(global_registry._opener.calls, [])
+
     def test_r4_two_hosts_same_cycle_global_atomic_ref_rejects_second(self):
         calls, shared = [], set()
         def denied(url):
