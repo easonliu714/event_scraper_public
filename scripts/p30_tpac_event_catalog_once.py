@@ -250,6 +250,12 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
     # This concrete client can create and independently read back an atomic ref.
     if type(global_registry) is not GitHubAtomicClaimRegistry:
         raise ValueError("TPAC_R4_GLOBAL_ATOMIC_REGISTRY_REQUIRED_HOLD")
+    # Production CLI supplies no injected fetch. A GitHub tag is deletable and
+    # therefore cannot authorize live HTTP until independently governed,
+    # immutable cross-host retention is implemented and verified. Preserve
+    # mock-only offline contract tests without creating a real source request.
+    if fetch is None:
+        raise ValueError("TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD")
     global_claim = global_registry.claim(cycle_id)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
