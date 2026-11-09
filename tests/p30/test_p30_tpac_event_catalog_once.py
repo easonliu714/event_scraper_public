@@ -324,7 +324,7 @@ class EventSourceOnceTests(unittest.TestCase):
                     second, cycle, source_policy_approved=True, fetch=denied,
                     pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
             self.assertFalse(second.exists())
-            self.assertEqual(calls, [ROBOTS])
+            self.assertEqual(denied.calls, [ROBOTS])
 
     def test_r4_missing_or_symlink_registry_holds_before_any_request(self):
         with tempfile.TemporaryDirectory() as root:
