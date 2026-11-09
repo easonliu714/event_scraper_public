@@ -8723,3 +8723,39 @@ Engineering Draft #243 exact HEAD c22d57711ef766b440cc456c0117ed146176a51e
 ```
 
 This change closes an additional *reachable legacy CLI and CI native-GET bypass* after the newer R4 live CLI guard was installed. It does not establish an immutable cross-host claim registry or grant source-fetch/publication authority; direct arbitrary Python network calls remain outside this narrow CLI contract. The next genuine Gate requires independent source-policy and retention approval, followed by two distinct real native LIST→DETAIL refreshes with separately read-back receipts and isolated CAS/LKG diffs.
+
+### 2026-11-09 10:59 Asia/Taipei — retired direct legacy native GET callable
+
+```text
+Source Engineering Draft #243 exact HEAD 09614e77f666f224efa4462587bc24ea4b831619
+  scripts/p30_tpac_event_catalog_once.py
+    bounded_fetch(url, opener=None, allowed_ids=SOURCE_IDS)
+      validate exact allowlisted URL (invalid -> UNAPPROVED_URL_HOLD)
+      -> ALWAYS TPAC_EVENT_DIRECT_NATIVE_FETCH_DISABLED_HOLD
+      -> NO Request / NO default build_opener / NO injected opener / NO native GET
+    collect_once(out, fetch=None)
+      -> legacy consumed one-shot HOLD before network
+    CLI --output without R4
+      -> exit 49, no native GET
+    collect_bounded_review_cycle(fetch=None)
+      -> GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD before tag/local claim/GET
+    GitHubAtomicClaimRegistry
+      -> atomic tag create/readback only; admin-deletable, NOT immutable authority
+  tests/p30/test_p30_tpac_event_catalog_once.py
+    + test_retired_direct_fetch_rejects_all_allowlisted_urls_before_network
+      robots, LIST, DETAIL 1301, DETAIL 2072 x default/poison opener
+      asserts NO network transport invocation
+  Exact-head CI #42553823146 SUCCESS / job 128955021317 / 60/60 Python tests
+  Original Artifact #13646242528, 11,003 bytes
+    SHA256 bb18bc09b1a7f1ca99de55562e599bfaee5b42a2dfc5c52ac533b37f5eb56ed1
+    GitHub digest parity, ZIP CRC 14/14, SHA256SUMS 13/13 PASS
+  Official main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8 unchanged
+  Formal docs/data.json blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+    -> one TPAC /program/2040 event, price blank, no new Golden/Publisher
+  TPAC R4 independent genuine native cycles 0/2 HOLD; new native GET 0
+  Source NT$1500 REVIEW only; OPENTIX 10 vs TPAC 8 SESSION_SET_CONFLICT_HOLD
+  Android North #244 USER_ATTESTED_PASS; UI-only #245 Draft unmerged
+  HARD_HOLD_NO_PUBLICATION; STALE_STATUS_METADATA_HOLD
+```
+
+**Remaining real authorization gate:** independent source-frequency/robots/request-budget approval plus immutable cross-host one-shot claim retention. No prior one-shot reGET, no privileged tag-retention inference, no 403/429 bypass, no automatic formal Publisher/Scheduler or price-only release. Direct Python legacy helper is now fail-closed, but arbitrary third-party Python code remains outside this repository helper boundary.
