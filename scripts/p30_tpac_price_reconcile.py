@@ -227,8 +227,8 @@ def inspect_opentix_native_body(body, receipt, *, event_url, expected_title, now
 # independently attested. Normalize *instants*, not strings, so UTC/+08:00
 # aliases cannot create false parity or conceal duplicate showtimes.
 SESSION_TIMESTAMP = re.compile(
-    r"^20\\d{2}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d"
-    r"(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+    r"^20\d{2}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d"
+    r"(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$"
 )
 TAIPEI = timezone(timedelta(hours=8))
 
