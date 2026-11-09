@@ -8835,3 +8835,37 @@ Engineering Draft #243 HEAD c8c7fb1929d2073ea2518533867d76b247038a56 [SOURCE-ONL
 ```
 
 **Trust boundary:** normalized caller-supplied session instants prevent false parity and unhandled input errors, but do **not** attest OPENTIX native ticket tiers, session ownership, inventory, original artifact provenance or current availability. Real R4 GET still requires independently approved robots/frequency/budget policy and immutable cross-host claim retention. This update is additive in the existing two canonical documents only; no new baseline or formal publication.
+
+### 2026-11-09 13:02 Asia/Taipei — TPAC evidence JSON semantic-integrity correction
+
+```text
+Original artifact #13651440036 [HISTORICAL SEMANTIC DEFECT]
+  CRC 14/14 PASS; manifest SHA 13/13 PASS; 64/64 unit tests PASS
+  tpac_native_versioned_diff.json: JSON parser FAIL
+    root cause: literal backslash-n appended after closing object
+  -> checksum-valid bytes were not machine-parseable evidence
+
+Source Engineering Draft #243 final HEAD 3db736ab0595f4c6bf91c871d40b7ae709e5fe9f
+  .github/workflows/eventradar_tpac_multi_event_refresh.yml
+    versioned diff JSON writer: actual newline, not literal escaped suffix
+    evidence pre-seal gate:
+      Path('evidence').rglob('*.json')
+      -> json.loads(each complete UTF-8 document)
+      -> any invalid => CI FAIL before SHA manifest/artifact upload
+  CI #42564877709 SUCCESS / job 128989110670
+    64/64 Python tests PASS
+    PASS_EVIDENCE_JSON_STRICT_PARSE=13
+    PASS_ZERO_FORMAL_DATA_AND_AUTOMATIC_PUBLISHER_WRITES
+  corrected original Artifact #13651316124 / 10,999 bytes
+    SHA256 60a2e90b148884b09a79131fe02f6b91652e4ca75447b015af0bacce171defba
+    GitHub digest parity; CRC 14/14; SHA256SUMS 13/13
+    independently parsed JSON 13/13 PASS
+  archived TPAC /event LIST 18 / DETAIL 2 / qualified REVIEW 2
+    missing detail HOLD 16; isolated LKG SHA 20a7bfd8f8930a53e7f7849571c712fb822c6167373211aa3cb1b07ca8be054d
+  new native GET 0; real TPAC-R4 independent cycles 0/2 HOLD
+  formal data 1 /program/2040, price blank; no new FIELD/Golden
+  Android #244 North USER_ATTESTED_PASS; UI-only #245 Draft unmerged
+  HARD_HOLD_NO_PUBLICATION / STALE_STATUS_METADATA_HOLD
+```
+
+This is an additive correction to evidence **semantic** integrity; previous original ZIP byte-level CRC/SHA PASS is not retracted. It does not prove native OPENTIX ticket-field provenance, immutable cross-host source-claim retention, Owner source-frequency approval or permission to publish.
