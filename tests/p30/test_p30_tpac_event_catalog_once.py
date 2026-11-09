@@ -11,7 +11,7 @@ from pathlib import Path
 from scripts.p30_tpac_event_catalog_once import (
     ROOT, ROBOTS, SOURCE_IDS, bounded_fetch, collect_once,
     collect_bounded_review_cycle, GitHubAtomicClaimRegistry,
-    OfflineFixtureTransport,
+    OfflineFixtureTransport, OfflineFixtureClock, OfflineFixturePause,
 )
 
 ROBOTS_OK = b"User-agent: *\nAllow: /event\n"
@@ -199,8 +199,8 @@ class EventSourceOnceTests(unittest.TestCase):
             ROOT + "/3456": ONE, ROOT + "/9876": TWO,
         })
         from datetime import datetime, timezone
-        def clock():
-            return datetime(2026, 11, 9, 1, 0, tzinfo=timezone.utc)
+        clock = OfflineFixtureClock(datetime(2026, 11, 9, 1, 0, tzinfo=timezone.utc))
+        pacer = OfflineFixturePause()
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "cycle-01"
             registry = Path(root) / "registry"
@@ -208,12 +208,12 @@ class EventSourceOnceTests(unittest.TestCase):
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-010000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fake,
-                clock=clock, pause=sleeps.append, registry_dir=registry, global_registry=fake_global_registry())
+                clock=clock, pause=pacer, registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(report["decision"], "ISOLATED_OFFLINE_FIXTURE_REPLAY_ONLY")
             self.assertEqual(report["new_native_http_get"], 0)
             self.assertEqual(report["selected_ids"], ["3456", "9876"])
             self.assertEqual(fake.calls, [ROBOTS, ROOT, ROOT + "/3456", ROOT + "/9876"])
-            self.assertEqual(sleeps, [3, 3, 3])
+            self.assertEqual(pacer.calls, [3, 3, 3])
             self.assertEqual(report["successful_get"], 4)
             self.assertFalse(report["independent_cycle_verified"])
             self.assertFalse(report["global_one_shot_registry_verified"])
@@ -228,7 +228,7 @@ class EventSourceOnceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "ALREADY_CLAIMED_HOLD"):
                 collect_bounded_review_cycle(
                     out, "tpac-r4-20261109-010000z-a1b2c3d4",
-                    source_policy_approved=True, fetch=fake, pause=sleeps.append,
+                    source_policy_approved=True, fetch=fake, pause=pacer,
                     registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(len(fake.calls), 4)
 
@@ -255,7 +255,7 @@ class EventSourceOnceTests(unittest.TestCase):
             registry.mkdir()
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-020000z-a1b2c3d4",
-                source_policy_approved=True, fetch=denied, pause=lambda n: None,
+                source_policy_approved=True, fetch=denied, pause=OfflineFixturePause(),
                 registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(denied.calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
@@ -277,7 +277,7 @@ class EventSourceOnceTests(unittest.TestCase):
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-030000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fail_first_detail,
-                pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
+                pause=OfflineFixturePause(), registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(fail_first_detail.calls, [ROBOTS, ROOT, ROOT + "/3456"])
             self.assertEqual(report["successful_get"], 2)
             self.assertEqual(report["decision"], "HOLD")
@@ -295,7 +295,7 @@ class EventSourceOnceTests(unittest.TestCase):
             report = collect_bounded_review_cycle(
                 out, "tpac-r4-20261109-040000z-a1b2c3d4",
                 source_policy_approved=True, fetch=slow,
-                pause=lambda n: self.fail("unexpected delay"),
+                pause=OfflineFixturePause(),
                 registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(slow.calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
@@ -315,14 +315,14 @@ class EventSourceOnceTests(unittest.TestCase):
             cycle = "tpac-r4-20261109-050000z-a1b2c3d4"
             report = collect_bounded_review_cycle(
                 first, cycle, source_policy_approved=True, fetch=denied,
-                pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
+                pause=OfflineFixturePause(), registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(report["decision"], "HOLD")
             self.assertEqual(denied.calls, [ROBOTS])
             self.assertTrue((registry / (cycle + ".claim.json")).is_file())
             with self.assertRaisesRegex(ValueError, "DURABLE_CYCLE_REUSE_HOLD"):
                 collect_bounded_review_cycle(
                     second, cycle, source_policy_approved=True, fetch=denied,
-                    pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
+                    pause=OfflineFixturePause(), registry_dir=registry, global_registry=fake_global_registry())
             self.assertFalse(second.exists())
             self.assertEqual(denied.calls, [ROBOTS])
 
@@ -394,7 +394,7 @@ class EventSourceOnceTests(unittest.TestCase):
             first = collect_bounded_review_cycle(
                 Path(root)/"first", cycle, source_policy_approved=True,
                 registry_dir=registry_a, global_registry=fake_global_registry(shared),
-                fetch=denied, pause=lambda _: None)
+                fetch=denied, pause=OfflineFixturePause())
             self.assertEqual(first["decision"], "HOLD")
             self.assertTrue(first["global_atomic_claim_created"])
             self.assertFalse(first["global_immutable_registry_verified"])
@@ -403,7 +403,7 @@ class EventSourceOnceTests(unittest.TestCase):
                 collect_bounded_review_cycle(
                     Path(root)/"second", cycle, source_policy_approved=True,
                     registry_dir=registry_b, global_registry=fake_global_registry(shared),
-                    fetch=denied, pause=lambda _: None)
+                    fetch=denied, pause=OfflineFixturePause())
             self.assertEqual(len(denied.calls), 1)
             self.assertFalse((Path(root)/"second").exists())
             self.assertEqual(list(registry_b.iterdir()), [])
@@ -453,6 +453,38 @@ class EventSourceOnceTests(unittest.TestCase):
             self.assertEqual(list(reg.iterdir()), [])
             self.assertFalse(legacy.exists())
             self.assertFalse((Path(root) / "r4").exists())
+
+    def test_r4_clock_pause_callback_injection_holds_before_claim(self):
+        """Clock/pause callables must not reintroduce native HTTP side effects."""
+        side_effects = []
+        def malicious_clock():
+            side_effects.append("clock")
+            raise AssertionError("UNAUTHORIZED_CALLBACK")
+        def malicious_pause(_):
+            side_effects.append("pause")
+            raise AssertionError("UNAUTHORIZED_CALLBACK")
+        with tempfile.TemporaryDirectory() as root:
+            registry = Path(root) / "registry"
+            registry.mkdir()
+            for kind, injection, reason in (
+                ("clock", {"clock": malicious_clock}, "UNTRUSTED_CLOCK_CALLBACK_HOLD"),
+                ("pause", {"pause": malicious_pause}, "UNTRUSTED_PAUSE_CALLBACK_HOLD"),
+            ):
+                with self.subTest(kind=kind):
+                    out = Path(root) / kind
+                    github = fake_global_registry()
+                    source = OfflineFixtureTransport({ROBOTS: ROBOTS_OK})
+                    with self.assertRaisesRegex(ValueError, reason):
+                        collect_bounded_review_cycle(
+                            out, "tpac-r4-20261109-145500z-a1b2c3d4",
+                            source_policy_approved=True, fetch=source,
+                            registry_dir=registry, global_registry=github,
+                            **injection)
+                    self.assertFalse(out.exists())
+                    self.assertEqual(source.calls, [])
+                    self.assertEqual(github._opener.calls, [])
+                    self.assertEqual(list(registry.iterdir()), [])
+            self.assertEqual(side_effects, [])
 
     def test_offline_fixture_receipt_rejected_by_native_adapter(self):
         from datetime import datetime, timezone
