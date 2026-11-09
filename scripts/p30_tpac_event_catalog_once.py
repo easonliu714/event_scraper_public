@@ -33,6 +33,43 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
+class OfflineFixtureTransport:
+    """Deterministic in-memory bytes only; no caller-provided HTTP callbacks.
+
+    Exact built-in types prevent arbitrary transport callbacks from bypassing
+    the consumed one-shot marker or the unapproved R4 retention gate.
+    """
+
+    def __init__(self, responses):
+        if type(responses) is not dict or not responses:
+            raise ValueError("TPAC_OFFLINE_FIXTURE_MAP_REQUIRED_HOLD")
+        self._responses = {}
+        for url, value in responses.items():
+            parts = urlsplit(url) if type(url) is str else None
+            if (parts is None or parts.scheme != "https"
+                    or parts.netloc != "tpac.org.taipei"
+                    or parts.query or parts.fragment
+                    or (url not in (ROOT, ROBOTS)
+                        and not re.fullmatch(r"/event/[1-9]\d{0,9}", parts.path))):
+                raise ValueError("TPAC_OFFLINE_FIXTURE_URL_HOLD")
+            if type(value) is bytes and 0 < len(value) <= MAX_BODY:
+                self._responses[url] = value
+            elif type(value) is ValueError:
+                self._responses[url] = value
+            else:
+                raise ValueError("TPAC_OFFLINE_FIXTURE_BYTES_OR_ERROR_HOLD")
+        self.calls = []
+
+    def __call__(self, url):
+        self.calls.append(url)
+        if url not in self._responses:
+            raise ValueError("TPAC_OFFLINE_FIXTURE_MISSING_URL_HOLD")
+        value = self._responses[url]
+        if type(value) is ValueError:
+            raise value
+        return value
+
+
 def bounded_fetch(url, *, opener=None, allowed_ids=SOURCE_IDS):
     """Retired direct native GET entrypoint: no caller can reconsume one-shot.
 
@@ -57,6 +94,7 @@ def _receipt(url, raw, now):
         "observed_at": now.isoformat(),
         "body_sha256": hashlib.sha256(raw).hexdigest(),
         "body_bytes": len(raw),
+        "offline_fixture_replay": True,
     }
 
 
@@ -80,15 +118,15 @@ def _visible_detail_ids(raw):
 def collect_once(out, *, fetch=None):
     """Offline replay of consumed legacy one-shot; never initiate native GET.
 
-    An explicitly injected callable is for isolated test fixtures only. This
-    is not a network security boundary against arbitrary Python callers.
+    Only exact OfflineFixtureTransport byte maps are permitted for replay.
+    No arbitrary callback, opener, or native HTTP path can be injected.
     """
     # The original first-party one-shot marker was consumed in run 42491637804.
     # Neither default CLI invocation nor passing the native fetcher may re-GET.
     if fetch is None or fetch is bounded_fetch:
         raise ValueError("TPAC_EVENT_LEGACY_NATIVE_FETCH_DISABLED_HOLD")
-    if not callable(fetch):
-        raise ValueError("TPAC_EVENT_TEST_FETCH_REQUIRED_HOLD")
+    if type(fetch) is not OfflineFixtureTransport:
+        raise ValueError("TPAC_EVENT_UNTRUSTED_FETCH_CALLBACK_HOLD")
     out = Path(out)
     report = {
         "kind": "EVENTRADAR_TPAC_EVENT_TWO_DETAILS_SINGLE_AUDIT",
@@ -96,6 +134,7 @@ def collect_once(out, *, fetch=None):
         "requested_ids": list(SOURCE_IDS),
         "robots_url": ROBOTS, "list_url": ROOT,
         "successful_get": 0, "attempted_urls": [],
+        "new_native_http_get": 0, "offline_fixture_replay": True,
         "decision": "HOLD", "first_failure": "NOT_STARTED",
         "published": 0, "accepted_fields": 0, "native_official_attestation": False,
         "source_receipts": {},
@@ -127,7 +166,7 @@ def collect_once(out, *, fetch=None):
             body = take(url)
             blobs["event_" + ident + "_detail.html"] = body
             report["source_receipts"][ident] = _receipt(url, body, datetime.now(timezone.utc))
-        report["decision"] = "NATIVE_BODY_CAPTURED_FOR_INDEPENDENT_REPLAY_ONLY"
+        report["decision"] = "OFFLINE_FIXTURE_REPLAY_ONLY"
         report["first_failure"] = "TPAC_EVENT_ROLE_AND_IDENTITY_FIELD_REPLAY_PENDING"
     except (HTTPError, URLError, OSError, UnicodeError, ValueError, TimeoutError) as exc:
         report["first_failure"] = type(exc).__name__ + ":" + str(exc)
@@ -265,6 +304,8 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
     # mock-only offline contract tests without creating a real source request.
     if fetch is None:
         raise ValueError("TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD")
+    if type(fetch) is not OfflineFixtureTransport:
+        raise ValueError("TPAC_R4_UNTRUSTED_FETCH_CALLBACK_HOLD")
     global_claim = global_registry.claim(cycle_id)
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     if hasattr(os, "O_NOFOLLOW"):
@@ -291,6 +332,7 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
         "cycle_id": cycle_id, "catalog": "event",
         "decision": "HOLD", "first_failure": "NOT_STARTED",
         "attempted_urls": [], "successful_get": 0,
+        "new_native_http_get": 0, "offline_fixture_replay": True,
         "source_receipts": {}, "selected_ids": [],
         "robots_allowed": False, "robots_sha256": None,
         "request_gap_seconds": None,
@@ -368,7 +410,7 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
             "list_receipt": report["source_receipts"]["list"],
             "details": details, "now": observed().isoformat(),
         }
-        report["decision"] = "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED"
+        report["decision"] = "ISOLATED_OFFLINE_FIXTURE_REPLAY_ONLY"
         report["first_failure"] = "INDEPENDENT_BODY_AND_RECEIPT_READBACK_PENDING"
     except (HTTPError, URLError, OSError, UnicodeError, ValueError, TimeoutError) as exc:
         report["first_failure"] = type(exc).__name__ + ":" + str(exc)
@@ -412,7 +454,7 @@ if __name__ == "__main__":
             source_policy_approved=args.authorize_isolated_cycle,
             registry_dir=args.registry_dir, global_registry=global_registry)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-        raise SystemExit(0 if report["decision"] == "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED" else 49)
+        raise SystemExit(0 if report["decision"] == "ISOLATED_OFFLINE_FIXTURE_REPLAY_ONLY" else 49)
     # The legacy source marker is consumed. An unqualified CLI invocation
     # must never become a second network path around TPAC-R4 retention HOLD.
     print(json.dumps({

@@ -75,6 +75,9 @@ def _visible(node):
 def _receipt(raw, receipt, url, now):
     if not isinstance(receipt, dict):
         raise ValueError("TPAC_RECEIPT_MISSING_HOLD")
+    # Fixture-marked receipts cannot masquerade as native source evidence.
+    if receipt.get("offline_fixture_replay") is True:
+        raise ValueError("TPAC_OFFLINE_FIXTURE_NOT_NATIVE_RECEIPT_HOLD")
     observed = _time(receipt.get("observed_at"))
     if now < observed - timedelta(minutes=2) or now - observed > timedelta(hours=24):
         raise ValueError("TPAC_SOURCE_STALE_OR_FUTURE_HOLD")

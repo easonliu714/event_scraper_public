@@ -11,6 +11,7 @@ from pathlib import Path
 from scripts.p30_tpac_event_catalog_once import (
     ROOT, ROBOTS, SOURCE_IDS, bounded_fetch, collect_once,
     collect_bounded_review_cycle, GitHubAtomicClaimRegistry,
+    OfflineFixtureTransport,
 )
 
 ROBOTS_OK = b"User-agent: *\nAllow: /event\n"
@@ -80,21 +81,19 @@ def fake_global_registry(shared=None, **kwargs):
 
 class EventSourceOnceTests(unittest.TestCase):
     def test_robots_then_list_then_two_different_details(self):
-        calls = []
-        allowed = {
+        fetch = OfflineFixtureTransport({
             ROBOTS: ROBOTS_OK, ROOT: LIST,
             ROOT + "/1301": ONE, ROOT + "/2072": TWO,
-        }
-        def fetch(u):
-            calls.append(u)
-            return allowed[u]
+        })
         with tempfile.TemporaryDirectory() as root:
             out = Path(root)
             report = collect_once(out, fetch=fetch)
-            self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/1301", ROOT + "/2072"])
+            self.assertEqual(fetch.calls, [ROBOTS, ROOT, ROOT + "/1301", ROOT + "/2072"])
             self.assertEqual(report["successful_get"], 4)
             self.assertEqual(report["listed_id_count"], 2)
-            self.assertEqual(report["decision"], "NATIVE_BODY_CAPTURED_FOR_INDEPENDENT_REPLAY_ONLY")
+            self.assertEqual(report["decision"], "OFFLINE_FIXTURE_REPLAY_ONLY")
+            self.assertEqual(report["new_native_http_get"], 0)
+            self.assertTrue(report["source_receipts"]["1301"]["offline_fixture_replay"])
             self.assertFalse(report["native_official_attestation"])
             self.assertEqual(report["published"], 0)
             self.assertEqual(report["accepted_fields"], 0)
@@ -103,38 +102,35 @@ class EventSourceOnceTests(unittest.TestCase):
             self.assertFalse((out / "docs" / "data.json").exists())
 
     def test_robots_disallow_blocks_list_and_detail(self):
-        calls = []
-        def denied(url):
-            calls.append(url)
-            return b"User-agent: *\nDisallow: /event\n"
+        denied = OfflineFixtureTransport({
+            ROBOTS: b"User-agent: *\nDisallow: /event\n"
+        })
         with tempfile.TemporaryDirectory() as root:
             report = collect_once(root, fetch=denied)
-            self.assertEqual(calls, [ROBOTS])
+            self.assertEqual(denied.calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("ROBOTS_DISALLOW_HOLD", report["first_failure"])
             self.assertEqual(report["successful_get"], 1)
 
     def test_missing_second_list_link_prevents_detail_get(self):
-        calls = []
-        def missing(u):
-            calls.append(u)
-            return ROBOTS_OK if u == ROBOTS else LIST.replace(b"/event/2072", b"/event/9999")
+        missing = OfflineFixtureTransport({
+            ROBOTS: ROBOTS_OK,
+            ROOT: LIST.replace(b"/event/2072", b"/event/9999"),
+        })
         with tempfile.TemporaryDirectory() as root:
             report = collect_once(root, fetch=missing)
-            self.assertEqual(calls, [ROBOTS, ROOT])
+            self.assertEqual(missing.calls, [ROBOTS, ROOT])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("TWO_DISTINCT_LIST_EDGES_MISSING_HOLD", report["first_failure"])
 
     def test_403_first_detail_has_no_retry_or_second_detail(self):
-        calls = []
-        def gone(u):
-            calls.append(u)
-            if u == ROOT + "/1301":
-                raise ValueError("403")
-            return ROBOTS_OK if u == ROBOTS else LIST
+        gone = OfflineFixtureTransport({
+            ROBOTS: ROBOTS_OK, ROOT: LIST,
+            ROOT + "/1301": ValueError("403"),
+        })
         with tempfile.TemporaryDirectory() as root:
             report = collect_once(root, fetch=gone)
-            self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/1301"])
+            self.assertEqual(gone.calls, [ROBOTS, ROOT, ROOT + "/1301"])
             self.assertEqual(report["decision"], "HOLD")
             self.assertEqual(report["successful_get"], 2)
             self.assertFalse((Path(root) / "event_2072_detail.html").exists())
@@ -195,14 +191,13 @@ class EventSourceOnceTests(unittest.TestCase):
 
 
     def test_r4_dynamic_two_ids_bounded_receipts_manifest_and_one_shot(self):
-        calls, sleeps = [], []
+        sleeps = []
         listing = (b'<main><a href="/event/3456" title="Tour">Tour</a>'
                    b'<a href="/event/9876" title="Exhibition">Exhibition</a></main>')
-        pages = {ROBOTS: ROBOTS_OK, ROOT: listing,
-                 ROOT + "/3456": ONE, ROOT + "/9876": TWO}
-        def fake(url):
-            calls.append(url)
-            return pages[url]
+        fake = OfflineFixtureTransport({
+            ROBOTS: ROBOTS_OK, ROOT: listing,
+            ROOT + "/3456": ONE, ROOT + "/9876": TWO,
+        })
         from datetime import datetime, timezone
         def clock():
             return datetime(2026, 11, 9, 1, 0, tzinfo=timezone.utc)
@@ -214,9 +209,10 @@ class EventSourceOnceTests(unittest.TestCase):
                 out, "tpac-r4-20261109-010000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fake,
                 clock=clock, pause=sleeps.append, registry_dir=registry, global_registry=fake_global_registry())
-            self.assertEqual(report["decision"], "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED")
+            self.assertEqual(report["decision"], "ISOLATED_OFFLINE_FIXTURE_REPLAY_ONLY")
+            self.assertEqual(report["new_native_http_get"], 0)
             self.assertEqual(report["selected_ids"], ["3456", "9876"])
-            self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/3456", ROOT + "/9876"])
+            self.assertEqual(fake.calls, [ROBOTS, ROOT, ROOT + "/3456", ROOT + "/9876"])
             self.assertEqual(sleeps, [3, 3, 3])
             self.assertEqual(report["successful_get"], 4)
             self.assertFalse(report["independent_cycle_verified"])
@@ -234,7 +230,7 @@ class EventSourceOnceTests(unittest.TestCase):
                     out, "tpac-r4-20261109-010000z-a1b2c3d4",
                     source_policy_approved=True, fetch=fake, pause=sleeps.append,
                     registry_dir=registry, global_registry=fake_global_registry())
-            self.assertEqual(len(calls), 4)
+            self.assertEqual(len(fake.calls), 4)
 
     def test_r4_requires_explicit_source_policy_before_any_request(self):
         with tempfile.TemporaryDirectory() as root:
@@ -250,10 +246,9 @@ class EventSourceOnceTests(unittest.TestCase):
             self.assertFalse(out.exists())
 
     def test_r4_robots_denial_stops_before_list_and_preserves_forensic_receipt(self):
-        calls = []
-        def denied(url):
-            calls.append(url)
-            return b"User-agent: *\nDisallow: /event\n"
+        denied = OfflineFixtureTransport({
+            ROBOTS: b"User-agent: *\nDisallow: /event\n"
+        })
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "denied"
             registry = Path(root) / "registry"
@@ -262,21 +257,19 @@ class EventSourceOnceTests(unittest.TestCase):
                 out, "tpac-r4-20261109-020000z-a1b2c3d4",
                 source_policy_approved=True, fetch=denied, pause=lambda n: None,
                 registry_dir=registry, global_registry=fake_global_registry())
-            self.assertEqual(calls, [ROBOTS])
+            self.assertEqual(denied.calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("ROBOTS_LIST_DISALLOW_HOLD", report["first_failure"])
             self.assertTrue((out / "tpac_r4_cycle_receipt.json").is_file())
             self.assertFalse((out / "tpac_r4_refresh_manifest.json").exists())
 
     def test_r4_detail_403_no_retry_and_no_consumable_manifest(self):
-        calls = []
         listing = (b'<a href="/event/3456">A</a>'
                    b'<a href="/event/9876">B</a>')
-        def fail_first_detail(url):
-            calls.append(url)
-            if url == ROOT + "/3456":
-                raise ValueError("HTTP 403")
-            return ROBOTS_OK if url == ROBOTS else listing
+        fail_first_detail = OfflineFixtureTransport({
+            ROBOTS: ROBOTS_OK, ROOT: listing,
+            ROOT + "/3456": ValueError("HTTP 403"),
+        })
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "forensic"
             registry = Path(root) / "registry"
@@ -285,17 +278,16 @@ class EventSourceOnceTests(unittest.TestCase):
                 out, "tpac-r4-20261109-030000z-a1b2c3d4",
                 source_policy_approved=True, fetch=fail_first_detail,
                 pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
-            self.assertEqual(calls, [ROBOTS, ROOT, ROOT + "/3456"])
+            self.assertEqual(fail_first_detail.calls, [ROBOTS, ROOT, ROOT + "/3456"])
             self.assertEqual(report["successful_get"], 2)
             self.assertEqual(report["decision"], "HOLD")
             self.assertFalse((out / "tpac_r4_refresh_manifest.json").exists())
             self.assertTrue((out / "event_list.html").is_file())
 
     def test_r4_excessive_robots_crawl_delay_holds_before_list(self):
-        calls = []
-        def slow(url):
-            calls.append(url)
-            return b"User-agent: *\nCrawl-delay: 120\nAllow: /event\n"
+        slow = OfflineFixtureTransport({
+            ROBOTS: b"User-agent: *\nCrawl-delay: 120\nAllow: /event\n"
+        })
         with tempfile.TemporaryDirectory() as root:
             out = Path(root) / "slow"
             registry = Path(root) / "registry"
@@ -305,17 +297,16 @@ class EventSourceOnceTests(unittest.TestCase):
                 source_policy_approved=True, fetch=slow,
                 pause=lambda n: self.fail("unexpected delay"),
                 registry_dir=registry, global_registry=fake_global_registry())
-            self.assertEqual(calls, [ROBOTS])
+            self.assertEqual(slow.calls, [ROBOTS])
             self.assertEqual(report["decision"], "HOLD")
             self.assertIn("CRAWL_DELAY_OVER_BUDGET_HOLD", report["first_failure"])
             self.assertFalse((out / "tpac_r4_refresh_manifest.json").exists())
 
 
     def test_r4_durable_registry_blocks_same_id_across_distinct_outputs_after_denial(self):
-        calls = []
-        def denied(url):
-            calls.append(url)
-            return b"User-agent: *\nDisallow: /event\n"
+        denied = OfflineFixtureTransport({
+            ROBOTS: b"User-agent: *\nDisallow: /event\n"
+        })
         with tempfile.TemporaryDirectory() as root:
             registry = Path(root) / "registry"
             registry.mkdir()
@@ -326,7 +317,7 @@ class EventSourceOnceTests(unittest.TestCase):
                 first, cycle, source_policy_approved=True, fetch=denied,
                 pause=lambda n: None, registry_dir=registry, global_registry=fake_global_registry())
             self.assertEqual(report["decision"], "HOLD")
-            self.assertEqual(calls, [ROBOTS])
+            self.assertEqual(denied.calls, [ROBOTS])
             self.assertTrue((registry / (cycle + ".claim.json")).is_file())
             with self.assertRaisesRegex(ValueError, "DURABLE_CYCLE_REUSE_HOLD"):
                 collect_bounded_review_cycle(
@@ -391,10 +382,10 @@ class EventSourceOnceTests(unittest.TestCase):
             self.assertEqual(global_registry._opener.calls, [])
 
     def test_r4_two_hosts_same_cycle_global_atomic_ref_rejects_second(self):
-        calls, shared = [], set()
-        def denied(url):
-            calls.append(url)
-            return b"User-agent: *\nDisallow: /event\n"
+        shared = set()
+        denied = OfflineFixtureTransport({
+            ROBOTS: b"User-agent: *\nDisallow: /event\n"
+        })
         with tempfile.TemporaryDirectory() as root:
             cycle = "tpac-r4-20261109-065500z-a1b2c3d4"
             registry_a, registry_b = Path(root)/"a", Path(root)/"b"
@@ -407,13 +398,13 @@ class EventSourceOnceTests(unittest.TestCase):
             self.assertEqual(first["decision"], "HOLD")
             self.assertTrue(first["global_atomic_claim_created"])
             self.assertFalse(first["global_immutable_registry_verified"])
-            self.assertEqual(len(calls), 1)
+            self.assertEqual(len(denied.calls), 1)
             with self.assertRaisesRegex(ValueError, "GLOBAL_CYCLE_ALREADY_CLAIMED"):
                 collect_bounded_review_cycle(
                     Path(root)/"second", cycle, source_policy_approved=True,
                     registry_dir=registry_b, global_registry=fake_global_registry(shared),
                     fetch=denied, pause=lambda _: None)
-            self.assertEqual(len(calls), 1)
+            self.assertEqual(len(denied.calls), 1)
             self.assertFalse((Path(root)/"second").exists())
             self.assertEqual(list(registry_b.iterdir()), [])
 
@@ -437,6 +428,44 @@ class EventSourceOnceTests(unittest.TestCase):
                     self.assertEqual(list(reg.iterdir()), [])
 
 
+
+
+    def test_arbitrary_callback_injection_never_consumes_source_or_claim(self):
+        """A malicious callable cannot trigger legacy or R4 source GET."""
+        calls = []
+        def untrusted(url):
+            calls.append(url)
+            raise AssertionError("UNAUTHORIZED_SOURCE_GET")
+        with tempfile.TemporaryDirectory() as root:
+            legacy = Path(root) / "legacy"
+            with self.assertRaisesRegex(ValueError, "UNTRUSTED_FETCH_CALLBACK_HOLD"):
+                collect_once(legacy, fetch=untrusted)
+            reg = Path(root) / "registry"
+            reg.mkdir()
+            global_registry = fake_global_registry()
+            with self.assertRaisesRegex(ValueError, "UNTRUSTED_FETCH_CALLBACK_HOLD"):
+                collect_bounded_review_cycle(
+                    Path(root) / "r4", "tpac-r4-20261109-135500z-a1b2c3d4",
+                    source_policy_approved=True, fetch=untrusted,
+                    registry_dir=reg, global_registry=global_registry)
+            self.assertEqual(calls, [])
+            self.assertEqual(global_registry._opener.calls, [])
+            self.assertEqual(list(reg.iterdir()), [])
+            self.assertFalse(legacy.exists())
+            self.assertFalse((Path(root) / "r4").exists())
+
+    def test_offline_fixture_receipt_rejected_by_native_adapter(self):
+        from datetime import datetime, timezone
+        from scripts.p30_tpac_multi_event_refresh import _receipt
+        now = datetime(2026, 11, 9, 5, 55, tzinfo=timezone.utc)
+        receipt = {
+            "observed_at": now.isoformat(), "http_status": 200,
+            "final_url": ROOT, "robots_allowed": True,
+            "body_sha256": hashlib.sha256(LIST).hexdigest(),
+            "body_bytes": len(LIST), "offline_fixture_replay": True,
+        }
+        with self.assertRaisesRegex(ValueError, "OFFLINE_FIXTURE_NOT_NATIVE_RECEIPT_HOLD"):
+            _receipt(LIST, receipt, ROOT, now)
 
 if __name__ == "__main__":
     unittest.main()
