@@ -8873,7 +8873,7 @@ This is an additive correction to evidence **semantic** integrity; previous orig
 
 ## 2026-11-09 13:54 Asia/Taipei — TPAC-R4 offline transport / native receipt separation
 
-\`\`\`text
+```text
 Source boundary (Engineering Draft #243, exact HEAD 468d8eccc89d65feb4ff5eb54e744289eaec026b)
   scripts/p30_tpac_event_catalog_once.py
     bounded_fetch() -> consumed legacy marker, direct native HTTP disabled
@@ -8902,8 +8902,8 @@ Source boundary (Engineering Draft #243, exact HEAD 468d8eccc89d65feb4ff5eb54e74
     existing robots, HTTP403, two-host claim, CAS, source controls retained
   .github/workflows/eventradar_tpac_multi_event_refresh.yml
     exact-head read-only PR CI; no native GET; no formal Publisher writes
-\`\`\`
+```
 
-- **Final evidence:** [PR #243](https://github.com/easonliu714/event_scraper_public/pull/243) exact HEAD \`468d8eccc89d65feb4ff5eb54e744289eaec026b\`; [CI #42569873566](https://github.com/easonliu714/event_scraper_public/actions/runs/42569873566) SUCCESS / job \`129004536301\`, 66/66 tests, strict JSON 13/13. [Artifact #13652612336](https://github.com/easonliu714/event_scraper_public/actions/runs/42569873566/artifacts/13652612336) ZIP SHA256 \`ab2c1954066aaec5072e28f127616926fd12e4542298e64eef29ce4d98b174fa\`, GitHub digest parity, CRC 14/14, SHA256SUMS 13/13, JSON 13/13 independently PASS. Initial test-input CI #42569830106 and #42569849035 FAIL repaired, not hidden.
-- **Product / gate separation:** no native GET this cycle, R4 independent cycles 0/2, no new formal accepted FIELD/Golden or release; source main \`4d207948526cd6a6e8ecd79ecd1251dcf44b31e8\`, formal data blob \`342eb7c101115b05dbc6ff90de7bd97d5bd63d59\` still one TPAC event, price empty. TPAC minimum NT$1,500 REVIEW, 10-vs-8 ticket session conflict HOLD. Android #244 North USER_ATTESTED_PASS, UI #245 Draft, HARD_HOLD_NO_PUBLICATION and STALE_STATUS_METADATA_HOLD unchanged.
+- **Final evidence:** [PR #243](https://github.com/easonliu714/event_scraper_public/pull/243) exact HEAD `468d8eccc89d65feb4ff5eb54e744289eaec026b`; [CI #42569873566](https://github.com/easonliu714/event_scraper_public/actions/runs/42569873566) SUCCESS / job `129004536301`, 66/66 tests, strict JSON 13/13. [Artifact #13652612336](https://github.com/easonliu714/event_scraper_public/actions/runs/42569873566/artifacts/13652612336) ZIP SHA256 `ab2c1954066aaec5072e28f127616926fd12e4542298e64eef29ce4d98b174fa`, GitHub digest parity, CRC 14/14, SHA256SUMS 13/13, JSON 13/13 independently PASS. Initial test-input CI #42569830106 and #42569849035 FAIL repaired, not hidden.
+- **Product / gate separation:** no native GET this cycle, R4 independent cycles 0/2, no new formal accepted FIELD/Golden or release; source main `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`, formal data blob `342eb7c101115b05dbc6ff90de7bd97d5bd63d59` still one TPAC event, price empty. TPAC minimum NT$1,500 REVIEW, 10-vs-8 ticket session conflict HOLD. Android #244 North USER_ATTESTED_PASS, UI #245 Draft, HARD_HOLD_NO_PUBLICATION and STALE_STATUS_METADATA_HOLD unchanged.
 - **Remaining architectural blocker:** immutable cross-host source-claim retention and independently approved robots/frequency/request-budget policy. A deletable Git tag, fixture byte map, offline replay or CI PASS cannot grant new native capture or Publisher/Scheduler authority. Existing Governance Draft #8 two canonical files remain the sole history.
