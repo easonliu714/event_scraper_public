@@ -132,10 +132,19 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         d["program_receipt"]["http_status"]=403
         with self.assertRaisesRegex(ValueError, "RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD"):
             review_two_catalog_plan(**d)
+        # Empty anchor inventory must retain the catalog's bounded-link
+        # fail-closed contract; do not weaken the source parser to fit a test.
         d=inputs()
         d["event_body"]=b"<main></main>"
         d["event_receipt"]=receipt(E_URL,d["event_body"])
-        with self.assertRaisesRegex(ValueError, "NO_VALID_EVENT_LINK_HOLD"):
+        with self.assertRaisesRegex(ValueError, "TPAC_CATALOG_LINK_CAP_HOLD"):
+            review_two_catalog_plan(**d)
+        # Nonempty anchor inventory with no valid official event identity is
+        # a distinct negative case and must remain fail-closed as well.
+        d=inputs()
+        d["event_body"]=b'<main><a href="/unrelated/1301">No event</a></main>'
+        d["event_receipt"]=receipt(E_URL,d["event_body"])
+        with self.assertRaisesRegex(ValueError, "TPAC_CATALOG_NO_VALID_EVENT_LINK_HOLD"):
             review_two_catalog_plan(**d)
 
     def test_caller_cannot_grant_immutable_claim_authority(self):
