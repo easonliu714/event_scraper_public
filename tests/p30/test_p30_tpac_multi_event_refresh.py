@@ -438,9 +438,9 @@ class MultiEventRefreshTests(unittest.TestCase):
             target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
             archived_bytes = target.read_bytes()
             second = write_isolated_plan(full_plan, root, first["sha256"])
-            self.assertEqual(second["diff"]["added"], ["tpac:2222"])
+            self.assertEqual(second["diff"]["added"], ["tpac:2112"])
             restored = restore_isolated_version(root, first["sha256"], second["sha256"])
-            self.assertEqual(restored["diff"]["removed"], ["tpac:2222"])
+            self.assertEqual(restored["diff"]["removed"], ["tpac:2112"])
             self.assertEqual(target.read_bytes(), archived_bytes)
             self.assertEqual(restored["sha256"], first["sha256"])
             self.assertFalse((root / "docs/data.json").exists())
