@@ -8759,3 +8759,42 @@ Source Engineering Draft #243 exact HEAD 09614e77f666f224efa4462587bc24ea4b83161
 ```
 
 **Remaining real authorization gate:** independent source-frequency/robots/request-budget approval plus immutable cross-host one-shot claim retention. No prior one-shot reGET, no privileged tag-retention inference, no 403/429 bypass, no automatic formal Publisher/Scheduler or price-only release. Direct Python legacy helper is now fail-closed, but arbitrary third-party Python code remains outside this repository helper boundary.
+
+
+### 2026-11-09 12:00 Asia/Taipei — TPAC isolated LKG rollback authority hardening
+
+```text
+Engineering Draft #243 exact HEAD 3e63d127ddf525b48080a4c884cbec44c48425fc
+  scripts/p30_tpac_multi_event_refresh.py
+    write_isolated_plan(plan, root, expected_sha,
+                        allow_archived_rollback=False,
+                        rollback_archive_sha=None)
+      legacy boolean True -> TPAC_ROLLBACK_BOOLEAN_BYPASS_HOLD
+      removed rows without archived authority -> UNAUTHORIZED_REMOVAL_EXPIRY_GATE_HOLD
+      rollback_archive_sha -> exact canonical payload SHA + existing nonsymlink
+        versions/<sha>.json byte parity under CAS lock BEFORE mutation
+      forged / missing / mismatched archive -> TPAC_ROLLBACK_ARCHIVE_AUTHORITY_HOLD
+    restore_isolated_version(...)
+      validate exact archived SHA + canonical bytes
+      -> write_isolated_plan(..., rollback_archive_sha=archived_sha)
+      -> verified local REVIEW rollback only, NEVER formal publication
+  tests/p30/test_p30_tpac_multi_event_refresh.py
+    + test_boolean_rollback_bypass_and_forged_archive_cannot_remove_lkg
+    + test_verified_archived_rollback_may_remove_only_to_exact_old_snapshot
+  CI #42559301642 initial FAIL: fixture expected 2222 instead of actual 2112
+    -> corrected exact two assertions only
+  CI #42559336171 exact-head SUCCESS / job 128972094942 / 62/62
+  Original Artifact #13647939025 / 11,002 bytes
+    ZIP SHA256 c9f9f5f5af26a6c937a8cd4af28624b13fc9a94e64a110f389ed3c3779b67851
+    GitHub digest parity / ZIP CRC 14/14 / SHA256SUMS 13/13 independently PASS
+  formal main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8 unchanged
+  formal data blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+    one TPAC /program/2040; price blank; no new Golden or formal Publisher
+  new native GET 0; independently verified R4 native cycles 0/2 HOLD
+  Android North #244 USER_ATTESTED_PASS; #245 UI-only Draft unmerged
+  general min NT$1500 REVIEW; OPENTIX 10 vs TPAC 8 SESSION_SET_CONFLICT_HOLD
+  HARD_HOLD_NO_PUBLICATION / STALE_STATUS_METADATA_HOLD
+```
+
+**Trust boundary:** local archived snapshot CAS and SHA checks prevent a direct boolean row-deletion bypass, but do not provide immutable cross-host GitHub tag retention or authorize source GET. Owner approval for robots/frequency/budget and independent immutable claim retention is still required before R4. No new one-shot marker, OPENTIX 403/429 bypass, formal data/Golden/status/Pages write or Scheduler activation.
+
