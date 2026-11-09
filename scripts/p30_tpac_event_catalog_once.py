@@ -78,8 +78,18 @@ def _visible_detail_ids(raw):
     return sorted(found)
 
 
-def collect_once(out, *, fetch=bounded_fetch):
-    """Save original official bytes for independent replay, never infer field PASS."""
+def collect_once(out, *, fetch=None):
+    """Offline replay of consumed legacy one-shot; never initiate native GET.
+
+    An explicitly injected callable is for isolated test fixtures only. This
+    is not a network security boundary against arbitrary Python callers.
+    """
+    # The original first-party one-shot marker was consumed in run 42491637804.
+    # Neither default CLI invocation nor passing the native fetcher may re-GET.
+    if fetch is None or fetch is bounded_fetch:
+        raise ValueError("TPAC_EVENT_LEGACY_NATIVE_FETCH_DISABLED_HOLD")
+    if not callable(fetch):
+        raise ValueError("TPAC_EVENT_TEST_FETCH_REQUIRED_HOLD")
     out = Path(out)
     report = {
         "kind": "EVENTRADAR_TPAC_EVENT_TWO_DETAILS_SINGLE_AUDIT",
@@ -404,7 +414,12 @@ if __name__ == "__main__":
             registry_dir=args.registry_dir, global_registry=global_registry)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True))
         raise SystemExit(0 if report["decision"] == "ISOLATED_NATIVE_BYTES_CAPTURED_REPLAY_REQUIRED" else 49)
-    report = collect_once(args.output)
-    print(json.dumps(report, ensure_ascii=False, sort_keys=True))
-    # Legacy one-shot is already consumed; CI never reissues that GET.
-    raise SystemExit(0)
+    # The legacy source marker is consumed. An unqualified CLI invocation
+    # must never become a second network path around TPAC-R4 retention HOLD.
+    print(json.dumps({
+        "kind": "TPAC_EVENT_LEGACY_ONESHOT_CONSUMED",
+        "decision": "HOLD",
+        "first_failure": "TPAC_EVENT_LEGACY_NATIVE_GET_DISABLED_HOLD",
+        "published": 0,
+    }, ensure_ascii=False, sort_keys=True))
+    raise SystemExit(49)

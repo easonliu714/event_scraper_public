@@ -2,6 +2,8 @@
 import hashlib
 from urllib.error import HTTPError
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -140,6 +142,34 @@ class EventSourceOnceTests(unittest.TestCase):
     def test_unapproved_detail_id_rejected_before_network(self):
         with self.assertRaisesRegex(ValueError, "UNAPPROVED_URL_HOLD"):
             bounded_fetch(ROOT + "/9999")
+
+    def test_consumed_legacy_one_shot_no_default_native_get_or_cli_output(self):
+        # Historical run 42491637804 exhausted the legacy native GET marker.
+        # A default CLI must not bypass the newer R4 immutable-retention HOLD.
+        with tempfile.TemporaryDirectory() as root:
+            out = Path(root) / "legacy-must-not-fetch"
+            for injected in (None, bounded_fetch):
+                with self.subTest(fetch=str(injected)):
+                    with self.assertRaisesRegex(
+                            ValueError, "TPAC_EVENT_LEGACY_NATIVE_FETCH_DISABLED_HOLD"):
+                        collect_once(out, fetch=injected)
+                    self.assertFalse(out.exists())
+            proc = subprocess.run(
+                [sys.executable, "-m", "scripts.p30_tpac_event_catalog_once",
+                 "--output", str(out)],
+                capture_output=True, text=True, timeout=10, check=False)
+            self.assertEqual(proc.returncode, 49, proc.stderr)
+            self.assertIn("TPAC_EVENT_LEGACY_NATIVE_GET_DISABLED_HOLD", proc.stdout)
+            self.assertFalse(out.exists())
+
+    def test_ci_never_reissues_consumed_legacy_source_one_shot(self):
+        workflow = (Path(__file__).resolve().parents[2] /
+                    ".github/workflows/eventradar_tpac_multi_event_refresh.yml")
+        content = workflow.read_text(encoding="utf-8")
+        self.assertIn("PASS_TPAC_EVENT_ONE_SHOT_CONSUMED_NO_NATIVE_GET", content)
+        self.assertNotIn("python -m scripts.p30_tpac_event_catalog_once --output", content)
+        self.assertIn("run-id: 42491637804", content)
+
 
 
 

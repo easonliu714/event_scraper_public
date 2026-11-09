@@ -57,19 +57,14 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_price_reconcile.py' -v
           python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
-      - name: TPAC /event first-party robots LIST and 2 distinct DETAIL bounded one-shot (NO PUBLISH)
-        env:
-          RUN_ATTEMPT: ${{ github.run_attempt }}
+      - name: Preserve consumed TPAC /event source one-shot (NO NETWORK)
         run: |
           set -euo pipefail
           mkdir -p evidence/native_event
-          if [ "$RUN_ATTEMPT" != "1" ] || git log --format=%s HEAD^ | grep -F '[tpac-event-catalog-once]'; then
-            echo 'TPAC_EVENT_SOURCE_PROBE_ALREADY_CONSUMED_OR_RERUN_HOLD'
-            printf '{"kind":"TPAC_EVENT_ONESHOT_ALREADY_CONSUMED","decision":"HOLD_DO_NOT_REPEAT","published":0}\n' > evidence/native_event/tpac_event_catalog_receipt.json
-          else
-            python -m scripts.p30_tpac_event_catalog_once --output evidence/native_event
-          fi
-          echo 'NATIVE_DIAGNOSTIC_ONLY__DO_NOT_INTERPRET_WORKFLOW_SUCCESS_AS_SOURCE_FIELD_PASS'
+          # The original one-shot was consumed by run 42491637804.
+          # Exact-head CI must only replay its SHA-pinned artifact.
+          printf '{"kind":"TPAC_EVENT_ONESHOT_ALREADY_CONSUMED","decision":"HOLD_DO_NOT_REPEAT","published":0}\n' > evidence/native_event/tpac_event_catalog_receipt.json
+          echo PASS_TPAC_EVENT_ONE_SHOT_CONSUMED_NO_NATIVE_GET
       - name: Retrieve pinned earlier first-party /event LIST and two DETAIL bodies (NO REGET)
         uses: actions/download-artifact@v4
         with:
