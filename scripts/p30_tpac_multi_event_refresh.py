@@ -395,8 +395,13 @@ def _canonical(obj):
     return (json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
 
 
-def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollback=False):
-    """Atomic/CAS isolated REVIEW snapshot; no formal output paths."""
+def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollback=False,
+                        rollback_archive_sha=None):
+    """Atomic/CAS isolated REVIEW snapshot; archived rollback is byte-bound.
+
+    A legacy boolean is never authority to remove LKG rows. Removal requires
+    a pre-existing, exact canonical archived snapshot, rechecked under CAS lock.
+    """
     if plan.get("decision") != "REVIEW_SNAPSHOT_READY_NOT_FORMAL":
         raise ValueError("TPAC_UNQUALIFIED_PLAN_WRITE_HOLD")
     if (plan.get("release_state") != "HARD_HOLD_NO_PUBLICATION" or
@@ -459,8 +464,24 @@ def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollb
             except (TypeError, json.JSONDecodeError) as error:
                 raise ValueError("TPAC_PRIOR_SCHEMA_HOLD") from error
         removed = sorted(set(old_rows) - set(rows))
-        if removed and not allow_archived_rollback:
+        # The previous allow_archived_rollback=True flag was an unbound
+        # deletion bypass. A caller cannot claim rollback authority by boolean.
+        if allow_archived_rollback is not False:
+            raise ValueError("TPAC_ROLLBACK_BOOLEAN_BYPASS_HOLD")
+        if removed and rollback_archive_sha is None:
             raise ValueError("TPAC_UNAUTHORIZED_REMOVAL_EXPIRY_GATE_HOLD")
+        if rollback_archive_sha is not None:
+            if (not isinstance(rollback_archive_sha, str)
+                    or not re.fullmatch(r"[0-9a-f]{64}", rollback_archive_sha)):
+                raise ValueError("TPAC_ROLLBACK_ARCHIVE_AUTHORITY_HOLD")
+            archived_payload = _canonical({"kind": KIND, "events": rows})
+            versions_for_rollback = dest_dir / "versions"
+            archived_path = versions_for_rollback / (rollback_archive_sha + ".json")
+            if (versions_for_rollback.is_symlink() or archived_path.is_symlink()
+                    or not archived_path.is_file()
+                    or _sha(archived_payload) != rollback_archive_sha
+                    or archived_path.read_bytes() != archived_payload):
+                raise ValueError("TPAC_ROLLBACK_ARCHIVE_AUTHORITY_HOLD")
         diff = {"added": sorted(set(rows) - set(old_rows)),
                 "changed": sorted(k for k in set(rows) & set(old_rows)
                                   if rows[k] != old_rows[k]),
@@ -557,7 +578,7 @@ def restore_isolated_version(repo_root, archived_sha, expected_current_sha):
             "native_attestation": "REQUIRES_INDEPENDENT_READBACK",
             "published": 0, "events": document["events"]}
     result = write_isolated_plan(plan, root, expected_current_sha,
-                                 allow_archived_rollback=True)
+                                 rollback_archive_sha=archived_sha)
     if result["sha256"] != archived_sha:
         raise ValueError("TPAC_ROLLBACK_NONCANONICAL_ARCHIVE_HOLD")
     return dict(result, decision="ISOLATED_REVIEW_ROLLBACK_NOT_FORMAL")

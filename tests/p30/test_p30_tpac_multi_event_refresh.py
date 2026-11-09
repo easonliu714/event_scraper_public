@@ -409,6 +409,42 @@ class MultiEventRefreshTests(unittest.TestCase):
                 restore_isolated_version(root, first["sha256"], repeated["sha256"])
             self.assertEqual(target.read_bytes(), original)
 
+    def test_boolean_rollback_bypass_and_forged_archive_cannot_remove_lkg(self):
+        raw, rr, details = inputs()
+        full = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        partial = dict(full, events={"tpac:2111": full["events"]["tpac:2111"]})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(full, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            before = target.read_bytes()
+            with self.assertRaisesRegex(ValueError, "ROLLBACK_BOOLEAN_BYPASS_HOLD"):
+                write_isolated_plan(partial, root, first["sha256"],
+                                    allow_archived_rollback=True)
+            with self.assertRaisesRegex(ValueError, "ROLLBACK_ARCHIVE_AUTHORITY_HOLD"):
+                write_isolated_plan(partial, root, first["sha256"],
+                                    rollback_archive_sha="a" * 64)
+            self.assertEqual(target.read_bytes(), before)
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_verified_archived_rollback_may_remove_only_to_exact_old_snapshot(self):
+        raw, rr, details = inputs()
+        old_plan = refresh_plan(raw, rr, {"2111": details["2111"]},
+                                empty_prior(), NOW)
+        full_plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(old_plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            archived_bytes = target.read_bytes()
+            second = write_isolated_plan(full_plan, root, first["sha256"])
+            self.assertEqual(second["diff"]["added"], ["tpac:2222"])
+            restored = restore_isolated_version(root, first["sha256"], second["sha256"])
+            self.assertEqual(restored["diff"]["removed"], ["tpac:2222"])
+            self.assertEqual(target.read_bytes(), archived_bytes)
+            self.assertEqual(restored["sha256"], first["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+
     def test_noncanonical_archive_cannot_write_then_fail(self):
         raw, rr, details = inputs()
         plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
