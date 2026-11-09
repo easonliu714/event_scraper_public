@@ -8667,3 +8667,22 @@ Draft #243 source/test (exact HEAD b6ce6c46d2ecd6f4b2c5dd3ea5adcad48b44caf8)
 ```
 
 This closes the specific real-CLI gap where a deletable tag plus a caller boolean could previously initiate live source GET. It does **not** establish immutable global claim retention, prevent custom Python callers from injecting their own network fetch, accept the NT$1,500 price FIELD, reconcile OPENTIX 10 vs TPAC 8 sessions, or authorize two native cycles. Existing Android North-region USER_ATTESTED_PASS and prior Gates are retained. Next architecture step: independently approved source policy and enforceable immutable cross-host retention, then exact-head CI and two genuinely separate original native LIST→DETAIL captures with CAS/LKG/diff/rollback; never reuse consumed one-shot markers or enable recurring publication.
+
+
+### 2026-11-09 08:51 Asia/Taipei — R4 exact-head original artifact independent integrity audit
+
+```text
+Exact source PR #243 HEAD b6ce6c46d2ecd6f4b2c5dd3ea5adcad48b44caf8
+  -> CI #42537907633 SUCCESS, 57/57
+  -> original Artifact #13640301610, 10,999 bytes
+     ZIP SHA256 2a885a078b6b78656b60a317013c5dba465aa27ce66c5d8241ebfc80e17ae0c5
+     independent original ZIP CRC 14/14 PASS
+     SHA256SUMS.txt payload hashes 13/13 PASS
+  -> archived native LIST 18, archived DETAIL 2, missing DETAIL 16 HOLD
+  -> isolated CAS LKG SHA256 20a7bfd8f8930a53e7f7849571c712fb822c6167373211aa3cb1b07ca8be054d
+  -> published=0, new native GET=0, real independent R4 cycles=0/2
+  -> real CLI retention authority unverified -> HOLD before source GET
+  -> main/data/Golden/status/Pages unchanged; no UI #245 merge
+```
+
+Independent original artifact integrity is now VERIFIED; do not mistake archived native-body replay, an offline injected-fetch test, or a valid artifact checksum for authorization of a real new source refresh. Retain source policy/robots/frequency/budget and immutable cross-host claim-retention gaps as first blockers. Preserve Android #244 USER_ATTESTED_PASS, session-set conflict, price REVIEW, and global HARD_HOLD_NO_PUBLICATION.
