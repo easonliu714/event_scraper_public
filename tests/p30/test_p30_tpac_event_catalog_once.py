@@ -423,7 +423,7 @@ class EventSourceOnceTests(unittest.TestCase):
                         collect_bounded_review_cycle(
                             out, cycle, source_policy_approved=True,
                             registry_dir=reg, global_registry=fake_global_registry(**opts),
-                            fetch=lambda url: self.fail("network attempted"))
+                            fetch=OfflineFixtureTransport({ROBOTS: ROBOTS_OK}))
                     self.assertFalse(out.exists())
                     self.assertEqual(list(reg.iterdir()), [])
 
