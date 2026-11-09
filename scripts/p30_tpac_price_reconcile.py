@@ -223,6 +223,36 @@ def inspect_opentix_native_body(body, receipt, *, event_url, expected_title, now
         return {"decision": "HOLD", "reason": str(error), "published": False}
 
 
+# Ticket-session inputs are untrusted until event-local native roles are
+# independently attested. Normalize *instants*, not strings, so UTC/+08:00
+# aliases cannot create false parity or conceal duplicate showtimes.
+SESSION_TIMESTAMP = re.compile(
+    r"^20\\d{2}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):[0-5]\\d"
+    r"(?:Z|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+)
+TAIPEI = timezone(timedelta(hours=8))
+
+
+def _canonical_session_instants(values):
+    if not isinstance(values, (list, tuple)) or not 1 <= len(values) <= 40:
+        raise ValueError("SESSION_EVIDENCE_SCHEMA_HOLD")
+    canonical = []
+    for value in values:
+        if type(value) is not str or not SESSION_TIMESTAMP.fullmatch(value):
+            raise ValueError("SESSION_TIMESTAMP_FORMAT_HOLD")
+        try:
+            instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError("SESSION_TIMESTAMP_FORMAT_HOLD") from error
+        if instant.tzinfo is None or instant.utcoffset() is None:
+            raise ValueError("SESSION_TIMESTAMP_TIMEZONE_HOLD")
+        canonical.append(
+            instant.astimezone(TAIPEI).strftime("%Y-%m-%dT%H:%M+08:00"))
+    if len(canonical) != len(set(canonical)):
+        raise ValueError("DUPLICATE_SESSION_INSTANT_HOLD")
+    return set(canonical)
+
+
 def reconcile_opentix_price(venue_offer, *, ticket_event_url, title,
                             venue_name, normal_ticket_tiers, sessions,
                             independent_ticket_receipt_verified=False,
@@ -251,11 +281,14 @@ def reconcile_opentix_price(venue_offer, *, ticket_event_url, title,
     if (min(normal_ticket_tiers) != venue_offer["min_price_ntd"]
             or max(normal_ticket_tiers) != venue_offer["max_price_ntd"]):
         return {"decision": "HOLD", "reason": "VENUE_TICKET_PRICE_RANGE_CONFLICT_HOLD"}
-    if not isinstance(sessions, (list, tuple)) or not isinstance(venue_sessions, (list, tuple)):
-        return {"decision": "HOLD", "reason": "SESSION_EVIDENCE_SCHEMA_HOLD"}
-    if len(sessions) != len(set(sessions)) or len(venue_sessions) != len(set(venue_sessions)):
-        return {"decision": "HOLD", "reason": "DUPLICATE_SESSION_IDENTITY_HOLD"}
-    ticket_set, venue_set = set(sessions), set(venue_sessions)
+    # Caller-provided sessions remain REVIEW, not ticket-body attestation.
+    # Strict aware timestamps and instant-level dedup prevent unhashable
+    # crashes, timezone alias mismatches and false cross-source parity.
+    try:
+        ticket_set = _canonical_session_instants(sessions)
+        venue_set = _canonical_session_instants(venue_sessions)
+    except ValueError as error:
+        return {"decision": "HOLD", "reason": str(error)}
     hold = []
     if ticket_set != venue_set:
         hold.append("CROSS_SOURCE_SESSION_SET_CONFLICT_HOLD")

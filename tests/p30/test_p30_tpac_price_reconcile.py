@@ -237,5 +237,53 @@ class TPACAdmissionReviewTests(unittest.TestCase):
                     raw, source, event_url=url, expected_title=title, now=clock)
                 self.assertEqual(result, {"decision":"HOLD","reason":expected,"published":False})
 
+    def test_session_timestamp_inputs_fail_closed_without_exceptions(self):
+        html, receipt = sample()
+        offer = extract_tpac_price_review(html, receipt, "2040", TITLE)
+        base = dict(ticket_event_url=OPENTIX, title=TITLE,
+                    venue_name="臺北表演藝術中心",
+                    normal_ticket_tiers=[1500, 2000, 2500, 3000, 3500],
+                    sessions=VENUE_SESSIONS, venue_sessions=VENUE_SESSIONS)
+        cases = [
+            ([{"start": VENUE_SESSIONS[0]}], "SESSION_TIMESTAMP_FORMAT_HOLD"),
+            (["2026-11-20T19:30"], "SESSION_TIMESTAMP_FORMAT_HOLD"),
+            (["2026-11-31T19:30+08:00"], "SESSION_TIMESTAMP_FORMAT_HOLD"),
+            (["2026-11-20T19:30+25:00"], "SESSION_TIMESTAMP_FORMAT_HOLD"),
+            ([VENUE_SESSIONS[0], "2026-11-20T11:30Z"],
+             "DUPLICATE_SESSION_INSTANT_HOLD"),
+            (VENUE_SESSIONS * 6, "SESSION_EVIDENCE_SCHEMA_HOLD"),
+        ]
+        for sessions, reason in cases:
+            with self.subTest(reason=reason, sample=str(sessions)[:60]):
+                result = reconcile_opentix_price(
+                    offer, **dict(base, sessions=sessions))
+                self.assertEqual(result, {"decision": "HOLD", "reason": reason})
+        # Venue-side timestamps must pass the same validation, not just tickets.
+        result = reconcile_opentix_price(
+            offer, **dict(base, venue_sessions=[{"date": "untrusted"}]))
+        self.assertEqual(result["reason"], "SESSION_TIMESTAMP_FORMAT_HOLD")
+
+    def test_cross_source_session_parity_normalizes_same_utc_instants(self):
+        html, receipt = sample()
+        offer = extract_tpac_price_review(html, receipt, "2040", TITLE)
+        utc_sessions = [
+            datetime.fromisoformat(value).astimezone(timezone.utc).strftime(
+                "%Y-%m-%dT%H:%MZ")
+            for value in VENUE_SESSIONS
+        ]
+        result = reconcile_opentix_price(
+            offer, ticket_event_url=OPENTIX, title=TITLE,
+            venue_name="臺北表演藝術中心",
+            normal_ticket_tiers=[1500, 2000, 2500, 3000, 3500],
+            sessions=utc_sessions, venue_sessions=VENUE_SESSIONS)
+        self.assertEqual(result["decision"], "PRICE_RANGE_MATCH_REVIEW_NOT_FORMAL")
+        self.assertEqual(result["ticket_only_sessions"], [])
+        self.assertEqual(result["venue_only_sessions"], [])
+        self.assertNotIn("CROSS_SOURCE_SESSION_SET_CONFLICT_HOLD",
+                         result["held_fields"])
+        self.assertIn("INDEPENDENT_TICKET_BODY_RECEIPT_REQUIRED_HOLD",
+                      result["held_fields"])
+        self.assertFalse(result["accepted_for_formal_publish"])
+
 if __name__=="__main__":
     unittest.main()
