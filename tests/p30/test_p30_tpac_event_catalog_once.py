@@ -143,6 +143,27 @@ class EventSourceOnceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "UNAPPROVED_URL_HOLD"):
             bounded_fetch(ROOT + "/9999")
 
+    def test_retired_direct_fetch_rejects_all_allowlisted_urls_before_network(self):
+        # Closing the CLI alone left a direct Python bounded_fetch() GET path.
+        # No default or explicitly injected opener may access old one-shot URLs.
+        from unittest.mock import patch
+
+        calls = []
+        class PoisonOpener:
+            def open(self, *args, **kwargs):
+                calls.append((args, kwargs))
+                raise AssertionError("LEGACY_DIRECT_NETWORK_MUST_NOT_BE_CALLED")
+
+        with patch("scripts.p30_tpac_event_catalog_once.build_opener",
+                   side_effect=AssertionError("DEFAULT_NETWORK_MUST_NOT_BE_CALLED")):
+            for url in (ROBOTS, ROOT, ROOT + "/1301", ROOT + "/2072"):
+                for opener in (None, PoisonOpener()):
+                    with self.subTest(url=url, explicit_opener=opener is not None):
+                        with self.assertRaisesRegex(
+                                ValueError, "TPAC_EVENT_DIRECT_NATIVE_FETCH_DISABLED_HOLD"):
+                            bounded_fetch(url, opener=opener)
+        self.assertEqual(calls, [])
+
     def test_consumed_legacy_one_shot_no_default_native_get_or_cli_output(self):
         # Historical run 42491637804 exhausted the legacy native GET marker.
         # A default CLI must not bypass the newer R4 immutable-retention HOLD.
