@@ -8638,3 +8638,32 @@ Owner-approved source policy + bounded cycle budget (STILL HOLD)
 
 
 **2026-11-09 06:57 Asia/Taipei independent original Artifact #13637264030 readback correction:** Downloaded exact original GitHub Artifact ZIP to isolated audit workspace. Original ZIP size **10,999 bytes**, SHA256 `5525b7314d971c800fe5db0721eb3ae3d14bfce0be46135fdc9217426767af92` equals GitHub artifact digest; ZIP **CRC 14/14 PASS**, `SHA256SUMS.txt` **13/13 PASS**. This independently supersedes the provisional “ZIP CRC NOT YET VERIFIED” text in the preceding checkpoint without erasing history. Still **zero** new TPAC/OPENTIX source GET and **zero** formal FIELD/Golden/data publication; cross-host atomic tag is a simulated offline contract only and tag retention/source policy remain HOLD.
+
+### 2026-11-09 07:58 Asia/Taipei — TPAC-R4 native capture pre-GET authority topology (fail closed)
+
+```text
+Draft #243 source/test (exact HEAD b6ce6c46d2ecd6f4b2c5dd3ea5adcad48b44caf8)
+  scripts/p30_tpac_event_catalog_once.py
+    collect_bounded_review_cycle(out, cycle_id, source_policy_approved, fetch, registry_dir, global_registry)
+      [1] explicit policy boolean + cycle syntax + new output + durable local registry
+      [2] concrete GitHubAtomicClaimRegistry type
+      [3] NEW: production CLI fetch=None -> TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD
+          BEFORE GitHub ref POST, local claim/tombstone or TPAC robots/LIST/DETAIL GET
+      [4] offline test-injected fetch only: GitHub atomic tag claim + local O_EXCL tombstone
+          -> bounded robots -> LIST -> two distinct DETAIL -> forensic receipt
+          -> no formal Publisher / no new genuine cycle
+    GitHubAtomicClaimRegistry.claim
+      GET exact main -> POST unique Git tag -> GET tag readback
+      global_immutable_registry_verified=False (deletable ref is NOT retention authority)
+  tests/p30/test_p30_tpac_event_catalog_once.py
+    test_r4_live_cli_retention_gap_holds_before_global_tag_or_source_get
+      assert no GitHub API calls / no tag / no local claim / no output
+  Exact-head CI #42537907633 SUCCESS, job 128906199481, 57/57 tests
+  Artifact #13640301610, GitHub-reported ZIP SHA256
+    2a885a078b6b78656b60a317013c5dba465aa27ce66c5d8241ebfc80e17ae0c5
+  Formal main/data/Golden/Publisher/status/Pages unchanged
+  Genuine TPAC-R4 independent native refresh 0/2; new native GET 0
+  HARD_HOLD_NO_PUBLICATION and STALE_STATUS_METADATA_HOLD remain
+```
+
+This closes the specific real-CLI gap where a deletable tag plus a caller boolean could previously initiate live source GET. It does **not** establish immutable global claim retention, prevent custom Python callers from injecting their own network fetch, accept the NT$1,500 price FIELD, reconcile OPENTIX 10 vs TPAC 8 sessions, or authorize two native cycles. Existing Android North-region USER_ATTESTED_PASS and prior Gates are retained. Next architecture step: independently approved source policy and enforceable immutable cross-host retention, then exact-head CI and two genuinely separate original native LIST→DETAIL captures with CAS/LKG/diff/rollback; never reuse consumed one-shot markers or enable recurring publication.
