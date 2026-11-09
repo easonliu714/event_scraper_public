@@ -34,21 +34,20 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def bounded_fetch(url, *, opener=None, allowed_ids=SOURCE_IDS):
+    """Retired direct native GET entrypoint: no caller can reconsume one-shot.
+
+    The original /event source marker is already consumed. This function
+    deliberately retains its old signature for fail-closed compatibility, but
+    never constructs a Request or calls an opener, even when explicitly given
+    a transport. A future live R4 fetch must be implemented only behind a
+    separately approved immutable cross-host retention and source policy Gate.
+    """
     allowed = {ROBOTS, ROOT, *(ROOT + "/" + sid for sid in allowed_ids)}
     if url not in allowed:
         raise ValueError("TPAC_EVENT_UNAPPROVED_URL_HOLD")
-    req = Request(url, headers={"User-Agent": AGENT, "Accept": "text/html,text/plain"})
-    with (opener or build_opener(NoRedirect())).open(req, timeout=15) as res:
-        content_type = res.headers.get("Content-Type", "").lower()
-        data = res.read(MAX_BODY + 1)
-        if res.status != 200 or res.geturl() != url:
-            raise ValueError("TPAC_EVENT_HTTP_OR_REDIRECT_HOLD")
-        if len(data) == 0 or len(data) > MAX_BODY:
-            raise ValueError("TPAC_EVENT_EMPTY_OR_OVERSIZE_HOLD")
-        if ("text/" not in content_type if url == ROBOTS else
-                "text/html" not in content_type):
-            raise ValueError("TPAC_EVENT_UNEXPECTED_MIME_HOLD")
-        return data
+    # A direct Python call previously bypassed the protected CLI path.
+    # Reject BEFORE any network side effect, including injected openers.
+    raise ValueError("TPAC_EVENT_DIRECT_NATIVE_FETCH_DISABLED_HOLD")
 
 
 def _receipt(url, raw, now):
