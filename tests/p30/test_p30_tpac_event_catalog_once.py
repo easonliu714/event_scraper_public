@@ -12,6 +12,7 @@ from scripts.p30_tpac_event_catalog_once import (
     ROOT, ROBOTS, SOURCE_IDS, bounded_fetch, collect_once,
     collect_bounded_review_cycle, GitHubAtomicClaimRegistry,
     OfflineFixtureTransport, OfflineFixtureClock, OfflineFixturePause,
+    OfflineFixtureGitHubClaimTransport,
 )
 
 ROBOTS_OK = b"User-agent: *\nAllow: /event\n"
@@ -23,58 +24,8 @@ TWO = b"<main><h1>Tour</h1><p>Showtimes</p></main>"
 
 
 
-class FakeGitHubOpener:
-    """No-network REST double with shared tag state across simulated hosts."""
-    SHA = "a" * 40
-    API = GitHubAtomicClaimRegistry.API
-
-    def __init__(self, claimed=None, *, main_sha=None, corrupt_readback=False):
-        self.claimed = claimed if claimed is not None else set()
-        self.main_sha = main_sha or self.SHA
-        self.corrupt_readback = corrupt_readback
-        self.calls = []
-
-    def open(self, req, timeout=None):
-        url = req.full_url
-        method = req.get_method()
-        self.calls.append((method, url))
-        class Response:
-            def __init__(self, url, status, body):
-                self.url, self.status = url, status
-                self.body = json.dumps(body).encode()
-            def geturl(self):
-                return self.url
-            def read(self, cap):
-                return self.body[:cap]
-            def __enter__(self):
-                return self
-            def __exit__(self, *args):
-                return False
-        if method == "GET" and url == self.API + "/git/ref/heads/main":
-            return Response(url, 200, {
-                "ref": "refs/heads/main", "object": {"sha": self.main_sha}})
-        prefix = "refs/tags/eventradar-tpac-r4-claims/"
-        if method == "POST" and url == self.API + "/git/refs":
-            value = json.loads(req.data.decode())
-            ref = value["ref"]
-            if ref in self.claimed:
-                raise HTTPError(url, 422, "already exists", {}, None)
-            self.claimed.add(ref)
-            return Response(url, 201, {
-                "ref": ref, "object": {"sha": value["sha"]}})
-        if method == "GET" and url.startswith(
-                self.API + "/git/ref/tags/eventradar-tpac-r4-claims/"):
-            ref = "refs/tags/" + url.split("/git/ref/tags/", 1)[1]
-            if ref not in self.claimed:
-                raise HTTPError(url, 404, "missing", {}, None)
-            return Response(url, 200, {
-                "ref": ref,
-                "object": {"sha": ("b" * 40 if self.corrupt_readback else self.SHA)}})
-        raise AssertionError("unexpected GitHub request " + method + " " + url)
-
-
 def fake_global_registry(shared=None, **kwargs):
-    opener = FakeGitHubOpener(shared, **kwargs)
+    opener = OfflineFixtureGitHubClaimTransport(shared, **kwargs)
     return GitHubAtomicClaimRegistry("no-network-unit-test-token", opener.SHA,
                                      opener=opener)
 
@@ -498,6 +449,54 @@ class EventSourceOnceTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "OFFLINE_FIXTURE_NOT_NATIVE_RECEIPT_HOLD"):
             _receipt(LIST, receipt, ROOT, now)
+
+
+    def test_r4_github_opener_injection_and_real_tag_creation_fail_closed(self):
+        """No arbitrary GitHub opener or deletable real tag before retention authority."""
+        side_effects = []
+        class PoisonOpener:
+            def open(self, *args, **kwargs):
+                side_effects.append("untrusted-github-open")
+                raise AssertionError("UNAUTHORIZED_GITHUB_IO")
+        class SubclassOpener(OfflineFixtureGitHubClaimTransport):
+            def open(self, *args, **kwargs):
+                side_effects.append("subclass-github-open")
+                raise AssertionError("UNAUTHORIZED_GITHUB_IO")
+
+        for injected in (PoisonOpener(), SubclassOpener()):
+            with self.assertRaisesRegex(ValueError, "UNTRUSTED_GITHUB_OPENER_HOLD"):
+                GitHubAtomicClaimRegistry("offline-token", "a" * 40, opener=injected)
+        with tempfile.TemporaryDirectory() as root:
+            reg = Path(root) / "registry"
+            reg.mkdir()
+            out = Path(root) / "no-real-github-tags"
+            # A real registry with a valid token cannot even claim a tag.
+            real = GitHubAtomicClaimRegistry("nonempty-token", "a" * 40)
+            with self.assertRaisesRegex(ValueError, "GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD"):
+                real.claim("tpac-r4-20261109-155500z-a1b2c3d4")
+            with self.assertRaisesRegex(ValueError, "GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD"):
+                collect_bounded_review_cycle(
+                    out, "tpac-r4-20261109-155500z-a1b2c3d4",
+                    source_policy_approved=True, registry_dir=reg,
+                    global_registry=real, fetch=OfflineFixtureTransport({ROBOTS: ROBOTS_OK}))
+            self.assertFalse(out.exists())
+            self.assertEqual(list(reg.iterdir()), [])
+        self.assertEqual(side_effects, [])
+
+    def test_r4_offline_github_instance_method_override_never_executes(self):
+        """Exact fixture type alone must not permit a patched .open callback."""
+        side_effects = []
+        fake = OfflineFixtureGitHubClaimTransport()
+        def poisoned_open(*args, **kwargs):
+            side_effects.append("instance-open")
+            raise AssertionError("UNAUTHORIZED_CALLBACK")
+        fake.open = poisoned_open
+        registry = GitHubAtomicClaimRegistry("offline-token", fake.SHA, opener=fake)
+        claim = registry.claim("tpac-r4-20261109-155501z-a1b2c3d4")
+        self.assertTrue(claim["global_atomic_claim_created"])
+        self.assertFalse(claim["global_immutable_registry_verified"])
+        self.assertEqual(len(fake.calls), 3)
+        self.assertEqual(side_effects, [])
 
 if __name__ == "__main__":
     unittest.main()

@@ -209,13 +209,82 @@ def collect_once(out, *, fetch=None):
 
 
 
+class OfflineFixtureGitHubClaimTransport:
+    """No-network GitHub claim emulator. NEVER evidence of immutable retention.
+
+    Exact-type-only transport: caller callbacks and arbitrary urllib openers
+    cannot execute before an R4 fixture replay. This does not grant native GET.
+    """
+
+    API = "https://api.github.com/repos/easonliu714/event_scraper_public"
+    SHA = "a" * 40
+
+    def __init__(self, claimed=None, *, main_sha=None, corrupt_readback=False):
+        if claimed is not None and type(claimed) is not set:
+            raise ValueError("TPAC_R4_OFFLINE_CLAIM_SET_TYPE_HOLD")
+        if main_sha is not None and (type(main_sha) is not str or
+                                      not re.fullmatch(r"[0-9a-f]{40}", main_sha)):
+            raise ValueError("TPAC_R4_OFFLINE_CLAIM_SHA_HOLD")
+        if type(corrupt_readback) is not bool:
+            raise ValueError("TPAC_R4_OFFLINE_CLAIM_READBACK_FLAG_HOLD")
+        self.claimed = claimed if claimed is not None else set()
+        self.main_sha = main_sha or self.SHA
+        self.corrupt_readback = corrupt_readback
+        self.calls = []
+
+    def open(self, req, timeout=None):
+        if type(req) is not Request:
+            raise ValueError("TPAC_R4_OFFLINE_CLAIM_REQUEST_TYPE_HOLD")
+        url, method = req.full_url, req.get_method()
+        self.calls.append((method, url))
+
+        class OfflineResponse:
+            def __init__(self, requested, status, data):
+                self.url = requested
+                self.status = status
+                self.body = json.dumps(data, sort_keys=True).encode("utf-8")
+
+            def geturl(self):
+                return self.url
+
+            def read(self, cap):
+                return self.body[:cap]
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        if method == "GET" and url == self.API + "/git/ref/heads/main":
+            return OfflineResponse(url, 200, {
+                "ref": "refs/heads/main", "object": {"sha": self.main_sha}})
+        if method == "POST" and url == self.API + "/git/refs":
+            value = json.loads(req.data.decode("utf-8", "strict"))
+            ref = value["ref"]
+            if ref in self.claimed:
+                raise HTTPError(url, 422, "already exists", {}, None)
+            self.claimed.add(ref)
+            return OfflineResponse(url, 201, {
+                "ref": ref, "object": {"sha": value["sha"]}})
+        prefix = self.API + "/git/ref/tags/eventradar-tpac-r4-claims/"
+        if method == "GET" and url.startswith(prefix):
+            ref = "refs/tags/" + url.split("/git/ref/tags/", 1)[1]
+            if ref not in self.claimed:
+                raise HTTPError(url, 404, "missing", {}, None)
+            return OfflineResponse(url, 200, {
+                "ref": ref,
+                "object": {"sha": "b" * 40 if self.corrupt_readback else self.SHA}})
+        raise ValueError("TPAC_R4_OFFLINE_CLAIM_UNEXPECTED_REQUEST_HOLD")
+
+
 class GitHubAtomicClaimRegistry:
     """Cross-host atomic one-shot source claim via unique GitHub Git tag refs.
 
-    A tag creation is an atomic uniqueness check across runners. A tag can be
-    deleted by a privileged actor: this is NOT immutable retention authority.
-    Requires separate Owner source-frequency approval; it never publishes data.
-    No automatic CI execution, no retries, and no HTTP source GET on failure.
+    Only an exact sealed in-memory GitHub emulator is permitted while immutable
+    cross-host retention and source-frequency authority are unverified.
+    Real GitHub tag creation is disabled; tags would be deletable and are NOT
+    immutable retention authority. No native HTTP, retries, or publication.
     """
 
     API = "https://api.github.com/repos/easonliu714/event_scraper_public"
@@ -226,11 +295,17 @@ class GitHubAtomicClaimRegistry:
         if not isinstance(expected_main_sha, str) or not re.fullmatch(
                 r"[0-9a-f]{40}", expected_main_sha):
             raise ValueError("TPAC_R4_GLOBAL_CLAIM_MAIN_SHA_HOLD")
+        # No caller-supplied opener, URL handler, or live GitHub transport.
+        # Even a real token cannot create a deletable tag while R4 is HOLD.
+        if opener is not None and type(opener) is not OfflineFixtureGitHubClaimTransport:
+            raise ValueError("TPAC_R4_UNTRUSTED_GITHUB_OPENER_HOLD")
         self._token = token
         self.expected_main_sha = expected_main_sha
-        self._opener = opener or build_opener(NoRedirect())
+        self._opener = opener
 
     def _request(self, method, url, *, payload=None, status=200):
+        if type(self._opener) is not OfflineFixtureGitHubClaimTransport:
+            raise ValueError("TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD")
         raw_payload = (json.dumps(payload, sort_keys=True).encode("utf-8")
                        if payload is not None else None)
         request = Request(
@@ -243,7 +318,10 @@ class GitHubAtomicClaimRegistry:
                 "User-Agent": AGENT,
             })
         try:
-            with self._opener.open(request, timeout=15) as response:
+            # Class-method dispatch defeats an instance-level .open override.
+            # The sealed fixture is memory-only; it never calls urllib.
+            with OfflineFixtureGitHubClaimTransport.open(
+                    self._opener, request, timeout=15) as response:
                 if response.status != status or response.geturl() != url:
                     raise ValueError("TPAC_R4_GLOBAL_CLAIM_REDIRECT_OR_STATUS_HOLD")
                 raw = response.read(65537)
@@ -261,6 +339,8 @@ class GitHubAtomicClaimRegistry:
             raise ValueError("TPAC_R4_GLOBAL_CLAIM_HTTP_OR_JSON_HOLD") from exc
 
     def claim(self, cycle_id):
+        if type(self._opener) is not OfflineFixtureGitHubClaimTransport:
+            raise ValueError("TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD")
         if not isinstance(cycle_id, str) or not re.fullmatch(
                 r"tpac-r4-[a-z0-9-]{8,72}", cycle_id):
             raise ValueError("TPAC_R4_GLOBAL_CLAIM_CYCLE_ID_HOLD")
@@ -332,6 +412,10 @@ def collect_bounded_review_cycle(out, cycle_id, *, source_policy_approved=False,
         raise ValueError("TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD")
     if type(fetch) is not OfflineFixtureTransport:
         raise ValueError("TPAC_R4_UNTRUSTED_FETCH_CALLBACK_HOLD")
+    # GitHub real tags are deletable and cannot be source authority.
+    # Reject a real registry BEFORE any GitHub write or local tombstone.
+    if type(global_registry._opener) is not OfflineFixtureGitHubClaimTransport:
+        raise ValueError("TPAC_R4_GLOBAL_RETENTION_AUTHORITY_UNVERIFIED_HOLD")
     # Test clocks and delays are also executable injection surfaces. Only
     # exact sealed offline fixtures are allowed before any global claim.
     if clock is not None and type(clock) is not OfflineFixtureClock:
