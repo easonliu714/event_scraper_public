@@ -371,7 +371,7 @@ class RawPairIdentityAdapter(unittest.TestCase):
         href = tainex.DETAIL
         for markup in (
             '<script><a href="' + href + '">' + title + '</a></script>',
-            '<a href="' + href + '">' + title + '</a>' * 2,
+            ('<a href="' + href + '">' + title + '</a>') * 2,
         ):
             damaged = dict(p, list_html_b64=base64.b64encode(
                 markup.encode("utf-8")).decode("ascii"))
