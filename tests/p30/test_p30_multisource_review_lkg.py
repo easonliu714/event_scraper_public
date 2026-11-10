@@ -7,7 +7,8 @@ from pathlib import Path
 
 from scripts import p30_venue02bo_tainex_exhibition as tainex
 from scripts import p30_l9dc_famiticket_teca as fami
-from scripts.p30_multisource_review_lkg import plan, write_isolated
+from scripts.p30_multisource_review_lkg import plan, write_isolated, load_previous_snapshot
+from scripts.p30_tainex_archived_native_bridge import archived_inputs
 
 NOW = datetime(2026, 11, 10, 5, 55, tzinfo=timezone.utc)
 TAINEX_STAMP = "2026-11-02T06:57:00+08:00"
@@ -191,6 +192,60 @@ class MultiSourceBridge(unittest.TestCase):
         old[0]["scraped_at"] = "2026-11-11T00:00:00+00:00"
         with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
             plan([tainex_packet()], previous=old, as_of=NOW)
+
+
+    def test_persisted_real_historical_four_id_lkg_resume(self):
+        """Persist real historical receipt review, restart with no source GET."""
+        fixture_dir = Path(__file__).parent / "fixtures"
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first = plan([tainex_packet(), fami_packet()], as_of=NOW,
+                         archived_native=archived_inputs(fixture_dir))
+            self.assertEqual(first["new_review"], 4)
+            path = root / "_isolated_review" / "multi" / "first.json"
+            sha = write_isolated(first, path, root)
+            previous = load_previous_snapshot(path, sha, root)
+            second = plan([], previous=previous, as_of=NOW)
+            self.assertEqual(second["new_review"], 0)
+            self.assertEqual(second["retained_lkg"], 4)
+            self.assertEqual(second["review_rows"], first["review_rows"])
+            self.assertEqual(second["decision"], "HOLD_NO_VALID_NEW_SOURCE")
+            self.assertEqual(second["native_get"], 0)
+            self.assertEqual(second["published_delta"], 0)
+            self.assertFalse(second["commit_permitted"])
+            out = root / "_isolated_review" / "multi" / "second.json"
+            self.assertEqual(len(write_isolated(second, out, root)), 64)
+            self.assertNotEqual(path.read_bytes(), out.read_bytes())
+
+    def test_persisted_snapshot_integrity_and_authority_fail_closed(self):
+        fixture_dir = Path(__file__).parent / "fixtures"
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first = plan([tainex_packet(), fami_packet()], as_of=NOW,
+                         archived_native=archived_inputs(fixture_dir))
+            path = root / "_isolated_review" / "multi" / "first.json"
+            sha = write_isolated(first, path, root)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_SHA_FORMAT_HOLD"):
+                load_previous_snapshot(path, "bad", root)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_ISOLATION_HOLD"):
+                load_previous_snapshot(root / "docs" / "data.json", sha, root)
+            path.write_bytes(path.read_bytes() + b" ")
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_SHA_MISMATCH_HOLD"):
+                load_previous_snapshot(path, sha, root)
+            import hashlib
+            import json
+            forged = copy.deepcopy(first)
+            forged["commit_permitted"] = True
+            raw = (json.dumps(forged, sort_keys=True) + "\n").encode("utf-8")
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_AUTHORITY_HOLD"):
+                load_previous_snapshot(path, hashlib.sha256(raw).hexdigest(), root)
+            forged = copy.deepcopy(first)
+            forged["review_rows"].append(copy.deepcopy(forged["review_rows"][0]))
+            raw = (json.dumps(forged, sort_keys=True) + "\n").encode("utf-8")
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_IDENTITY_HOLD"):
+                load_previous_snapshot(path, hashlib.sha256(raw).hexdigest(), root)
 
 
 if __name__ == "__main__":
