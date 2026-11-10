@@ -165,7 +165,12 @@ def plan(packets, *, previous=None, as_of):
     prior, prior_report = build_candidate_dataset(previous)
     if prior_report["rejectedRows"] or len(prior) != len(previous):
         raise ValueError("PRIOR_LKG_INTEGRITY_HOLD")
-    for old_row in prior:
+    # The generic candidate Core may intentionally strip unsupported keys.
+    # For a durable LKG input, silent sanitization would conceal a forged
+    # field receipt or publication claim. Require exact canonical round-trip.
+    for raw_row, old_row in zip(previous, prior):
+        if raw_row != old_row:
+            raise ValueError("PRIOR_LKG_NONCANONICAL_HOLD")
         validate_prior_binding(old_row, now)
     receipts, rejected = [], []
     for index, packet in enumerate(packets):

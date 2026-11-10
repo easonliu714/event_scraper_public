@@ -165,7 +165,10 @@ class MultiSourceBridge(unittest.TestCase):
         for key, value in changes:
             altered = copy.deepcopy(old)
             altered[0][key] = value
-            with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+            with self.assertRaisesRegex(
+                ValueError,
+                "PRIOR_LKG_(?:SOURCE_BINDING|INTEGRITY|NONCANONICAL)_HOLD"
+            ):
                 plan([fami_packet()], previous=altered, as_of=NOW)
         for key, value in [
             ("source_event_id", "690"),
@@ -177,7 +180,10 @@ class MultiSourceBridge(unittest.TestCase):
         ]:
             altered = copy.deepcopy(old)
             altered[0]["_candidate"][key] = value
-            with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+            with self.assertRaisesRegex(
+                ValueError,
+                "PRIOR_LKG_(?:SOURCE_BINDING|INTEGRITY|NONCANONICAL)_HOLD"
+            ):
                 plan([fami_packet()], previous=altered, as_of=NOW)
 
     def test_prior_future_lkg_cannot_poison_isolated_snapshot(self):
