@@ -95,6 +95,43 @@ def verified_shape(row):
     return {k:row.get(k) for k in ("platform","source_event_id","url","title","date","price")}
 
 
+# Versioned rollback manifests pin the original Git blob and per-event bytes.
+# They do NOT confer release authority or guarantee Git object retention.
+def _json_sha(value):
+    return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True,
+                                     separators=(",", ":")).encode("utf-8")).hexdigest()
+
+def rollback_manifest(formal_raw, expected_blob):
+    if not isinstance(formal_raw, bytes) or blob_sha(formal_raw) != expected_blob:
+        raise ValueError("ROLLBACK_BASE_CAS_HOLD")
+    try:
+        rows=json.loads(formal_raw)
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError("ROLLBACK_BASE_JSON_HOLD") from exc
+    if not isinstance(rows, list) or not 0 < len(rows) <= 2000:
+        raise ValueError("ROLLBACK_BASE_ROWS_HOLD")
+    entries={}
+    for row in rows:
+        k=":".join(identity(row))
+        if k in entries:
+            raise ValueError("ROLLBACK_DUPLICATE_ID_HOLD")
+        entries[k]=_json_sha(row)
+    return {"kind":"EVENTRADAR_FORMAL_ROLLBACK_MANIFEST_V1",
+            "release_state":HOLD,"base_git_blob":expected_blob,
+            "base_raw_sha256":hashlib.sha256(formal_raw).hexdigest(),
+            "row_count":len(rows),"event_row_sha256":dict(sorted(entries.items())),
+            "storage_retention_attested":False,
+            "restore_requires_separate_owner_authority":True,
+            "commit_permitted":False}
+
+def verify_rollback_manifest(formal_raw, manifest):
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("base_git_blob"), str):
+        raise ValueError("ROLLBACK_MANIFEST_SHAPE_HOLD")
+    actual=rollback_manifest(formal_raw, manifest["base_git_blob"])
+    if actual != manifest:
+        raise ValueError("ROLLBACK_MANIFEST_MISMATCH_HOLD")
+    return True
+
 def review_bridge_only(row):
     """Consume an existing A_OPENTIX REVIEW envelope without accepting any field.
 
@@ -252,12 +289,24 @@ def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None):
         except (ValueError,TypeError,KeyError) as e:
             rejected.append({"index":n,"reason":str(e)})
     added,changed,unchanged=[],[],[]
+    diff_entries=[]
     for k,row in proposed.items():
         label=":".join(k)
-        if k not in prior: added.append(label)
+        if k not in prior:
+            added.append(label)
+            change="ADD"
         elif any(row.get(x)!=prior[k].get(x) for x in ("url","title","date","price")):
             changed.append(label)
-        else: unchanged.append(label)
+            change="CHANGE"
+        else:
+            unchanged.append(label)
+            change="UNCHANGED"
+        fields=("platform","source_event_id","url","title","date","price")
+        before={x:prior[k].get(x) for x in fields} if k in prior else None
+        diff_entries.append({"event_key":label,"change":change,
+            "before_fields_sha256":_json_sha(before) if before is not None else None,
+            "candidate_fields_sha256":_json_sha(row),
+            "authority":"SHAPE_ONLY_NOT_INDEPENDENTLY_ACCEPTED"})
     return {"kind":KIND,"decision":"HOLD_INDEPENDENT_NATIVE_AND_RELEASE_AUTHORITY",
             "release_state":HOLD,"formal_blob_before":actual,"formal_blob_after":actual,
             "formal_rows_before":len(original),"formal_rows_after":len(original),
@@ -267,6 +316,8 @@ def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None):
             "archived_native_list_rows":18 if archived_reviews else 0,"review_only":review_only,
             "would_add":sorted(added),"would_change":sorted(changed),
             "unchanged":sorted(unchanged),"rejected":rejected,
+            "versioned_diff":sorted(diff_entries,key=lambda x:x["event_key"]),
+            "rollback_manifest":rollback_manifest(formal_raw,expected_blob),
             "lkg_retained":len(original),"native_get":0,"published_delta":0,
             "commit_permitted":False,"scheduler_enabled":False,
             "formal_data_mutated":False,
