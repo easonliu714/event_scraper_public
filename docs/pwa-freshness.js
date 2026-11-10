@@ -100,13 +100,32 @@
       .finally(() => { pending = null; });
     return pending;
   }
-  const api = { summarize, renderSummary, refresh };
+  // A restored/backgrounded PWA can keep stale event cards even when the
+  // freshness panel re-reads JSON. Reuse the existing formal-feed init() only
+  // on BFCache restore or foreground return; never GET source or dispatch.
+  let cardsPending = null;
+  function refreshPublishedCards() {
+    if (!root || typeof root.init !== "function") return Promise.resolve(null);
+    if (cardsPending) return cardsPending;
+    cardsPending = Promise.resolve().then(() => root.init())
+      .catch(() => null)
+      .finally(() => { cardsPending = null; });
+    return cardsPending;
+  }
+  const api = { summarize, renderSummary, refresh, refreshPublishedCards };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (root && typeof document !== "undefined") {
     root.EventRadarReadOnlyFreshness = api;
-    root.addEventListener("pageshow", () => { void refresh(); });
+    root.addEventListener("pageshow", event => {
+      // Initial load already runs init() in the existing inline application.
+      if (event && event.persisted) void refreshPublishedCards();
+      void refresh();
+    });
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") void refresh();
+      if (document.visibilityState === "visible") {
+        void refreshPublishedCards();
+        void refresh();
+      }
     });
     root.addEventListener("touchend", () => {
       const ptr = document.getElementById("pull-to-refresh");

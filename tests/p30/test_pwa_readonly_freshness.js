@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 const { summarize, renderSummary, refresh } = require("../../docs/pwa-freshness.js");
 
 const published = [{
@@ -86,6 +87,46 @@ async function main() {
   assert.match(html, /fetch\(`data\.json\?t=\$\{timestamp\}`/);
   assert.doesNotMatch(js, /repository_dispatch|workflow_dispatch|api\.github\.com|Authorization\s*:|github_pat_|ghp_/);
   assert.doesNotMatch(js, /tpac\.org|tainex\.com|famiticket\.com/);
+  // Reopening a cached PWA must refresh the real event cards as well as
+  // the status panel. Initial pageshow must not duplicate inline init().
+  const lifecycle = {};
+  const lifecyclePanel = { textContent: "" };
+  const fakeDocument = {
+    visibilityState: "visible",
+    getElementById(id) { return id === "pwa-freshness-detail" ? lifecyclePanel : null; },
+    addEventListener(name, callback) { lifecycle[name] = callback; }
+  };
+  let cardReads = 0;
+  let statusReads = 0;
+  const fakeWindow = {
+    init: async () => { cardReads += 1; },
+    addEventListener(name, callback) { lifecycle[name] = callback; }
+  };
+  vm.runInNewContext(js, {
+    window: fakeWindow, document: fakeDocument,
+    fetch: async url => {
+      statusReads += 1;
+      return { ok: true, status: 200, json: async () =>
+        url.startsWith("./data.json?") ? published : held };
+    }
+  }, { filename: "docs/pwa-freshness.js" });
+  const settled = () => new Promise(resolve => setImmediate(resolve));
+  lifecycle.pageshow({ persisted: false });
+  await settled();
+  assert.equal(cardReads, 0, "initial load already calls init()");
+  lifecycle.pageshow({ persisted: true });
+  await settled();
+  assert.equal(cardReads, 1, "BFCache restore refreshes event cards");
+  lifecycle.visibilitychange();
+  await settled();
+  assert.equal(cardReads, 2, "foreground resume refreshes event cards");
+  fakeDocument.visibilityState = "hidden";
+  lifecycle.visibilitychange();
+  await settled();
+  assert.equal(cardReads, 2, "background transition does not refresh cards");
+  assert.ok(statusReads >= 4, "read-only status/data remain refreshed");
+  assert.doesNotMatch(js, /repository_dispatch|workflow_dispatch|api\\.github\\.com|Authorization\\s*:|github_pat_|ghp_/);
+  console.log("PASS PUB_OD_02_BFCACHE_FOREGROUND_FORMAL_CARDS_REFRESH");
   console.log("PASS PUB_OD_02_READONLY_PWA_FRESHNESS_20_ASSERTION_GROUPS");
 }
 main().catch(err => { console.error(err); process.exitCode = 1; });
