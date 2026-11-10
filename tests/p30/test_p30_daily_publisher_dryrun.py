@@ -1,5 +1,5 @@
 import copy,json,unittest
-from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape
+from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape,identity
 U="https://tpac.org.taipei/program/2040"
 def row():
     e={"platform":"臺北表演藝術中心","source_event_id":"2040","url":U,
@@ -94,4 +94,54 @@ class TestSafety(unittest.TestCase):
     def test_unregistered_adapter(self):
         e=row(); e["platform"]="UNKNOWN"
         with self.assertRaisesRegex(ValueError,"UNREGISTERED_ADAPTER"): verified_shape(e)
+
+    def test_historical_opentix_review_bridge_stays_review(self):
+        # The ID is the historical OPENTIX #05 same-ID REVIEW, not a new GET.
+        # Hashes below are test-only placeholders and never native attestation.
+        event_id="2070446724700692480"
+        e={"kind":"EVENTRADAR_AB_ISOLATED_REVIEW_BRIDGE_V1",
+           "adapter_key":"A_OPENTIX","line":"A","source_id":"05",
+           "source_event_id":event_id,"list_url":"https://www.opentix.life/",
+           "detail_url":"https://www.opentix.life/event/"+event_id,
+           "source_attestation":"CALLER_SUPPLIED_NOT_NATIVE",
+           "decision":"REVIEW_ONLY_NOT_NATIVE",
+           "release_state":"HARD_HOLD_NO_PUBLICATION",
+           "native_get":0,"native_body_lkg":0,"formal_accepted_fields":0,
+           "golden":0,"published":0,
+           "observed_at_utc":"2026-11-08T00:00:00+00:00",
+           "body_digests":{"list_sha256":"a"*64,"detail_sha256":"b"*64}}
+        raw,sha=feed()
+        p=plan(raw,[e],sha)
+        self.assertEqual(p["review_only_count"],1)
+        self.assertEqual(p["shape_valid"],0)
+        self.assertEqual(p["would_add"],[])
+        self.assertEqual(p["lkg_retained"],1)
+        self.assertFalse(p["commit_permitted"])
+        self.assertEqual(p["review_only"][0]["source_event_id"],event_id)
+        self.assertEqual(p["review_only"][0]["decision"],"REVIEW_ONLY_NOT_NATIVE")
+        for key,val in (("source_attestation","NATIVE_ATTESTED"),
+                        ("native_get",1),("published",1)):
+            bad=copy.deepcopy(e); bad[key]=val
+            q=plan(raw,[bad],sha)
+            self.assertEqual(q["review_only_count"],0)
+            self.assertEqual(len(q["rejected"]),1)
+        bad=copy.deepcopy(e); bad["candidate"]={"formal_field_pass":True}
+        self.assertEqual(plan(raw,[bad],sha)["review_only_count"],0)
+
+    def test_opentix_official_identity_registered_without_field_acceptance(self):
+        event_id="2070446724700692480"
+        e={"platform":"OPENTIX","source_event_id":event_id,
+           "url":"https://www.opentix.life/event/"+event_id}
+        self.assertEqual(identity(e),("OPENTIX","event",event_id))
+        for url in ("https://www.opentix.life/program/"+event_id,
+                    "https://www.opentix.life.evil.example/event/"+event_id):
+            bad=copy.deepcopy(e);bad["url"]=url
+            if "/program/" in url:
+                with self.assertRaisesRegex(ValueError,"NAMESPACE_NOT_REGISTERED"):
+                    identity(bad)
+            else:
+                with self.assertRaisesRegex(ValueError,"EXACT_OFFICIAL"):
+                    verified_shape(bad)
+        with self.assertRaisesRegex(ValueError,"FIELD_EVIDENCE"):
+            verified_shape(e)
 if __name__=="__main__": unittest.main()
