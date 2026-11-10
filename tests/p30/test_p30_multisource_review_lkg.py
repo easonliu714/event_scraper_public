@@ -9,7 +9,8 @@ from pathlib import Path
 from scripts import p30_venue02bo_tainex_exhibition as tainex
 from scripts import p30_l9dc_famiticket_teca as fami
 from scripts.p30_multisource_review_lkg import (
-    REGISTRY, inspect_raw_pair, plan, write_isolated, load_previous_snapshot)
+    REGISTRY, inspect_raw_pair, archive_raw_pair, verify_raw_pair_archive,
+    plan, write_isolated, load_previous_snapshot)
 from scripts.p30_tainex_archived_native_bridge import archived_inputs
 
 NOW = datetime(2026, 11, 10, 5, 55, tzinfo=timezone.utc)
@@ -434,6 +435,68 @@ class RawPairIdentityAdapter(unittest.TestCase):
         self.assertIn("RAW_PAIR_DUPLICATE_ID_HOLD", result["rejected"][0]["reason"])
         self.assertEqual(result["new_review"], 0)
         self.assertFalse(result["commit_permitted"])
+
+
+class IsolatedRawByteRetention(unittest.TestCase):
+    """Actual disk byte retention, not native HTTP/field attestation."""
+
+    def test_exact_bytes_survive_restart_without_promoting_source_authority(self):
+        import hashlib
+        for source in ("tainex", "famiticket"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as td:
+                packet = raw_pair_packet(source)
+                packet["native_http_attested"] = True  # Never trusted.
+                packet["published"] = True
+                saved = archive_raw_pair(
+                    packet, repo_root=td, archive_id="raw-pair-01", as_of=NOW)
+                readback = verify_raw_pair_archive(td, "raw-pair-01", NOW)
+                self.assertEqual(saved, readback)
+                for role in ("list", "detail"):
+                    original = base64.b64decode(packet[role + "_html_b64"])
+                    actual = (Path(td) / "_isolated_review" / "raw_pairs" /
+                              "raw-pair-01" / (role + ".html")).read_bytes()
+                    self.assertEqual(actual, original)
+                    self.assertEqual(
+                        hashlib.sha256(actual).hexdigest(),
+                        next(x["sha256"] for x in saved["raw_bodies"]
+                             if x["role"] == role.upper()))
+                self.assertTrue(saved["raw_html_retention_verified"])
+                self.assertFalse(saved["native_http_attested"])
+                self.assertFalse(saved["commit_permitted"])
+                self.assertFalse(saved["published"])
+                self.assertFalse(saved["lkg_promoted"])
+                self.assertEqual(saved["independently_accepted_fields"], 0)
+
+    def test_archive_is_write_once_and_fails_closed_on_tampering(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = raw_pair_packet("tainex")
+            archive_raw_pair(p, repo_root=td, archive_id="raw-pair-02", as_of=NOW)
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_REPLAY_OR_COLLISION_HOLD"):
+                archive_raw_pair(p, repo_root=td, archive_id="raw-pair-02", as_of=NOW)
+            target = Path(td) / "_isolated_review" / "raw_pairs" / "raw-pair-02"
+            with (target / "detail.html").open("ab") as stream:
+                stream.write(b"tamper")
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_HASH_OR_ID_HOLD"):
+                verify_raw_pair_archive(td, "raw-pair-02", NOW)
+            (target / "detail.html").write_bytes(
+                base64.b64decode(p["detail_html_b64"]))
+            manifest_path = target / "manifest.json"
+            manifest = __import__("json").loads(manifest_path.read_text())
+            manifest["native_http_attested"] = True
+            manifest_path.write_text(__import__("json").dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_AUTHORITY_HOLD"):
+                verify_raw_pair_archive(td, "raw-pair-02", NOW)
+
+    def test_archive_path_and_symlink_cannot_escape_isolation(self):
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as outside:
+            p = raw_pair_packet("famiticket")
+            for bad_id in ("../docs", "a/b", "", ".hidden", "A", "x" * 65):
+                with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_ID_HOLD"):
+                    archive_raw_pair(p, repo_root=td, archive_id=bad_id, as_of=NOW)
+            base = Path(td) / "_isolated_review"
+            base.symlink_to(outside, target_is_directory=True) if not base.exists() else None
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_SYMLINK_HOLD"):
+                archive_raw_pair(p, repo_root=td, archive_id="safe", as_of=NOW)
 
 
 if __name__ == "__main__":
