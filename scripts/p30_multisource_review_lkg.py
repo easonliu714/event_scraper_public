@@ -32,11 +32,13 @@ REGISTRY = {
     "tainex": {"module": tainex, "platform_id": "TAINEX",
                "platform": "台北南港展覽館", "gate": "P30-VENUE-02BO",
                "expected_decision": "REVIEW", "expected_fields": 6,
-               "namespace": "event", "source_pr": 217},
+               "namespace": "event", "source_pr": 217,
+               "replay_clock": "2026-11-02T06:57:00+08:00"},
     "famiticket": {"module": famiticket, "platform_id": "FAMITICKET",
                    "platform": "FamiTicket", "gate": "P30-L9-DC",
                    "expected_decision": "REVIEW_WITH_HOLD", "expected_fields": 9,
-                   "namespace": "Home/Activity/Info", "source_pr": 221},
+                   "namespace": "Home/Activity/Info", "source_pr": 221,
+                   "replay_clock": "2026-11-02T06:55:00+08:00"},
 }
 
 
@@ -61,6 +63,11 @@ def inspect_one(packet, as_of):
         raise ValueError("FUTURE_OBSERVATION_HOLD")
     if seen_at >= HISTORICAL_REPLAY_END_UTC:
         raise ValueError("HISTORICAL_REPLAY_CLOCK_ESCALATION_HOLD")
+    # A caller cannot backdate or advance the old reconstructed observation
+    # within the historical day to replace a retained LKG. This clock is a
+    # fixed replay reference, NOT an independently attested HTTP timestamp.
+    if seen_at != utc(spec["replay_clock"]):
+        raise ValueError("HISTORICAL_REPLAY_CLOCK_BINDING_HOLD")
     inspected = spec["module"].inspect(obs, observed_at)
     if (inspected.get("decision") != spec["expected_decision"]
             or inspected.get("acceptedFields") != 0
@@ -162,7 +169,8 @@ def validate_prior_binding(row, as_of):
             or meta.get("field_evidence") != {}
             or any(row.get(k) != "未確認" for k in ("date", "price", "location"))
             or utc(row["scraped_at"]) > as_of
-            or utc(row["scraped_at"]) >= HISTORICAL_REPLAY_END_UTC):
+            or utc(row["scraped_at"]) >= HISTORICAL_REPLAY_END_UTC
+            or utc(row["scraped_at"]) != utc(spec["replay_clock"])):
         raise ValueError("PRIOR_LKG_SOURCE_BINDING_HOLD")
 
 

@@ -127,6 +127,30 @@ class MultiSourceBridge(unittest.TestCase):
         self.assertEqual(r2["source_reader_qualified"], 0)
         self.assertEqual(r2["new_review"], 0)
 
+    def test_reconstructed_replay_clock_is_exactly_bound_not_only_day_bounded(self):
+        # Neither a fabricated later clock nor a backdated clock may create
+        # a new REVIEW LKG revision from the same unaudited source packet.
+        old = plan([tainex_packet(), fami_packet()], as_of=NOW)["review_rows"]
+        for make, stamp in ((tainex_packet, "2026-11-02T15:59:00+08:00"),
+                            (tainex_packet, "2026-11-01T06:57:00+08:00"),
+                            (fami_packet, "2026-11-02T07:55:00+08:00"),
+                            (fami_packet, "2026-11-01T06:55:00+08:00")):
+            packet = make()
+            packet["observed_at"] = stamp
+            result = plan([packet], previous=old, as_of=NOW)
+            self.assertEqual(result["changed_review"], 0)
+            self.assertEqual(result["new_review"], 0)
+            self.assertEqual(result["review_rows"], old)
+            self.assertIn("HISTORICAL_REPLAY_CLOCK_BINDING_HOLD",
+                          result["rejected"][0]["reason"])
+        for key, stamp in (("TAINEX", "2026-11-02T07:57:00+08:00"),
+                           ("FAMITICKET", "2026-11-01T06:55:00+08:00")):
+            altered = copy.deepcopy(old)
+            row = next(r for r in altered if r["_candidate"]["platform_id"] == key)
+            row["scraped_at"] = stamp
+            with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+                plan([], previous=altered, as_of=NOW)
+
     def test_prior_replay_clock_escalation_rejected_on_restart(self):
         old = plan([tainex_packet()], as_of=NOW)["review_rows"]
         old[0]["scraped_at"] = "2026-11-03T00:00:00+08:00"
