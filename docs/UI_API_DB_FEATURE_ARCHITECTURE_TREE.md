@@ -9110,3 +9110,28 @@ Future optional schedule: OFF, separate Gate and Owner authority
 - **UI / API / storage / release status:** Formal PWA read-only refresh eligibility UI and status receipt schema **TODO/UNVERIFIED**; trusted Gateway **NOT IMPLEMENTED** (GitHub Pages static, must not embed repo token); cross-host Claim **HOLD**; REST dispatch **NOT ENABLED**; Publisher exact source/freshness/quality attestation and formal Blob CAS write **HOLD**; data.json 1 TPAC event unchanged. Existing `docs/platform_status.json` is independent engineering diagnostics and must not silently publish activities. Pages and Android live readback **UNVERIFIED** this turn; retain historically attested UI PASS.
 - **Multi-source boundary:** Reuse ongoing [Draft #247](https://github.com/easonliu714/event_scraper_public/pull/247) TaiNEX/FamiTicket historical REVIEW/LKG and approved source adapters rather than duplicating. CLAIM_RETENTION_AUTHORITY_HOLD on new TPAC official GET remains, with TPAC 6h official site budget separate from generic Publisher 24h freshness. Unknown/uncertain fields remain HOLD, and partial reliable fields may be accepted only with independent formal release authority. No daily AI model calls are required by the target runtime.
 - **Governance cross-reference:** [Issue #248](https://github.com/easonliu714/event_scraper_public/issues/248) tracks PUB-OD-01~06. Only existing two canonical governance files in Governance Draft #8 are authoritative; no third baseline, no merge/main/Golden/formal JSON or publishing HOLD change.
+
+## 2026-11-10 17:55 Asia/Taipei — PUB-OD-02 isolated PWA read-only status architecture (Draft #249)
+
+```text
+Public static GitHub Pages PWA (Draft only; not deployed)
+  existing init() -> immediately read current docs/data.json -> formal activity cards
+  new docs/pwa-freshness.js -> on pageshow / visible / existing pull refresh
+    -> fetch ONLY ./data.json and ./platform_status.json (cache: no-store)
+    -> show published count, latest source observation and report date
+    -> show independently recorded last_verified/last_success/last_attempt
+       and added/changed/retained/rejected ONLY if present in publisherStatus
+    -> missing receipt = UNKNOWN, not zero; current production HOLD overrides
+    -> show "TTL not authoritative: trusted Gateway NOT DEPLOYED"
+    -> 403/429 or malformed JSON -> status FAIL/UNKNOWN; formal cards unaffected
+  NO token, no source GET, no dispatch, no scheduled Publisher, no formal write
+Future separately authorized Gateway (NOT IMPLEMENTED):
+  authenticated / abuse-controlled request + server time + global atomic Claim
+  -> bounded workflow_dispatch -> deterministic Adapter/Core/Quality/LKG
+  -> independently authorized release CAS -> Pages + Android
+```
+
+- **Five-file isolated change scope:** `docs/index.html`, `docs/pwa-freshness.js`, `tests/p30/test_pwa_readonly_freshness.js`, `.github/workflows/eventradar_pwa_readonly_freshness.yml`, plus `.github/workflows/eventradar_pwa_source_groups.yml` to constrain an obsolete frozen PR #238 exact-scope job to its own PR, preventing false failures on unrelated UI Drafts. No `docs/data.json`, `docs/platform_status.json`, Golden, scraper, source adapter or existing UI business logic changed.
+- **Source/Test functions:** New `summarize(feed,status)` separates source observation from formal verification; `renderSummary(summary,target)` uses `textContent` and explicit UNKNOWN; `readJson(name)` permits only two static same-origin paths and fail-closes 403/429; `refresh()` deduplicates concurrent status reads. No browser-derived TTL is ever an authorization signal; PWA cannot invoke the server-side `assess_refresh_request()` from Draft #246 as dispatch authority.
+- **Exact-head proof:** Engineering [Draft #249](https://github.com/easonliu714/event_scraper_public/pull/249) HEAD `48f778a79b5676a7ce5403c2eb4870e6a9e27302`, CI [#42794787344](https://github.com/easonliu714/event_scraper_public/actions/runs/42794787344) SUCCESS, Job `129757065223`, Artifact `13753373262` independently downloaded ZIP SHA256 `5e73ff36d069b2fac831547d94c73a7672c8e66964489a0db8d1eff2e0647fee`, CRC PASS, formal data/status blobs unchanged (`342eb7c101115b05dbc6ff90de7bd97d5bd63d59` / `720cac528faacc9560a5ab41ce725bf8cc183166`). Initial unrelated legacy source-groups CI failure `HOLD_UNAPPROVED_UI_SCOPE` corrected by exact PR #238 guard; latest legacy job SKIPPED, dedicated CI PASS.
+- **Deployment/UX truth:** PUB-OD-02 has **Draft CI PASS, Pages HTTP/Android NOT VERIFIED, not deployed**. Existing `platform_status.json` is an old engineering report, not publisher telemetry; last_success, last_attempt, last_verified and deltas remain UNKNOWN on the current formal data. Current main still has one TPAC #2040 event and HARD_HOLD_NO_PUBLICATION. PUB-OD-03 manual isolated workflow, PUB-OD-04 Gateway/Claim/abuse protection, PUB-OD-05 formal release, PUB-OD-06 optional future schedule remain HOLD/OPEN. Owner must separately authorize any merge, formal publication, dispatch, secrets, external service or scheduler.
