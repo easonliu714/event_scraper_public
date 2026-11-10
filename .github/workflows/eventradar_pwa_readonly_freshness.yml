@@ -23,7 +23,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Exact PR HEAD, frozen formal assets and four-file scope
+      - name: Exact PR HEAD, frozen formal assets and five-file scope
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -35,9 +35,9 @@ jobs:
           test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_readonly_freshness.yml' 'docs/index.html' 'docs/pwa-freshness.js' 'tests/p30/test_pwa_readonly_freshness.js' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_readonly_freshness.yml' 'docs/index.html' '.github/workflows/eventradar_pwa_source_groups.yml' 'docs/pwa-freshness.js' 'tests/p30/test_pwa_readonly_freshness.js' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UI_SCOPE_DRIFT; exit 1; }
-          echo PASS_EXACT_HEAD_FROZEN_FORMAL_DATA_STATUS_SCRAPER_FOUR_FILES
+          echo PASS_EXACT_HEAD_FROZEN_FORMAL_DATA_STATUS_SCRAPER_FIVE_FILES
       - name: Browser JS syntax, isolated read-only and existing UI regression
         run: |
           set -euo pipefail
