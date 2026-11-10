@@ -77,7 +77,14 @@ jobs:
           except ValueError as exc: assert 'ARCHIVE_ZIP_SHA256_HOLD' in str(exc)
           else: raise AssertionError('tampered archive accepted')
           assert p['commit_permitted'] is False and p['scheduler_enabled'] is False
-          print('PASS_FORMAL_ONE_ROW_ISOLATED_DRYRUN_NO_PUBLICATION')
+          from scripts.p30_daily_publisher_dryrun import verify_rollback_manifest
+          assert verify_rollback_manifest(Path('docs/data.json').read_bytes(),p['rollback_manifest'])
+          assert p['rollback_manifest']['row_count']==1
+          assert p['rollback_manifest']['base_git_blob']=='342eb7c101115b05dbc6ff90de7bd97d5bd63d59'
+          assert p['rollback_manifest']['storage_retention_attested'] is False
+          assert p['versioned_diff'][0]['change']=='UNCHANGED'
+          assert p['versioned_diff'][0]['authority']=='SHAPE_ONLY_NOT_INDEPENDENTLY_ACCEPTED'
+          print('PASS_ACTUAL_FORMAL_VERSIONED_DIFF_AND_BYTE_EXACT_ROLLBACK_NO_PUBLICATION')
           PY
           (cd _isolated_review/daily && sha256sum plan.json > SHA256SUMS.txt)
           git diff --exit-code -- docs/data.json docs/platform_status.json
