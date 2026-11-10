@@ -136,5 +136,56 @@ class MultiSourceBridge(unittest.TestCase):
             self.assertFalse((root / "docs" / "data.json").exists())
 
 
+    def test_source_owned_role_receipts_survive_core_normalization(self):
+        r = plan([tainex_packet(), fami_packet()], as_of=NOW)
+        self.assertEqual(r["source_review_field_count"], 15)
+        self.assertEqual(len(r["source_review_receipts"]), 2)
+        roles = {f["role"] for item in r["source_review_receipts"]
+                 for f in item["source_reader_fields"]}
+        self.assertIn("EXHIBITION_PERIOD_START", roles)
+        self.assertIn("PRESALE_PRICE", roles)
+        self.assertIn("VENUE_HALL", roles)
+        for item in r["source_review_receipts"]:
+            self.assertEqual(len(item["source_reader_fields_sha256"]), 64)
+            self.assertFalse(item["native_http_attested"])
+            self.assertFalse(item["formal_field_accepted"])
+            self.assertTrue(all(f["decision"] == "REVIEW"
+                                for f in item["source_reader_fields"]))
+        self.assertEqual(r["independently_accepted_fields"], 0)
+        self.assertEqual(r["published_delta"], 0)
+
+    def test_prior_lkg_rejects_foreign_identity_and_role_forgery(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        changes = [
+            ("url", "https://example.com/event/691"),
+            ("title", "Other event title"),
+            ("platform", "Other platform"),
+            ("date", "2026-11-13"),
+        ]
+        for key, value in changes:
+            altered = copy.deepcopy(old)
+            altered[0][key] = value
+            with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+                plan([fami_packet()], previous=altered, as_of=NOW)
+        for key, value in [
+            ("source_event_id", "690"),
+            ("record_id", "TAINEX:event:690"),
+            ("source_class", "NATIVE_ATTESTED"),
+            ("sources", ["https://example.com", tainex.DETAIL]),
+            ("field_evidence", {"price": {"decision": "ACCEPTED"}}),
+            ("hold_reasons", ["OTHER_HOLD"]),
+        ]:
+            altered = copy.deepcopy(old)
+            altered[0]["_candidate"][key] = value
+            with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+                plan([fami_packet()], previous=altered, as_of=NOW)
+
+    def test_prior_future_lkg_cannot_poison_isolated_snapshot(self):
+        old = plan([fami_packet()], as_of=NOW)["review_rows"]
+        old[0]["scraped_at"] = "2026-11-11T00:00:00+00:00"
+        with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+            plan([tainex_packet()], previous=old, as_of=NOW)
+
+
 if __name__ == "__main__":
     unittest.main()

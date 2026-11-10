@@ -119,6 +119,38 @@ def inspect_one(packet, as_of):
             "native_http_attested": False}
 
 
+def validate_prior_binding(row, as_of):
+    """Reject forged/stale historical LKG even if the generic preview schema accepts it."""
+    meta = row["_candidate"]
+    specs = [spec for spec in REGISTRY.values()
+             if spec["platform_id"] == meta.get("platform_id")]
+    if len(specs) != 1:
+        raise ValueError("PRIOR_LKG_SOURCE_BINDING_HOLD")
+    spec = specs[0]
+    detail = spec["module"].DETAIL
+    url = urlsplit(detail)
+    event_id = url.path[len("/" + spec["namespace"] + "/"):]
+    required_holds = {
+        "SOURCE_READER_NOT_INDEPENDENT_NATIVE_ATTESTATION",
+        "HISTORICAL_OBSERVATION_NOT_CURRENT_SOURCE",
+        "EXHIBITION_PERIOD_NOT_SHOW_START",
+        "TICKET_SESSION_AND_GENERAL_MIN_PRICE_NOT_ACCEPTED",
+    }
+    if (row.get("url") != detail or row.get("title") != spec["module"].TITLE
+            or row.get("platform") != spec["platform"]
+            or row.get("type") != "展覽"
+            or meta.get("source_event_id") != event_id
+            or meta.get("record_id") != (
+                spec["platform_id"] + ":" + spec["namespace"] + ":" + event_id)
+            or meta.get("source_class") != "HISTORICAL_SOURCE_READER_REPLAY"
+            or meta.get("sources") != [spec["module"].LIST, detail]
+            or not required_holds.issubset(set(meta.get("hold_reasons", [])))
+            or meta.get("field_evidence") != {}
+            or any(row.get(k) != "未確認" for k in ("date", "price", "location"))
+            or utc(row["scraped_at"]) > as_of):
+        raise ValueError("PRIOR_LKG_SOURCE_BINDING_HOLD")
+
+
 def plan(packets, *, previous=None, as_of):
     """Pure multi-source REVIEW merge, with fail-closed non-destructive LKG."""
     if as_of.tzinfo is None or as_of.utcoffset() is None:
@@ -133,6 +165,8 @@ def plan(packets, *, previous=None, as_of):
     prior, prior_report = build_candidate_dataset(previous)
     if prior_report["rejectedRows"] or len(prior) != len(previous):
         raise ValueError("PRIOR_LKG_INTEGRITY_HOLD")
+    for old_row in prior:
+        validate_prior_binding(old_row, now)
     receipts, rejected = [], []
     for index, packet in enumerate(packets):
         try:
@@ -143,6 +177,31 @@ def plan(packets, *, previous=None, as_of):
     if quality["rejectedRows"]:
         rejected.extend({"index": x["index"], "reason": ",".join(x["reasons"])}
                         for x in quality["rejected"])
+    # Keep the source reader's role/value/URL/observed_at receipts in the
+    # isolated plan. The generic PWA Core deliberately drops unsupported
+    # roles; these receipts are REVIEW only, not native HTML attestation.
+    qualified_ids = {x["_candidate"]["record_id"] for x in candidates}
+    source_receipts, audited_ids = [], set()
+    for receipt in receipts:
+        meta = receipt["candidate"]["_candidate"]
+        record_id = meta["record_id"]
+        if record_id not in qualified_ids or record_id in audited_ids:
+            continue
+        audited_ids.add(record_id)
+        fields = receipt["source_reader_fields"]
+        encoded = json.dumps(fields, ensure_ascii=False, sort_keys=True,
+                             separators=(",", ":")).encode("utf-8")
+        source_receipts.append({
+            "record_id": record_id,
+            "source_gate": receipt["gate"],
+            "source_pr": receipt["source_pr"],
+            "source_reader_decision": receipt["source_reader_decision"],
+            "source_reader_fields": fields,
+            "source_reader_fields_sha256": hashlib.sha256(encoded).hexdigest(),
+            "native_http_attested": False,
+            "formal_field_accepted": False,
+        })
+    source_receipts.sort(key=lambda x: x["record_id"])
     old = {(x["_candidate"]["platform_id"], x["_candidate"]["source_event_id"]): x
            for x in prior}
     merged = dict(old)
@@ -172,6 +231,9 @@ def plan(packets, *, previous=None, as_of):
         "new_review": added, "changed_review": changed,
         "unchanged_review": unchanged, "retained_lkg": retained,
         "review_rows": rows, "rejected": rejected,
+        "source_review_receipts": source_receipts,
+        "source_review_field_count": sum(
+            len(x["source_reader_fields"]) for x in source_receipts),
         "independent_native_detail_new": 0,
         "independently_accepted_fields": 0,
         "published_delta": 0, "native_get": 0,
