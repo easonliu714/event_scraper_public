@@ -9184,3 +9184,31 @@ Future separately authorized Gateway (NOT IMPLEMENTED):
 - **Publication/observability contract:** `docs/data.json` only accepted event/field roles and trusted source evidence, retain last-known-good on bad/empty/403/stale/conflicting inputs. `docs/platform_status.json` engineering status is separate from formal activity feed; receipt should expose last attempt, last success, running/HOLD/failed, accepted/rejected/preserved/published diff, source observation timestamps vs verification timestamps, release commit/blob, independently verified Pages/Android status. Report `UNKNOWN` if receipts unavailable; never invent apparent live success.
 - **Actual status at design approval:** main Source `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`, Preview `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal 1 TPAC `docs/data.json` Blob `342eb7c101115b05dbc6ff90de7bd97d5bd63d59`, status Blob `720cac528faacc9560a5ab41ce725bf8cc183166`; no Gateway/trigger/Publisher schedule/official write. `HARD_HOLD_NO_PUBLICATION` active; prior Android USER_ATTESTED_PASS retained. Next Gate PUB-OD-02/03 verification and cross-source real evidence, no duplicate Publisher micro-Gate.
 
+
+## 2026-11-10 22:44+08 — PUB-OD-03 bounded manual dry-run contract (isolated Draft)
+
+```text
+正式 PWA docs/index.html [main: unchanged; Draft #249 read-only UI, not deployed]
+  ├── Read same-origin docs/data.json + docs/platform_status.json (no token)
+  ├── Freshness/attempt/status display; missing receipts => UNKNOWN
+  └── On-demand dispatch [NOT IMPLEMENTED / TRUSTED GATEWAY HOLD]
+        └── trusted backend [HOLD: auth, anti-abuse, atomic Claim/TTL/CAS]
+              └── GitHub Actions dispatch [HOLD: separate Owner approval]
+
+Manual transition B [isolated engineering Draft #246; no dispatch]
+  scripts/p30_daily_publisher_dryrun.py
+    ├── validate_manual_isolated_request(request, trusted_head, trusted_formal_blob)
+    │     strict keys: mode, expected_head, expected_formal_blob, requested_release
+    │     exact SHA40 refs, stale-reference rejection, only ISOLATED_DRY_RUN
+    │     no IO / GET / dispatch / credential exposure / release authority
+    ├── assess_refresh_request() [existing server-only eligibility; no dispatch]
+    ├── plan() / rollback_manifest() / verify_rollback_manifest() [existing isolated CAS]
+    └── tests/p30/test_p30_daily_publisher_dryrun.py
+          TestManualIsolatedTransitionContract: eligible envelope, SHA drift,
+          malformed input, unapproved release/schedule/token => HOLD
+```
+
+- Engineering PR #246 exact HEAD `0c868051d1c19be40a7840dd63f857f21f913a25`; exact CI run `42837564617` / job `129903734294` SUCCESS; Artifact `13773693412` digest metadata `sha256:900dfc0c3ead661592e15327fbfec18512f8b4f05bbd31380d02c391d6184f5c`. Artifact ZIP bytes/CRC not independently read. Contract is an offline safety capability only; it is not a runnable workflow_dispatch on a Draft and confers no operational authority.
+- Existing Owner strategy: deterministic Publisher uses source-specific compliant HTTP→LIST→same-ID DETAIL→IDENTITY→FIELD→quality and LKG/CAS/rollback. No AI required per event. Prefer trusted, abuse-resistant PWA-triggered dispatch after independent security validation, with manual isolated workflow as transitional validation; no Publisher schedule or official write until independently approved.
+- Main/formal data/status/Golden unchanged. `HARD_HOLD_NO_PUBLICATION`, TPAC source Claim retention HOLD remain. Non-TPAC independent native coverage and formal field acceptance not advanced by this contract; next source work stays existing #247. Issue #248 is Gate tracking, not a competing official document.
+
