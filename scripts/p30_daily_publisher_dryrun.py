@@ -395,6 +395,39 @@ def assess_refresh_request(status, now, *, gateway_attested=False,
         "warning": "Server-only preflight; official source limits and publisher checks remain separate",
     }
 
+# [PUB-OD-03] Owner/manual transition contract.  This is a *validator*,
+# never a GitHub Actions trigger.  The checked SHA and formal blob must come
+# from trusted GitHub readback, not a browser-supplied authorization claim.
+def validate_manual_isolated_request(request, *, trusted_head, trusted_formal_blob):
+    """Validate a pinned, read-only manual dry-run request; perform no I/O."""
+    if not isinstance(request, dict) or set(request) != {
+            "mode", "expected_head", "expected_formal_blob", "requested_release"}:
+        raise ValueError("MANUAL_REQUEST_SCHEMA_HOLD")
+    if request["mode"] != "ISOLATED_DRY_RUN" or request["requested_release"] is not False:
+        raise ValueError("MANUAL_REQUEST_RELEASE_OR_MODE_HOLD")
+    for value, length in ((trusted_head, 40), (trusted_formal_blob, 40),
+                          (request["expected_head"], 40),
+                          (request["expected_formal_blob"], 40)):
+        if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{%d}" % length, value):
+            raise ValueError("MANUAL_REQUEST_SHA_SHAPE_HOLD")
+    if request["expected_head"] != trusted_head:
+        raise ValueError("MANUAL_REQUEST_STALE_HEAD_HOLD")
+    if request["expected_formal_blob"] != trusted_formal_blob:
+        raise ValueError("MANUAL_REQUEST_STALE_FORMAL_BLOB_HOLD")
+    return {
+        "kind": "EVENTRADAR_PUB_OD_MANUAL_ISOLATED_PREFLIGHT_V1",
+        "decision": "READY_FOR_SEPARATELY_AUTHORIZED_MANUAL_DRY_RUN_ONLY",
+        "pinned_head": trusted_head,
+        "pinned_formal_blob": trusted_formal_blob,
+        "dispatch_performed": False,
+        "publisher_executed": False,
+        "formal_write_performed": False,
+        "source_get_performed": False,
+        "schedule_enabled": False,
+        "release_authorized": False,
+    }
+
+
 def main():
     a=argparse.ArgumentParser()
     for flag in ("formal","candidates","expected-blob","output"): a.add_argument("--"+flag,required=True)
