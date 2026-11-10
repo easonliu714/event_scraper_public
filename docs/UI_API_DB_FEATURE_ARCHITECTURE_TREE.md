@@ -9149,3 +9149,38 @@ Future separately authorized Gateway (NOT IMPLEMENTED):
 - `inspect_one(packet, as_of)`: formerly bounded only by future time and historical cutoff; now requires `utc(observed_at)==utc(spec['replay_clock'])` or `HISTORICAL_REPLAY_CLOCK_BINDING_HOLD`. `validate_prior_binding(row, as_of)`: persisted LKG replay clock must match same exact source-specific reference, preventing same-day replay revision and backdated false lineage. No new Source Adapter GET or FIELD promotion; candidate Core remains REVIEW-only.
 - Exact-head Draft #247 `fc89e0ae022668e2e612ed3c84e7ad545cb59eaf`, CI #42812178513 job #129816103652 SUCCESS, 20/20 Python tests, artifact #13763495364 digest `sha256:a9f50abb115f39dbabbad09cac6145deac45a2f2b39f686f94c7f33cdc348ff7`. Historical 4 REVIEW identities retained; fresh official LIST/DETAIL 0, accepted FIELD 0, new LKG 0, formal publication 0.
 - Source main `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`; formal data/status blobs `342eb7c101115b05dbc6ff90de7bd97d5bd63d59`/`720cac528faacc9560a5ab41ce725bf8cc183166` unchanged. No scheduled Publisher, public dispatch, trusted Gateway, GitHub protected Claim or WORM proven. #249 read-only PWA Draft remains undeployed; new Pages/Android UI not attested. Owner latest on-demand architecture overrides all historical 24h schedule plans.
+
+## 2026-11-10 22:01 Asia/Taipei — OWNER_APPROVED_PUB_OD_TRANSITION_20261110_2201 / Issue #248
+
+```text
+[Existing one formal PWA on GitHub Pages]
+   ├─ pageshow / manual pull-to-refresh / visibility resume
+   ├─ same-origin docs/data.json immediately [READ_ONLY, already published]
+   ├─ same-origin docs/platform_status.json + release receipt [READ_ONLY]
+   └─ pending trusted readiness response (TTL/status) [NO BROWSER AUTHORITY]
+                │ eligible only, after Gate PUB-OD-04 and Owner authority
+                ▼
+[Trusted minimal Gateway: FUTURE, NOT DEPLOYED]
+   ├─ credential isolation; never GitHub token / App key in public HTML or SW
+   ├─ per-client abuse prevention, global atomic Claim and bounded TTL
+   ├─ source-specific robots/rate budgets, retained CAS/lease/readback
+   └─ authorized GitHub Actions dispatch (no public direct dispatch)
+                ▼
+[Deterministic isolated Publisher core: DRAFT #246; NO SCHEDULE/NO PUBLISH]
+   ├─ source-specific validated Adapters, shared Core
+   ├─ HTTP → LIST → same-ID DETAIL → IDENTITY → FIELD role/provenance
+   ├─ REVIEW/HOLD for missing, conflicting, stale or forged evidence
+   ├─ strict per-source 403/429 and excessive/empty/abnormal data fail-closed
+   ├─ independent acceptance → incremental Diff + LKG + Git Blob CAS
+   └─ verified rollback version / exact-head CI / artifact / release receipt
+                │ independent release safety Gate + separate Owner authority
+                ▼
+[docs/data.json formal on main → GitHub Pages → PWA independent readback]
+```
+
+- **Design choice:** A = trusted Gateway-triggered on-demand refresh (no background guarantee without users); B = manual, Owner-authorized GitHub Actions `workflow_dispatch` isolated dry-run as interim verification. Explicitly no 24h/`schedule` until future Owner release decision. Frontend refresh alone cannot securely dispatch GitHub Actions from static Pages, and must never directly hold write credentials or unconditional public Runner invocation.
+- **Existing components (not yet production):** #249 PWA freshness/status-only Draft with read-only JSON and missing-telemetry UNKNOWN, no dispatch/merge/Android PASS; #246 isolated deterministic Publisher Draft with field-shape, LKG/CAS/diff/rollback and no schedule/production writes; #247 TaiNEX/FamiTicket cross-source parser/LKG REVIEW Draft, historical native audit only and new independently qualified source bytes 0. Governance Draft #8 is sole architecture/roadmap document owner; Issue #248 tracks outstanding Gates.
+- **API/security boundary to validate:** gateway admission policy = authorized trigger + server-trusted time + global Claim lease and anti-replay + bounded source budgets + concurrency + circuit breaker + rate-abuse caps; all control decisions fail closed. Ruleset UI Owner-attested access is not proof of immutable Claim retention or atomic cross-host CAS. `CLAIM_RETENTION_AUTHORITY_HOLD` remains for TPAC GET. No source GET by publisher until each source has independently cleared its own robots/claim policy. Freshness/TTL on PWA is descriptive, not permission authority.
+- **Publication/observability contract:** `docs/data.json` only accepted event/field roles and trusted source evidence, retain last-known-good on bad/empty/403/stale/conflicting inputs. `docs/platform_status.json` engineering status is separate from formal activity feed; receipt should expose last attempt, last success, running/HOLD/failed, accepted/rejected/preserved/published diff, source observation timestamps vs verification timestamps, release commit/blob, independently verified Pages/Android status. Report `UNKNOWN` if receipts unavailable; never invent apparent live success.
+- **Actual status at design approval:** main Source `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`, Preview `03e515d65e827d5ed67fe341d079907a96bf784a`, ShowNews `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal 1 TPAC `docs/data.json` Blob `342eb7c101115b05dbc6ff90de7bd97d5bd63d59`, status Blob `720cac528faacc9560a5ab41ce725bf8cc183166`; no Gateway/trigger/Publisher schedule/official write. `HARD_HOLD_NO_PUBLICATION` active; prior Android USER_ATTESTED_PASS retained. Next Gate PUB-OD-02/03 verification and cross-source real evidence, no duplicate Publisher micro-Gate.
+
