@@ -1,6 +1,6 @@
 import copy,json,unittest
 from datetime import datetime,timedelta,timezone
-from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape,identity,rollback_manifest,verify_rollback_manifest,assess_refresh_request
+from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape,identity,rollback_manifest,verify_rollback_manifest,assess_refresh_request,validate_manual_isolated_request
 U="https://tpac.org.taipei/program/2040"
 def row():
     e={"platform":"臺北表演藝術中心","source_event_id":"2040","url":U,
@@ -255,5 +255,51 @@ class TestOnDemandRefreshPreflight(unittest.TestCase):
             with self.subTest(kwargs=kwargs):
                 with self.assertRaises(ValueError):
                     assess_refresh_request({},self.now,**kwargs)
+
+
+class TestManualIsolatedTransitionContract(unittest.TestCase):
+    """No browser-provided request can authorize GET, dispatch or release."""
+    def setUp(self):
+        self.head = "a"*40
+        self.formal = "b"*40
+        self.request = {"mode":"ISOLATED_DRY_RUN",
+                        "expected_head":self.head,
+                        "expected_formal_blob":self.formal,
+                        "requested_release":False}
+
+    def evaluate(self, request):
+        return validate_manual_isolated_request(
+            request, trusted_head=self.head,
+            trusted_formal_blob=self.formal)
+
+    def test_pinned_dryrun_never_executes(self):
+        result = self.evaluate(self.request)
+        self.assertEqual(result["decision"],
+            "READY_FOR_SEPARATELY_AUTHORIZED_MANUAL_DRY_RUN_ONLY")
+        for key in ("dispatch_performed", "publisher_executed",
+                    "formal_write_performed", "source_get_performed",
+                    "schedule_enabled", "release_authorized"):
+            self.assertFalse(result[key])
+
+    def test_mismatched_head_or_formal_blob_holds(self):
+        for key in ("expected_head", "expected_formal_blob"):
+            bad = dict(self.request)
+            bad[key] = "0"*40
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, "STALE_"):
+                    self.evaluate(bad)
+
+    def test_public_or_release_input_holds(self):
+        for bad in (
+            dict(self.request, requested_release=True),
+            dict(self.request, mode="PUBLISH"),
+            dict(self.request, github_token="secret"),
+            dict(self.request, schedule="0 0 * * *"),
+            dict(self.request, expected_head="a"*39),
+            dict(self.request, requested_release=0),
+        ):
+            with self.subTest(bad=sorted(bad)):
+                with self.assertRaises(ValueError):
+                    self.evaluate(bad)
 
 if __name__=="__main__": unittest.main()
