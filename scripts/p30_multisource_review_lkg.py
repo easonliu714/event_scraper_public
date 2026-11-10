@@ -253,12 +253,14 @@ def plan(packets, *, previous=None, as_of, archived_native=None):
     return {
         "kind": "EVENTRADAR_MULTISOURCE_HISTORICAL_REVIEW_LKG_V1",
         "decision": "REVIEW_ONLY" if candidates else "HOLD_NO_VALID_NEW_SOURCE",
-        "source_reader_qualified": sum(
-            r["candidate"]["_candidate"]["record_id"] in qualified_ids
-            for r in receipts),
-        "archived_native_receipt_qualified": sum(
-            r["candidate"]["_candidate"]["record_id"] in qualified_ids
-            for r in native_receipts),
+        "source_reader_qualified": len({
+            r["candidate"]["_candidate"]["record_id"] for r in receipts
+            if r["candidate"]["_candidate"]["record_id"] in qualified_ids
+        }),
+        "archived_native_receipt_qualified": len({
+            r["candidate"]["_candidate"]["record_id"] for r in native_receipts
+            if r["candidate"]["_candidate"]["record_id"] in qualified_ids
+        }),
         "source_platforms": sorted({x["_candidate"]["platform_id"] for x in candidates}),
         "source_gates": sorted({r["gate"] for r in receipts + native_receipts}),
         "new_review": added, "changed_review": changed,
