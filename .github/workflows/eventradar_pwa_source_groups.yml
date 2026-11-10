@@ -9,7 +9,9 @@ permissions:
   contents: read
 jobs:
   pwa-source-groups:
-    if: github.repository == 'easonliu714/event_scraper_public'
+    # This frozen three-file gate belongs exclusively to already-merged UI PR #238.
+    # Other UI Draft PRs use their own exact-head checks; never report false scope failures.
+    if: github.repository == 'easonliu714/event_scraper_public' && github.event.number == 238 && github.head_ref == 'feat/eventradar-pwa-source-group-filter'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
