@@ -56,10 +56,25 @@ def verified_shape(row):
     price=row.get("price","")
     if price:
         r=ev.get("price")
-        if (not isinstance(r,dict) or r.get("role")!="EVENT_GENERAL_ADMISSION_MIN_PRICE"
-                or r.get("decision")!="FIELD_ACCEPTED" or r.get("value")!=price
-                or r.get("event_id")!=i or r.get("source_url")!=u
-                or r.get("body_sha256")!=sha):
+        m=re.fullmatch(r"NT\\$\\s*(\\d{1,3}(?:,\\d{3})*|\\d{3,6})\\s*起",price)
+        amount=int(m.group(1).replace(",","")) if m else None
+        try:
+            stamp=r.get("observed_at") if isinstance(r,dict) else None
+            dt=datetime.fromisoformat(stamp.replace("Z","+00:00"))
+            aware=dt.tzinfo is not None and dt.utcoffset() is not None
+        except (ValueError,TypeError,AttributeError):
+            aware=False
+        if (not isinstance(r,dict) or not aware or amount is None
+                or not 100<=amount<=100000 or r.get("accepted") is not True
+                or r.get("role")!="EVENT_GENERAL_ADMISSION_MIN_PRICE"
+                or r.get("decision")!="FIELD_ACCEPTED"
+                or r.get("price_kind")!="GENERAL_NON_DISCOUNTED"
+                or r.get("value")!=price or r.get("event_id")!=i
+                or r.get("source")!=u or r.get("source_url")!=u
+                or r.get("source_body_sha256")!=sha
+                or r.get("min_price_ntd")!=amount
+                or type(r.get("max_price_ntd")) is not int
+                or not amount<=r["max_price_ntd"]<=100000):
             raise ValueError("UNACCEPTED_PRICE_HOLD")
     return {k:row.get(k) for k in ("platform","source_event_id","url","title","date","price")}
 

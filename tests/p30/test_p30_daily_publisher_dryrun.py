@@ -30,6 +30,22 @@ class TestSafety(unittest.TestCase):
     def test_unaccepted_price(self):
         e=row(); e["price"]="NT$500 起"
         with self.assertRaisesRegex(ValueError,"UNACCEPTED_PRICE"): verified_shape(e)
+    def test_accepted_general_price_shape_only_not_release(self):
+        e=row(); e["price"]="NT$1,500 起"
+        e["_formal_field_evidence"]["price"]={
+            "accepted":True,"decision":"FIELD_ACCEPTED",
+            "role":"EVENT_GENERAL_ADMISSION_MIN_PRICE",
+            "price_kind":"GENERAL_NON_DISCOUNTED",
+            "source":U,"source_url":U,"event_id":"2040",
+            "value":e["price"],"source_body_sha256":"a"*64,
+            "observed_at":"2026-11-08T13:15:54+00:00",
+            "min_price_ntd":1500,"max_price_ntd":3500}
+        self.assertEqual(verified_shape(e)["price"],"NT$1,500 起")
+        raw,sha=feed(); p=plan(raw,[e],sha)
+        self.assertFalse(p["commit_permitted"])
+        e["_formal_field_evidence"]["price"]["price_kind"]="EARLY_BIRD"
+        with self.assertRaisesRegex(ValueError,"UNACCEPTED_PRICE"):
+            verified_shape(e)
     def test_host_spoof(self):
         e=row(); e["url"]="https://tpac.org.taipei.evil.example/program/2040"
         with self.assertRaisesRegex(ValueError,"EXACT_OFFICIAL"): verified_shape(e)
