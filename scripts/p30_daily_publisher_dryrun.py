@@ -1,4 +1,4 @@
-"""Isolated 24h Publisher preflight. NO HTTP, NO production writes, NO authority."""
+"""Isolated 24h Publisher preflight. Namespace-safe identities; NO HTTP, writes or authority."""
 import argparse, hashlib, json, re
 from datetime import datetime
 from pathlib import Path
@@ -17,16 +17,24 @@ def identity(row):
     if p not in DOMAINS: raise ValueError("UNREGISTERED_ADAPTER_HOLD")
     if not isinstance(i,str) or not re.fullmatch(r"[0-9]{1,20}",i):
         raise ValueError("INVALID_SOURCE_ID_HOLD")
-    return (p,i)
+    # TPAC /program and /event have independent numeric ID namespaces.
+    # Never collapse same-number events into one formal row or LKG key.
+    u=row.get("url")
+    if not isinstance(u,str): raise ValueError("SOURCE_NAMESPACE_HOLD")
+    try: match=re.fullmatch(r"/(program|event)/([0-9]{1,20})",urlsplit(u).path)
+    except ValueError: raise ValueError("SOURCE_NAMESPACE_HOLD")
+    if not match or match.group(2)!=i:
+        raise ValueError("SOURCE_NAMESPACE_ID_HOLD")
+    return (p,match.group(1),i)
 
 def verified_shape(row):
-    p,i=identity(row)
+    p,namespace,i=identity(row)
     u=row.get("url")
     if not isinstance(u,str): raise ValueError("URL_HOLD")
     x=urlsplit(u)
     if (x.scheme!="https" or x.hostname!=DOMAINS[p] or x.username or x.password
             or x.port not in (None,443) or x.query or x.fragment
-            or x.path not in (f"/program/{i}",f"/event/{i}")):
+            or x.path!=f"/{namespace}/{i}"):
         raise ValueError("EXACT_OFFICIAL_ID_URL_HOLD")
     if row.get("formal_field_pass") is not True or row.get("_candidate") is not None:
         raise ValueError("REVIEW_ONLY_HOLD")

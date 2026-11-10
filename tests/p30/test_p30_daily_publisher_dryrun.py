@@ -46,6 +46,34 @@ class TestSafety(unittest.TestCase):
         e["_formal_field_evidence"]["price"]["price_kind"]="EARLY_BIRD"
         with self.assertRaisesRegex(ValueError,"UNACCEPTED_PRICE"):
             verified_shape(e)
+    def test_same_numeric_id_in_two_namespaces_does_not_collapse(self):
+        # Identity regression only: this fixture does NOT attest /event/2040 native existence.
+        raw,sha=feed()
+        e=row()
+        e["url"]="https://tpac.org.taipei/event/2040"
+        for field in ("title","date"):
+            e["_formal_field_evidence"][field]["source"]=e["url"]
+            e["_formal_field_evidence"][field]["source_url"]=e["url"]
+        p=plan(raw,[row(),e],sha)
+        self.assertEqual(p["shape_valid"],2)
+        self.assertEqual(p["unchanged"],["臺北表演藝術中心:program:2040"])
+        self.assertEqual(p["would_add"],["臺北表演藝術中心:event:2040"])
+        self.assertFalse(p["commit_permitted"])
+    def test_prior_namespace_collision_is_not_duplicate(self):
+        a=row(); b=copy.deepcopy(a)
+        b["url"]="https://tpac.org.taipei/event/2040"
+        for field in ("title","date"):
+            b["_formal_field_evidence"][field]["source"]=b["url"]
+            b["_formal_field_evidence"][field]["source_url"]=b["url"]
+        raw=(json.dumps([a,b],ensure_ascii=False)+"\n").encode()
+        p=plan(raw,[],blob_sha(raw))
+        self.assertEqual(p["formal_rows_before"],2)
+        self.assertEqual(p["lkg_retained"],2)
+        self.assertEqual(p["published_delta"],0)
+    def test_namespace_id_url_mismatch_holds(self):
+        e=row(); e["url"]="https://tpac.org.taipei/event/2041"
+        with self.assertRaisesRegex(ValueError,"SOURCE_NAMESPACE_ID_HOLD"):
+            verified_shape(e)
     def test_host_spoof(self):
         e=row(); e["url"]="https://tpac.org.taipei.evil.example/program/2040"
         with self.assertRaisesRegex(ValueError,"EXACT_OFFICIAL"): verified_shape(e)
