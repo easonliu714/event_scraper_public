@@ -389,5 +389,52 @@ class RawPairIdentityAdapter(unittest.TestCase):
         self.assertEqual(result["independently_accepted_fields"], 0)
 
 
+    def test_dynamic_same_source_ids_beyond_frozen_historical_readers(self):
+        # Source/Core capability for multiple official namespace IDs.
+        # These HTML strings are synthetic, never official native evidence.
+        t = raw_pair_packet("tainex")
+        t["detail_url"] = "https://www.tainex.com.tw/event/692"
+        title_t = "Additional exhibition (synthetic, not verified)"
+        t["list_html_b64"] = base64.b64encode(
+            ('<a href="/event/692">' + title_t + '</a>').encode()).decode()
+        t["detail_html_b64"] = base64.b64encode(
+            ('<h1>' + title_t + '</h1>').encode()).decode()
+        f = raw_pair_packet("famiticket")
+        f["detail_url"] = REGISTRY["famiticket"]["module"].DETAIL + "X"
+        title_f = "Additional ticket activity (synthetic, not verified)"
+        f["list_html_b64"] = base64.b64encode(
+            ('<a href="' + f["detail_url"] + '">' + title_f + '</a>').encode()).decode()
+        f["detail_html_b64"] = base64.b64encode(
+            ('<h2>' + title_f + '</h2>').encode()).decode()
+        r = plan([], as_of=NOW, raw_pairs=[t, f])
+        self.assertEqual(r["raw_pair_identity_parsed_unattested"], 2)
+        self.assertEqual(r["raw_pair_reviews_unattested"][0]["source_event_id"], "692")
+        self.assertEqual(r["raw_pair_reviews_unattested"][1]["source_event_id"],
+                         f["detail_url"].split("/")[-1])
+        self.assertEqual(r["raw_pair_reviews_unattested"][0]["source_title_unattested"], title_t)
+        self.assertEqual(r["raw_pair_reviews_unattested"][1]["source_title_unattested"], title_f)
+        self.assertEqual(r["new_review"], 0)
+        self.assertEqual(r["independently_accepted_fields"], 0)
+        self.assertEqual(r["native_get"], 0)
+        self.assertFalse(r["commit_permitted"])
+
+    def test_dynamic_identity_host_namespace_and_duplicate_rejected(self):
+        p = raw_pair_packet("tainex")
+        for url in ("https://www.famiticket.com.tw/event/691",
+                    "https://www.tainex.com.tw:443/event/691",
+                    "https://www.tainex.com.tw/event/691?session=1",
+                    "https://www.tainex.com.tw/event/691/extra",
+                    "https://www.tainex.com.tw/event/abc",
+                    "https://www.tainex.com.tw/event/691#frag"):
+            with self.assertRaisesRegex(ValueError, "RAW_DETAIL_ID_NAMESPACE_HOLD"):
+                inspect_raw_pair(dict(p, detail_url=url), NOW)
+        result = plan([], as_of=NOW, raw_pairs=[p, dict(p)])
+        self.assertEqual(result["raw_pair_identity_parsed_unattested"], 1)
+        self.assertEqual(len(result["rejected"]), 1)
+        self.assertIn("RAW_PAIR_DUPLICATE_ID_HOLD", result["rejected"][0]["reason"])
+        self.assertEqual(result["new_review"], 0)
+        self.assertFalse(result["commit_permitted"])
+
+
 if __name__ == "__main__":
     unittest.main()

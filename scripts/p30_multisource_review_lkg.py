@@ -11,6 +11,7 @@ import argparse
 import base64
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
@@ -218,6 +219,36 @@ class _RawPairHTML(HTMLParser):
                 break
 
 
+
+def _raw_source_detail_id(spec, detail_url):
+    """Validate a source-local event ID, not a caller-asserted ticket identity.
+
+    Unlike historical frozen readers, this isolated raw-byte adapter accepts
+    additional IDs under the exact official host and source-specific namespace.
+    No HTTP origin, freshness, field, LKG, or publication authority is granted.
+    """
+    if not isinstance(detail_url, str):
+        raise ValueError("RAW_DETAIL_ID_NAMESPACE_HOLD")
+    try:
+        actual = urlsplit(detail_url)
+        expected = urlsplit(spec["module"].DETAIL)
+        prefix = "/" + spec["namespace"] + "/"
+        if (actual.scheme != "https" or actual.netloc != expected.netloc
+                or actual.username is not None or actual.password is not None
+                or actual.port is not None or actual.query or actual.fragment
+                or not actual.path.startswith(prefix)
+                or detail_url != "https://" + expected.netloc + actual.path):
+            raise ValueError("RAW_DETAIL_ID_NAMESPACE_HOLD")
+        event_id = actual.path[len(prefix):]
+        pattern = (r"[0-9]{1,8}" if spec["platform_id"] == "TAINEX"
+                   else r"[A-Za-z0-9_-]{16,256}")
+        if not re.fullmatch(pattern, event_id, flags=re.ASCII):
+            raise ValueError("RAW_DETAIL_ID_NAMESPACE_HOLD")
+        return event_id
+    except (ValueError, TypeError) as exc:
+        raise ValueError("RAW_DETAIL_ID_NAMESPACE_HOLD") from exc
+
+
 def inspect_raw_pair(packet, as_of):
     """Parse caller-supplied raw LIST/DETAIL bytes without claiming HTTP provenance.
 
@@ -229,9 +260,10 @@ def inspect_raw_pair(packet, as_of):
     if not isinstance(packet, dict) or packet.get("source") not in REGISTRY:
         raise ValueError("RAW_SOURCE_ALLOWLIST_HOLD")
     spec = REGISTRY[packet["source"]]
-    list_url, detail_url = spec["module"].LIST, spec["module"].DETAIL
-    if packet.get("list_url") != list_url or packet.get("detail_url") != detail_url:
+    list_url, detail_url = spec["module"].LIST, packet.get("detail_url")
+    if packet.get("list_url") != list_url:
         raise ValueError("RAW_URL_EXACT_HOLD")
+    event_id = _raw_source_detail_id(spec, detail_url)
     if not isinstance(packet.get("observed_at"), str):
         raise ValueError("RAW_CLOCK_MISSING_HOLD")
     seen = utc(packet["observed_at"])
@@ -259,20 +291,20 @@ def inspect_raw_pair(packet, as_of):
         label for href, label in parsed[0].links
         if isinstance(href, str) and urljoin(list_url, href) == detail_url
     ]
-    title = spec["module"].TITLE
-    if exact_links != [title]:
+    # Title is derived from the actual supplied LIST bytes, never from
+    # caller metadata or the frozen historical single-event constants.
+    if len(exact_links) != 1 or not 0 < len(exact_links[0]) <= 200:
+        raise ValueError("RAW_LIST_EXACT_ID_TITLE_HOLD")
+    title = exact_links[0]
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in title):
         raise ValueError("RAW_LIST_EXACT_ID_TITLE_HOLD")
     if parsed[1].headings.count(title) != 1:
         raise ValueError("RAW_DETAIL_EXACT_TITLE_HOLD")
-    path = urlsplit(detail_url).path
-    prefix = "/" + spec["namespace"] + "/"
-    if not path.startswith(prefix) or not path[len(prefix):] or "/" in path[len(prefix):]:
-        raise ValueError("RAW_DETAIL_ID_NAMESPACE_HOLD")
-    event_id = path[len(prefix):]
     return {
         "source": packet["source"], "record_id": spec["platform_id"] + ":" +
         spec["namespace"] + ":" + event_id, "source_event_id": event_id,
-        "list_url": list_url, "detail_url": detail_url, "raw_bodies": bodies,
+        "list_url": list_url, "detail_url": detail_url,
+        "source_title_unattested": title, "raw_bodies": bodies,
         "observed_at_claimed": packet["observed_at"],
         "decision": "REVIEW_RAW_PAIR_IDENTITY_ONLY",
         "source_authority": "CALLER_SUPPLIED_UNATTESTED_BYTES",
@@ -332,10 +364,14 @@ def plan(packets, *, previous=None, as_of, archived_native=None, raw_pairs=None)
         raw_pairs = []
     if not isinstance(raw_pairs, list) or len(raw_pairs) > 20:
         raise ValueError("RAW_PAIR_INPUT_CAP_HOLD")
-    raw_pair_reviews = []
+    raw_pair_reviews, raw_seen = [], set()
     for index, pair in enumerate(raw_pairs):
         try:
-            raw_pair_reviews.append(inspect_raw_pair(pair, now))
+            parsed_pair = inspect_raw_pair(pair, now)
+            if parsed_pair["record_id"] in raw_seen:
+                raise ValueError("RAW_PAIR_DUPLICATE_ID_HOLD")
+            raw_seen.add(parsed_pair["record_id"])
+            raw_pair_reviews.append(parsed_pair)
         except (ValueError, TypeError, KeyError, OverflowError) as exc:
             rejected.append({"index": "raw:" + str(index), "reason": str(exc)})
     candidates, quality = build_candidate_dataset(
