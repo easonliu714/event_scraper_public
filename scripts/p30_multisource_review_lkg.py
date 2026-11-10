@@ -17,6 +17,10 @@ from urllib.parse import urlsplit
 from scripts import p30_venue02bo_tainex_exhibition as tainex
 from scripts import p30_l9dc_famiticket_teca as famiticket
 from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+from scripts.p30_tainex_archived_native_bridge import (
+    SOURCE_CLASS as NATIVE_AUDIT_CLASS, archived_inputs,
+    inspect_archived_native, validate_archived_prior,
+)
 
 HOLD = "HARD_HOLD_NO_PUBLICATION"
 REGISTRY = {
@@ -122,6 +126,9 @@ def inspect_one(packet, as_of):
 def validate_prior_binding(row, as_of):
     """Reject forged/stale historical LKG even if the generic preview schema accepts it."""
     meta = row["_candidate"]
+    if meta.get("source_class") == NATIVE_AUDIT_CLASS:
+        validate_archived_prior(row, as_of)
+        return
     specs = [spec for spec in REGISTRY.values()
              if spec["platform_id"] == meta.get("platform_id")]
     if len(specs) != 1:
@@ -151,7 +158,7 @@ def validate_prior_binding(row, as_of):
         raise ValueError("PRIOR_LKG_SOURCE_BINDING_HOLD")
 
 
-def plan(packets, *, previous=None, as_of):
+def plan(packets, *, previous=None, as_of, archived_native=None):
     """Pure multi-source REVIEW merge, with fail-closed non-destructive LKG."""
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("CLOCK_TIMEZONE_HOLD")
@@ -178,7 +185,23 @@ def plan(packets, *, previous=None, as_of):
             receipts.append(inspect_one(packet, now))
         except (ValueError, KeyError, TypeError, OverflowError) as exc:
             rejected.append({"index": index, "reason": str(exc)})
-    candidates, quality = build_candidate_dataset([r["candidate"] for r in receipts])
+    # Historical official native audit JSON, SHA-pinned to two independent
+    # earlier GitHub artifacts. Original HTML was NOT retained; REVIEW only.
+    if archived_native is None:
+        archived_native = []
+    if not isinstance(archived_native, list) or len(archived_native) > 2:
+        raise ValueError("ARCHIVED_NATIVE_INPUT_CAP_HOLD")
+    native_receipts = []
+    for index, item in enumerate(archived_native):
+        try:
+            if not isinstance(item, dict):
+                raise ValueError("ARCHIVED_NATIVE_INPUT_HOLD")
+            native_receipts.append(inspect_archived_native(
+                item.get("id"), item.get("audit_bytes"), now))
+        except (ValueError, KeyError, TypeError, OverflowError) as exc:
+            rejected.append({"index": "native:" + str(index), "reason": str(exc)})
+    candidates, quality = build_candidate_dataset(
+        [r["candidate"] for r in receipts + native_receipts])
     if quality["rejectedRows"]:
         rejected.extend({"index": x["index"], "reason": ",".join(x["reasons"])}
                         for x in quality["rejected"])
@@ -230,13 +253,23 @@ def plan(packets, *, previous=None, as_of):
     return {
         "kind": "EVENTRADAR_MULTISOURCE_HISTORICAL_REVIEW_LKG_V1",
         "decision": "REVIEW_ONLY" if candidates else "HOLD_NO_VALID_NEW_SOURCE",
-        "source_reader_qualified": len(candidates),
+        "source_reader_qualified": sum(
+            r["candidate"]["_candidate"]["record_id"] in qualified_ids
+            for r in receipts),
+        "archived_native_receipt_qualified": sum(
+            r["candidate"]["_candidate"]["record_id"] in qualified_ids
+            for r in native_receipts),
         "source_platforms": sorted({x["_candidate"]["platform_id"] for x in candidates}),
-        "source_gates": sorted({r["gate"] for r in receipts}),
+        "source_gates": sorted({r["gate"] for r in receipts + native_receipts}),
         "new_review": added, "changed_review": changed,
         "unchanged_review": unchanged, "retained_lkg": retained,
         "review_rows": rows, "rejected": rejected,
         "source_review_receipts": source_receipts,
+        "archived_native_receipts": [
+            {k: v for k, v in r.items() if k != "candidate"}
+            for r in native_receipts
+            if r["candidate"]["_candidate"]["record_id"] in qualified_ids
+        ],
         "source_review_field_count": sum(
             len(x["source_reader_fields"]) for x in source_receipts),
         "independent_native_detail_new": 0,
@@ -280,17 +313,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", type=Path, required=True)
     ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument("--tainex-native-audits-dir", type=Path, default=None,
+                    help="Local archived SHA-pinned audit.json copies only; no GET")
     args = ap.parse_args()
     source = json.loads(args.input.read_text(encoding="utf-8"))
     result = plan(source["packets"], previous=source.get("previous", []),
-                  as_of=utc(source["as_of"]))
+                  as_of=utc(source["as_of"]),
+                  archived_native=(archived_inputs(args.tainex_native_audits_dir)
+                                   if args.tainex_native_audits_dir else []))
     digest = write_isolated(result, args.output, Path.cwd())
     print(json.dumps({"decision": result["decision"],
                       "source_reader_qualified": result["source_reader_qualified"],
                       "independently_accepted_fields": 0,
+                      "archived_native_receipt_qualified": result["archived_native_receipt_qualified"],
                       "native_get": 0, "published_delta": 0,
                       "isolated_sha256": digest}, sort_keys=True))
-    return 0 if result["source_reader_qualified"] else 49
+    return 0 if (result["source_reader_qualified"] or
+                 result["archived_native_receipt_qualified"]) else 49
 
 
 if __name__ == "__main__":

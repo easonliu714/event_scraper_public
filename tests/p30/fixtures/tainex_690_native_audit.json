@@ -1,0 +1,47 @@
+{
+  "acceptedFields": 0,
+  "decision": "REVIEW_ONE_OFFICIAL_DETAIL_ROLE_PROVENANCE_NO_PROMOTION",
+  "distinctFrom689": "REVIEW_DISTINCT_SOURCE_LOCAL_IDS_NO_MERGE",
+  "fieldProvenance": {
+    "exhibitionPeriod": {
+      "decision": "REVIEW_LABEL_PRESENCE_NO_VALUE_ACCEPTANCE",
+      "observed_at": "2026-10-29T23:55:51.744805+00:00",
+      "role": "EXHIBITION_RANGE_NOT_SESSION_START",
+      "source": "https://www.tainex.com.tw/event/690"
+    },
+    "organizer": {
+      "decision": "REVIEW_LABEL_PRESENCE_NO_VALUE_ACCEPTANCE",
+      "observed_at": "2026-10-29T23:55:51.744805+00:00",
+      "role": "ORGANIZER_NOT_TICKET_EVENT_ID",
+      "source": "https://www.tainex.com.tw/event/690"
+    },
+    "venue": {
+      "decision": "REVIEW_LABEL_PRESENCE_NO_VALUE_ACCEPTANCE",
+      "observed_at": "2026-10-29T23:55:51.744805+00:00",
+      "role": "VENUE_ROLE_NOT_TICKET_URL",
+      "source": "https://www.tainex.com.tw/event/690"
+    }
+  },
+  "goldenAccepted": 0,
+  "observedAtUTC": "2026-10-29T23:55:51.744805+00:00",
+  "published": false,
+  "receipt": {
+    "bodyBytes": 25598,
+    "bodySHA256": "67b1584bd00fed3eff13df8ef0fb4a7ac43886609e649e1606d8fd317ce49fa0",
+    "decision": "REVIEW_HTTP_200_HTML",
+    "httpStatus": 200,
+    "urlRole": "DETAIL"
+  },
+  "releaseState": "HARD_HOLD_NO_PUBLICATION",
+  "requestBudget": 1,
+  "requestCount": 1,
+  "roleLabelCounts": {
+    "exhibitionPeriod": 1,
+    "organizer": 1,
+    "venue": 1
+  },
+  "source": "TAINEX_OFFICIAL_VENUE",
+  "sourceURL": "https://www.tainex.com.tw/event/690",
+  "ticketEventId": null,
+  "venueLocalIdReview": "690"
+}
