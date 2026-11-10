@@ -311,15 +311,72 @@ def write_isolated(plan_data, out, repo_root):
     return hashlib.sha256(data).hexdigest()
 
 
+def load_previous_snapshot(path, expected_sha256, repo_root):
+    """Load a SHA-pinned isolated LKG snapshot; never treat it as global CAS."""
+    root = Path(repo_root).resolve()
+    allowed = (root / "_isolated_review").resolve()
+    target = Path(path).resolve()
+    if not target.is_relative_to(allowed) or target == allowed:
+        raise ValueError("PRIOR_SNAPSHOT_ISOLATION_HOLD")
+    if (not isinstance(expected_sha256, str)
+            or len(expected_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in expected_sha256)):
+        raise ValueError("PRIOR_SNAPSHOT_SHA_FORMAT_HOLD")
+    try:
+        if target.stat().st_size > 10_000_000:
+            raise ValueError("PRIOR_SNAPSHOT_SIZE_HOLD")
+        raw = target.read_bytes()
+    except OSError as exc:
+        raise ValueError("PRIOR_SNAPSHOT_UNREADABLE_HOLD") from exc
+    if hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError("PRIOR_SNAPSHOT_SHA_MISMATCH_HOLD")
+    try:
+        previous = json.loads(raw)
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError("PRIOR_SNAPSHOT_JSON_HOLD") from exc
+    if (not isinstance(previous, dict)
+            or previous.get("kind") != "EVENTRADAR_MULTISOURCE_HISTORICAL_REVIEW_LKG_V1"
+            or previous.get("release_state") != HOLD
+            or previous.get("decision") not in ("REVIEW_ONLY", "HOLD_NO_VALID_NEW_SOURCE")
+            or any(previous.get(k) is not False for k in
+                   ("commit_permitted", "scheduler_enabled", "formal_data_mutated",
+                    "cross_host_cas_attested"))
+            or any(type(previous.get(k)) is not int or previous[k] != 0
+                   for k in ("native_get", "published_delta",
+                             "independently_accepted_fields"))
+            or not isinstance(previous.get("review_rows"), list)
+            or len(previous["review_rows"]) > 2000):
+        raise ValueError("PRIOR_SNAPSHOT_AUTHORITY_HOLD")
+    rows = previous["review_rows"]
+    ids = [r.get("_candidate", {}).get("record_id") for r in rows
+           if isinstance(r, dict) and isinstance(r.get("_candidate"), dict)]
+    if len(ids) != len(rows) or len(set(ids)) != len(ids):
+        raise ValueError("PRIOR_SNAPSHOT_IDENTITY_HOLD")
+    # plan() independently revalidates each retained row's source binding.
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", type=Path, required=True)
     ap.add_argument("--output", type=Path, required=True)
     ap.add_argument("--tainex-native-audits-dir", type=Path, default=None,
                     help="Local archived SHA-pinned audit.json copies only; no GET")
+    ap.add_argument("--previous-plan", type=Path, default=None,
+                    help="Previous isolated plan.json, never formal data")
+    ap.add_argument("--previous-sha256", default=None,
+                    help="Exact SHA256 of previous isolated plan.json")
     args = ap.parse_args()
     source = json.loads(args.input.read_text(encoding="utf-8"))
-    result = plan(source["packets"], previous=source.get("previous", []),
+    if (args.previous_plan is None) != (args.previous_sha256 is None):
+        raise ValueError("PRIOR_SNAPSHOT_PAIR_HOLD")
+    if args.previous_plan is not None and "previous" in source:
+        raise ValueError("AMBIGUOUS_PRIOR_LKG_HOLD")
+    previous = (load_previous_snapshot(args.previous_plan, args.previous_sha256,
+                                       Path.cwd())
+                if args.previous_plan is not None
+                else source.get("previous", []))
+    result = plan(source["packets"], previous=previous,
                   as_of=utc(source["as_of"]),
                   archived_native=(archived_inputs(args.tainex_native_audits_dir)
                                    if args.tainex_native_audits_dir else []))
