@@ -1,5 +1,6 @@
 import copy,json,unittest
-from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape,identity,rollback_manifest,verify_rollback_manifest
+from datetime import datetime,timedelta,timezone
+from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape,identity,rollback_manifest,verify_rollback_manifest,assess_refresh_request
 U="https://tpac.org.taipei/program/2040"
 def row():
     e={"platform":"臺北表演藝術中心","source_event_id":"2040","url":U,
@@ -179,4 +180,80 @@ class TestSafety(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"ROLLBACK_MANIFEST_MISMATCH_HOLD"):
             verify_rollback_manifest(raw,bad)
         self.assertFalse(p["commit_permitted"])
+
+class TestOnDemandRefreshPreflight(unittest.TestCase):
+    """Gateway-only eligibility does not authorize a public browser dispatch."""
+
+    def setUp(self):
+        self.now=datetime(2026,11,10,9,0,tzinfo=timezone.utc)
+        self.old=(self.now-timedelta(hours=26)).isoformat()
+        self.last=(self.now-timedelta(hours=2)).isoformat()
+        self.flags=dict(gateway_attested=True,claim_attested=True,
+                        release_authorized=True)
+
+    def test_eligible_only_after_all_trusted_attestations(self):
+        p=assess_refresh_request({"last_success_at":self.old},self.now,
+                                 **self.flags)
+        self.assertEqual(p["decision"],"REQUEST_ELIGIBLE_NOT_DISPATCHED")
+        self.assertTrue(p["request_eligible"])
+        for key in ("dispatch_performed","publisher_executed",
+                    "formal_write_performed","source_get_performed",
+                    "schedule_enabled","source_rate_limits_checked"):
+            self.assertFalse(p[key])
+
+    def test_no_authority_never_dispatches(self):
+        for flags,decision in (
+            ({}, "HOLD_TRUSTED_GATEWAY_NOT_ATTESTED"),
+            ({"gateway_attested":True},"HOLD_GLOBAL_CLAIM_NOT_ATTESTED"),
+            ({"gateway_attested":True,"claim_attested":True},
+             "HOLD_PUBLICATION_AUTHORITY")):
+            with self.subTest(decision=decision):
+                p=assess_refresh_request({"last_success_at":self.old},
+                                          self.now,**flags)
+                self.assertEqual(p["decision"],decision)
+                self.assertFalse(p["request_eligible"])
+                self.assertFalse(p["dispatch_performed"])
+
+    def test_repeated_pwa_open_skips_fresh_and_active(self):
+        fresh=(self.now-timedelta(minutes=10)).isoformat()
+        self.assertEqual(assess_refresh_request(
+            {"last_success_at":fresh},self.now,**self.flags
+        )["decision"],"SKIP_DATA_FRESH")
+        self.assertEqual(assess_refresh_request(
+            {"running":True,"last_success_at":self.old},self.now,**self.flags
+        )["decision"],"SKIP_ALREADY_RUNNING")
+
+    def test_failed_last_attempt_cooldown(self):
+        ago=(self.now-timedelta(minutes=20)).isoformat()
+        p=assess_refresh_request({"last_success_at":self.old,
+                                  "last_attempt_at":ago},self.now,**self.flags)
+        self.assertEqual(p["decision"],"SKIP_RETRY_COOLDOWN")
+        self.assertFalse(p["request_eligible"])
+        p2=assess_refresh_request({"last_success_at":self.old,
+                                   "last_attempt_at":self.last},
+                                  self.now,**self.flags)
+        self.assertTrue(p2["request_eligible"])
+
+    def test_server_clock_and_receipt_fail_closed(self):
+        badstatus=({"last_success_at":"2026-11-10 09:00"},
+                   {"last_attempt_at":(self.now+timedelta(seconds=1)).isoformat()},
+                   {"running":"false"},{"last_success_at":13})
+        for status in badstatus:
+            with self.subTest(status=status):
+                with self.assertRaises(ValueError):
+                    assess_refresh_request(status,self.now,**self.flags)
+        with self.assertRaisesRegex(ValueError,"SERVER_TIMEZONE"):
+            assess_refresh_request({},self.now.replace(tzinfo=None),**self.flags)
+        with self.assertRaisesRegex(ValueError,"TRUSTED_INPUT"):
+            assess_refresh_request([],self.now,**self.flags)
+
+    def test_policy_bounds_and_boolean_authority(self):
+        for kwargs in ({"ttl_seconds":0},{"retry_cooldown_seconds":0},
+                       {"ttl_seconds":3600,"retry_cooldown_seconds":7200},
+                       {"gateway_attested":"yes"},
+                       {"claim_attested":1}):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaises(ValueError):
+                    assess_refresh_request({},self.now,**kwargs)
+
 if __name__=="__main__": unittest.main()
