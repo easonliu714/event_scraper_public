@@ -9212,3 +9212,29 @@ Manual transition B [isolated engineering Draft #246; no dispatch]
 - Existing Owner strategy: deterministic Publisher uses source-specific compliant HTTP→LIST→same-ID DETAIL→IDENTITY→FIELD→quality and LKG/CAS/rollback. No AI required per event. Prefer trusted, abuse-resistant PWA-triggered dispatch after independent security validation, with manual isolated workflow as transitional validation; no Publisher schedule or official write until independently approved.
 - Main/formal data/status/Golden unchanged. `HARD_HOLD_NO_PUBLICATION`, TPAC source Claim retention HOLD remain. Non-TPAC independent native coverage and formal field acceptance not advanced by this contract; next source work stays existing #247. Issue #248 is Gate tracking, not a competing official document.
 
+## 2026-11-10 23:58 Asia/Taipei — Isolated raw-byte retention boundary (#247)
+
+```text
+Non-TPAC source acquisition [NOT AUTHORIZED until source policy + Claim PASS]
+  -> trusted collector HTTP LIST + same-ID DETAIL [native bytes NOT YET AVAILABLE]
+  -> source response URL/status/time/robots/rate/Claim receipt [NOT YET ATTESTED]
+  -> isolated byte retention contract [CODE + TEST PASS, NO GET]
+       _raw_archive_directory(repo_root, archive_id)
+         - fixed _isolated_review/raw_pairs/ only, no symlink/traversal
+       archive_raw_pair(packet, repo_root, archive_id, as_of)
+         - inspect_raw_pair strict official namespace and exact title identity
+         - write-once list.html, detail.html, manifest.json
+         - per-role SHA256/byte count, fsync, no silent overwrite
+       verify_raw_pair_archive(repo_root, archive_id, as_of)
+         - independently reread bytes, verify SHA256 and same-ID
+         - raw_html_retention_verified=True (LOCAL BYTES ONLY)
+         - native_http_attested=False; accepted_fields=0; LKG=False
+  -> source-independent origin and field-role acceptance [HOLD]
+  -> REVIEW/LKG [historical four retained; new native accepted zero]
+  -> deterministic Publisher quality/LKG/CAS/rollback [FORMAL HOLD]
+  -> GitHub Pages docs/data.json [UNCHANGED]
+```
+
+- Exact-head Draft #247 `5bd6b36f14e40d7a4c0ee30a7916a17188666933`; [CI #42849210417](https://github.com/easonliu714/event_scraper_public/actions/runs/42849210417) SUCCESS 26+3 tests, Job `129944899595`; Artifact `13780395121` ZIP SHA256 `7332c3442be6b7d920b4582f28c5ada20a80d046239259c1d2f6323e6e829d9f` CRC PASS. ZIP contains old REVIEW plan/resume only, **not native HTML**.
+- Source/Test diff only `scripts/p30_multisource_review_lkg.py` and `tests/p30/test_p30_multisource_review_lkg.py`. New tests use synthetic bytes strictly as parser/retention regression; no first-party raw capture. Missing source collector integration and cross-host Claim/6h fence/retention still block native GET and field promotion.
+- Formal PWA read-only Draft #249 remains unmerged; deterministic Publisher Draft #246 remains isolated, manual `workflow_dispatch` unactivated. Target A trusted Gateway on-demand requires independent authorization and abuse control; no Publisher schedule, public token/dispatch, second Writer, main/data/status/Golden write or `HARD_HOLD_NO_PUBLICATION` release. TPAC 6h source-specific Claim HOLD remains separate from global Publisher TTL.
