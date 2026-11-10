@@ -1,5 +1,5 @@
 """Isolated 24h Publisher preflight. Namespace-safe identities; NO HTTP, writes or authority."""
-import argparse, hashlib, json, re
+import argparse, hashlib, json, re, io, zipfile, html
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -140,7 +140,83 @@ def review_bridge_only(row):
             "decision":"REVIEW_ONLY_NOT_NATIVE",
             "first_failure":"INDEPENDENT_NATIVE_AND_FIELD_AUTHORITY_HOLD"}
 
-def plan(formal_raw,candidates,expected_blob):
+
+# Sealed TPAC original native bytes, run 42491637804; NEVER a new GET or FIELD acceptance.
+TPAC_ARCHIVE_SHA256="87fd004eb1a3b3019620a2ae93f2e991b1669caa9ab17c3938479eda295c0acd"
+
+def replay_tpac_event_archive(raw,expected_sha):
+    if not isinstance(raw,bytes) or expected_sha!=TPAC_ARCHIVE_SHA256:
+        raise ValueError("ARCHIVE_PROVENANCE_PIN_HOLD")
+    if hashlib.sha256(raw).hexdigest()!=expected_sha:
+        raise ValueError("ARCHIVE_ZIP_SHA256_HOLD")
+    names={"SHA256SUMS.txt","native_event/event_list.html",
+           "native_event/event_1301_detail.html","native_event/event_2072_detail.html",
+           "native_event/tpac_event_catalog_receipt.json",
+           "tpac_catalog_topology_fixture.json","tpac_multi_event_offline_demo.json"}
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as z:
+            if set(z.namelist())!=names or len(z.namelist())!=len(names) or z.testzip():
+                raise ValueError("ARCHIVE_MEMBERS_CRC_HOLD")
+            sums={}
+            for line in z.read("SHA256SUMS.txt").decode().splitlines():
+                m=re.fullmatch(r"([a-f0-9]{64})  \./([A-Za-z0-9_./-]+)",line)
+                if not m or m.group(2) in sums: raise ValueError("ARCHIVE_MANIFEST_HOLD")
+                sums[m.group(2)]=m.group(1)
+            if set(sums)!=names-{"SHA256SUMS.txt"}:
+                raise ValueError("ARCHIVE_MANIFEST_SCOPE_HOLD")
+            if any(hashlib.sha256(z.read(n)).hexdigest()!=h for n,h in sums.items()):
+                raise ValueError("ARCHIVE_MEMBER_SHA256_HOLD")
+            r=json.loads(z.read("native_event/tpac_event_catalog_receipt.json"))
+            if (r.get("kind")!="EVENTRADAR_TPAC_EVENT_TWO_DETAILS_SINGLE_AUDIT"
+                or r.get("decision")!="NATIVE_BODY_CAPTURED_FOR_INDEPENDENT_REPLAY_ONLY"
+                or r.get("native_official_attestation") is not False
+                or r.get("accepted_fields")!=0 or r.get("published")!=0
+                or r.get("list_url")!="https://tpac.org.taipei/event"
+                or r.get("listed_id_count")!=18
+                or set(r.get("ids_present_on_list",[]))!={"1301","2072"}
+                or set(r.get("source_receipts",{}))!={"list","1301","2072"}):
+                raise ValueError("ARCHIVE_RECEIPT_AUTHORITY_HOLD")
+            ids=re.findall(r'href="/event/([0-9]+)"',
+                           z.read("native_event/event_list.html").decode())
+            if len(ids)!=18 or len(set(ids))!=18:
+                raise ValueError("ARCHIVE_LIST_TOPOLOGY_HOLD")
+            reviews=[]
+            for i in ("list","1301","2072"):
+                receipt=r["source_receipts"][i]
+                name=("native_event/event_list.html" if i=="list"
+                      else "native_event/event_"+i+"_detail.html")
+                url=("https://tpac.org.taipei/event" if i=="list"
+                     else "https://tpac.org.taipei/event/"+i)
+                stamp=receipt.get("observed_at")
+                try:
+                    dt=datetime.fromisoformat(stamp.replace("Z","+00:00"))
+                    if dt.tzinfo is None or dt.utcoffset() is None: raise ValueError()
+                except (ValueError,TypeError,AttributeError):
+                    raise ValueError("ARCHIVE_OBSERVED_AT_HOLD")
+                body=z.read(name)
+                if (receipt.get("final_url")!=url or receipt.get("http_status")!=200
+                    or receipt.get("robots_allowed") is not True
+                    or receipt.get("body_bytes")!=len(body)
+                    or receipt.get("body_sha256")!=hashlib.sha256(body).hexdigest()):
+                    raise ValueError("ARCHIVE_RECEIPT_BODY_HOLD")
+                if i=="list": continue
+                if i not in ids: raise ValueError("ARCHIVE_LIST_DETAIL_ID_HOLD")
+                m=re.search(r"<h1\b[^>]*>(.*?)</h1>",body.decode(),re.S|re.I)
+                if not m: raise ValueError("ARCHIVE_TITLE_HOLD")
+                title=html.unescape(re.sub(r"<[^>]+>","",m.group(1))).strip()
+                if not title or len(title)>180: raise ValueError("ARCHIVE_TITLE_HOLD")
+                reviews.append({"source":"臺北表演藝術中心","namespace":"event",
+                    "source_event_id":i,"url":url,"title_review":title,
+                    "title_role":"EVENT_TITLE_REVIEW_NOT_ACCEPTED",
+                    "observed_at":stamp,"detail_body_sha256":receipt["body_sha256"],
+                    "archive_run_id":42491637804,"archive_zip_sha256":expected_sha,
+                    "decision":"ARCHIVED_NATIVE_REPLAY_REVIEW_ONLY",
+                    "first_failure":"INDEPENDENT_FIELD_ACCEPTANCE_AND_FRESHNESS_HOLD"})
+            return reviews
+    except (zipfile.BadZipFile,UnicodeError,KeyError,TypeError,json.JSONDecodeError) as e:
+        raise ValueError("ARCHIVE_STRUCTURE_HOLD") from e
+
+def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None):
     if not isinstance(formal_raw,bytes) or not re.fullmatch("[a-f0-9]{40}",expected_blob):
         raise ValueError("CAS_INPUT_HOLD")
     actual=blob_sha(formal_raw)
@@ -157,6 +233,11 @@ def plan(formal_raw,candidates,expected_blob):
         prior[k]=row
     proposed,seen,rejected={ },set(),[]
     review_only=[]
+    if (archive_zip is None)!=(archive_sha is None):
+        raise ValueError("ARCHIVE_PAIR_REQUIRED_HOLD")
+    archived_reviews=(replay_tpac_event_archive(archive_zip,archive_sha)
+                      if archive_zip is not None else [])
+    review_only.extend(archived_reviews)
     for n,row in enumerate(candidates):
         try:
             if isinstance(row,dict) and row.get("kind")=="EVENTRADAR_AB_ISOLATED_REVIEW_BRIDGE_V1":
@@ -181,7 +262,9 @@ def plan(formal_raw,candidates,expected_blob):
             "release_state":HOLD,"formal_blob_before":actual,"formal_blob_after":actual,
             "formal_rows_before":len(original),"formal_rows_after":len(original),
             "candidate_count":len(candidates),"shape_valid":len(proposed),
-            "review_only_count":len(review_only),"review_only":review_only,
+            "review_only_count":len(review_only),
+            "archived_native_review_count":len(archived_reviews),
+            "archived_native_list_rows":18 if archived_reviews else 0,"review_only":review_only,
             "would_add":sorted(added),"would_change":sorted(changed),
             "unchanged":sorted(unchanged),"rejected":rejected,
             "lkg_retained":len(original),"native_get":0,"published_delta":0,
@@ -192,13 +275,17 @@ def plan(formal_raw,candidates,expected_blob):
 def main():
     a=argparse.ArgumentParser()
     for flag in ("formal","candidates","expected-blob","output"): a.add_argument("--"+flag,required=True)
+    a.add_argument("--archived-tpac-zip")
+    a.add_argument("--archived-tpac-sha256")
     x=a.parse_args()
     root=Path(__file__).resolve().parents[1]
     out=Path(x.output).resolve()
     if not out.is_relative_to((root/"_isolated_review").resolve()) or out.suffix!=".json":
         raise ValueError("FORMAL_WRITE_PATH_FORBIDDEN")
     raw=Path(x.formal).read_bytes()
-    result=plan(raw,json.loads(Path(x.candidates).read_text(encoding="utf-8")),x.expected_blob)
+    archived=Path(x.archived_tpac_zip).read_bytes() if x.archived_tpac_zip else None
+    result=plan(raw,json.loads(Path(x.candidates).read_text(encoding="utf-8")),
+                x.expected_blob,archived,x.archived_tpac_sha256)
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+"\n",encoding="utf-8")
     if Path(x.formal).read_bytes()!=raw: raise ValueError("FORMAL_CHANGED_HOLD")

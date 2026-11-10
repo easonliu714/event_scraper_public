@@ -7,6 +7,7 @@ on:
       - .github/workflows/eventradar_daily_publisher_dryrun.yml
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: daily-publisher-dryrun-${{ github.event.pull_request.number }}
   cancel-in-progress: false
@@ -42,12 +43,22 @@ jobs:
       - name: Fail-closed safety regressions
         run: |
           python -m unittest discover -s tests/p30 -p test_p30_daily_publisher_dryrun.py -v
+      - name: Replay original TPAC first-party archive from GitHub (NO TPAC GET)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p _isolated_review/daily
+          curl -fsSL --retry 0 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/13621717373/zip" \
+            -o _isolated_review/daily/tpac_event_archive.zip
+          echo "87fd004eb1a3b3019620a2ae93f2e991b1669caa9ab17c3938479eda295c0acd  _isolated_review/daily/tpac_event_archive.zip" | sha256sum -c -
       - name: Actual one-row formal readback and isolated CAS diff
         run: |
           set -euo pipefail
           mkdir -p _isolated_review/daily
           cp docs/data.json _isolated_review/daily/input.json
-          python -m scripts.p30_daily_publisher_dryrun --formal docs/data.json --candidates _isolated_review/daily/input.json --expected-blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 --output _isolated_review/daily/plan.json
+          python -m scripts.p30_daily_publisher_dryrun --formal docs/data.json --candidates _isolated_review/daily/input.json --expected-blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 --output _isolated_review/daily/plan.json --archived-tpac-zip _isolated_review/daily/tpac_event_archive.zip --archived-tpac-sha256 87fd004eb1a3b3019620a2ae93f2e991b1669caa9ab17c3938479eda295c0acd
           python - <<'PY'
           import json
           from pathlib import Path
@@ -55,6 +66,16 @@ jobs:
           assert p['formal_rows_before']==p['formal_rows_after']==1
           assert p['formal_blob_before']==p['formal_blob_after']=='342eb7c101115b05dbc6ff90de7bd97d5bd63d59'
           assert p['published_delta']==p['native_get']==0
+          assert p['archived_native_review_count']==2 and p['archived_native_list_rows']==18
+          assert p['review_only_count']==2 and p['shape_valid']==1
+          assert {x['source_event_id'] for x in p['review_only']}=={'1301','2072'}
+          assert all(x['decision']=='ARCHIVED_NATIVE_REPLAY_REVIEW_ONLY' for x in p['review_only'])
+          from scripts.p30_daily_publisher_dryrun import replay_tpac_event_archive,TPAC_ARCHIVE_SHA256
+          b=bytearray(Path('_isolated_review/daily/tpac_event_archive.zip').read_bytes())
+          b[-1]^=1
+          try: replay_tpac_event_archive(bytes(b),TPAC_ARCHIVE_SHA256)
+          except ValueError as exc: assert 'ARCHIVE_ZIP_SHA256_HOLD' in str(exc)
+          else: raise AssertionError('tampered archive accepted')
           assert p['commit_permitted'] is False and p['scheduler_enabled'] is False
           print('PASS_FORMAL_ONE_ROW_ISOLATED_DRYRUN_NO_PUBLICATION')
           PY
