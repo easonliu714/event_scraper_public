@@ -56,7 +56,7 @@ def verified_shape(row):
     price=row.get("price","")
     if price:
         r=ev.get("price")
-        m=re.fullmatch(r"NT\\$\\s*(\\d{1,3}(?:,\\d{3})*|\\d{3,6})\\s*起",price)
+        m=re.fullmatch(r"NT\$\s*(\d{1,3}(?:,\d{3})*|\d{3,6})\s*起",price)
         amount=int(m.group(1).replace(",","")) if m else None
         try:
             stamp=r.get("observed_at") if isinstance(r,dict) else None
