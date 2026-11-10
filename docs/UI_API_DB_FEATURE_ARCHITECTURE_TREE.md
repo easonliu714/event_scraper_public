@@ -9243,3 +9243,30 @@ Non-TPAC source acquisition [NOT AUTHORIZED until source policy + Claim PASS]
 
 - Static GitHub Pages cannot dispatch trusted Publisher work. In isolated Draft #249 (`120f35d88013d8f719b74df52aea6e92b0a5fdce`), `pageshow` on BFCache restore and `visibilitychange` on foreground resume now call `refreshPublishedCards()` (deduplicated Promise wrapper around the existing `window.init()`) **and** the existing read-only `refresh()` panel. Initial `pageshow` does not duplicate the existing `init()`; touch pull retains its pre-existing `init()` and the panel listener. All requests remain same-origin published `data.json`/`platform_status.json` only, never official source GET, Actions dispatch or a release authority.
 - This fixes the architecture gap where a refreshed status panel could coexist with stale PWA cards after mobile app restore. Tests cover BFCache restore, foreground return, hidden transition, and initial-load nonduplication. Exact-head [CI #42880178582](https://github.com/easonliu714/event_scraper_public/actions/runs/42880178582) SUCCESS; Artifact `13793018271` independently SHA256/CRC verified. Production Pages HTTP/Android remains UNKNOWN; `PUB-OD-02` OPEN pending independent Owner deployment authorization. Publisher target A/B and `HARD_HOLD_NO_PUBLICATION` unchanged; no schedule, no public Gateway/dispatch, no per-event AI.
+
+## 2026-11-11 07:36+08 — Source-first implementation cadence and whole-source Publisher boundary
+
+```text
+Only hourly engineering Writer (Task 6ae1e6147e548191881f20e730ab0f11)
+  └── PRIMARY: platform/venue Source Adapter improvements, rotate legal sources
+        HTTP/robots/Claim → official LIST → same-ID DETAIL → IDENTITY → FIELD
+          ├── independent source URL, body, observation time and role receipt
+          ├── known reliable fields accepted; ambiguous fields UNKNOWN/REVIEW
+          └── isolated CAS/LKG + fail-closed regressions + exact-head CI
+                └── SOURCE_READY (actual native and independent quality PASS)
+                      └── TRIGGER *ONE* whole-source deterministic Publisher integration
+                            registered/accepted Source A + B + C ... + newly ready Source
+                              → common Core/quality → incremental diff
+                              → reject/retain REVIEW & LKG → CAS & rollback
+                              → isolated whole-source dry-run/CI/Artifact
+                              → formal commit/deploy [HARD_HOLD, separate Owner approval]
+No newly SOURCE_READY => NO whole-source Publisher rebuild/periodic run.
+Public PWA refresh => same-origin feed/status read [#249 Draft; not deployed]
+  -> trusted gateway/anti-abuse/TTL/global Claim/dispatch [NOT AUTHORIZED]
+  -> Publisher schedule [DEFERRED / NO 24H TIMER]
+Manual transition B => isolated safe preflight [#246 CI PASS, dispatch NOT ENABLED]
+```
+
+- This revises engineering frequency, not source-specific fetch policy or formal Publisher release authorization. TPAC Claim retention HOLD (full 6h host scope; robots 1, two LIST 1 each, DETAIL total 2, single concurrency, 403/429 stop) persists. Other Sources must prove own compliant acquisition before new native GET. No AI needed for routine field parsing or quality release after fixed rules are independently verified.
+- SOURCE_READY requires a reusable official LIST + exact event DETAIL + independent ID/field provenance and positive/negative test evidence; synthetic raw retention or cached caller-supplied HTML does not establish source authority. Do not merge unrelated Event/Product/Session identities or replace partial valid fields with unsupported guesses. LKG protects accepted activities when other Sources fail.
+- Whole-source Publisher is not a new hourly Writer or a timer; only one integration/dry-run when source coverage advances. Production GitHub Pages `docs/data.json` and engineering `docs/platform_status.json` remain separate. Issue #248 has the precise Owner decision and unique Task unchanged.
