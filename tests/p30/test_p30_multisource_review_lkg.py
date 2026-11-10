@@ -110,6 +110,29 @@ class MultiSourceBridge(unittest.TestCase):
         p["source"] = "unknown"
         self.assertEqual(plan([p], as_of=NOW)["source_reader_qualified"], 0)
 
+    def test_historical_replay_cannot_masquerade_as_new_live_observation(self):
+        # Same historical content with a 2026-11-10 clock must never replace LKG.
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        replay = tainex_packet()
+        replay["observed_at"] = "2026-11-10T18:00:00+08:00"
+        r = plan([replay], previous=old, as_of=NOW)
+        self.assertEqual(r["source_reader_qualified"], 0)
+        self.assertEqual(r["changed_review"], 0)
+        self.assertEqual(r["retained_lkg"], 1)
+        self.assertEqual(r["review_rows"], old)
+        self.assertIn("HISTORICAL_REPLAY_CLOCK_ESCALATION_HOLD", r["rejected"][0]["reason"])
+        fami_replay = fami_packet()
+        fami_replay["observed_at"] = "2026-11-03T00:00:00+08:00"
+        r2 = plan([fami_replay], as_of=NOW)
+        self.assertEqual(r2["source_reader_qualified"], 0)
+        self.assertEqual(r2["new_review"], 0)
+
+    def test_prior_replay_clock_escalation_rejected_on_restart(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        old[0]["scraped_at"] = "2026-11-03T00:00:00+08:00"
+        with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+            plan([], previous=old, as_of=NOW)
+
     def test_prior_lkg_tampering_is_hard_failure(self):
         old = plan([tainex_packet()], as_of=NOW)["review_rows"]
         old[0]["_candidate"]["published"] = True

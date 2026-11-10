@@ -23,6 +23,11 @@ from scripts.p30_tainex_archived_native_bridge import (
 )
 
 HOLD = "HARD_HOLD_NO_PUBLICATION"
+# Both reused readers are 2026-11-02 historical observations, not live adapters.
+# The next local midnight is an upper bound, NOT a native evidence timestamp.
+# Reject later caller-supplied clocks rather than laundering a replay into a
+# newer LKG revision; fresh source data requires a separately attested adapter.
+HISTORICAL_REPLAY_END_UTC = datetime(2026, 11, 2, 16, 0, tzinfo=timezone.utc)
 REGISTRY = {
     "tainex": {"module": tainex, "platform_id": "TAINEX",
                "platform": "台北南港展覽館", "gate": "P30-VENUE-02BO",
@@ -54,6 +59,8 @@ def inspect_one(packet, as_of):
     seen_at = utc(observed_at)
     if seen_at > as_of:
         raise ValueError("FUTURE_OBSERVATION_HOLD")
+    if seen_at >= HISTORICAL_REPLAY_END_UTC:
+        raise ValueError("HISTORICAL_REPLAY_CLOCK_ESCALATION_HOLD")
     inspected = spec["module"].inspect(obs, observed_at)
     if (inspected.get("decision") != spec["expected_decision"]
             or inspected.get("acceptedFields") != 0
@@ -154,7 +161,8 @@ def validate_prior_binding(row, as_of):
             or not required_holds.issubset(set(meta.get("hold_reasons", [])))
             or meta.get("field_evidence") != {}
             or any(row.get(k) != "未確認" for k in ("date", "price", "location"))
-            or utc(row["scraped_at"]) > as_of):
+            or utc(row["scraped_at"]) > as_of
+            or utc(row["scraped_at"]) >= HISTORICAL_REPLAY_END_UTC):
         raise ValueError("PRIOR_LKG_SOURCE_BINDING_HOLD")
 
 
