@@ -323,6 +323,78 @@ def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None):
             "formal_data_mutated":False,
             "warning":"Caller-supplied ACCEPTED flags are not independent source attestation"}
 
+
+# [P30-PUB-OD-01] Deterministic, read-only gate for an authenticated server.
+# Public PWA refresh may only read these results. Browser inputs, this function,
+# and the existing PR workflow have ZERO GitHub dispatch or publication power.
+# A trusted gateway must re-read server-side receipts, obtain a durable global
+# claim, enforce per-source rate limits, and separately attest release authority.
+def assess_refresh_request(status, now, *, gateway_attested=False,
+                           claim_attested=False, release_authorized=False,
+                           ttl_seconds=86400, retry_cooldown_seconds=3600):
+    """Return refresh REQUEST eligibility, never execute a request or publish.
+
+    All timestamps must be checked server-side; browser-supplied status and
+    clock are untrusted. Per-source robots/6h limits are independent gates.
+    """
+    if not isinstance(status, dict) or not isinstance(now, datetime):
+        raise ValueError("REFRESH_TRUSTED_INPUT_HOLD")
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("REFRESH_SERVER_TIMEZONE_HOLD")
+    if (type(ttl_seconds) is not int or not 3600 <= ttl_seconds <= 604800
+            or type(retry_cooldown_seconds) is not int
+            or not 300 <= retry_cooldown_seconds <= ttl_seconds):
+        raise ValueError("REFRESH_BOUND_POLICY_HOLD")
+    if type(status.get("running", False)) is not bool:
+        raise ValueError("REFRESH_RUNNING_SHAPE_HOLD")
+    if any(type(v) is not bool for v in
+           (gateway_attested, claim_attested, release_authorized)):
+        raise ValueError("REFRESH_AUTHORITY_SHAPE_HOLD")
+    def parse_timestamp(key):
+        value = status.get(key)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("REFRESH_RECEIPT_SHAPE_HOLD")
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None or parsed.utcoffset() is None:
+                raise ValueError()
+        except ValueError as exc:
+            raise ValueError("REFRESH_RECEIPT_TIMEZONE_HOLD") from exc
+        if parsed > now:
+            raise ValueError("REFRESH_FUTURE_RECEIPT_HOLD")
+        return parsed
+    last_success = parse_timestamp("last_success_at")
+    last_attempt = parse_timestamp("last_attempt_at")
+    decision = "REQUEST_ELIGIBLE_NOT_DISPATCHED"
+    if status.get("running", False):
+        decision = "SKIP_ALREADY_RUNNING"
+    elif last_success is not None and (
+            now - last_success).total_seconds() < ttl_seconds:
+        decision = "SKIP_DATA_FRESH"
+    elif last_attempt is not None and (
+            now - last_attempt).total_seconds() < retry_cooldown_seconds:
+        decision = "SKIP_RETRY_COOLDOWN"
+    elif not gateway_attested:
+        decision = "HOLD_TRUSTED_GATEWAY_NOT_ATTESTED"
+    elif not claim_attested:
+        decision = "HOLD_GLOBAL_CLAIM_NOT_ATTESTED"
+    elif not release_authorized:
+        decision = "HOLD_PUBLICATION_AUTHORITY"
+    return {
+        "kind": "EVENTRADAR_ONDEMAND_REFRESH_ELIGIBILITY_V1",
+        "decision": decision,
+        "request_eligible": decision == "REQUEST_ELIGIBLE_NOT_DISPATCHED",
+        "dispatch_performed": False,
+        "publisher_executed": False,
+        "formal_write_performed": False,
+        "source_get_performed": False,
+        "schedule_enabled": False,
+        "source_rate_limits_checked": False,
+        "warning": "Server-only preflight; official source limits and publisher checks remain separate",
+    }
+
 def main():
     a=argparse.ArgumentParser()
     for flag in ("formal","candidates","expected-blob","output"): a.add_argument("--"+flag,required=True)
