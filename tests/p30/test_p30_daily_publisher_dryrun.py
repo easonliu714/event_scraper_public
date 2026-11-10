@@ -1,5 +1,5 @@
 import copy,json,unittest
-from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape,identity
+from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape,identity,rollback_manifest,verify_rollback_manifest
 U="https://tpac.org.taipei/program/2040"
 def row():
     e={"platform":"臺北表演藝術中心","source_event_id":"2040","url":U,
@@ -144,4 +144,39 @@ class TestSafety(unittest.TestCase):
                     verified_shape(bad)
         with self.assertRaisesRegex(ValueError,"REVIEW_ONLY_HOLD"):
             verified_shape(e)
+
+    def test_versioned_diff_and_original_rollback_manifest(self):
+        raw,sha=feed()
+        p=plan(raw,[row()],sha)
+        m=p["rollback_manifest"]
+        self.assertEqual(m["base_git_blob"],sha)
+        self.assertEqual(m["row_count"],1)
+        self.assertFalse(m["storage_retention_attested"])
+        self.assertFalse(m["commit_permitted"])
+        self.assertTrue(verify_rollback_manifest(raw,m))
+        self.assertEqual(p["versioned_diff"][0]["change"],"UNCHANGED")
+        self.assertEqual(p["versioned_diff"][0]["authority"],
+                         "SHAPE_ONLY_NOT_INDEPENDENTLY_ACCEPTED")
+        self.assertEqual(p["versioned_diff"][0]["before_fields_sha256"],
+                         p["versioned_diff"][0]["candidate_fields_sha256"])
+        self.assertFalse(p["commit_permitted"])
+
+    def test_versioned_diff_change_and_exact_rollback_guard(self):
+        raw,sha=feed()
+        e=row()
+        e["date"]="2026-11-21 12:30"
+        e["_formal_field_evidence"]["date"]["value"]=e["date"]
+        p=plan(raw,[e],sha)
+        self.assertEqual(p["versioned_diff"][0]["change"],"CHANGE")
+        self.assertNotEqual(p["versioned_diff"][0]["before_fields_sha256"],
+                            p["versioned_diff"][0]["candidate_fields_sha256"])
+        self.assertTrue(verify_rollback_manifest(raw,p["rollback_manifest"]))
+        altered=raw.replace("士林YES！".encode(), "士林NO！".encode())
+        with self.assertRaisesRegex(ValueError,"ROLLBACK_BASE_CAS_HOLD"):
+            verify_rollback_manifest(altered,p["rollback_manifest"])
+        bad=copy.deepcopy(p["rollback_manifest"])
+        bad["event_row_sha256"]["臺北表演藝術中心:program:2040"]="0"*64
+        with self.assertRaisesRegex(ValueError,"ROLLBACK_MANIFEST_MISMATCH_HOLD"):
+            verify_rollback_manifest(raw,bad)
+        self.assertFalse(p["commit_permitted"])
 if __name__=="__main__": unittest.main()
