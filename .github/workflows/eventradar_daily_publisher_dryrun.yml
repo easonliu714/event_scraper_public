@@ -1,0 +1,70 @@
+name: EventRadar daily Publisher isolated safety CI (NO PUBLISH)
+on:
+  pull_request:
+    paths:
+      - scripts/p30_daily_publisher_dryrun.py
+      - tests/p30/test_p30_daily_publisher_dryrun.py
+      - .github/workflows/eventradar_daily_publisher_dryrun.yml
+permissions:
+  contents: read
+concurrency:
+  group: daily-publisher-dryrun-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  safety:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-daily-publisher-safety-dryrun'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact-head scope, immutable formal baseline and no schedule
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test "$(git rev-parse HEAD:docs/data.json)" = 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git rev-parse HEAD:docs/index.html)" = 489edb5615584458387e0caa853702d278f6ca1f
+          base=4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_daily_publisher_dryrun.yml' 'scripts/p30_daily_publisher_dryrun.py' 'tests/p30/test_p30_daily_publisher_dryrun.py' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          ! grep -Eq '^[[:space:]]*(schedule|workflow_dispatch):' .github/workflows/eventradar_daily_publisher_dryrun.yml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fail-closed safety regressions
+        run: |
+          python -m unittest discover -s tests/p30 -p test_p30_daily_publisher_dryrun.py -v
+      - name: Actual one-row formal readback and isolated CAS diff
+        run: |
+          set -euo pipefail
+          mkdir -p _isolated_review/daily
+          cp docs/data.json _isolated_review/daily/input.json
+          python -m scripts.p30_daily_publisher_dryrun --formal docs/data.json --candidates _isolated_review/daily/input.json --expected-blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 --output _isolated_review/daily/plan.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=json.loads(Path('_isolated_review/daily/plan.json').read_text())
+          assert p['formal_rows_before']==p['formal_rows_after']==1
+          assert p['formal_blob_before']==p['formal_blob_after']=='342eb7c101115b05dbc6ff90de7bd97d5bd63d59'
+          assert p['published_delta']==p['native_get']==0
+          assert p['commit_permitted'] is False and p['scheduler_enabled'] is False
+          print('PASS_FORMAL_ONE_ROW_ISOLATED_DRYRUN_NO_PUBLICATION')
+          PY
+          (cd _isolated_review/daily && sha256sum plan.json > SHA256SUMS.txt)
+          git diff --exit-code -- docs/data.json docs/platform_status.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-daily-publisher-dryrun-evidence
+          path: |
+            _isolated_review/daily/plan.json
+            _isolated_review/daily/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14

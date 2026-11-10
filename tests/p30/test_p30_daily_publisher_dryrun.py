@@ -1,0 +1,53 @@
+import copy,json,unittest
+from scripts.p30_daily_publisher_dryrun import blob_sha,plan,verified_shape
+U="https://tpac.org.taipei/program/2040"
+def row():
+    e={"platform":"臺北表演藝術中心","source_event_id":"2040","url":U,
+       "title":"士林YES！","date":"2026-11-20 19:30","price":"",
+       "formal_field_pass":True,"_publication":{"source_body_sha256":{"detail":"a"*64}},
+       "_formal_field_evidence":{}}
+    for k,role in (("title","EVENT_TITLE"),("date","EVENT_SHOW_START")):
+        e["_formal_field_evidence"][k]={"value":e[k],"role":role,"decision":"ACCEPTED",
+           "event_id":"2040","source":U,"source_url":U,"observed_at":"2026-11-08T13:15:54+00:00"}
+    return e
+def feed():
+    raw=(json.dumps([row()],ensure_ascii=False)+"\n").encode()
+    return raw,blob_sha(raw)
+class TestSafety(unittest.TestCase):
+    def test_unchanged(self):
+        raw,sha=feed(); p=plan(raw,[row()],sha)
+        self.assertEqual((p["formal_rows_before"],p["formal_rows_after"]),(1,1))
+        self.assertEqual(len(p["unchanged"]),1); self.assertFalse(p["commit_permitted"])
+    def test_empty_lkg(self):
+        raw,sha=feed(); p=plan(raw,[],sha)
+        self.assertEqual(p["lkg_retained"],1); self.assertEqual(p["published_delta"],0)
+    def test_cas(self):
+        raw,_=feed()
+        with self.assertRaisesRegex(ValueError,"CAS_MISMATCH"): plan(raw,[],"0"*40)
+    def test_review(self):
+        raw,sha=feed(); e=row(); e["formal_field_pass"]=False
+        self.assertIn("REVIEW_ONLY",plan(raw,[e],sha)["rejected"][0]["reason"])
+    def test_unaccepted_price(self):
+        e=row(); e["price"]="NT$500 起"
+        with self.assertRaisesRegex(ValueError,"UNACCEPTED_PRICE"): verified_shape(e)
+    def test_host_spoof(self):
+        e=row(); e["url"]="https://tpac.org.taipei.evil.example/program/2040"
+        with self.assertRaisesRegex(ValueError,"EXACT_OFFICIAL"): verified_shape(e)
+    def test_event_id_conflict(self):
+        e=row(); e["_formal_field_evidence"]["title"]["event_id"]="2041"
+        with self.assertRaisesRegex(ValueError,"FIELD_TITLE_AUTHORITY"): verified_shape(e)
+    def test_duplicate(self):
+        raw,sha=feed(); p=plan(raw,[row(),row()],sha)
+        self.assertEqual(p["shape_valid"],0)
+    def test_body_sha(self):
+        e=row(); e["_publication"]["source_body_sha256"]["detail"]="bad"
+        with self.assertRaisesRegex(ValueError,"NATIVE_SHA"): verified_shape(e)
+    def test_changed_still_hold(self):
+        raw,sha=feed(); e=row(); e["date"]="2026-11-21 12:30"
+        e["_formal_field_evidence"]["date"]["value"]=e["date"]
+        p=plan(raw,[e],sha)
+        self.assertEqual(len(p["would_change"]),1); self.assertFalse(p["commit_permitted"])
+    def test_unregistered_adapter(self):
+        e=row(); e["platform"]="UNKNOWN"
+        with self.assertRaisesRegex(ValueError,"UNREGISTERED_ADAPTER"): verified_shape(e)
+if __name__=="__main__": unittest.main()
