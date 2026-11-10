@@ -114,7 +114,7 @@ class MultiSourceBridge(unittest.TestCase):
         # Same historical content with a 2026-11-10 clock must never replace LKG.
         old = plan([tainex_packet()], as_of=NOW)["review_rows"]
         replay = tainex_packet()
-        replay["observed_at"] = "2026-11-10T18:00:00+08:00"
+        replay["observed_at"] = "2026-11-10T12:00:00+08:00"
         r = plan([replay], previous=old, as_of=NOW)
         self.assertEqual(r["source_reader_qualified"], 0)
         self.assertEqual(r["changed_review"], 0)
