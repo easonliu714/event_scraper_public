@@ -8,11 +8,13 @@ No field is promoted to formal ACCEPTED; exhibition periods are not showtimes.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from scripts import p30_venue02bo_tainex_exhibition as tainex
 from scripts import p30_l9dc_famiticket_teca as famiticket
@@ -174,7 +176,114 @@ def validate_prior_binding(row, as_of):
         raise ValueError("PRIOR_LKG_SOURCE_BINDING_HOLD")
 
 
-def plan(packets, *, previous=None, as_of, archived_native=None):
+
+class _RawPairHTML(HTMLParser):
+    """Extract only visible exact links/headings; no script or network execution."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.links, self.headings, self.stack = [], [], []
+        self.skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "noscript"):
+            self.skip += 1
+            return
+        if self.skip:
+            return
+        if tag == "a":
+            self.stack.append((tag, dict(attrs).get("href"), []))
+        elif tag in ("h1", "h2", "h3"):
+            self.stack.append((tag, None, []))
+
+    def handle_data(self, data):
+        if not self.skip:
+            for item in self.stack:
+                item[2].append(data)
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript"):
+            self.skip = max(0, self.skip - 1)
+            return
+        if self.skip:
+            return
+        for i in range(len(self.stack) - 1, -1, -1):
+            if self.stack[i][0] == tag:
+                kind, href, chunks = self.stack.pop(i)
+                value = " ".join("".join(chunks).split())
+                if kind == "a":
+                    self.links.append((href, value))
+                else:
+                    self.headings.append(value)
+                break
+
+
+def inspect_raw_pair(packet, as_of):
+    """Parse caller-supplied raw LIST/DETAIL bytes without claiming HTTP provenance.
+
+    The raw bytes and clock are not an independently attested native capture.
+    Never merge this result into accepted fields or REVIEW LKG. A separate
+    source collector must preserve original bytes and prove origin, timing,
+    source-specific policy and cross-host Claim before any promotion.
+    """
+    if not isinstance(packet, dict) or packet.get("source") not in REGISTRY:
+        raise ValueError("RAW_SOURCE_ALLOWLIST_HOLD")
+    spec = REGISTRY[packet["source"]]
+    list_url, detail_url = spec["module"].LIST, spec["module"].DETAIL
+    if packet.get("list_url") != list_url or packet.get("detail_url") != detail_url:
+        raise ValueError("RAW_URL_EXACT_HOLD")
+    if not isinstance(packet.get("observed_at"), str):
+        raise ValueError("RAW_CLOCK_MISSING_HOLD")
+    seen = utc(packet["observed_at"])
+    if as_of.tzinfo is None or as_of.utcoffset() is None or seen > as_of.astimezone(timezone.utc):
+        raise ValueError("RAW_CLOCK_FUTURE_HOLD")
+    bodies, parsed = [], []
+    for role in ("list", "detail"):
+        encoded = packet.get(role + "_html_b64")
+        if not isinstance(encoded, str):
+            raise ValueError("RAW_BODY_MISSING_HOLD")
+        try:
+            raw = base64.b64decode(encoded, validate=True)
+            if not 0 < len(raw) <= 1048576 or b"\x00" in raw:
+                raise ValueError("RAW_BODY_SIZE_OR_BINARY_HOLD")
+            html = raw.decode("utf-8", errors="strict")
+        except (ValueError, UnicodeError, base64.binascii.Error) as exc:
+            raise ValueError("RAW_BODY_ENCODING_HOLD") from exc
+        p = _RawPairHTML()
+        p.feed(html)
+        p.close()
+        bodies.append({"role": role.upper(), "sha256": hashlib.sha256(raw).hexdigest(),
+                       "bytes": len(raw)})
+        parsed.append(p)
+    exact_links = [
+        label for href, label in parsed[0].links
+        if isinstance(href, str) and urljoin(list_url, href) == detail_url
+    ]
+    title = spec["module"].TITLE
+    if exact_links != [title]:
+        raise ValueError("RAW_LIST_EXACT_ID_TITLE_HOLD")
+    if parsed[1].headings.count(title) != 1:
+        raise ValueError("RAW_DETAIL_EXACT_TITLE_HOLD")
+    path = urlsplit(detail_url).path
+    prefix = "/" + spec["namespace"] + "/"
+    if not path.startswith(prefix) or not path[len(prefix):] or "/" in path[len(prefix):]:
+        raise ValueError("RAW_DETAIL_ID_NAMESPACE_HOLD")
+    event_id = path[len(prefix):]
+    return {
+        "source": packet["source"], "record_id": spec["platform_id"] + ":" +
+        spec["namespace"] + ":" + event_id, "source_event_id": event_id,
+        "list_url": list_url, "detail_url": detail_url, "raw_bodies": bodies,
+        "observed_at_claimed": packet["observed_at"],
+        "decision": "REVIEW_RAW_PAIR_IDENTITY_ONLY",
+        "source_authority": "CALLER_SUPPLIED_UNATTESTED_BYTES",
+        "source_time_authority": "UNATTESTED",
+        "raw_html_retention_verified": False, "native_http_attested": False,
+        "accepted_fields": 0, "lkg_promoted": False, "published": False,
+        "commit_permitted": False,
+    }
+
+
+def plan(packets, *, previous=None, as_of, archived_native=None, raw_pairs=None):
     """Pure multi-source REVIEW merge, with fail-closed non-destructive LKG."""
     if as_of.tzinfo is None or as_of.utcoffset() is None:
         raise ValueError("CLOCK_TIMEZONE_HOLD")
@@ -216,6 +325,19 @@ def plan(packets, *, previous=None, as_of, archived_native=None):
                 item.get("id"), item.get("audit_bytes"), now))
         except (ValueError, KeyError, TypeError, OverflowError) as exc:
             rejected.append({"index": "native:" + str(index), "reason": str(exc)})
+    # Raw HTML parsing is a real adapter capability, but caller-supplied
+    # bytes cannot establish origin or retention. Do not add these records to
+    # REVIEW LKG or independently accepted fields without a separate Gate.
+    if raw_pairs is None:
+        raw_pairs = []
+    if not isinstance(raw_pairs, list) or len(raw_pairs) > 20:
+        raise ValueError("RAW_PAIR_INPUT_CAP_HOLD")
+    raw_pair_reviews = []
+    for index, pair in enumerate(raw_pairs):
+        try:
+            raw_pair_reviews.append(inspect_raw_pair(pair, now))
+        except (ValueError, TypeError, KeyError, OverflowError) as exc:
+            rejected.append({"index": "raw:" + str(index), "reason": str(exc)})
     candidates, quality = build_candidate_dataset(
         [r["candidate"] for r in receipts + native_receipts])
     if quality["rejectedRows"]:
@@ -282,6 +404,8 @@ def plan(packets, *, previous=None, as_of, archived_native=None):
         "new_review": added, "changed_review": changed,
         "unchanged_review": unchanged, "retained_lkg": retained,
         "review_rows": rows, "rejected": rejected,
+        "raw_pair_reviews_unattested": raw_pair_reviews,
+        "raw_pair_identity_parsed_unattested": len(raw_pair_reviews),
         "source_review_receipts": source_receipts,
         "archived_native_receipts": [
             {k: v for k, v in r.items() if k != "candidate"}
@@ -395,13 +519,15 @@ def main():
     result = plan(source["packets"], previous=previous,
                   as_of=utc(source["as_of"]),
                   archived_native=(archived_inputs(args.tainex_native_audits_dir)
-                                   if args.tainex_native_audits_dir else []))
+                                   if args.tainex_native_audits_dir else []),
+                  raw_pairs=source.get("raw_pairs", []))
     digest = write_isolated(result, args.output, Path.cwd())
     print(json.dumps({"decision": result["decision"],
                       "source_reader_qualified": result["source_reader_qualified"],
                       "independently_accepted_fields": 0,
                       "archived_native_receipt_qualified": result["archived_native_receipt_qualified"],
                       "native_get": 0, "published_delta": 0,
+                      "raw_pair_identity_parsed_unattested": result["raw_pair_identity_parsed_unattested"],
                       "isolated_sha256": digest}, sort_keys=True))
     return 0 if (result["source_reader_qualified"] or
                  result["archived_native_receipt_qualified"]) else 49
