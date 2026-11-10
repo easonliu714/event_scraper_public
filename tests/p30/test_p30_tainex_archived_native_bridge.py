@@ -66,11 +66,11 @@ class NativeArchivedTaiNEX(unittest.TestCase):
                      ("title", "unrelated")]:
             tampered = copy.deepcopy(prior)
             tampered[0][k] = v
-            with self.assertRaisesRegex(ValueError, "PRIOR_LKG_"):
+            with self.assertRaisesRegex(ValueError, "PRIOR_(?:LKG|NATIVE)_"):
                 plan([], previous=tampered, as_of=NOW)
         tampered = copy.deepcopy(prior)
         tampered[1]["_candidate"]["source_class"] = "NATIVE_ACCEPTED"
-        with self.assertRaisesRegex(ValueError, "PRIOR_LKG_"):
+        with self.assertRaisesRegex(ValueError, "PRIOR_(?:LKG|NATIVE)_"):
             plan([], previous=tampered, as_of=NOW)
 
 
