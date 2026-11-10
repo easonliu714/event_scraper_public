@@ -1,4 +1,5 @@
 """Integration tests reuse historical #217/#221 reader contracts, no HTTP."""
+import base64
 import copy
 import tempfile
 import unittest
@@ -7,7 +8,8 @@ from pathlib import Path
 
 from scripts import p30_venue02bo_tainex_exhibition as tainex
 from scripts import p30_l9dc_famiticket_teca as fami
-from scripts.p30_multisource_review_lkg import plan, write_isolated, load_previous_snapshot
+from scripts.p30_multisource_review_lkg import (
+    REGISTRY, inspect_raw_pair, plan, write_isolated, load_previous_snapshot)
 from scripts.p30_tainex_archived_native_bridge import archived_inputs
 
 NOW = datetime(2026, 11, 10, 5, 55, tzinfo=timezone.utc)
@@ -293,6 +295,98 @@ class MultiSourceBridge(unittest.TestCase):
             path.write_bytes(raw)
             with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_IDENTITY_HOLD"):
                 load_previous_snapshot(path, hashlib.sha256(raw).hexdigest(), root)
+
+
+
+def raw_pair_packet(source):
+    """Synthetic HTML tests parser behavior; not native HTTP evidence."""
+    module = REGISTRY[source]["module"]
+    list_html = ('<html><body><a href="' + module.DETAIL + '">' +
+                 module.TITLE + '</a></body></html>').encode("utf-8")
+    detail_html = ('<html><body><h1>' + module.TITLE +
+                   '</h1></body></html>').encode("utf-8")
+    return {
+        "source": source, "list_url": module.LIST, "detail_url": module.DETAIL,
+        "observed_at": "2026-11-09T08:00:00Z",
+        "list_html_b64": base64.b64encode(list_html).decode("ascii"),
+        "detail_html_b64": base64.b64encode(detail_html).decode("ascii"),
+    }
+
+
+class RawPairIdentityAdapter(unittest.TestCase):
+    def test_two_source_raw_bytes_identity_only_no_authority(self):
+        import hashlib
+        for source in ("tainex", "famiticket"):
+            p = raw_pair_packet(source)
+            receipt = inspect_raw_pair(p, NOW)
+            self.assertEqual(receipt["decision"], "REVIEW_RAW_PAIR_IDENTITY_ONLY")
+            self.assertEqual(receipt["source_authority"], "CALLER_SUPPLIED_UNATTESTED_BYTES")
+            self.assertEqual(receipt["source_time_authority"], "UNATTESTED")
+            self.assertFalse(receipt["native_http_attested"])
+            self.assertFalse(receipt["raw_html_retention_verified"])
+            self.assertEqual(receipt["accepted_fields"], 0)
+            self.assertFalse(receipt["lkg_promoted"])
+            self.assertFalse(receipt["commit_permitted"])
+            self.assertEqual(receipt["raw_bodies"][0]["sha256"], hashlib.sha256(
+                base64.b64decode(p["list_html_b64"])).hexdigest())
+        result = plan([], as_of=NOW, raw_pairs=[
+            raw_pair_packet("tainex"), raw_pair_packet("famiticket")])
+        self.assertEqual(result["raw_pair_identity_parsed_unattested"], 2)
+        self.assertEqual(result["new_review"], 0)
+        self.assertEqual(result["independently_accepted_fields"], 0)
+        self.assertEqual(result["native_get"], 0)
+        self.assertEqual(result["review_rows"], [])
+        self.assertFalse(result["commit_permitted"])
+
+    def test_cross_source_wrong_link_and_detail_title_fail_closed(self):
+        p = raw_pair_packet("tainex")
+        other = REGISTRY["famiticket"]["module"].DETAIL
+        p["list_html_b64"] = base64.b64encode(
+            ('<a href="' + other + '">' + tainex.TITLE + '</a>').encode()
+        ).decode("ascii")
+        self.assertIn("RAW_LIST_EXACT_ID_TITLE_HOLD",
+                      plan([], as_of=NOW, raw_pairs=[p])["rejected"][0]["reason"])
+        p = raw_pair_packet("famiticket")
+        p["detail_html_b64"] = base64.b64encode(
+            b"<h1>Unrelated exhibition</h1>").decode("ascii")
+        self.assertIn("RAW_DETAIL_EXACT_TITLE_HOLD",
+                      plan([], as_of=NOW, raw_pairs=[p])["rejected"][0]["reason"])
+
+    def test_untrusted_bytes_clock_script_and_duplicate_edges_fail_closed(self):
+        p = raw_pair_packet("tainex")
+        p["native_http_attested"] = True  # Caller claims cannot grant authority.
+        p["published"] = True
+        self.assertFalse(inspect_raw_pair(p, NOW)["native_http_attested"])
+        self.assertFalse(inspect_raw_pair(p, NOW)["published"])
+        for change, expected in (
+            ({"observed_at": "2026-11-11T00:00:00Z"}, "RAW_CLOCK_FUTURE_HOLD"),
+            ({"list_html_b64": "not-base64!"}, "RAW_BODY_ENCODING_HOLD"),
+            ({"list_html_b64": base64.b64encode(b"\xff").decode()}, "RAW_BODY_ENCODING_HOLD"),
+            ({"list_url": "https://example.org/event"}, "RAW_URL_EXACT_HOLD"),
+        ):
+            damaged = dict(p, **change)
+            with self.assertRaisesRegex(ValueError, expected):
+                inspect_raw_pair(damaged, NOW)
+        title = tainex.TITLE
+        href = tainex.DETAIL
+        for markup in (
+            '<script><a href="' + href + '">' + title + '</a></script>',
+            '<a href="' + href + '">' + title + '</a>' * 2,
+        ):
+            damaged = dict(p, list_html_b64=base64.b64encode(
+                markup.encode("utf-8")).decode("ascii"))
+            with self.assertRaisesRegex(ValueError, "RAW_LIST_EXACT_ID_TITLE_HOLD"):
+                inspect_raw_pair(damaged, NOW)
+
+    def test_raw_pair_cannot_override_prior_review_lkg(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        result = plan([], previous=old, as_of=NOW,
+                      raw_pairs=[raw_pair_packet("tainex")])
+        self.assertEqual(result["raw_pair_identity_parsed_unattested"], 1)
+        self.assertEqual(result["retained_lkg"], 1)
+        self.assertEqual(result["new_review"], 0)
+        self.assertEqual(result["review_rows"], old)
+        self.assertEqual(result["independently_accepted_fields"], 0)
 
 
 if __name__ == "__main__":
