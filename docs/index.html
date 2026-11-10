@@ -100,6 +100,13 @@
     </div>
 </header>
 
+<!-- PUB-OD-02: formal feed remains the existing data.json; this panel is read-only.
+     No token, public dispatch, crawler GET or publication permission is present. -->
+<section id="pwa-freshness" aria-label="正式資料新鮮度與發布狀態" style="padding:10px 16px;background:#16202c;border-bottom:1px solid #36485b;font-size:.78rem;line-height:1.65;color:#d4e7ff">
+  <strong>正式資料新鮮度（只讀；不會觸發更新工作）</strong>
+  <div id="pwa-freshness-detail" role="status" aria-live="polite" style="white-space:pre-line">正在讀取正式資料及發布狀態；無可信 Gateway 前不會自動啟動 Publisher。</div>
+</section>
+
 <div class="filter-section">
     <!-- 來源分組僅影響首頁篩選呈現，不改變活動來源身分、正式資料或發布狀態。 -->
     <div class="filter-block" aria-labelledby="ticket-source-label">
@@ -972,5 +979,6 @@
 
     init();
 </script>
+<script src="pwa-freshness.js" defer></script>
 </body>
 </html>

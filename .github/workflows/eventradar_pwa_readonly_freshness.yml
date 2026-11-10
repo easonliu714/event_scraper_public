@@ -1,0 +1,73 @@
+name: EventRadar PWA read-only freshness isolated CI (NO DISPATCH/PUBLISH)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/index.html'
+      - 'docs/pwa-freshness.js'
+      - 'tests/p30/test_pwa_readonly_freshness.js'
+      - '.github/workflows/eventradar_pwa_readonly_freshness.yml'
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-pwa-freshness-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  readonly-ui:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-pwa-readonly-freshness'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact PR HEAD, frozen formal assets and five-file scope
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          base=4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_readonly_freshness.yml' 'docs/index.html' '.github/workflows/eventradar_pwa_source_groups.yml' 'docs/pwa-freshness.js' 'tests/p30/test_pwa_readonly_freshness.js' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UI_SCOPE_DRIFT; exit 1; }
+          echo PASS_EXACT_HEAD_FROZEN_FORMAL_DATA_STATUS_SCRAPER_FIVE_FILES
+      - name: Browser JS syntax, isolated read-only and existing UI regression
+        run: |
+          set -euo pipefail
+          node --check docs/pwa-freshness.js
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          html=Path('docs/index.html').read_text(encoding='utf-8')
+          scripts=re.findall(r'<script>(.*?)</script>', html, re.S)
+          assert len(scripts)==1, 'existing inline app script changed'
+          Path('/tmp/eventradar_main_inline.js').write_text(scripts[0], encoding='utf-8')
+          PY
+          node --check /tmp/eventradar_main_inline.js
+          node tests/p30/test_pwa_readonly_freshness.js
+          node tests/p30/test_candidate_review_ui_provenance.js
+          node tests/p30/test_pwa_source_groups.js
+          echo PASS_PUB_OD_02_ISOLATED_NO_GATEWAY_NO_SOURCE_GET_NO_PUBLISH
+      - name: Read-only evidence and SHA256
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/exact_head.txt
+          git rev-parse HEAD:docs/data.json > evidence/formal_data_blob.txt
+          git rev-parse HEAD:docs/platform_status.json > evidence/formal_status_blob.txt
+          printf '%s\n' 'mode=PUB_OD_02_READONLY_DRAFT' 'gateway=NOT_DEPLOYED' 'dispatch=NONE' 'schedule=NONE' 'formal_publish=NONE' 'android=NOT_TESTED' > evidence/decision.txt
+          sha256sum docs/index.html docs/pwa-freshness.js tests/p30/test_pwa_readonly_freshness.js evidence/*.txt > evidence/SHA256SUMS.txt
+          sha256sum -c evidence/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-pub-od-02-readonly-freshness
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
