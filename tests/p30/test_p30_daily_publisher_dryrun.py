@@ -142,6 +142,6 @@ class TestSafety(unittest.TestCase):
             else:
                 with self.assertRaisesRegex(ValueError,"EXACT_OFFICIAL"):
                     verified_shape(bad)
-        with self.assertRaisesRegex(ValueError,"FIELD_EVIDENCE"):
+        with self.assertRaisesRegex(ValueError,"REVIEW_ONLY_HOLD"):
             verified_shape(e)
 if __name__=="__main__": unittest.main()
