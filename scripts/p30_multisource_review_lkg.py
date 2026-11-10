@@ -315,6 +315,125 @@ def inspect_raw_pair(packet, as_of):
     }
 
 
+def _raw_archive_directory(repo_root, archive_id):
+    """Return an isolated unique archive path, never a formal or shared path."""
+    if not isinstance(archive_id, str) or not re.fullmatch(
+            r"[a-z0-9][a-z0-9_-]{0,63}", archive_id, flags=re.ASCII):
+        raise ValueError("RAW_ARCHIVE_ID_HOLD")
+    root = Path(repo_root).resolve(strict=True)
+    isolated = root / "_isolated_review"
+    if isolated.is_symlink():
+        raise ValueError("RAW_ARCHIVE_SYMLINK_HOLD")
+    isolated.mkdir(exist_ok=True)
+    base = isolated / "raw_pairs"
+    if base.is_symlink():
+        raise ValueError("RAW_ARCHIVE_SYMLINK_HOLD")
+    base.mkdir(exist_ok=True)
+    if not base.resolve().is_relative_to(root) or base.resolve() == root:
+        raise ValueError("RAW_ARCHIVE_ISOLATION_HOLD")
+    target = base / archive_id
+    if target.is_symlink():
+        raise ValueError("RAW_ARCHIVE_SYMLINK_HOLD")
+    return target
+
+
+def verify_raw_pair_archive(repo_root, archive_id, as_of):
+    """Independently read back exact retained bytes; HTTP origin remains UNATTESTED."""
+    target = _raw_archive_directory(repo_root, archive_id)
+    if not target.is_dir() or target.is_symlink():
+        raise ValueError("RAW_ARCHIVE_MISSING_HOLD")
+    names = {"list.html", "detail.html", "manifest.json"}
+    if {p.name for p in target.iterdir()} != names:
+        raise ValueError("RAW_ARCHIVE_MEMBER_SET_HOLD")
+    if any((target / name).is_symlink() for name in names):
+        raise ValueError("RAW_ARCHIVE_SYMLINK_HOLD")
+    try:
+        raw_manifest = (target / "manifest.json").read_bytes()
+        if len(raw_manifest) > 8192:
+            raise ValueError("RAW_ARCHIVE_MANIFEST_SIZE_HOLD")
+        manifest = json.loads(raw_manifest.decode("utf-8"))
+        if not isinstance(manifest, dict) or manifest.get("kind") != (
+                "EVENTRADAR_ISOLATED_RAW_PAIR_RETENTION_V1"):
+            raise ValueError("RAW_ARCHIVE_MANIFEST_HOLD")
+        if manifest.get("archive_id") != archive_id:
+            raise ValueError("RAW_ARCHIVE_ID_MISMATCH_HOLD")
+        if (manifest.get("native_http_attested") is not False
+                or manifest.get("source_authority") != "CALLER_SUPPLIED_UNATTESTED_BYTES"
+                or manifest.get("commit_permitted") is not False
+                or manifest.get("published") is not False
+                or manifest.get("accepted_fields") != 0):
+            raise ValueError("RAW_ARCHIVE_AUTHORITY_HOLD")
+        packet = {key: manifest[key] for key in
+                  ("source", "list_url", "detail_url", "observed_at")}
+        for role in ("list", "detail"):
+            raw = (target / (role + ".html")).read_bytes()
+            packet[role + "_html_b64"] = base64.b64encode(raw).decode("ascii")
+        inspected = inspect_raw_pair(packet, as_of)
+        if (manifest.get("record_id") != inspected["record_id"]
+                or manifest.get("raw_bodies") != inspected["raw_bodies"]):
+            raise ValueError("RAW_ARCHIVE_HASH_OR_ID_HOLD")
+    except (OSError, UnicodeError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("RAW_ARCHIVE_UNREADABLE_HOLD") from exc
+    return {
+        "archive_id": archive_id,
+        "record_id": inspected["record_id"],
+        "raw_bodies": inspected["raw_bodies"],
+        "manifest_sha256": hashlib.sha256(raw_manifest).hexdigest(),
+        "raw_html_retention_verified": True,
+        "native_http_attested": False,
+        "source_authority": "CALLER_SUPPLIED_UNATTESTED_BYTES",
+        "independently_accepted_fields": 0,
+        "lkg_promoted": False,
+        "commit_permitted": False,
+        "published": False,
+    }
+
+
+def archive_raw_pair(packet, *, repo_root, archive_id, as_of):
+    """Persist exact supplied LIST/DETAIL bytes in a new isolated directory.
+
+    This closes the missing *byte-retention mechanism*, not the independent
+    HTTP provenance/Claim Gate. A future authorized collector must attest
+    source response, rate budget and cross-host Claim separately. Never GET.
+    """
+    import os
+    inspected = inspect_raw_pair(packet, as_of)
+    target = _raw_archive_directory(repo_root, archive_id)
+    try:
+        target.mkdir(exist_ok=False)
+    except FileExistsError as exc:
+        raise ValueError("RAW_ARCHIVE_REPLAY_OR_COLLISION_HOLD") from exc
+    manifest = {
+        "kind": "EVENTRADAR_ISOLATED_RAW_PAIR_RETENTION_V1",
+        "archive_id": archive_id,
+        "source": packet["source"],
+        "list_url": inspected["list_url"],
+        "detail_url": inspected["detail_url"],
+        "observed_at": packet["observed_at"],
+        "record_id": inspected["record_id"],
+        "raw_bodies": inspected["raw_bodies"],
+        "source_authority": "CALLER_SUPPLIED_UNATTESTED_BYTES",
+        "native_http_attested": False,
+        "accepted_fields": 0,
+        "commit_permitted": False,
+        "published": False,
+    }
+    for role in ("list", "detail"):
+        raw = base64.b64decode(packet[role + "_html_b64"], validate=True)
+        # Exclusive creation and fsync prevent silently replacing evidence.
+        with (target / (role + ".html")).open("xb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+    encoded = (json.dumps(manifest, ensure_ascii=False, sort_keys=True,
+                          separators=(",", ":")) + "\n").encode("utf-8")
+    with (target / "manifest.json").open("xb") as stream:
+        stream.write(encoded)
+        stream.flush()
+        os.fsync(stream.fileno())
+    return verify_raw_pair_archive(repo_root, archive_id, as_of)
+
+
 def plan(packets, *, previous=None, as_of, archived_native=None, raw_pairs=None):
     """Pure multi-source REVIEW merge, with fail-closed non-destructive LKG."""
     if as_of.tzinfo is None or as_of.utcoffset() is None:
