@@ -9081,3 +9081,32 @@ Engineering Draft #243, head 2a7c8402b3e78ff0475853b99f003028dfc34430
 - Actual archived source evidence: TaiNEX 689/690 native audit receipts and TaiNEX 691/FamiTicket TECA historical source reader; first isolated plan has four REVIEW identities, resumed plan with zero new inputs retains all four identically. First plan new_review=4 from HISTORICAL REPLAY, second new_review=0 and retained_lkg=4. New native HTTP/LIST/DETAIL=0; independently accepted FIELD=0; new formal activities=0; publication=0.
 - Source main 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8 unchanged; docs/data.json blob 342eb7c101115b05dbc6ff90de7bd97d5bd63d59 remains one TPAC #2040; docs/platform_status.json blob 720cac528faacc9560a5ab41ce725bf8cc183166 unchanged. Pages HTTP this turn unverified; prior Owner Android PASS retained.
 - HARD_HOLD_NO_PUBLICATION and TPAC CLAIM_RETENTION_AUTHORITY_HOLD remain. No schedule, public dispatch, merge, formal JSON/status/Golden write. Next real product gate: lawful archived-body or newly authorized native non-TPAC LIST to same-ID DETAIL to FIELD with independent evidence, plus read-only PWA freshness/status in isolated Draft. No new Writer.
+
+## 2026-11-10 — PUB-OD-01 On-demand system architecture / Issue #248
+
+Owner selects **A as target** (PWA open/refresh -> freshness read -> guarded trusted-gateway trigger -> deterministic Publisher) and **B as transitional validation** (Owner-authorized GitHub Actions manual isolated Dry-run). Automatic 24h Publisher schedule and other Publisher schedulers are **NOT ENABLED** until future multi-platform quality and separate Owner release approval. Engineering hourly single Writer remains separate; no AI-based per-activity review is part of daily Publisher.
+
+```text
+Public PWA (existing GitHub Pages; user open / pull refresh)
+  -> immediate read-only docs/data.json + read-only refresh/status receipt
+  -> show last-success / last-attempt / in-progress / fresh / HOLD / failed
+  -> if fresh: display existing data without triggering GET or job
+  -> if stale: request only to trusted Gateway [NOT IMPLEMENTED]
+       server-authoritative clock & immutable last attempt/last success [HOLD]
+       abuse control / account authorization / global durable CAS Claim [HOLD]
+       cross-host race & replay suppression / source-specific robots limits [HOLD]
+       limited GitHub App / workflow dispatch credential, never in PWA [HOLD]
+       -> GitHub Actions deterministic Publisher [isolated Draft only]
+            fixed validated Adapter per source -> HTTP / LIST / DETAIL
+            -> stable source ID / FIELD evidence -> common Quality Gate
+            -> REVIEW/HOLD OR verified formal candidate -> LKG / diff / rollback
+            -> independently authorized formal commit CAS -> Pages / Android
+  -> separate formal data JSON vs independent platform engineering status
+Future optional schedule: OFF, separate Gate and Owner authority
+```
+
+- **Backend / Core isolated implementation:** In Engineering Draft [#246](https://github.com/easonliu714/event_scraper_public/pull/246), `scripts/p30_daily_publisher_dryrun.py` now has `assess_refresh_request(status, now, *, gateway_attested=False, claim_attested=False, release_authorized=False, ttl_seconds=86400, retry_cooldown_seconds=3600)`. This accepts **trusted server-side** inputs only, checks timezone-aware now and receipts, invalid/future timestamps, bounds, concurrent running, fresh TTL and retry cooldown. Returns `request_eligible` but sets `dispatch_performed`, `publisher_executed`, `formal_write_performed`, `source_get_performed`, `schedule_enabled`, `source_rate_limits_checked` all to FALSE. No API endpoint or public dispatch has been deployed.
+- **Positive and negative verification:** `tests/p30/test_p30_daily_publisher_dryrun.py` adds `TestOnDemandRefreshPreflight` six test methods including eligible request, missing gateway/Claim/release authority, freshness, in-progress, cooldown, forged/non-aware/future timestamps, and invalid policy. Exact-head `ebf09feb9c9b7fae018372f0c01ebc6a3c4c4e40`; [CI #42788026982](https://github.com/easonliu714/event_scraper_public/actions/runs/42788026982) SUCCESS, Job #129734067615 log 25/25 PASS, Artifact #13750270810 GitHub SHA256 `f5bb488489bf103f66b4387d1cc15f0c6fcb68cfffd2f4ae3c9dfc277e5190f0` (not independently ZIP-byte audited). Existing Publisher workflow remains `pull_request` only, read-only, exact-head, no `schedule`, no `workflow_dispatch`, no contents write.
+- **UI / API / storage / release status:** Formal PWA read-only refresh eligibility UI and status receipt schema **TODO/UNVERIFIED**; trusted Gateway **NOT IMPLEMENTED** (GitHub Pages static, must not embed repo token); cross-host Claim **HOLD**; REST dispatch **NOT ENABLED**; Publisher exact source/freshness/quality attestation and formal Blob CAS write **HOLD**; data.json 1 TPAC event unchanged. Existing `docs/platform_status.json` is independent engineering diagnostics and must not silently publish activities. Pages and Android live readback **UNVERIFIED** this turn; retain historically attested UI PASS.
+- **Multi-source boundary:** Reuse ongoing [Draft #247](https://github.com/easonliu714/event_scraper_public/pull/247) TaiNEX/FamiTicket historical REVIEW/LKG and approved source adapters rather than duplicating. CLAIM_RETENTION_AUTHORITY_HOLD on new TPAC official GET remains, with TPAC 6h official site budget separate from generic Publisher 24h freshness. Unknown/uncertain fields remain HOLD, and partial reliable fields may be accepted only with independent formal release authority. No daily AI model calls are required by the target runtime.
+- **Governance cross-reference:** [Issue #248](https://github.com/easonliu714/event_scraper_public/issues/248) tracks PUB-OD-01~06. Only existing two canonical governance files in Governance Draft #8 are authoritative; no third baseline, no merge/main/Golden/formal JSON or publishing HOLD change.
