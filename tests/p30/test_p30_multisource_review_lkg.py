@@ -700,6 +700,25 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
                     transport=forbidden_get)
         self.assertEqual(calls, [])
 
+    def test_future_owner_release_cannot_inject_http_or_skip_robots_delay(self):
+        # Even a future separately approved release must not accept a fake
+        # transport or no-op sleep from a caller; no official GET occurs here.
+        from unittest.mock import patch
+        from scripts import p30_multisource_review_lkg as source
+        with tempfile.TemporaryDirectory() as directory:
+            for kwargs in (
+                    {"transport": lambda url: (_ for _ in ()).throw(
+                        AssertionError("INJECTED_GET_MUST_NOT_RUN"))},
+                    {"pause": lambda seconds: None}):
+                with self.subTest(injection=tuple(kwargs)):
+                    with patch.object(source, "TAINEX_OWNER_LIVE_GET_RELEASED", True):
+                        with self.assertRaisesRegex(
+                                ValueError, "TAINEX_LIVE_IO_INJECTION_HOLD"):
+                            source.tainex_native_capture_once(
+                                claim={}, repo_root=directory,
+                                archive_id="not-created", **kwargs)
+            self.assertFalse((Path(directory) / "_isolated_review").exists())
+
     def test_robots_and_http_receipt_fail_closed_before_detail(self):
         from scripts.p30_multisource_review_lkg import (
             _tainex_robots_delay, _tainex_verified_response)
