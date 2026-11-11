@@ -1083,6 +1083,11 @@ def tainex_native_capture_once(*, claim, repo_root, archive_id,
     """
     if not TAINEX_OWNER_LIVE_GET_RELEASED:
         raise ValueError("TAINEX_OWNER_NATIVE_GET_NOT_RELEASED_HOLD")
+    # Live acquisition must use the bounded official HTTP transport and real
+    # sleep. Caller-supplied I/O can forge native receipts or bypass robots
+    # crawl-delay even after a future separate Owner release.
+    if transport is not None or pause is not None:
+        raise ValueError("TAINEX_LIVE_IO_INJECTION_HOLD")
     if (not isinstance(claim, dict) or claim.get("source") != "tainex"
             or claim.get("native_get_allowed") is not True
             or claim.get("independent_cross_host_verified") is not True
