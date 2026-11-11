@@ -9317,3 +9317,19 @@ Authenticated controlled host
 - Draft Source #247 `82248e7cc238732b86983e3e3c721cccd07d9220` updates `_claim_ruleset_verified()` and `test_real_ruleset_scope_exclusion_and_actor_bypass_hold()`. Exact-head CI #43025197788 SUCCESS; Artifact #13856592631 independent ZIP SHA256/CRC/SHA256SUMS PASS. Ruleset #27026973 independently read back with exact conditions and `current_user_can_bypass=never`. The patch closes a concrete scope-exclusion/bypass false-positive; it is not immutable WORM proof, live HTTP authorization or accepted Source.
 - TaiNEX official /event and /event/691 title/period are visible in 2026-11-11 public search index; no original HTML/HTTP collector/robots receipt in this run. Keep exhibition period distinct from showtime and organizer site distinct from ticket Event ID. New native GET=0, accepted FIELD=0, SOURCE_READY=0; historical REVIEW/LKG preserved.
 - No changes to main, formal data/status, Golden, PWA #249, Publisher #246, schedule or publication. TPAC cross-host Claim remains HOLD.
+
+
+---
+## 2026-11-11 22:02 Asia/Taipei — TaiNEX bounded source HTTP collector (Draft #247, NO LIVE GET)
+
+Source-specific flow in scripts/p30_multisource_review_lkg.py, HEAD 7cb6194b8657ec3590090c220e6a442cfed18f27:
+
+1. TAINEX_OWNER_LIVE_GET_RELEASED=False: pre-network hard HOLD; current reserve_protected_claim() returns native_get_allowed=false; no official GET or Claim consumption.
+2. After separate Owner release and real provider/budget acceptance ONLY: require source=tainex, independent_cross_host_verified, source_policy_verified, source_request_budget=3, cleanup_allowed=false.
+3. _tainex_bounded_http_get() permits exactly https://www.tainex.com.tw/robots.txt, /event, /event/691. No redirects, cookies, login, retries or arbitrary URL discovery; 12-second timeout; robots 64KiB and HTML 1MiB caps.
+4. _tainex_verified_response(): exact URL/status 200/content type/UTC timestamp/body SHA256. Any 403/429/redirect/malformed content is terminal HOLD.
+5. _tainex_robots_delay(): require valid robots directives, LIST+DETAIL can_fetch for dedicated agent; enforce at least 10-second spacing or longer crawl-delay. Unknown/blocked robots is HOLD.
+6. _RawPairHTML exact LIST edge for /event/691, then DETAIL, inspect_raw_pair() same ID/title; archive_raw_pair() exclusive isolated raw-byte retention + verify_raw_pair_archive() readback. Source output stays REVIEW_NATIVE_HTTP_UNPROMOTED, accepted_fields=0, lkg_promoted=false, source_ready=false, published=false.
+7. No Publisher staging unless a future independently accepted new SOURCE_READY; formal data/status, PWA/Android, Gateway and schedule unchanged.
+
+Exact-head CI #43034484981 SUCCESS (35 Source/Core + 3 historical bridge tests), Artifact #13861438668 digest 32a48ef049ac5e7110f4de9df5d26084df4582ae3a850044ff06bd42d26df18b, ZIP CRC/SHA256SUMS PASS. Tests are policy/transport contracts, NOT actual robots or source bytes. Current status: native HTTP=0, accepted FIELD=0, new REVIEW/LKG=0, SOURCE_READY=0, Claim PARTIAL/HOLD, SOURCE_PROGRESS=FAIL/BLOCKED, HARD_HOLD_NO_PUBLICATION.
