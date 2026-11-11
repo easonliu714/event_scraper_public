@@ -829,5 +829,73 @@ def reserve_protected_claim(source, anchor_sha, api):
     }
 
 
+
+class GitHubClaimREST:
+    """Controlled-host-only authenticated GitHub REST transport.
+
+    Does not fetch source websites. No retries, token logging, or environment
+    auto-discovery. Caller must supply the secret out-of-band. All requests
+    are constrained to this repo; HTTP Date must be fresh and timezone-aware.
+    """
+
+    def __init__(self, token):
+        if not isinstance(token, str) or len(token) < 16 or any(
+                ch.isspace() for ch in token):
+            raise ValueError("CLAIM_TOKEN_NOT_PROVIDED_HOLD")
+        self._token = token
+
+    def __call__(self, method, path, payload):
+        from email.utils import parsedate_to_datetime
+        from urllib.error import HTTPError
+        from urllib.request import Request, urlopen
+        if method not in ("GET", "POST") or not isinstance(path, str):
+            raise ValueError("CLAIM_REST_METHOD_HOLD")
+        prefix = "/repos/" + CLAIM_REPO + "/"
+        if (not path.startswith(prefix) or "?" in path or "#" in path or
+                ".." in path or "//" in path):
+            raise ValueError("CLAIM_REST_PATH_HOLD")
+        if method == "GET" and payload is not None:
+            raise ValueError("CLAIM_REST_GET_BODY_HOLD")
+        if method == "POST" and (not path.endswith("/git/refs") or
+                                 not isinstance(payload, dict)):
+            raise ValueError("CLAIM_REST_POST_SCOPE_HOLD")
+        body = (json.dumps(payload, separators=(",", ":")).encode("utf-8")
+                if payload is not None else None)
+        req = Request(
+            "https://api.github.com" + path, data=body, method=method,
+            headers={"Accept": "application/vnd.github+json",
+                     "X-GitHub-Api-Version": "2022-11-28",
+                     "Authorization": "Bearer " + self._token,
+                     "Cache-Control": "no-cache",
+                     "User-Agent": "EventRadarSourceClaim/1.0",
+                     **({"Content-Type": "application/json"}
+                        if body is not None else {})})
+        try:
+            response = urlopen(req, timeout=12)
+        except HTTPError as exc:
+            response = exc
+        with response:
+            status = response.status
+            stamp = response.headers.get("Date")
+            if not stamp:
+                raise ValueError("CLAIM_GITHUB_SERVER_DATE_MISSING_HOLD")
+            try:
+                at = parsedate_to_datetime(stamp).astimezone(timezone.utc)
+            except (ValueError, TypeError, OverflowError) as exc:
+                raise ValueError("CLAIM_GITHUB_SERVER_DATE_INVALID_HOLD") from exc
+            if abs((datetime.now(timezone.utc) - at).total_seconds()) > 120:
+                raise ValueError("CLAIM_GITHUB_SERVER_CLOCK_STALE_HOLD")
+            raw = response.read(524289)
+            if len(raw) > 524288:
+                raise ValueError("CLAIM_REST_RESPONSE_TOO_LARGE_HOLD")
+        try:
+            obj = json.loads(raw) if raw else None
+        except (ValueError, UnicodeError) as exc:
+            raise ValueError("CLAIM_REST_INVALID_JSON_HOLD") from exc
+        # Any HTTP error is terminal. A 422 create-ref collision is returned
+        # to the caller and then fails closed without retrying or deleting.
+        return status, obj, at
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
