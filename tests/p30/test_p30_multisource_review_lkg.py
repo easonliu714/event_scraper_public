@@ -725,5 +725,50 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
                         TAINEX_ROBOTS, "ROBOTS")
 
 
+    def test_partial_http_429_keeps_exact_list_receipt_without_detail(self):
+        # A real 429 must remain inspectable after a failed attempt; this
+        # exercises the durable local journal only, never an official GET.
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, _tainex_journal_get,
+            REGISTRY)
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "partial-429")
+            url = REGISTRY["tainex"]["module"].LIST
+            calls = []
+            def denied_get(requested):
+                calls.append(requested)
+                return {"status": 429, "url": requested,
+                        "content_type": "text/html", "body": b"rate limited",
+                        "observed_at": datetime.now(timezone.utc).isoformat()}
+            with self.assertRaisesRegex(ValueError, "TAINEX_LIST_HTTP_STATUS_HOLD"):
+                _tainex_journal_get(attempt, "LIST", url, denied_get)
+            self.assertEqual(calls, [url])
+            self.assertTrue((attempt / "list.intent.json").exists())
+            raw = (attempt / "list.body").read_bytes()
+            self.assertEqual(raw, b"rate limited")
+            receipt = json.loads((attempt / "list.receipt.json").read_text("utf-8"))
+            self.assertEqual(receipt["http_status"], 429)
+            self.assertFalse(receipt["native_source_accepted"])
+            self.assertEqual(receipt["body_sha256"], hashlib.sha256(raw).hexdigest())
+            self.assertFalse((attempt / "detail.intent.json").exists())
+            with self.assertRaisesRegex(ValueError, "TAINEX_ATTEMPT_REPLAY_HOLD"):
+                _tainex_attempt_directory(directory, "partial-429")
+
+    def test_transport_crash_retains_pre_get_intent_without_forged_receipt(self):
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, _tainex_journal_get, TAINEX_ROBOTS)
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "crash-before-response")
+            def crashed(_):
+                raise OSError("simulated transport loss")
+            with self.assertRaises(OSError):
+                _tainex_journal_get(attempt, "ROBOTS", TAINEX_ROBOTS, crashed)
+            intent = json.loads((attempt / "robots.intent.json").read_text("utf-8"))
+            self.assertEqual(intent["url"], TAINEX_ROBOTS)
+            self.assertFalse(intent["native_source_accepted"])
+            self.assertFalse((attempt / "robots.body").exists())
+            self.assertFalse((attempt / "robots.receipt.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
