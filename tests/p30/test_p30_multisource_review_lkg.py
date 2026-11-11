@@ -675,5 +675,55 @@ class ProtectedClaimRefProvider(unittest.TestCase):
         self.assertEqual(api.posts, 0)
 
 
+
+class TaiNEXNativeP0Collector(unittest.TestCase):
+    """Source-specific transport safety, NOT official capture or SOURCE_READY."""
+
+    def test_owner_hold_prevents_all_official_requests_and_claim_consumption(self):
+        from scripts.p30_multisource_review_lkg import tainex_native_capture_once
+        calls = []
+        def forbidden_get(url):
+            calls.append(url)
+            raise AssertionError("OFFICIAL_GET_MUST_NOT_OCCUR")
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                    ValueError, "TAINEX_OWNER_NATIVE_GET_NOT_RELEASED_HOLD"):
+                tainex_native_capture_once(
+                    claim={"source": "tainex", "native_get_allowed": True,
+                           "independent_cross_host_verified": True,
+                           "source_policy_verified": True,
+                           "source_request_budget": 3,
+                           "cleanup_allowed": False},
+                    repo_root=directory, archive_id="tainex-test",
+                    transport=forbidden_get)
+        self.assertEqual(calls, [])
+
+    def test_robots_and_http_receipt_fail_closed_before_detail(self):
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_robots_delay, _tainex_verified_response)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\nDisallow:\nCrawl-delay: 12\n"), 12)
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DISALLOW_HOLD"):
+            _tainex_robots_delay(
+                b"User-agent: *\nDisallow: /event\n")
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DIRECTIVES_MISSING_HOLD"):
+            _tainex_robots_delay(b"unverified")
+        from scripts.p30_multisource_review_lkg import TAINEX_ROBOTS
+        stamp = datetime.now(timezone.utc).isoformat()
+        for status, url, expected in (
+            (403, TAINEX_ROBOTS, "HTTP_STATUS"),
+            (429, TAINEX_ROBOTS, "HTTP_STATUS"),
+            (200, "https://other.invalid/robots.txt", "REDIRECT_OR_URL"),
+        ):
+            with self.subTest(status=status, url=url):
+                with self.assertRaisesRegex(ValueError, expected):
+                    _tainex_verified_response(
+                        {"status": status, "url": url,
+                         "content_type": "text/plain",
+                         "body": b"User-agent: *\nDisallow:\n",
+                         "observed_at": stamp},
+                        TAINEX_ROBOTS, "ROBOTS")
+
+
 if __name__ == "__main__":
     unittest.main()
