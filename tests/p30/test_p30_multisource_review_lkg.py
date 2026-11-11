@@ -379,6 +379,45 @@ class RawPairIdentityAdapter(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "RAW_LIST_EXACT_ID_TITLE_HOLD"):
                 inspect_raw_pair(damaged, NOW)
 
+    def test_hidden_dom_cannot_forge_official_list_detail_identity(self):
+        # Synthetic safety regression only; NOT native official evidence.
+        for source in ("tainex", "famiticket"):
+            packet = raw_pair_packet(source)
+            module = REGISTRY[source]["module"]
+            href, title = module.DETAIL, module.TITLE
+            visible_link = '<a href="' + href + '">' + title + '</a>'
+            visible_heading = '<h1>' + title + '</h1>'
+            hidden_links = (
+                '<a hidden href="' + href + '">' + title + '</a>',
+                '<div aria-hidden="true">' + visible_link + '</div>',
+                '<section style="display:none!important">' + visible_link + '</section>',
+                '<div class="d-none">' + visible_link + '</div>',
+                '<template>' + visible_link + '</template>',
+                '<div inert><img src="unused.png">' + visible_link + '</div>',
+            )
+            hidden_headings = (
+                '<h1 hidden>' + title + '</h1>',
+                '<div aria-hidden="true">' + visible_heading + '</div>',
+                '<div style="visibility:hidden">' + visible_heading + '</div>',
+                '<template>' + visible_heading + '</template>',
+            )
+            for hidden in hidden_links:
+                bad = dict(packet, list_html_b64=base64.b64encode(
+                    hidden.encode("utf-8")).decode("ascii"))
+                with self.assertRaisesRegex(ValueError, "RAW_LIST_EXACT_ID_TITLE_HOLD"):
+                    inspect_raw_pair(bad, NOW)
+                clean = dict(packet, list_html_b64=base64.b64encode(
+                    (hidden + visible_link).encode("utf-8")).decode("ascii"))
+                self.assertEqual(inspect_raw_pair(clean, NOW)["accepted_fields"], 0)
+            for hidden in hidden_headings:
+                bad = dict(packet, detail_html_b64=base64.b64encode(
+                    hidden.encode("utf-8")).decode("ascii"))
+                with self.assertRaisesRegex(ValueError, "RAW_DETAIL_EXACT_TITLE_HOLD"):
+                    inspect_raw_pair(bad, NOW)
+                clean = dict(packet, detail_html_b64=base64.b64encode(
+                    (hidden + visible_heading).encode("utf-8")).decode("ascii"))
+                self.assertFalse(inspect_raw_pair(clean, NOW)["native_http_attested"])
+
     def test_raw_pair_cannot_override_prior_review_lkg(self):
         old = plan([tainex_packet()], as_of=NOW)["review_rows"]
         result = plan([], previous=old, as_of=NOW,

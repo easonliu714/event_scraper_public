@@ -179,18 +179,46 @@ def validate_prior_binding(row, as_of):
 
 
 class _RawPairHTML(HTMLParser):
-    """Extract only visible exact links/headings; no script or network execution."""
+    """Parse visible source LIST links and DETAIL headings only.
+
+    Hidden DOM cannot attest identity. Supplied bytes remain UNATTESTED,
+    with no native HTTP, field acceptance, LKG or publication authority.
+    """
+    _VOID = frozenset(("area", "base", "br", "col", "embed", "hr",
+                       "img", "input", "link", "meta", "param", "source",
+                       "track", "wbr"))
+    _NON_RENDERED = frozenset(("script", "style", "noscript", "template"))
+    _HIDDEN_CLASSES = frozenset(("hidden", "sr-only", "visually-hidden",
+                                 "d-none", "display-none", "invisible",
+                                 "is-hidden", "ng-hide"))
 
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.links, self.headings, self.stack = [], [], []
-        self.skip = 0
+        self.blocked_stack = []
+
+    @classmethod
+    def _not_visible(cls, tag, attrs):
+        attributes = dict(attrs)
+        style = attributes.get("style") or ""
+        classes = set((attributes.get("class") or "").lower().split())
+        return (
+            tag in cls._NON_RENDERED
+            or "hidden" in attributes or "inert" in attributes
+            or (attributes.get("aria-hidden") or "").strip().lower() == "true"
+            or bool(classes & cls._HIDDEN_CLASSES)
+            or bool(re.search(
+                r"(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden|"
+                r"content-visibility\s*:\s*hidden)\b",
+                style, flags=re.IGNORECASE,
+            ))
+        )
 
     def handle_starttag(self, tag, attrs):
-        if tag in ("script", "style", "noscript"):
-            self.skip += 1
-            return
-        if self.skip:
+        if self.blocked_stack or self._not_visible(tag, attrs):
+            # Void elements must not swallow later visible source edges.
+            if tag not in self._VOID:
+                self.blocked_stack.append(tag)
             return
         if tag == "a":
             self.stack.append((tag, dict(attrs).get("href"), []))
@@ -198,15 +226,16 @@ class _RawPairHTML(HTMLParser):
             self.stack.append((tag, None, []))
 
     def handle_data(self, data):
-        if not self.skip:
+        if not self.blocked_stack:
             for item in self.stack:
                 item[2].append(data)
 
     def handle_endtag(self, tag):
-        if tag in ("script", "style", "noscript"):
-            self.skip = max(0, self.skip - 1)
-            return
-        if self.skip:
+        if self.blocked_stack:
+            if tag in self.blocked_stack:
+                while self.blocked_stack:
+                    if self.blocked_stack.pop() == tag:
+                        break
             return
         for i in range(len(self.stack) - 1, -1, -1):
             if self.stack[i][0] == tag:
