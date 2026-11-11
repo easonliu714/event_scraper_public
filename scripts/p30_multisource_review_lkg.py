@@ -994,6 +994,84 @@ def _tainex_robots_delay(raw):
     return max(10, delay or 0)
 
 
+def _tainex_attempt_directory(repo_root, archive_id):
+    """Reserve an exclusive local journal before any official HTTP request.
+
+    A crash or failed DETAIL must not erase the LIST request intent/response.
+    Existing attempt IDs are never resumed or overwritten; the Claim stays
+    consumed. This is isolated evidence, not a native-source acceptance Gate.
+    """
+    import os
+    if not isinstance(archive_id, str) or not re.fullmatch(
+            r"[a-z0-9][a-z0-9_-]{0,63}", archive_id, flags=re.ASCII):
+        raise ValueError("TAINEX_ATTEMPT_ID_HOLD")
+    root = Path(repo_root).resolve(strict=True)
+    isolated = root / "_isolated_review"
+    if isolated.is_symlink():
+        raise ValueError("TAINEX_ATTEMPT_SYMLINK_HOLD")
+    isolated.mkdir(exist_ok=True)
+    base = isolated / "tainex_http_attempts"
+    if base.is_symlink():
+        raise ValueError("TAINEX_ATTEMPT_SYMLINK_HOLD")
+    base.mkdir(exist_ok=True)
+    if not base.resolve().is_relative_to(root):
+        raise ValueError("TAINEX_ATTEMPT_ISOLATION_HOLD")
+    target = base / archive_id
+    if target.is_symlink():
+        raise ValueError("TAINEX_ATTEMPT_SYMLINK_HOLD")
+    try:
+        target.mkdir(exist_ok=False)
+    except FileExistsError as exc:
+        raise ValueError("TAINEX_ATTEMPT_REPLAY_HOLD") from exc
+    return target
+
+
+def _tainex_journal_get(target, role, url, transport):
+    """Fsync pre-GET intent, then persist response bytes before validation.
+
+    Non-200/403/429 responses are retained as failures, never accepted.
+    A transport crash leaves the durable intent without an invented response.
+    """
+    import os
+    if role not in ("ROBOTS", "LIST", "DETAIL"):
+        raise ValueError("TAINEX_ATTEMPT_ROLE_HOLD")
+    stem = role.lower()
+    intent = {"kind": "TAINEX_HTTP_INTENT_V1", "role": role, "url": url,
+              "created_at": datetime.now(timezone.utc).isoformat(),
+              "native_source_accepted": False, "published": False}
+    with (target / (stem + ".intent.json")).open("xb") as stream:
+        stream.write((json.dumps(intent, sort_keys=True) + "\n").encode("utf-8"))
+        stream.flush()
+        os.fsync(stream.fileno())
+    reply = transport(url)
+    if not isinstance(reply, dict) or not isinstance(reply.get("body"), bytes):
+        raise ValueError("TAINEX_ATTEMPT_RESPONSE_HOLD")
+    raw = reply["body"]
+    cap = 65536 if role == "ROBOTS" else TAINEX_MAX_HTTP_BYTES
+    if len(raw) > cap + 1:
+        raise ValueError("TAINEX_ATTEMPT_RESPONSE_CAP_HOLD")
+    with (target / (stem + ".body")).open("xb") as stream:
+        stream.write(raw)
+        stream.flush()
+        os.fsync(stream.fileno())
+    receipt = {
+        "kind": "TAINEX_HTTP_UNVERIFIED_RECEIPT_V1", "role": role,
+        "url": reply.get("url"), "http_status": reply.get("status"),
+        "content_type": reply.get("content_type"),
+        "observed_at": reply.get("observed_at"),
+        "body_bytes": len(raw), "body_sha256": hashlib.sha256(raw).hexdigest(),
+        "native_source_accepted": False, "published": False,
+    }
+    with (target / (stem + ".receipt.json")).open("xb") as stream:
+        stream.write((json.dumps(receipt, sort_keys=True) + "\n").encode("utf-8"))
+        stream.flush()
+        os.fsync(stream.fileno())
+    if hashlib.sha256((target / (stem + ".body")).read_bytes()).hexdigest() != (
+            receipt["body_sha256"]):
+        raise ValueError("TAINEX_ATTEMPT_READBACK_HOLD")
+    return reply, _tainex_verified_response(reply, url, role)
+
+
 def tainex_native_capture_once(*, claim, repo_root, archive_id,
                                transport=None, pause=None):
     """Future controlled-host-only collector: robots 1, LIST 1, same-ID DETAIL 1.
@@ -1015,15 +1093,20 @@ def tainex_native_capture_once(*, claim, repo_root, archive_id,
     import time
     transport = transport or _tainex_bounded_http_get
     pause = pause or time.sleep
+    # Exclusive attempt reservation and fsynced intent precede all GETs.
+    # A failed LIST/DETAIL leaves durable raw receipts and consumes the Claim.
+    attempt = _tainex_attempt_directory(repo_root, archive_id)
     receipts = []
-    robots = transport(TAINEX_ROBOTS)
-    receipts.append(_tainex_verified_response(robots, TAINEX_ROBOTS, "ROBOTS"))
+    robots, verified = _tainex_journal_get(
+        attempt, "ROBOTS", TAINEX_ROBOTS, transport)
+    receipts.append(verified)
     delay = _tainex_robots_delay(robots["body"])
     listing_url = REGISTRY["tainex"]["module"].LIST
     detail_url = REGISTRY["tainex"]["module"].DETAIL
     pause(delay)
-    listing = transport(listing_url)
-    receipts.append(_tainex_verified_response(listing, listing_url, "LIST"))
+    listing, verified = _tainex_journal_get(
+        attempt, "LIST", listing_url, transport)
+    receipts.append(verified)
     try:
         p = _RawPairHTML()
         p.feed(listing["body"].decode("utf-8", errors="strict"))
@@ -1036,8 +1119,9 @@ def tainex_native_capture_once(*, claim, repo_root, archive_id,
     if len(matches) != 1:
         raise ValueError("TAINEX_LIST_SAME_ID_EDGE_HOLD")
     pause(delay)
-    detail = transport(detail_url)
-    receipts.append(_tainex_verified_response(detail, detail_url, "DETAIL"))
+    detail, verified = _tainex_journal_get(
+        attempt, "DETAIL", detail_url, transport)
+    receipts.append(verified)
     packet = {
         "source": "tainex", "list_url": listing_url, "detail_url": detail_url,
         "observed_at": receipts[-1]["observed_at"],
@@ -1055,7 +1139,8 @@ def tainex_native_capture_once(*, claim, repo_root, archive_id,
         "decision": "REVIEW_NATIVE_HTTP_UNPROMOTED",
         "source": "tainex", "source_event_id": reviewed["source_event_id"],
         "record_id": reviewed["record_id"], "http_receipts": receipts,
-        "archive": archived, "native_get_count": 3,
+        "archive": archived, "attempt_journal": str(attempt),
+        "native_get_count": 3,
         "accepted_fields": 0, "source_ready": False,
         "lkg_promoted": False, "published": False,
         "commit_permitted": False,
