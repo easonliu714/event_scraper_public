@@ -717,5 +717,117 @@ def main():
                  result["archived_native_receipt_qualified"]) else 49
 
 
+
+# Source-claim blocker resolution: GitHub protected-ref reservation, not GET authority.
+# A six-hour sliding exclusion cannot be enforced by ONE six-hour bucket ref:
+# attempts on opposite sides of a bucket boundary would both succeed.
+# Reserve current AND next buckets. Any two starts <6h apart overlap at
+# least one ref; create-ref uniqueness makes at most one pair complete.
+# A crash/partial reservation is NEVER cleaned up: availability loses to safety.
+# This is a staging provider; live HTTP remains HOLD until independent ruleset
+# rejection and cross-host tests are witnessed on real GitHub.
+CLAIM_SLOT_SECONDS = 6 * 3600
+CLAIM_REPO = "easonliu714/event_scraper_public"
+CLAIM_SOURCES = frozenset(("tainex", "famiticket", "tmc", "opentix", "ticc", "tpac"))
+CLAIM_RULESET_INCLUDE = "refs/heads/source-claims/*"
+CLAIM_REQUIRED_RULES = frozenset(("update", "deletion", "non_fast_forward"))
+
+
+def claim_ref_plan(source, github_server_at):
+    """Two intersecting immutable reservations; not a permit for official GET."""
+    if source not in CLAIM_SOURCES:
+        raise ValueError("CLAIM_UNREGISTERED_SOURCE_HOLD")
+    at = github_server_at
+    if (type(at) is not datetime or at.tzinfo is None or
+            at.utcoffset() is None):
+        raise ValueError("CLAIM_SERVER_CLOCK_HOLD")
+    bucket = int(at.astimezone(timezone.utc).timestamp()) // CLAIM_SLOT_SECONDS
+    if bucket < 0:
+        raise ValueError("CLAIM_SERVER_CLOCK_HOLD")
+    return tuple("refs/heads/source-claims/" + source + "-b" +
+                 str(i).zfill(10) for i in (bucket, bucket + 1))
+
+
+def _claim_ruleset_verified(api):
+    """Inspect actual active branch ruleset; absence or ambiguity is HOLD."""
+    status, rows, _ = api("GET", "/repos/" + CLAIM_REPO + "/rulesets", None)
+    if status != 200 or not isinstance(rows, list):
+        raise ValueError("CLAIM_RULESET_LIST_HOLD")
+    qualified = 0
+    for row in rows:
+        if not isinstance(row, dict) or type(row.get("id")) is not int:
+            continue
+        status, rule, _ = api(
+            "GET", "/repos/" + CLAIM_REPO + "/rulesets/" + str(row["id"]), None)
+        if status != 200 or not isinstance(rule, dict):
+            raise ValueError("CLAIM_RULESET_DETAIL_HOLD")
+        if rule.get("enforcement") != "active" or rule.get("target") != "branch":
+            continue
+        cond = rule.get("conditions")
+        names = cond.get("ref_name") if isinstance(cond, dict) else None
+        if not isinstance(names, dict):
+            continue
+        if CLAIM_RULESET_INCLUDE not in names.get("include", []):
+            continue
+        if rule.get("bypass_actors") not in ([], None):
+            raise ValueError("CLAIM_RULESET_BYPASS_HOLD")
+        types = {r.get("type") for r in rule.get("rules", [])
+                 if isinstance(r, dict)}
+        if not CLAIM_REQUIRED_RULES.issubset(types) or "creation" in types:
+            raise ValueError("CLAIM_RULESET_RULES_HOLD")
+        qualified += 1
+    if qualified != 1:
+        raise ValueError("CLAIM_RULESET_NOT_EXACTLY_ONE_ACTIVE_HOLD")
+
+
+def reserve_protected_claim(source, anchor_sha, api):
+    """Reserve two protected refs, with no retries/deletion and NO live GET permit.
+
+    api(method, repository-relative path, JSON payload) must use authenticated
+    GitHub REST and return (HTTP status, parsed JSON, GitHub HTTP Date as aware
+    datetime). Only a controlled engineering host may supply it. This module
+    does NOT provide a network transport, GitHub credential or public dispatch.
+    """
+    if (not isinstance(anchor_sha, str) or
+            re.fullmatch(r"[0-9a-f]{40}", anchor_sha, re.ASCII) is None):
+        raise ValueError("CLAIM_ANCHOR_SHA_HOLD")
+    _claim_ruleset_verified(api)
+    status, head, server_at = api(
+        "GET", "/repos/" + CLAIM_REPO + "/git/ref/heads/main", None)
+    if (status != 200 or not isinstance(head, dict) or
+            not isinstance(head.get("object"), dict) or
+            head["object"].get("sha") != anchor_sha):
+        raise ValueError("CLAIM_ANCHOR_MAIN_DRIFT_HOLD")
+    refs = claim_ref_plan(source, server_at)
+    for ref in refs:
+        status, created, at = api(
+            "POST", "/repos/" + CLAIM_REPO + "/git/refs",
+            {"ref": ref, "sha": anchor_sha})
+        if status != 201 or not isinstance(created, dict) or created.get("ref") != ref:
+            raise ValueError("CLAIM_CREATE_REF_COLLISION_OR_DENIED_HOLD")
+        if claim_ref_plan(source, at) != refs:
+            raise ValueError("CLAIM_SERVER_CLOCK_CROSSED_BUCKET_HOLD")
+    for ref in refs:
+        status, got, at = api(
+            "GET", "/repos/" + CLAIM_REPO + "/git/ref/" +
+            ref.removeprefix("refs/"), None)
+        if (status != 200 or not isinstance(got, dict) or
+                got.get("ref") != ref or
+                not isinstance(got.get("object"), dict) or
+                got["object"].get("sha") != anchor_sha or
+                claim_ref_plan(source, at) != refs):
+            raise ValueError("CLAIM_REF_READBACK_OR_CLOCK_HOLD")
+    _claim_ruleset_verified(api)
+    return {
+        "source": source, "refs": list(refs), "anchor_sha": anchor_sha,
+        "reserved_ref_count": 2,
+        "decision": "HOLD_REAL_RULESET_NEGATIVE_AND_TWO_HOST_VERIFICATION",
+        "claim_provider_candidate": True,
+        "independent_cross_host_verified": False,
+        "native_get_allowed": False, "source_ready": False,
+        "published": False, "cleanup_allowed": False,
+    }
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
