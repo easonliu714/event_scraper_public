@@ -538,5 +538,107 @@ class IsolatedRawByteRetention(unittest.TestCase):
                 archive_raw_pair(p, repo_root=td, archive_id="safe", as_of=NOW)
 
 
+
+# Source-claim provider contract tests; these are NOT source coverage or
+# official HTTP evidence. Real ruleset refusal and two-host race remain HOLD.
+class ProtectedClaimRefProvider(unittest.TestCase):
+    SHA = "4d207948526cd6a6e8ecd79ecd1251dcf44b31e8"
+
+    class API:
+        def __init__(self, when, sha, rules=True, fail_second=False):
+            self.when, self.sha = when, sha
+            self.refs = {}
+            self.rules = rules
+            self.fail_second = fail_second
+            self.posts = 0
+
+        def __call__(self, method, path, payload):
+            at = self.when
+            if path.endswith("/rulesets") and method == "GET":
+                return 200, ([{"id": 1}] if self.rules else []), at
+            if path.endswith("/rulesets/1") and method == "GET":
+                return 200, {
+                    "target": "branch", "enforcement": "active",
+                    "conditions": {"ref_name": {
+                        "include": ["refs/heads/source-claims/*"],
+                        "exclude": []}},
+                    "bypass_actors": [],
+                    "rules": [{"type": v} for v in
+                              ("update", "deletion", "non_fast_forward")]
+                }, at
+            if path.endswith("/git/ref/heads/main") and method == "GET":
+                return 200, {"object": {"sha": self.sha}}, at
+            if path.endswith("/git/refs") and method == "POST":
+                self.posts += 1
+                ref = payload["ref"]
+                if ref in self.refs or (self.fail_second and self.posts == 2):
+                    return 422, {"message": "Reference already exists"}, at
+                self.refs[ref] = payload["sha"]
+                return 201, {"ref": ref, "object": {"sha": payload["sha"]}}, at
+            if "/git/ref/heads/source-claims/" in path and method == "GET":
+                ref = "refs/" + path.split("/git/ref/", 1)[1]
+                if ref not in self.refs:
+                    return 404, {}, at
+                return 200, {"ref": ref, "object": {"sha": self.refs[ref]}}, at
+            raise AssertionError((method, path))
+
+    def test_sliding_six_hour_cross_bucket_exclusion(self):
+        from datetime import timedelta
+        from scripts.p30_multisource_review_lkg import claim_ref_plan
+        start = datetime(2026, 11, 11, 5, 59, tzinfo=timezone.utc)
+        first = set(claim_ref_plan("tainex", start))
+        # All later starts within six hours, including a UTC bucket boundary,
+        # must compete for at least one same ref.
+        for minutes in range(0, 360):
+            second = set(claim_ref_plan(
+                "tainex", start + timedelta(minutes=minutes)))
+            self.assertTrue(first & second, minutes)
+        self.assertNotEqual(
+            claim_ref_plan("tainex", start),
+            claim_ref_plan("famiticket", start))
+
+    def test_two_host_collision_cannot_issue_two_claims(self):
+        from datetime import timedelta
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        start = datetime(2026, 11, 11, 5, 59, tzinfo=timezone.utc)
+        api = self.API(start, self.SHA)
+        first = reserve_protected_claim("tainex", self.SHA, api)
+        self.assertEqual(first["reserved_ref_count"], 2)
+        self.assertFalse(first["native_get_allowed"])
+        self.assertFalse(first["independent_cross_host_verified"])
+        self.assertEqual(len(api.refs), 2)
+        api.when = start + timedelta(minutes=2)  # next UTC 6h bucket
+        with self.assertRaisesRegex(ValueError, "CLAIM_CREATE_REF_COLLISION"):
+            reserve_protected_claim("tainex", self.SHA, api)
+        self.assertEqual(len(api.refs), 2)
+
+    def test_missing_ruleset_denies_all_create_refs(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
+                       self.SHA, rules=False)
+        with self.assertRaisesRegex(ValueError, "CLAIM_RULESET_NOT_EXACTLY_ONE"):
+            reserve_protected_claim("tainex", self.SHA, api)
+        self.assertEqual(api.posts, 0)
+
+    def test_partial_reservation_is_never_released_or_promoted(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
+                       self.SHA, fail_second=True)
+        with self.assertRaisesRegex(ValueError, "CLAIM_CREATE_REF_COLLISION"):
+            reserve_protected_claim("tainex", self.SHA, api)
+        self.assertEqual(api.posts, 2)
+        self.assertEqual(len(api.refs), 1)
+        self.assertTrue(next(iter(api.refs)).startswith(
+            "refs/heads/source-claims/tainex-b"))
+
+    def test_main_head_drift_denies_before_create(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
+                       "a" * 40)
+        with self.assertRaisesRegex(ValueError, "CLAIM_ANCHOR_MAIN_DRIFT"):
+            reserve_protected_claim("tainex", self.SHA, api)
+        self.assertEqual(api.posts, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
