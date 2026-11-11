@@ -767,9 +767,14 @@ def _claim_ruleset_verified(api):
         names = cond.get("ref_name") if isinstance(cond, dict) else None
         if not isinstance(names, dict):
             continue
-        if CLAIM_RULESET_INCLUDE not in names.get("include", []):
-            continue
-        if rule.get("bypass_actors") not in ([], None):
+        # The live GitHub ruleset must cover the entire Claim namespace.
+        # An exclusion or a wider include could silently exempt a protected
+        # ref; a privileged current actor is not an immutable Claim writer.
+        if (names.get("include") != [CLAIM_RULESET_INCLUDE]
+                or names.get("exclude") != []):
+            raise ValueError("CLAIM_RULESET_SCOPE_GAP_HOLD")
+        if (rule.get("bypass_actors") != []
+                or rule.get("current_user_can_bypass") != "never"):
             raise ValueError("CLAIM_RULESET_BYPASS_HOLD")
         types = {r.get("type") for r in rule.get("rules", [])
                  if isinstance(r, dict)}

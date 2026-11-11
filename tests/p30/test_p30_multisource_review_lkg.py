@@ -563,6 +563,7 @@ class ProtectedClaimRefProvider(unittest.TestCase):
                         "include": ["refs/heads/source-claims/*"],
                         "exclude": []}},
                     "bypass_actors": [],
+                    "current_user_can_bypass": "never",
                     "rules": [{"type": v} for v in
                               ("update", "deletion", "non_fast_forward")]
                 }, at
@@ -611,6 +612,40 @@ class ProtectedClaimRefProvider(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "CLAIM_CREATE_REF_COLLISION"):
             reserve_protected_claim("tainex", self.SHA, api)
         self.assertEqual(len(api.refs), 2)
+
+    def test_real_ruleset_scope_exclusion_and_actor_bypass_hold(self):
+        # Actual Ruleset 27026973 has one include, no exclusions and
+        # current_user_can_bypass=never. Regression protects this authority.
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        when = datetime(2026, 11, 11, tzinfo=timezone.utc)
+        for variant, expected in (
+            ("excluded_source", "CLAIM_RULESET_SCOPE_GAP_HOLD"),
+            ("extra_include", "CLAIM_RULESET_SCOPE_GAP_HOLD"),
+            ("actor_bypass", "CLAIM_RULESET_BYPASS_HOLD"),
+        ):
+            with self.subTest(variant=variant):
+                base = self.API(when, self.SHA)
+                class AlteredRuleset:
+                    def __init__(self):
+                        self.posts = 0
+                    def __call__(self, method, path, payload):
+                        status, data, stamp = base(method, path, payload)
+                        if method == "POST":
+                            self.posts += 1
+                        if path.endswith("/rulesets/1") and method == "GET":
+                            if variant == "excluded_source":
+                                data["conditions"]["ref_name"]["exclude"] = [
+                                    "refs/heads/source-claims/tainex-*"]
+                            elif variant == "extra_include":
+                                data["conditions"]["ref_name"]["include"].append(
+                                    "refs/heads/other/*")
+                            else:
+                                data["current_user_can_bypass"] = "always"
+                        return status, data, stamp
+                api = AlteredRuleset()
+                with self.assertRaisesRegex(ValueError, expected):
+                    reserve_protected_claim("tainex", self.SHA, api)
+                self.assertEqual(api.posts, 0)
 
     def test_missing_ruleset_denies_all_create_refs(self):
         from scripts.p30_multisource_review_lkg import reserve_protected_claim
