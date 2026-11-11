@@ -902,5 +902,165 @@ class GitHubClaimREST:
         return status, obj, at
 
 
+
+# TaiNEX native-source P0: an actual bounded transport and robots/receipt path.
+# Owner has NOT released native GET: this source-specific collector is fail-closed
+# at entry until real cross-host Claim and source request-budget evidence pass.
+# Existing archived and caller-supplied raw adapters remain unchanged.
+TAINEX_ROBOTS = "https://www.tainex.com.tw/robots.txt"
+TAINEX_USER_AGENT = "EventRadarSourceReview"
+TAINEX_MAX_HTTP_BYTES = 1048576
+TAINEX_OWNER_LIVE_GET_RELEASED = False
+
+
+def _tainex_bounded_http_get(url):
+    """No redirect, cookies, login, retries, or implicit alternate URLs."""
+    from urllib.error import HTTPError, URLError
+    from urllib.request import (Request, HTTPRedirectHandler, build_opener)
+
+    if url not in (TAINEX_ROBOTS, REGISTRY["tainex"]["module"].LIST,
+                   REGISTRY["tainex"]["module"].DETAIL):
+        raise ValueError("TAINEX_HTTP_URL_ALLOWLIST_HOLD")
+
+    class NoRedirect(HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    req = Request(url, method="GET",
+                  headers={"User-Agent": TAINEX_USER_AGENT + "/1.0",
+                           "Accept": "text/plain" if url == TAINEX_ROBOTS
+                           else "text/html",
+                           "Cache-Control": "no-cache"})
+    try:
+        response = build_opener(NoRedirect).open(req, timeout=12)
+    except HTTPError as exc:
+        response = exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise ValueError("TAINEX_HTTP_TRANSPORT_HOLD") from exc
+    with response:
+        status = response.status
+        final_url = response.geturl()
+        media = response.headers.get("Content-Type", "").split(";", 1)[0].lower().strip()
+        cap = 65536 if url == TAINEX_ROBOTS else TAINEX_MAX_HTTP_BYTES
+        body = response.read(cap + 1)
+    return {"status": status, "url": final_url,
+            "content_type": media, "body": body,
+            "observed_at": datetime.now(timezone.utc).isoformat()}
+
+
+def _tainex_verified_response(reply, url, role):
+    """Reject redirect, 403/429, HTML challenge, oversized or ambiguous bytes."""
+    if not isinstance(reply, dict) or reply.get("url") != url:
+        raise ValueError("TAINEX_" + role + "_REDIRECT_OR_URL_HOLD")
+    if type(reply.get("status")) is not int or reply["status"] != 200:
+        raise ValueError("TAINEX_" + role + "_HTTP_STATUS_HOLD")
+    expected = ("text/plain",) if role == "ROBOTS" else (
+        "text/html", "application/xhtml+xml")
+    if reply.get("content_type") not in expected:
+        raise ValueError("TAINEX_" + role + "_CONTENT_TYPE_HOLD")
+    raw = reply.get("body")
+    cap = 65536 if role == "ROBOTS" else TAINEX_MAX_HTTP_BYTES
+    if not isinstance(raw, bytes) or not 0 < len(raw) <= cap or b"\x00" in raw:
+        raise ValueError("TAINEX_" + role + "_BODY_HOLD")
+    seen = utc(reply.get("observed_at"))
+    if abs((datetime.now(timezone.utc) - seen).total_seconds()) > 120:
+        raise ValueError("TAINEX_" + role + "_CLOCK_HOLD")
+    return {"role": role, "url": url, "http_status": 200,
+            "content_type": reply["content_type"],
+            "observed_at": seen.isoformat(),
+            "body_bytes": len(raw), "body_sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def _tainex_robots_delay(raw):
+    """Missing, unreadable or disallowing robots is a hard HOLD, not allow-all."""
+    from urllib.robotparser import RobotFileParser
+    try:
+        content = raw.decode("utf-8-sig", errors="strict")
+    except UnicodeError as exc:
+        raise ValueError("TAINEX_ROBOTS_ENCODING_HOLD") from exc
+    if not re.search(r"(?im)^\s*user-agent\s*:", content):
+        raise ValueError("TAINEX_ROBOTS_DIRECTIVES_MISSING_HOLD")
+    parser = RobotFileParser()
+    parser.parse(content.splitlines())
+    if not all(parser.can_fetch(TAINEX_USER_AGENT + "/1.0", url)
+               for url in (REGISTRY["tainex"]["module"].LIST,
+                           REGISTRY["tainex"]["module"].DETAIL)):
+        raise ValueError("TAINEX_ROBOTS_DISALLOW_HOLD")
+    delay = parser.crawl_delay(TAINEX_USER_AGENT + "/1.0")
+    if delay is None:
+        delay = parser.crawl_delay("*")
+    if delay is not None and (type(delay) is not int or delay < 0 or delay > 300):
+        raise ValueError("TAINEX_ROBOTS_DELAY_HOLD")
+    return max(10, delay or 0)
+
+
+def tainex_native_capture_once(*, claim, repo_root, archive_id,
+                               transport=None, pause=None):
+    """Future controlled-host-only collector: robots 1, LIST 1, same-ID DETAIL 1.
+
+    NEVER enabled by PR/CI or user input. A separate Owner decision, real
+    protected Claim verification and source-specific request-budget authority
+    must first change the hard-coded release boundary. Returned source bytes
+    are isolated REVIEW, never independently accepted fields or publication.
+    """
+    if not TAINEX_OWNER_LIVE_GET_RELEASED:
+        raise ValueError("TAINEX_OWNER_NATIVE_GET_NOT_RELEASED_HOLD")
+    if (not isinstance(claim, dict) or claim.get("source") != "tainex"
+            or claim.get("native_get_allowed") is not True
+            or claim.get("independent_cross_host_verified") is not True
+            or claim.get("source_policy_verified") is not True
+            or claim.get("source_request_budget") != 3
+            or claim.get("cleanup_allowed") is not False):
+        raise ValueError("TAINEX_CLAIM_OR_BUDGET_NOT_VERIFIED_HOLD")
+    import time
+    transport = transport or _tainex_bounded_http_get
+    pause = pause or time.sleep
+    receipts = []
+    robots = transport(TAINEX_ROBOTS)
+    receipts.append(_tainex_verified_response(robots, TAINEX_ROBOTS, "ROBOTS"))
+    delay = _tainex_robots_delay(robots["body"])
+    listing_url = REGISTRY["tainex"]["module"].LIST
+    detail_url = REGISTRY["tainex"]["module"].DETAIL
+    pause(delay)
+    listing = transport(listing_url)
+    receipts.append(_tainex_verified_response(listing, listing_url, "LIST"))
+    try:
+        p = _RawPairHTML()
+        p.feed(listing["body"].decode("utf-8", errors="strict"))
+        p.close()
+    except UnicodeError as exc:
+        raise ValueError("TAINEX_LIST_UTF8_HOLD") from exc
+    matches = [(href, title) for href, title in p.links
+               if isinstance(href, str) and urljoin(listing_url, href) == detail_url
+               and title]
+    if len(matches) != 1:
+        raise ValueError("TAINEX_LIST_SAME_ID_EDGE_HOLD")
+    pause(delay)
+    detail = transport(detail_url)
+    receipts.append(_tainex_verified_response(detail, detail_url, "DETAIL"))
+    packet = {
+        "source": "tainex", "list_url": listing_url, "detail_url": detail_url,
+        "observed_at": receipts[-1]["observed_at"],
+        "list_html_b64": base64.b64encode(listing["body"]).decode("ascii"),
+        "detail_html_b64": base64.b64encode(detail["body"]).decode("ascii"),
+    }
+    reviewed = inspect_raw_pair(packet, datetime.now(timezone.utc))
+    archived = archive_raw_pair(
+        packet, repo_root=repo_root, archive_id=archive_id,
+        as_of=datetime.now(timezone.utc))
+    if (archived["raw_bodies"] != reviewed["raw_bodies"]
+            or not archived["raw_html_retention_verified"]):
+        raise ValueError("TAINEX_NATIVE_ARCHIVE_READBACK_HOLD")
+    return {
+        "decision": "REVIEW_NATIVE_HTTP_UNPROMOTED",
+        "source": "tainex", "source_event_id": reviewed["source_event_id"],
+        "record_id": reviewed["record_id"], "http_receipts": receipts,
+        "archive": archived, "native_get_count": 3,
+        "accepted_fields": 0, "source_ready": False,
+        "lkg_promoted": False, "published": False,
+        "commit_permitted": False,
+    }
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
