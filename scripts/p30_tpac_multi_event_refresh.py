@@ -137,6 +137,37 @@ def discover_list(raw, receipt, now):
     return results
 
 
+def _venue_role_review(soup):
+    """Strict event-owned physical space + separate start-area note, REVIEW only.
+
+    A page-wide venue mention or performance starting area is not an address,
+    ticket product, showtime, or independently accepted formal location.
+    """
+    containers = soup.select("div.page-program__aside-place")
+    blocks = soup.select("div.page-program__aside-place-venue")
+    if (len(containers) != 1 or len(blocks) != 1
+            or blocks[0].find_parent("div", class_="page-program__aside-place") is not containers[0]
+            or not _visible(blocks[0])):
+        raise ValueError("TPAC_VENUE_EXACT_EVENT_SCOPE_HOLD")
+    block = blocks[0]
+    headings = block.find_all("h3", recursive=False)
+    spaces = block.find_all("p", recursive=False)
+    notes = block.find_all("div", recursive=False)
+    if (len(headings) != 1 or _text(headings[0]) != "場地"
+            or len(spaces) != 1 or len(notes) > 1):
+        raise ValueError("TPAC_VENUE_LABEL_OR_ROLE_HOLD")
+    space = _text(spaces[0])
+    note = _text(notes[0]) if notes else ""
+    if (not 1 <= len(space) <= 80 or len(note) > 180
+            or any(c in space + note for c in "<>\r\n")
+            or "http" in (space + note).lower()):
+        raise ValueError("TPAC_VENUE_VALUE_HOLD")
+    return {"role": "EVENT_VENUE_SPACE", "value": space,
+            "start_area_note": note,
+            "start_area_role": "EVENT_START_AREA_NOTE_NOT_SHOWTIME",
+            "decision": "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE"}
+
+
 def parse_detail(card, body, receipt, now):
     """Parse exact-ID DETAIL and event-owned SHOW roles; ambiguous fields HOLD."""
     url = card["url"]
@@ -176,7 +207,15 @@ def parse_detail(card, body, receipt, now):
     # or needs independent field publication authority.
     admission = extract_tpac_price_review(
         body, receipt, card["source_event_id"], card["title"])
-    holds = ["HALL_NOT_VERIFIED", "LOCATION_NOT_EVENT_VERIFIED"]
+    # Independent source-owned role parsing cannot authorize formal location.
+    try:
+        venue_review = _venue_role_review(soup)
+    except ValueError as exc:
+        venue_review = None
+        venue_hold = str(exc)
+    else:
+        venue_hold = "VENUE_SPACE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE"
+    holds = ["HALL_NOT_VERIFIED", "LOCATION_NOT_EVENT_VERIFIED", venue_hold]
     if admission.get("decision") == "SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL":
         holds.append("PRICE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE")
     else:
@@ -222,6 +261,18 @@ def parse_detail(card, body, receipt, now):
             "source_body_sha256": admission["source_body_sha256"],
             "observed_at": admission["observed_at"],
             "decision": "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE",
+        }
+    if venue_review is not None:
+        event["_candidate"]["venue_review"] = {
+            **venue_review, "source_url": url,
+            "source_body_sha256": _sha(body),
+            "observed_at": observed.isoformat(),
+            "formal_field_pass": False, "published": False,
+        }
+        event["_candidate"]["field_roles"]["venue_space"] = {
+            **venue_review, "source_url": url,
+            "source_body_sha256": _sha(body),
+            "observed_at": observed.isoformat(),
         }
     return event
 

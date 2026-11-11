@@ -541,5 +541,52 @@ class MultiEventRefreshTests(unittest.TestCase):
             self.assertEqual(outside.read_bytes(), original)
 
 
+
+class VenueRoleReviewTests(unittest.TestCase):
+    """Fixture regressions are not first-party native field acceptance."""
+
+    def test_event_owned_venue_and_start_area_stay_review_only(self):
+        raw, list_receipt, details = inputs()
+        sid = "2111"
+        markup = ('<div class="page-program__aside-place">'
+                  '<div class="page-program__aside-place-venue">'
+                  '<h3>場地</h3><p>藍盒子</p>'
+                  '<div>本演出將於一樓小戲台開演</div>'
+                  '</div></div>')
+        body = details[sid]["body"].replace(b"</main>", markup.encode("utf-8") + b"</main>")
+        details[sid] = {"body": body, "receipt": receipt(ROOT + "/" + sid, body)}
+        plan = refresh_plan(raw, list_receipt, details, empty_prior(), NOW)
+        event = plan["events"]["tpac:" + sid]
+        role = event["_candidate"]["field_roles"]["venue_space"]
+        self.assertEqual(role["value"], "藍盒子")
+        self.assertEqual(role["start_area_note"], "本演出將於一樓小戲台開演")
+        self.assertEqual(role["role"], "EVENT_VENUE_SPACE")
+        self.assertEqual(role["source_body_sha256"], hashlib.sha256(body).hexdigest())
+        self.assertEqual(event["location"], "")
+        self.assertFalse(event["formal_field_pass"])
+        self.assertFalse(event["published"])
+        self.assertIn("VENUE_SPACE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE",
+                      event["_candidate"]["hold_reasons"])
+
+    def test_venue_wrong_label_duplicate_and_hidden_are_field_holds(self):
+        from bs4 import BeautifulSoup
+        from scripts.p30_tpac_multi_event_refresh import _venue_role_review
+        good = ('<div class="page-program__aside-place">'
+                '<div class="page-program__aside-place-venue">'
+                '<h3>場地</h3><p>藍盒子</p>'
+                '<div>本演出將於一樓小戲台開演</div></div></div>')
+        cases = [
+            (good.replace("場地", "票價"), "TPAC_VENUE_LABEL_OR_ROLE_HOLD"),
+            (good + good, "TPAC_VENUE_EXACT_EVENT_SCOPE_HOLD"),
+            (good.replace('page-program__aside-place-venue"',
+                          'page-program__aside-place-venue" hidden'),
+             "TPAC_VENUE_EXACT_EVENT_SCOPE_HOLD"),
+        ]
+        for markup, reason in cases:
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    _venue_role_review(BeautifulSoup(markup, "html.parser"))
+
+
 if __name__ == "__main__":
     unittest.main()
