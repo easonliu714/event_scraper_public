@@ -9293,3 +9293,27 @@ protected refs current+next 6h slot -> real ruleset denial (UPDATE PASS; DELETE 
   -> IDENTITY / accepted FIELD / REVIEW-LKG / exact-head CI (HOLD)
   -> SOURCE_READY 0 -> whole-source Publisher staging NOT TRIGGERED
 ```
+
+---
+
+## 2026-11-11 20:57 Asia/Taipei — Source Claim ruleset scope fail-closed repair — Claim authority boundary (Source-only)
+
+```text
+Authenticated controlled host
+  -> exact GitHub Ruleset #27026973 readback
+     require Active branch, include == [refs/heads/source-claims/*]
+     require exclude == [], bypass_actors == [], current_user_can_bypass == never
+     require update + deletion + non_fast_forward; no creation restriction
+  -> real create-ref unique collision / existing Claim readback
+  -> two-host real race + deletion refusal + sliding 6h + crash/restart
+     NOT YET independently accepted -> native_get_allowed=false
+  -> future per-Source robots/request budget and native LIST/DETAIL capture
+     URL/status/observed_at/raw bytes/SHA -> same-ID/field provenance
+     NOT YET ACCEPTED -> SOURCE_READY=0
+  -> only on new SOURCE_READY: one all-Source Publisher isolated staging
+     NOT TRIGGERED -> HARD_HOLD_NO_PUBLICATION
+```
+
+- Draft Source #247 `82248e7cc238732b86983e3e3c721cccd07d9220` updates `_claim_ruleset_verified()` and `test_real_ruleset_scope_exclusion_and_actor_bypass_hold()`. Exact-head CI #43025197788 SUCCESS; Artifact #13856592631 independent ZIP SHA256/CRC/SHA256SUMS PASS. Ruleset #27026973 independently read back with exact conditions and `current_user_can_bypass=never`. The patch closes a concrete scope-exclusion/bypass false-positive; it is not immutable WORM proof, live HTTP authorization or accepted Source.
+- TaiNEX official /event and /event/691 title/period are visible in 2026-11-11 public search index; no original HTML/HTTP collector/robots receipt in this run. Keep exhibition period distinct from showtime and organizer site distinct from ticket Event ID. New native GET=0, accepted FIELD=0, SOURCE_READY=0; historical REVIEW/LKG preserved.
+- No changes to main, formal data/status, Golden, PWA #249, Publisher #246, schedule or publication. TPAC cross-host Claim remains HOLD.
