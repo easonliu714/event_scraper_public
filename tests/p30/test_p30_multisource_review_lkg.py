@@ -746,6 +746,35 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
                         TAINEX_ROBOTS, "ROBOTS")
 
 
+    def test_live_list_selects_new_id_and_rechecks_detail_robots(self):
+        # Product regression: LIST can advance beyond historical /event/691.
+        # Local HTML is synthetic; this does NOT count as official source bytes.
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_select_list_detail, _tainex_robots_delay,
+            _tainex_bounded_http_get, REGISTRY)
+        listing = REGISTRY["tainex"]["module"].LIST
+        raw = (b'<a href="/event/692">Current Exhibition</a>'
+               b'<a href="/event/693">Other Exhibition</a>')
+        detail = _tainex_select_list_detail(raw, listing)
+        self.assertEqual(detail, "https://www.tainex.com.tw/event/692")
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DISALLOW_HOLD"):
+            _tainex_robots_delay(
+                b"User-agent: *\\nDisallow: /event/692\\n", detail)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\\nDisallow:\\n", detail), 10)
+        for bad, reason in (
+            (b'<a href="/event/692">One</a><a href="/event/692">Two</a>',
+             "TAINEX_LIST_DUPLICATE_ID_HOLD"),
+            (b'<a href="https://evil.invalid/event/692">Wrong</a>',
+             "TAINEX_LIST_NO_CANONICAL_EVENT_HOLD"),
+            (b'<a href="/event/692?token=1">Wrong</a>',
+             "TAINEX_LIST_NO_CANONICAL_EVENT_HOLD"),
+            (b'<a href="/event/692"></a>', "TAINEX_LIST_TITLE_HOLD"),
+        ):
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    _tainex_select_list_detail(bad, listing)
+
     def test_partial_http_429_keeps_exact_list_receipt_without_detail(self):
         # A real 429 must remain inspectable after a failed attempt; this
         # exercises the durable local journal only, never an official GET.

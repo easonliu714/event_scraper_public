@@ -918,9 +918,13 @@ def _tainex_bounded_http_get(url):
     from urllib.error import HTTPError, URLError
     from urllib.request import (Request, HTTPRedirectHandler, build_opener)
 
-    if url not in (TAINEX_ROBOTS, REGISTRY["tainex"]["module"].LIST,
-                   REGISTRY["tainex"]["module"].DETAIL):
-        raise ValueError("TAINEX_HTTP_URL_ALLOWLIST_HOLD")
+    # LIST chooses the actual event ID; permit only canonical TaiNEX detail
+    # paths, never caller-supplied hosts, query strings or arbitrary URLs.
+    if url not in (TAINEX_ROBOTS, REGISTRY["tainex"]["module"].LIST):
+        try:
+            _raw_source_detail_id(REGISTRY["tainex"], url)
+        except (ValueError, TypeError) as exc:
+            raise ValueError("TAINEX_HTTP_URL_ALLOWLIST_HOLD") from exc
 
     class NoRedirect(HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -971,8 +975,8 @@ def _tainex_verified_response(reply, url, role):
             "body_bytes": len(raw), "body_sha256": hashlib.sha256(raw).hexdigest()}
 
 
-def _tainex_robots_delay(raw):
-    """Missing, unreadable or disallowing robots is a hard HOLD, not allow-all."""
+def _tainex_robots_delay(raw, detail_url=None):
+    """Check LIST and, once selected, its exact DETAIL against the same robots."""
     from urllib.robotparser import RobotFileParser
     try:
         content = raw.decode("utf-8-sig", errors="strict")
@@ -982,9 +986,15 @@ def _tainex_robots_delay(raw):
         raise ValueError("TAINEX_ROBOTS_DIRECTIVES_MISSING_HOLD")
     parser = RobotFileParser()
     parser.parse(content.splitlines())
+    urls = [REGISTRY["tainex"]["module"].LIST]
+    if detail_url is not None:
+        try:
+            _raw_source_detail_id(REGISTRY["tainex"], detail_url)
+        except (ValueError, TypeError) as exc:
+            raise ValueError("TAINEX_ROBOTS_DETAIL_URL_HOLD") from exc
+        urls.append(detail_url)
     if not all(parser.can_fetch(TAINEX_USER_AGENT + "/1.0", url)
-               for url in (REGISTRY["tainex"]["module"].LIST,
-                           REGISTRY["tainex"]["module"].DETAIL)):
+               for url in urls):
         raise ValueError("TAINEX_ROBOTS_DISALLOW_HOLD")
     delay = parser.crawl_delay(TAINEX_USER_AGENT + "/1.0")
     if delay is None:
@@ -992,6 +1002,43 @@ def _tainex_robots_delay(raw):
     if delay is not None and (type(delay) is not int or delay < 0 or delay > 300):
         raise ValueError("TAINEX_ROBOTS_DELAY_HOLD")
     return max(10, delay or 0)
+
+
+
+def _tainex_select_list_detail(raw, listing_url):
+    """Choose first visible canonical event edge in official LIST order.
+
+    No historical /event/691 pinning, external hosts or unlabelled links.
+    Duplicated event edges fail closed instead of silently choosing a title.
+    This is an ID-selection policy, NOT native-source or field acceptance.
+    """
+    if listing_url != REGISTRY["tainex"]["module"].LIST:
+        raise ValueError("TAINEX_LIST_URL_HOLD")
+    try:
+        parser = _RawPairHTML()
+        parser.feed(raw.decode("utf-8", errors="strict"))
+        parser.close()
+    except UnicodeError as exc:
+        raise ValueError("TAINEX_LIST_UTF8_HOLD") from exc
+    choices, seen = [], set()
+    for href, title in parser.links:
+        if not isinstance(href, str):
+            continue
+        candidate = urljoin(listing_url, href)
+        try:
+            _raw_source_detail_id(REGISTRY["tainex"], candidate)
+        except (ValueError, TypeError):
+            continue
+        if (not isinstance(title, str) or not 0 < len(title) <= 200
+                or any(ord(ch) < 32 or ord(ch) == 127 for ch in title)):
+            raise ValueError("TAINEX_LIST_TITLE_HOLD")
+        if candidate in seen:
+            raise ValueError("TAINEX_LIST_DUPLICATE_ID_HOLD")
+        seen.add(candidate)
+        choices.append(candidate)
+    if not choices:
+        raise ValueError("TAINEX_LIST_NO_CANONICAL_EVENT_HOLD")
+    return choices[0]
 
 
 def _tainex_attempt_directory(repo_root, archive_id):
@@ -1107,23 +1154,15 @@ def tainex_native_capture_once(*, claim, repo_root, archive_id,
     receipts.append(verified)
     delay = _tainex_robots_delay(robots["body"])
     listing_url = REGISTRY["tainex"]["module"].LIST
-    detail_url = REGISTRY["tainex"]["module"].DETAIL
     pause(delay)
     listing, verified = _tainex_journal_get(
         attempt, "LIST", listing_url, transport)
     receipts.append(verified)
-    try:
-        p = _RawPairHTML()
-        p.feed(listing["body"].decode("utf-8", errors="strict"))
-        p.close()
-    except UnicodeError as exc:
-        raise ValueError("TAINEX_LIST_UTF8_HOLD") from exc
-    matches = [(href, title) for href, title in p.links
-               if isinstance(href, str) and urljoin(listing_url, href) == detail_url
-               and title]
-    if len(matches) != 1:
-        raise ValueError("TAINEX_LIST_SAME_ID_EDGE_HOLD")
-    pause(delay)
+    # Select a real visible ID from this LIST, not the frozen 2026-11-02 /691.
+    # Validate the selected URL against the already fetched robots before GET.
+    detail_url = _tainex_select_list_detail(listing["body"], listing_url)
+    detail_delay = _tainex_robots_delay(robots["body"], detail_url)
+    pause(max(delay, detail_delay))
     detail, verified = _tainex_journal_get(
         attempt, "DETAIL", detail_url, transport)
     receipts.append(verified)
