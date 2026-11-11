@@ -1,0 +1,65 @@
+name: EventRadar P30 VENUE-02A Taipei Music Center discovery (NO PUBLISH)
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-venue02a-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  tmc-source-review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-venue02a-tmc-discovery-20261029-2355'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact head, exact scope and formal blob guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=fbf4ca02b91159f2423caf3d79fb0ca4bb747069
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf 'A\t%s\n' '.github/workflows/eventradar_p30_venue02a_tmc_source.yml' 'scripts/p30_venue02a_tmc_source.py' 'tests/p30/test_venue02a_tmc_source.py' | LC_ALL=C sort)"
+          actual="$(git diff --name-status "$base" HEAD | LC_ALL=C sort)"
+          test "$expected" = "$actual"
+          test "$(git rev-parse origin/main:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse origin/main:docs/platform_status.json)" = e19ca37c4c80c10b7278d0813b8ff1047535d124
+      - name: Source boundary offline negatives
+        run: |
+          python -m py_compile scripts/p30_venue02a_tmc_source.py tests/p30/test_venue02a_tmc_source.py
+          python -m unittest discover -s tests/p30 -p test_venue02a_tmc_source.py -v
+      - name: One official list and maximum one same-origin detail GET
+        run: |
+          python scripts/p30_venue02a_tmc_source.py --live --out p30-venue02a-evidence
+      - name: Independent manifest SHA and publication hold
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,pathlib
+          p=pathlib.Path('p30-venue02a-evidence')
+          r=json.loads((p/'source_review.json').read_text())
+          m=json.loads((p/'manifest.json').read_text())
+          assert hashlib.sha256((p/'source_review.json').read_bytes()).hexdigest()==m['filesSHA256']['source_review.json']
+          assert r['releaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert r['acceptedFields']==0 and r['goldenAccepted']==0 and r['published'] is False
+          assert not r['rawHtmlPersisted'] and not r['rawTitlesPersisted'] and not r['rawUrlsPersisted']
+          print('PASS_VENUE02A_NO_PUBLICATION')
+          PY
+          (cd p30-venue02a-evidence && sha256sum *.json > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-venue02a-tmc-source-review
+          path: p30-venue02a-evidence/
+          if-no-files-found: ignore
