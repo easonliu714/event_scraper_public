@@ -759,9 +759,9 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
         self.assertEqual(detail, "https://www.tainex.com.tw/event/692")
         with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DISALLOW_HOLD"):
             _tainex_robots_delay(
-                b"User-agent: *\\nDisallow: /event/692\\n", detail)
+                b"User-agent: *\nDisallow: /event/692\n", detail)
         self.assertEqual(_tainex_robots_delay(
-            b"User-agent: *\\nDisallow:\\n", detail), 10)
+            b"User-agent: *\nDisallow:\n", detail), 10)
         for bad, reason in (
             (b'<a href="/event/692">One</a><a href="/event/692">Two</a>',
              "TAINEX_LIST_DUPLICATE_ID_HOLD"),
