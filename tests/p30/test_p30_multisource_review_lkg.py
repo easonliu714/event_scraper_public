@@ -1,6 +1,8 @@
 """Integration tests reuse historical #217/#221 reader contracts, no HTTP."""
 import base64
 import copy
+import hashlib
+import json
 import tempfile
 import unittest
 from datetime import datetime, timezone
