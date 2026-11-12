@@ -9364,3 +9364,25 @@ TaiNEX Source Adapter / controlled host (existing Draft #247)
 - Approval is narrowly scoped to **one future** three-request maximum TaiNEX cycle; no other Source gets an automatic live GET release. TPAC R4 source policy and 6h Claim HOLD remain separate. This policy does not eliminate independent source robots evidence or producer/consumer authorization. GitHub Ruleset is not absolute WORM; true cross-host/deletion/retention proof still missing.
 - Existing Source `scripts/p30_multisource_review_lkg.py::tainex_native_capture_once()` stays hard-blocked at `TAINEX_OWNER_LIVE_GET_RELEASED=False`, and `reserve_protected_claim()` does not grant native_get_allowed. The engineering source can be updated only after actual PASS evidence while preserving this authorization boundary; no official GET, FIELD acceptance, new LKG, Source READY or formal release results from this policy entry.
 - Issue #248 [Owner decision](https://github.com/easonliu714/event_scraper_public/issues/248#issuecomment-6811875274) and the original unique hourly Writer Task `6ae1e6147e548191881f20e730ab0f11` contain matching policy. Engineering PR #247 pinned `1c8746890c760a95a8239c3b4466c60ab6782513`, exact-head CI #43107791505 success, Artifact #13894697699 existing. Official main/data/status untouched.
+
+## 2026-11-12 15:01 Asia/Taipei — Real Claim no-consumption HOLD repair (Source Draft #247)
+
+```text
+Owner TaiNEX conditional request budget [policy PASS, no live HTTP]
+  -> reserve_protected_claim() [NEW REAL PRE-CONSUMPTION HOLD]
+       CLAIM_REAL_ENFORCEMENT_RELEASED=False
+       -> zero GitHub API calls, zero source Claim refs on UNKNOWN/HOLD
+       -> existing simulated collision tests use scoped test-only patch
+  -> protected test-only deletion branch exists [READBACK PASS]
+       source-claims/validation-delete-denial-20261112-1457
+       Ruleset #27026973 active deletion/update/non_fast_forward [READBACK PASS]
+       actual DELETE denial / independent two-host race [NOT YET PASS]
+  -> real sliding 6h, restart/crash, retention/admin trust [HOLD]
+  -> TaiNEX robots -> LIST -> same-ID DETAIL [NO GET]
+  -> accepted FIELD / SOURCE_READY [0]
+  -> all-source Publisher staging [NOT TRIGGERED]
+  -> HARD_HOLD_NO_PUBLICATION [UNCHANGED]
+```
+
+- Source Draft #247 commit `6050d3a7e2d0f2881daf4f49202ea963f83b447f` changes only `scripts/p30_multisource_review_lkg.py` and `tests/p30/test_p30_multisource_review_lkg.py`; real bug: prior reserve path consumed two protected refs even though all real enforcement Gates were not PASS. Public reservation now raises `CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD` before API, and the test checks no API call. Exact-head CI #43172122585 SUCCESS (41+3), Artifact #13921823781 metadata digest `3294d36fef974085827dc63520c10b46345ed5f200761ea5380c2db28e196bf0`.
+- Protected disposable non-source ref created/read back for **future** deletion denial test; no deletion attempted, no real Source Claim consumed. Ruleset #27026973 still ACTIVE, bypass never; mutable by admin, not WORM. TaiNEX `TAINEX_OWNER_LIVE_GET_RELEASED=False`; formal Publisher/PWA deploy/main/data/status/Golden unchanged.
