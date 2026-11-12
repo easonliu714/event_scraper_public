@@ -800,6 +800,27 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
                     _tainex_robots_delay(
                         b"User-agent: *\nDisallow:\nCrawl-delay: " +
                         declared + b"\n")
+        # Production policy gap: Request-rate is a real robots directive.
+        # A 1/60 policy must not be treated as the default 10-second delay.
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\nDisallow:\nRequest-rate: 1/60\n"), 60)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\nDisallow:\nCrawl-delay: 15\n"
+            b"Request-rate: 2/90\n"), 45)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: EventRadarSourceReview\nRequest-rate: 1/75\n"
+            b"\nUser-agent: *\nRequest-rate: 1/120\n"), 75)
+        for bad_rate in (b"bogus", b"1.5/60", b"0/60", b"1/0",
+                         b"999999999/1"):
+            with self.subTest(request_rate=bad_rate):
+                with self.assertRaisesRegex(
+                        ValueError, "TAINEX_ROBOTS_RATE_FORMAT_HOLD"):
+                    _tainex_robots_delay(
+                        b"User-agent: *\nDisallow:\nRequest-rate: " +
+                        bad_rate + b"\n")
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_RATE_HOLD"):
+            _tainex_robots_delay(
+                b"User-agent: *\nDisallow:\nRequest-rate: 1/301\n")
         with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DISALLOW_HOLD"):
             _tainex_robots_delay(
                 b"User-agent: *\nDisallow: /event\n")

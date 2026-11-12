@@ -1046,6 +1046,15 @@ def _tainex_robots_delay(raw, detail_url=None):
     if any(re.fullmatch(r"[0-9]+", value.strip(), re.ASCII) is None
            for value in declared_delays):
         raise ValueError("TAINEX_ROBOTS_DELAY_FORMAT_HOLD")
+    # RobotFileParser silently ignores malformed Request-rate directives.
+    # A real robots policy may limit requests more strictly than Crawl-delay.
+    # Validate every declared rate before interpreting the applicable group.
+    declared_rates = re.findall(
+        r"(?im)^\s*request-rate\s*:\s*([^\r\n#]*)", content)
+    if any(re.fullmatch(r"[1-9][0-9]{0,5}/[1-9][0-9]{0,5}",
+                        value.strip(), re.ASCII) is None
+           for value in declared_rates):
+        raise ValueError("TAINEX_ROBOTS_RATE_FORMAT_HOLD")
     parser = RobotFileParser()
     parser.parse(content.splitlines())
     urls = [REGISTRY["tainex"]["module"].LIST]
@@ -1063,7 +1072,20 @@ def _tainex_robots_delay(raw, detail_url=None):
         delay = parser.crawl_delay("*")
     if delay is not None and (type(delay) is not int or delay < 0 or delay > 300):
         raise ValueError("TAINEX_ROBOTS_DELAY_HOLD")
-    return max(10, delay or 0)
+    rate = parser.request_rate(TAINEX_USER_AGENT + "/1.0")
+    if rate is None:
+        rate = parser.request_rate("*")
+    rate_delay = 0
+    if rate is not None:
+        if (type(rate.requests) is not int or type(rate.seconds) is not int
+                or rate.requests <= 0 or rate.seconds <= 0):
+            raise ValueError("TAINEX_ROBOTS_RATE_HOLD")
+        # Conservative uniform spacing honors requests/seconds even when
+        # a burst would technically be permitted; round up, never down.
+        rate_delay = (rate.seconds + rate.requests - 1) // rate.requests
+        if rate_delay > 300:
+            raise ValueError("TAINEX_ROBOTS_RATE_HOLD")
+    return max(10, delay or 0, rate_delay)
 
 
 
