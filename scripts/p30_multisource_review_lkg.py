@@ -992,6 +992,14 @@ def _tainex_robots_delay(raw, detail_url=None):
         raise ValueError("TAINEX_ROBOTS_ENCODING_HOLD") from exc
     if not re.search(r"(?im)^\s*user-agent\s*:", content):
         raise ValueError("TAINEX_ROBOTS_DIRECTIVES_MISSING_HOLD")
+    # Security: RobotFileParser silently ignores fractional/malformed
+    # Crawl-delay values (e.g. 30.5 -> None). Never fall back to 10 seconds
+    # when the official robots file declares a delay we cannot honor.
+    declared_delays = re.findall(
+        r"(?im)^\\s*crawl-delay\\s*:\\s*([^\\r\\n#]*)", content)
+    if any(re.fullmatch(r"[0-9]+", value.strip(), re.ASCII) is None
+           for value in declared_delays):
+        raise ValueError("TAINEX_ROBOTS_DELAY_FORMAT_HOLD")
     parser = RobotFileParser()
     parser.parse(content.splitlines())
     urls = [REGISTRY["tainex"]["module"].LIST]
