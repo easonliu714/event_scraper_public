@@ -9392,3 +9392,28 @@ Owner TaiNEX conditional request budget [policy PASS, no live HTTP]
 - Source Draft [#247](https://github.com/easonliu714/event_scraper_public/pull/247) exact HEAD `3e2b6346e09d0b7c901289df8efa053aa19bbaf0` corrects a real future-live safety path: Python `RobotFileParser.crawl_delay()` ignores fractional or malformed declared values and previously could silently downgrade `Crawl-delay: 30.5` to a 10-second pause. `_tainex_robots_delay()` now explicitly rejects unparseable declared directives (`TAINEX_ROBOTS_DELAY_FORMAT_HOLD`) before any LIST GET; existing negative regression tests cover decimal, malformed and negative values. This is a fail-closed parser repair, not a live source request.
 - [Exact-head CI #43187849353](https://github.com/easonliu714/event_scraper_public/actions/runs/43187849353) SUCCESS, Job `131079480591`, 41 Source/Core + 3 Bridge PASS; Artifact `13929087350` metadata SHA256 `d8c973e6868e6553373330ee37142f72bf512ce78ca7a30a4d54ac3d26e9130b`, ZIP-byte CRC independent verification UNKNOWN.
 - Claim actual DELETE denial, two-host race, real 6h sliding window, crash/restart/retention, admin mutable-Ruleset trust remain HOLD. Existing disposable test-only ref is `source-claims/validation-delete-denial-20261112-1457`; no deletion was attempted. `CLAIM_REAL_ENFORCEMENT_RELEASED=False` and `TAINEX_OWNER_LIVE_GET_RELEASED=False` remain; `native_get_allowed=False`, native GET/accepted FIELD/SOURCE_READY/published delta all 0. `HARD_HOLD_NO_PUBLICATION` stays active. Owner one-time conditional request policy was previously recorded; no new authorization requested.
+
+## 2026-11-12 20:49 +08 — GitHub protected Claim DELETE real denial readback
+
+```text
+Owner Termux gh (authenticated CLI, OAuth scopes returned)
+  -> single negative DELETE of disposable test ref only
+     refs/heads/source-claims/validation-delete-denial-20261112-1457
+  -> GitHub API HTTP 422 Repository rule violations:
+     "Cannot delete this branch" [REAL DENIAL PASS]
+  -> gh independent post-DELETE GET: SHA 4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+  -> GitHub connector independent ref/compare readback: IDENTICAL [PASS]
+
+GitHub protected Claim provider (Ruleset #27026973)
+  -> unique create-ref collision [historical PASS]
+  -> ordinary update denied [historical PASS]
+  -> authenticated DELETE denied + preserved SHA [NEW PASS]
+  -> two independent executor hosts / live sliding 6h / crash + restart
+     retention / authority and mutable admin Ruleset [HOLD]
+  -> CLAIM_REAL_ENFORCEMENT_RELEASED=False (correct; not WORM)
+  -> TaiNEX native GET [HOLD; no robots/LIST/DETAIL attempted]
+  -> FIELD / SOURCE_READY [0] -> all-source Publisher [NOT TRIGGERED]
+```
+
+- Owner's Termux execution occurred `2026-11-12 12:49:15 UTC`, via `gh api -i -X DELETE` with repository rule violation HTTP 422 and `DELETE_EXIT=1`; post-GET SHA equals expected main anchor. `X-Oauth-Scopes` confirms authenticated GitHub CLI only, not necessarily website-browser session. GitHub connector subsequent branch ref comparison and branch search independently confirmed unchanged.
+- This evidence verifies a real denial for one OAuth principal on the protected test ref. It does not certify all principals, infinite immutable storage, an unmodifiable Ruleset, independent cross-host competition, six-hour retention, or runtime safety authorization. No repeat DELETE, token handling, Source GET, registry change, Publisher staging/schedule, data/status/Golden/main modification. Preserve all earlier successful evidence and historical Android PASS.
