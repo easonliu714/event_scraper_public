@@ -588,6 +588,22 @@ class ProtectedClaimRefProvider(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, expected):
                         transport(method, path, payload)
 
+    def test_direct_rest_post_cannot_consume_real_source_claim_before_release(self):
+        # Real transport-layer defect: a direct valid POST previously bypassed
+        # reserve_protected_claim() and could consume a source Claim during HOLD.
+        # This is a no-network negative guard, NOT a two-host Claim PASS.
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import GitHubClaimREST
+        transport = GitHubClaimREST("controlled-test-token-123456")
+        root = "/repos/easonliu714/event_scraper_public/git/refs"
+        payload = {"ref": "refs/heads/source-claims/tainex-b0000001234",
+                   "sha": self.SHA}
+        with patch("urllib.request.build_opener",
+                   side_effect=AssertionError("SOURCE_CLAIM_HTTP_FORBIDDEN")):
+            with self.assertRaisesRegex(
+                    ValueError, "CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD"):
+                transport("POST", root, payload)
+
     def test_unverified_real_gate_never_consumes_claim_or_calls_api(self):
         from scripts.p30_multisource_review_lkg import reserve_protected_claim
         class ForbiddenNetwork:

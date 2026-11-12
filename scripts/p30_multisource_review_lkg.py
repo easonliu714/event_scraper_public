@@ -900,6 +900,11 @@ class GitHubClaimREST:
                     or re.fullmatch(r"[0-9a-f]{40}", payload["sha"],
                                     re.ASCII) is None):
                 raise ValueError("CLAIM_REST_POST_ANCHOR_HOLD")
+        # A direct transport call must never consume a protected source Claim
+        # while the independent real-enforcement Gate is still HOLD. The
+        # higher-level reservation preflight alone is not a side-effect guard.
+        if method == "POST" and not CLAIM_REAL_ENFORCEMENT_RELEASED:
+            raise ValueError("CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD")
         body = (json.dumps(payload, separators=(",", ":")).encode("utf-8")
                 if payload is not None else None)
         req = Request(
