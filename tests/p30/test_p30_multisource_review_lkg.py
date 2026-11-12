@@ -883,5 +883,54 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
             self.assertFalse((attempt / "robots.receipt.json").exists())
 
 
+
+    def test_real_process_exit_and_fresh_restart_audit_never_replays_get(self):
+        """Actual os._exit after fsynced intent; no simulated exception or HTTP."""
+        import os
+        import subprocess
+        import sys
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, verify_tainex_attempt_after_restart)
+        if (os.name != "posix" or not hasattr(os, "O_DIRECTORY")
+                or not hasattr(os, "O_NOFOLLOW")):
+            self.skipTest("POSIX fsync host required; native GET remains HOLD")
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "real-process-exit")
+            # The child exits from the transport call without creating a
+            # response. The durable intent must be independently readable.
+            code = (
+                "import os,sys\n"
+                "from pathlib import Path\n"
+                "from scripts.p30_multisource_review_lkg import "
+                "_tainex_journal_get, TAINEX_ROBOTS\n"
+                "_tainex_journal_get(Path(sys.argv[1]), 'ROBOTS', "
+                "TAINEX_ROBOTS, lambda url: os._exit(73))\n"
+            )
+            child = subprocess.run(
+                [sys.executable, "-c", code, str(attempt)],
+                cwd=Path(__file__).resolve().parents[2],
+                capture_output=True, text=True, timeout=15, check=False)
+            self.assertEqual(child.returncode, 73, child.stderr)
+            audit = verify_tainex_attempt_after_restart(
+                directory, "real-process-exit")
+            self.assertEqual(audit["completed"], [])
+            self.assertEqual(audit["incomplete_roles"], ["ROBOTS"])
+            self.assertEqual(audit["native_get_replayed"], 0)
+            self.assertFalse(audit["source_ready"])
+            self.assertFalse(audit["native_http_attested"])
+            self.assertFalse(audit["commit_permitted"])
+            self.assertFalse((attempt / "robots.body").exists())
+            with self.assertRaisesRegex(ValueError, "TAINEX_ATTEMPT_REPLAY_HOLD"):
+                _tainex_attempt_directory(directory, "real-process-exit")
+            # Tampering with the intent after restart cannot create authority.
+            intent = attempt / "robots.intent.json"
+            data = json.loads(intent.read_text("utf-8"))
+            data["url"] = "https://other.invalid/robots.txt"
+            intent.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "TAINEX_RESTART_INTENT_HOLD"):
+                verify_tainex_attempt_after_restart(
+                    directory, "real-process-exit")
+
+
 if __name__ == "__main__":
     unittest.main()
