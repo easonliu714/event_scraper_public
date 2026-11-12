@@ -9353,7 +9353,7 @@ TaiNEX Source Adapter / controlled host (existing Draft #247)
       robots allow -> bounded LIST -> select same-ID DETAIL -> durable body/URL/status/UTC/SHA receipts
        |
        v
-    REVEW / LKG isolation [future real receipts only; no formal field promotion]
+    REVIEW / LKG isolation [future real receipts only; no formal field promotion]
       accepted FIELD / SOURCE_READY [HOLD]
        |
        v (ONLY on new SOURCE_READY)
