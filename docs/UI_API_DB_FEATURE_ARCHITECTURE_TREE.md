@@ -9463,3 +9463,33 @@ ZIP CRC 3/3, member SHA256 2/2 independently checked
 ```
 
 This is a substantive source-side security fix, not a release of the Claim ledger. Existing real DELETE refusal remains PASS without retest. Two separate hosts, real 6h exclusion, cross-host restart/retention and administrator trust remain HOLD. TaiNEX Owner conditional GET budget stays approved but blocked: `CLAIM_REAL_ENFORCEMENT_RELEASED=False`, `TAINEX_OWNER_LIVE_GET_RELEASED=False`, `native_get_allowed=False`, new GET/FIELD/SOURCE_READY=0, no all-source Publisher, no formal publication.
+
+
+### 2026-11-13 02:55 +08 — Direct GitHub Claim REST POST fail-closed transport gate (Draft #247)
+
+```text
+Source Draft #247 92b7d6bb7e3894d6584ae4ba3bf9daaba1982fd7
+  -> 14f57d7729ed711fb4236640e18b8f1f72e9b67c
+GitHubClaimREST.__call__(POST, /repos/.../git/refs, valid protected source ref)
+  BEFORE: allowed direct HTTP even when CLAIM_REAL_ENFORCEMENT_RELEASED=False
+  AFTER: reject CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD
+         before constructing/sending the request
+  -> reserve_protected_claim() original preflight unchanged
+  -> no real source Claim consumed, no network POST
+  -> negative regression PASS; NOT a cross-host race
+Exact-head CI #43284667920 / job #131414762174 SUCCESS
+  -> 44 Source/Core + 3 archived Bridge PASS
+  -> Artifact #13972804367, 4491 bytes
+  -> metadata digest sha256:ff7b9102985a4134baadf1810291dae56935183e96662c34ed525c70c054242c
+  -> independent artifact ZIP CRC/bytes UNKNOWN
+GitHub Ruleset #27026973 active; authenticated DELETE denial historical PASS
+  -> independent Host A x Host B, live sliding 6h, crash/restart/retention,
+     least-privilege writer/admin mutable Ruleset HOLD
+  -> CLAIM_REAL_ENFORCEMENT_RELEASED=False
+  -> TAINEX_OWNER_LIVE_GET_RELEASED=False
+  -> native_get_allowed=False
+  -> new official GET / accepted FIELD / SOURCE_READY = 0
+  -> all-source Publisher not triggered; HARD_HOLD_NO_PUBLICATION
+```
+
+Only existing Draft #247 source/test changed; Source main, Golden, formal data/status, Publisher, schedules and Pages unchanged. A controlled non-source test Claim cross-host race still requires Owner authorization. No DELETE retest.
