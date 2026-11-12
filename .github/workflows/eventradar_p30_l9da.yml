@@ -1,0 +1,66 @@
+name: EventRadar P30-L9-DA exact-head source REVIEW NO PUBLISH
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  source-review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-p30-l9da-famiticket-ultra-roles'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Exact HEAD, 3 ADD-only paths, frozen formal outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=9d8ddfab2cbe6175ca04c3bf3942b5ca2ed503bb
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_p30_l9da.yml' 'scripts/p30_l9da_famiticket_ultra_roles.py' 'tests/p30/test_l9da_famiticket_ultra_roles.py' | LC_ALL=C sort)"
+          test "$expected" = "$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          git diff --name-status "$base" HEAD | awk '$1!="A" {exit 1}'
+          test "$(git rev-parse HEAD:docs/data.json)" = 7fc4fe32567a57fd504483eeb9a8b9e10b568ea4
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = cdeeb3b551e38f862c37759426a14b5129e1224d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          python - <<'PY'
+          import json,subprocess
+          d=json.loads(subprocess.check_output(['git','show','HEAD:docs/platform_status.json']))
+          assert len(d['platforms'])==19
+          assert d['production']['eventFeedReleaseState']=='HARD_HOLD_NO_PUBLICATION'
+          assert d['production']['goldenAccepted']==0
+          PY
+      - name: Source-bound REVIEW role negatives
+        run: |
+          python -m py_compile scripts/p30_l9da_famiticket_ultra_roles.py tests/p30/test_l9da_famiticket_ultra_roles.py
+          python -m unittest discover -s tests/p30 -p 'test_l9da_famiticket_ultra_roles.py' -v
+      - name: SHA evidence manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import json,pathlib,subprocess
+          audit={'gate':'P30-L9-DA','headSHA':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+                 'sourceObservationDate':'2026-11-02','officialGETinCI':0,
+                 'sourceQuality':'FamiTicket #07 official Home LIST -> exact Ultra Taiwan 2026 DETAIL; event date vs EEGA cutoff, surcharge, HSR discount',
+                 'acceptedFields':0,'ticketSessionIdsVerified':0,'goldenAccepted':0,
+                 'published':False,'releaseState':'HARD_HOLD_NO_PUBLICATION'}
+          pathlib.Path('evidence/audit.json').write_text(json.dumps(audit,sort_keys=True)+'\n',encoding='utf-8')
+          PY
+          (cd evidence && sha256sum *.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eventradar-p30-l9da-source-review
+          path: evidence/
+          if-no-files-found: error
