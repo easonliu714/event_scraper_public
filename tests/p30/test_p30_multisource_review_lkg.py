@@ -553,6 +553,39 @@ class ProtectedClaimRefProvider(unittest.TestCase):
         with patch("scripts.p30_multisource_review_lkg.CLAIM_REAL_ENFORCEMENT_RELEASED", True):
             return reserve_protected_claim(source, anchor, api)
 
+    def test_claim_rest_credential_is_limited_to_protected_source_bucket_refs(self):
+        # Real source defect: the previous POST transport accepted arbitrary
+        # refs/heads/main or other unprotected branches. This checks that the
+        # network boundary rejects unsafe requests BEFORE any HTTP call.
+        # It does NOT certify live two-host competition or release native GET.
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import GitHubClaimREST
+        transport = GitHubClaimREST("controlled-test-token-123456")
+        root = "/repos/easonliu714/event_scraper_public/"
+        bucket = "refs/heads/source-claims/tainex-b0000001234"
+        cases = (
+            ("POST", root + "git/refs",
+             {"ref": "refs/heads/main", "sha": self.SHA},
+             "CLAIM_REST_POST_UNPROTECTED_REF_HOLD"),
+            ("POST", root + "git/refs",
+             {"ref": "refs/heads/source-claims/validation-b0000001234",
+              "sha": self.SHA}, "CLAIM_REST_POST_UNPROTECTED_REF_HOLD"),
+            ("POST", root + "git/refs",
+             {"ref": bucket, "sha": self.SHA, "force": True},
+             "CLAIM_REST_POST_SCOPE_HOLD"),
+            ("POST", root + "git/refs",
+             {"ref": bucket, "sha": "invalid"},
+             "CLAIM_REST_POST_ANCHOR_HOLD"),
+            ("GET", root + "contents/docs/data.json", None,
+             "CLAIM_REST_GET_SCOPE_HOLD"),
+        )
+        with patch("urllib.request.build_opener",
+                   side_effect=AssertionError("UNAUTHORIZED_HTTP_CALL")):
+            for method, path, payload, expected in cases:
+                with self.subTest(method=method, path=path, expected=expected):
+                    with self.assertRaisesRegex(ValueError, expected):
+                        transport(method, path, payload)
+
     def test_unverified_real_gate_never_consumes_claim_or_calls_api(self):
         from scripts.p30_multisource_review_lkg import reserve_protected_claim
         class ForbiddenNetwork:
