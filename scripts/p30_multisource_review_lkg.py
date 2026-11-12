@@ -1041,6 +1041,26 @@ def _tainex_select_list_detail(raw, listing_url):
     return choices[0]
 
 
+def _tainex_sync_directory(directory):
+    """Fsync journal directory metadata; unsupported hosts fail closed.
+
+    File fsync does not guarantee persistence of a newly created filename.
+    This local guard is not proof of power-loss survival or cross-host Claims.
+    """
+    import os
+    if (os.name != "posix" or not hasattr(os, "O_DIRECTORY")
+            or not hasattr(os, "O_NOFOLLOW")):
+        raise ValueError("TAINEX_DIRECTORY_FSYNC_UNSUPPORTED_HOLD")
+    try:
+        fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError as exc:
+        raise ValueError("TAINEX_DIRECTORY_FSYNC_HOLD") from exc
+
+
 def _tainex_attempt_directory(repo_root, archive_id):
     """Reserve an exclusive local journal before any official HTTP request.
 
@@ -1057,10 +1077,12 @@ def _tainex_attempt_directory(repo_root, archive_id):
     if isolated.is_symlink():
         raise ValueError("TAINEX_ATTEMPT_SYMLINK_HOLD")
     isolated.mkdir(exist_ok=True)
+    _tainex_sync_directory(root)
     base = isolated / "tainex_http_attempts"
     if base.is_symlink():
         raise ValueError("TAINEX_ATTEMPT_SYMLINK_HOLD")
     base.mkdir(exist_ok=True)
+    _tainex_sync_directory(isolated)
     if not base.resolve().is_relative_to(root):
         raise ValueError("TAINEX_ATTEMPT_ISOLATION_HOLD")
     target = base / archive_id
@@ -1070,6 +1092,8 @@ def _tainex_attempt_directory(repo_root, archive_id):
         target.mkdir(exist_ok=False)
     except FileExistsError as exc:
         raise ValueError("TAINEX_ATTEMPT_REPLAY_HOLD") from exc
+    _tainex_sync_directory(base)
+    _tainex_sync_directory(target)
     return target
 
 
@@ -1090,6 +1114,8 @@ def _tainex_journal_get(target, role, url, transport):
         stream.write((json.dumps(intent, sort_keys=True) + "\n").encode("utf-8"))
         stream.flush()
         os.fsync(stream.fileno())
+    # Persist the intent filename before the first external request.
+    _tainex_sync_directory(target)
     reply = transport(url)
     if not isinstance(reply, dict) or not isinstance(reply.get("body"), bytes):
         raise ValueError("TAINEX_ATTEMPT_RESPONSE_HOLD")
@@ -1101,6 +1127,7 @@ def _tainex_journal_get(target, role, url, transport):
         stream.write(raw)
         stream.flush()
         os.fsync(stream.fileno())
+    _tainex_sync_directory(target)
     receipt = {
         "kind": "TAINEX_HTTP_UNVERIFIED_RECEIPT_V1", "role": role,
         "url": reply.get("url"), "http_status": reply.get("status"),
@@ -1113,6 +1140,7 @@ def _tainex_journal_get(target, role, url, transport):
         stream.write((json.dumps(receipt, sort_keys=True) + "\n").encode("utf-8"))
         stream.flush()
         os.fsync(stream.fileno())
+    _tainex_sync_directory(target)
     if hashlib.sha256((target / (stem + ".body")).read_bytes()).hexdigest() != (
             receipt["body_sha256"]):
         raise ValueError("TAINEX_ATTEMPT_READBACK_HOLD")

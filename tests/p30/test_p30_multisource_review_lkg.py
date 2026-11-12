@@ -804,6 +804,44 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "TAINEX_ATTEMPT_REPLAY_HOLD"):
                 _tainex_attempt_directory(directory, "partial-429")
 
+    def test_directory_fsync_precedes_get_and_failure_blocks_get(self):
+        # Crash durability regression; no official GET, Claim or SOURCE_READY.
+        import os
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, _tainex_journal_get,
+            _tainex_sync_directory, TAINEX_ROBOTS)
+        if (os.name != "posix" or not hasattr(os, "O_DIRECTORY")
+                or not hasattr(os, "O_NOFOLLOW")):
+            self.skipTest("POSIX directory fsync required; live GET stays HOLD")
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "durable-intent")
+            order = []
+            def synced(path):
+                order.append("directory_fsync")
+                _tainex_sync_directory(path)
+            def crashed(_):
+                order.append("transport")
+                raise OSError("simulated transport loss")
+            with patch("scripts.p30_multisource_review_lkg._tainex_sync_directory",
+                       side_effect=synced):
+                with self.assertRaisesRegex(OSError, "simulated transport loss"):
+                    _tainex_journal_get(attempt, "ROBOTS", TAINEX_ROBOTS, crashed)
+            self.assertEqual(order, ["directory_fsync", "transport"])
+            self.assertTrue((attempt / "robots.intent.json").exists())
+            self.assertFalse((attempt / "robots.receipt.json").exists())
+            denied = _tainex_attempt_directory(directory, "sync-denied")
+            calls = []
+            with patch("scripts.p30_multisource_review_lkg._tainex_sync_directory",
+                       side_effect=ValueError("TAINEX_DIRECTORY_FSYNC_HOLD")):
+                with self.assertRaisesRegex(ValueError, "TAINEX_DIRECTORY_FSYNC_HOLD"):
+                    _tainex_journal_get(
+                        denied, "ROBOTS", TAINEX_ROBOTS,
+                        lambda url: calls.append(url))
+            self.assertEqual(calls, [])
+            self.assertTrue((denied / "robots.intent.json").exists())
+            self.assertFalse((denied / "robots.body").exists())
+
     def test_transport_crash_retains_pre_get_intent_without_forged_receipt(self):
         from scripts.p30_multisource_review_lkg import (
             _tainex_attempt_directory, _tainex_journal_get, TAINEX_ROBOTS)
