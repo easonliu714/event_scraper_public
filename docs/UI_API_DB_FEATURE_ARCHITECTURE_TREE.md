@@ -9417,3 +9417,27 @@ GitHub protected Claim provider (Ruleset #27026973)
 
 - Owner's Termux execution occurred `2026-11-12 12:49:15 UTC`, via `gh api -i -X DELETE` with repository rule violation HTTP 422 and `DELETE_EXIT=1`; post-GET SHA equals expected main anchor. `X-Oauth-Scopes` confirms authenticated GitHub CLI only, not necessarily website-browser session. GitHub connector subsequent branch ref comparison and branch search independently confirmed unchanged.
 - This evidence verifies a real denial for one OAuth principal on the protected test ref. It does not certify all principals, infinite immutable storage, an unmodifiable Ruleset, independent cross-host competition, six-hour retention, or runtime safety authorization. No repeat DELETE, token handling, Source GET, registry change, Publisher staging/schedule, data/status/Golden/main modification. Preserve all earlier successful evidence and historical Android PASS.
+
+
+### 2026-11-12 22:02 Asia/Taipei — local crash-safe TaiNEX journal readback boundary
+
+```text
+Source Draft #247 461b67ec07ae985d208447ac6e86fdba3eb7b127
+  -> _tainex_attempt_directory() [exclusive local ID + directory fsync]
+  -> _tainex_journal_get() [pre-GET durable intent; body/receipt if returned]
+  -> child os._exit(73) after ROBOTS intent [actual process exit; NO HTTP]
+  -> verify_tainex_attempt_after_restart() [new read-only audit]
+       -> member allowlist / symlink guard / intent URL+role+UTC
+       -> receipt SHA256 / body size / chronology / robots+LIST identity
+       -> incomplete/denied terminal, no replay or cleanup
+       -> native_http_attested=False; claim_consumption_verified=False
+       -> accepted_fields=0; source_ready=False; commit_permitted=False
+  -> exact-head CI #43233087089 SUCCESS [42 Source/Core + 3 Bridge]
+  -> artifact #13950649082 metadata sha256:29994d82838e0113e8bc860216d84527828fc200e979a183fa3425447b309051
+  -> LOCAL_PROCESS_EXIT_RESTART_AUDIT PASS only
+  -> GitHub Claim independent two-host/6h/crash-retention/admin trust HOLD
+  -> TaiNEX native robots/LIST/DETAIL GET 0; SOURCE_READY 0
+  -> Publisher not triggered; HARD_HOLD_NO_PUBLICATION
+```
+
+No new source authority, formal JSON/Golden/main changes, public workflow dispatch, or scheduled Publisher. Owner's authenticated DELETE refusal remains prior PASS, not repeated. This is a local evidence integrity increment, not a WORM or cross-host Claim attestation.
