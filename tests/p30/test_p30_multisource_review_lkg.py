@@ -983,5 +983,27 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
                     directory, "real-process-exit")
 
 
+    def test_direct_native_http_transport_requires_both_real_release_gates(self):
+        """Actual production GET function cannot bypass either release gate."""
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_bounded_http_get, TAINEX_ROBOTS)
+        # No urllib request may be constructed/opened in any denied case.
+        with patch("urllib.request.build_opener") as opener, \
+             patch("urllib.request.urlopen") as urlopen:
+            for claim_released, source_released in (
+                    (False, False), (True, False), (False, True)):
+                with self.subTest(claim=claim_released, source=source_released):
+                    with patch("scripts.p30_multisource_review_lkg.CLAIM_REAL_ENFORCEMENT_RELEASED",
+                               claim_released), \
+                         patch("scripts.p30_multisource_review_lkg.TAINEX_OWNER_LIVE_GET_RELEASED",
+                               source_released):
+                        with self.assertRaisesRegex(
+                                ValueError, "TAINEX_NATIVE_TRANSPORT_RELEASE_HOLD"):
+                            _tainex_bounded_http_get(TAINEX_ROBOTS)
+            opener.assert_not_called()
+            urlopen.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

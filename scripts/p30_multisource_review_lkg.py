@@ -964,6 +964,11 @@ TAINEX_OWNER_LIVE_GET_RELEASED = False
 
 def _tainex_bounded_http_get(url):
     """No redirect, cookies, login, retries, or implicit alternate URLs."""
+    # Production HTTP transport is independently fail-closed. A direct
+    # invocation must not bypass the capture entry-point or consume any
+    # official TaiNEX request while either real release Gate remains HOLD.
+    if not (CLAIM_REAL_ENFORCEMENT_RELEASED and TAINEX_OWNER_LIVE_GET_RELEASED):
+        raise ValueError("TAINEX_NATIVE_TRANSPORT_RELEASE_HOLD")
     from urllib.error import HTTPError, URLError
     from urllib.request import (Request, HTTPRedirectHandler, build_opener)
 
