@@ -392,6 +392,7 @@ class RawPairIdentityAdapter(unittest.TestCase):
             hidden_links = (
                 '<a hidden href="' + href + '">' + title + '</a>',
                 '<div aria-hidden="true">' + visible_link + '</div>',
+                '<div aria-hidden="true"><div></div>' + visible_link + '</div>',
                 '<section style="display:none!important">' + visible_link + '</section>',
                 '<div class="d-none">' + visible_link + '</div>',
                 '<template>' + visible_link + '</template>',
@@ -400,6 +401,7 @@ class RawPairIdentityAdapter(unittest.TestCase):
             hidden_headings = (
                 '<h1 hidden>' + title + '</h1>',
                 '<div aria-hidden="true">' + visible_heading + '</div>',
+                '<section hidden><section></section>' + visible_heading + '</section>',
                 '<div style="visibility:hidden">' + visible_heading + '</div>',
                 '<template>' + visible_heading + '</template>',
             )

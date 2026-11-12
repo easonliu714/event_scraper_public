@@ -215,8 +215,14 @@ class _RawPairHTML(HTMLParser):
         )
 
     def handle_starttag(self, tag, attrs):
-        if self.blocked_stack or self._not_visible(tag, attrs):
-            # Void elements must not swallow later visible source edges.
+        if self.blocked_stack:
+            # Track EVERY non-void descendant while a hidden parent is open.
+            # Otherwise an inner </div> can expose forged LIST/DETAIL identity.
+            if tag not in self._VOID:
+                self.blocked_stack.append(tag)
+            return
+        if self._not_visible(tag, attrs):
+            # Void hidden elements do not create a blocking subtree.
             if tag not in self._VOID:
                 self.blocked_stack.append(tag)
             return
