@@ -9333,3 +9333,34 @@ Source-specific flow in scripts/p30_multisource_review_lkg.py, HEAD 7cb6194b8657
 7. No Publisher staging unless a future independently accepted new SOURCE_READY; formal data/status, PWA/Android, Gateway and schedule unchanged.
 
 Exact-head CI #43034484981 SUCCESS (35 Source/Core + 3 historical bridge tests), Artifact #13861438668 digest 32a48ef049ac5e7110f4de9df5d26084df4582ae3a850044ff06bd42d26df18b, ZIP CRC/SHA256SUMS PASS. Tests are policy/transport contracts, NOT actual robots or source bytes. Current status: native HTTP=0, accepted FIELD=0, new REVIEW/LKG=0, SOURCE_READY=0, Claim PARTIAL/HOLD, SOURCE_PROGRESS=FAIL/BLOCKED, HARD_HOLD_NO_PUBLICATION.
+
+## 2026-11-12 — TaiNEX conditional source-acquisition approval separated from runtime gate
+
+```text
+TaiNEX Source Adapter / controlled host (existing Draft #247)
+    Owner conditional REQUEST POLICY [PASS; not a live switch]
+      robots GET <=1 -> official /event LIST GET <=1 -> one LIST-derived same Event ID DETAIL GET <=1
+      concurrency 1; >=10 seconds / longer robots crawl-delay
+      403/429/robots denied/redirect/unexpected status -> STOP, no retry
+       |
+       v
+    GitHub protected source-claims provider [PARTIAL, REAL ENFORCEMENT HOLD]
+      Ruleset #27026973 scope protections + prior create-ref race/update denial
+      REAL delete denial + two independent hosts + 6h sliding/restart/retention [HOLD]
+       |
+       v (only if ALL independent Gates PASS; otherwise no HTTP)
+    tainex_native_capture_once() [TAINEX_OWNER_LIVE_GET_RELEASED=False, NO GET]
+      robots allow -> bounded LIST -> select same-ID DETAIL -> durable body/URL/status/UTC/SHA receipts
+       |
+       v
+    REVEW / LKG isolation [future real receipts only; no formal field promotion]
+      accepted FIELD / SOURCE_READY [HOLD]
+       |
+       v (ONLY on new SOURCE_READY)
+    ALL Source Publisher one isolated integration + Quality Gate + LKG/CAS/Rollback
+      formal publish [HARD_HOLD_NO_PUBLICATION] | schedule [DEFERRED] | public dispatch [HOLD]
+```
+
+- Approval is narrowly scoped to **one future** three-request maximum TaiNEX cycle; no other Source gets an automatic live GET release. TPAC R4 source policy and 6h Claim HOLD remain separate. This policy does not eliminate independent source robots evidence or producer/consumer authorization. GitHub Ruleset is not absolute WORM; true cross-host/deletion/retention proof still missing.
+- Existing Source `scripts/p30_multisource_review_lkg.py::tainex_native_capture_once()` stays hard-blocked at `TAINEX_OWNER_LIVE_GET_RELEASED=False`, and `reserve_protected_claim()` does not grant native_get_allowed. The engineering source can be updated only after actual PASS evidence while preserving this authorization boundary; no official GET, FIELD acceptance, new LKG, Source READY or formal release results from this policy entry.
+- Issue #248 [Owner decision](https://github.com/easonliu714/event_scraper_public/issues/248#issuecomment-6811875274) and the original unique hourly Writer Task `6ae1e6147e548191881f20e730ab0f11` contain matching policy. Engineering PR #247 pinned `1c8746890c760a95a8239c3b4466c60ab6782513`, exact-head CI #43107791505 success, Artifact #13894697699 existing. Official main/data/status untouched.
