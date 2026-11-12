@@ -9441,3 +9441,25 @@ Source Draft #247 461b67ec07ae985d208447ac6e86fdba3eb7b127
 ```
 
 No new source authority, formal JSON/Golden/main changes, public workflow dispatch, or scheduled Publisher. Owner's authenticated DELETE refusal remains prior PASS, not repeated. This is a local evidence integrity increment, not a WORM or cross-host Claim attestation.
+
+
+### 2026-11-12 22:55 +08 — Claim REST transport credential-scope containment (Source #247)
+
+```text
+GitHubClaimREST.__call__ before:
+  POST /git/refs with arbitrary JSON ref/sha -> could target unprotected branch
+  GET any repository-relative endpoint -> generic credential-bearing reader
+GitHubClaimREST.__call__ after:
+  POST only /git/refs with exactly ref+sha
+  ref = refs/heads/source-claims/<registered-source>-b<10digits>
+  sha = lowercase 40-hex commit anchor
+  GET only /rulesets, /rulesets/<id>, /git/ref/heads/main,
+           /git/ref/heads/source-claims/<registered-source>-b<10digits>
+  no cross-host HTTP redirect / no retry; invalid requests rejected pre-network
+Source Draft #247 HEAD: 7a197509c91b31b9b7ceab3ca11f68cb9c3bb9f3
+CI #43242174509 SUCCESS: 43 Source/Core + 3 Bridge
+Artifact #13956240607 ZIP SHA256 ce4045b68c01e623b0d1cd39985b5196b6c3313ec509ce1090a4144f54a2ead8
+ZIP CRC 3/3, member SHA256 2/2 independently checked
+```
+
+This is a substantive source-side security fix, not a release of the Claim ledger. Existing real DELETE refusal remains PASS without retest. Two separate hosts, real 6h exclusion, cross-host restart/retention and administrator trust remain HOLD. TaiNEX Owner conditional GET budget stays approved but blocked: `CLAIM_REAL_ENFORCEMENT_RELEASED=False`, `TAINEX_OWNER_LIVE_GET_RELEASED=False`, `native_get_allowed=False`, new GET/FIELD/SOURCE_READY=0, no all-source Publisher, no formal publication.
