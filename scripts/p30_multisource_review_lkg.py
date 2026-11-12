@@ -731,6 +731,10 @@ CLAIM_REPO = "easonliu714/event_scraper_public"
 CLAIM_SOURCES = frozenset(("tainex", "famiticket", "tmc", "opentix", "ticc", "tpac"))
 CLAIM_RULESET_INCLUDE = "refs/heads/source-claims/*"
 CLAIM_REQUIRED_RULES = frozenset(("update", "deletion", "non_fast_forward"))
+# Real deletion denial, independent hosts, sliding time, crash/retention and
+# authority have not passed. Do not consume protected source Claim refs merely
+# because the policy permits a future single-shot TaiNEX HTTP capture.
+CLAIM_REAL_ENFORCEMENT_RELEASED = False
 
 
 def claim_ref_plan(source, github_server_at):
@@ -793,6 +797,10 @@ def reserve_protected_claim(source, anchor_sha, api):
     datetime). Only a controlled engineering host may supply it. This module
     does NOT provide a network transport, GitHub credential or public dispatch.
     """
+    # Strict preflight: even a successful protected-ref reservation is a
+    # permanent side effect. UNKNOWN/HOLD must not consume a source Claim.
+    if not CLAIM_REAL_ENFORCEMENT_RELEASED:
+        raise ValueError("CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD")
     if (not isinstance(anchor_sha, str) or
             re.fullmatch(r"[0-9a-f]{40}", anchor_sha, re.ASCII) is None):
         raise ValueError("CLAIM_ANCHOR_SHA_HOLD")

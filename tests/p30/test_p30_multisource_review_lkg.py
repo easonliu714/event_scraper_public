@@ -546,6 +546,22 @@ class IsolatedRawByteRetention(unittest.TestCase):
 class ProtectedClaimRefProvider(unittest.TestCase):
     SHA = "4d207948526cd6a6e8ecd79ecd1251dcf44b31e8"
 
+    def candidate(self, source, anchor, api):
+        # Existing simulated collision tests are not a real Gate release.
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        with patch("scripts.p30_multisource_review_lkg.CLAIM_REAL_ENFORCEMENT_RELEASED", True):
+            return reserve_protected_claim(source, anchor, api)
+
+    def test_unverified_real_gate_never_consumes_claim_or_calls_api(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        class ForbiddenNetwork:
+            def __call__(self, method, path, payload):
+                raise AssertionError("NO_NETWORK_OR_CLAIM_CONSUMPTION_ALLOWED")
+        with self.assertRaisesRegex(
+                ValueError, "CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD"):
+            reserve_protected_claim("tainex", self.SHA, ForbiddenNetwork())
+
     class API:
         def __init__(self, when, sha, rules=True, fail_second=False):
             self.when, self.sha = when, sha
@@ -605,14 +621,14 @@ class ProtectedClaimRefProvider(unittest.TestCase):
         from scripts.p30_multisource_review_lkg import reserve_protected_claim
         start = datetime(2026, 11, 11, 5, 59, tzinfo=timezone.utc)
         api = self.API(start, self.SHA)
-        first = reserve_protected_claim("tainex", self.SHA, api)
+        first = self.candidate("tainex", self.SHA, api)
         self.assertEqual(first["reserved_ref_count"], 2)
         self.assertFalse(first["native_get_allowed"])
         self.assertFalse(first["independent_cross_host_verified"])
         self.assertEqual(len(api.refs), 2)
         api.when = start + timedelta(minutes=2)  # next UTC 6h bucket
         with self.assertRaisesRegex(ValueError, "CLAIM_CREATE_REF_COLLISION"):
-            reserve_protected_claim("tainex", self.SHA, api)
+            self.candidate("tainex", self.SHA, api)
         self.assertEqual(len(api.refs), 2)
 
     def test_real_ruleset_scope_exclusion_and_actor_bypass_hold(self):
@@ -646,7 +662,7 @@ class ProtectedClaimRefProvider(unittest.TestCase):
                         return status, data, stamp
                 api = AlteredRuleset()
                 with self.assertRaisesRegex(ValueError, expected):
-                    reserve_protected_claim("tainex", self.SHA, api)
+                    self.candidate("tainex", self.SHA, api)
                 self.assertEqual(api.posts, 0)
 
     def test_missing_ruleset_denies_all_create_refs(self):
@@ -654,7 +670,7 @@ class ProtectedClaimRefProvider(unittest.TestCase):
         api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
                        self.SHA, rules=False)
         with self.assertRaisesRegex(ValueError, "CLAIM_RULESET_NOT_EXACTLY_ONE"):
-            reserve_protected_claim("tainex", self.SHA, api)
+            self.candidate("tainex", self.SHA, api)
         self.assertEqual(api.posts, 0)
 
     def test_partial_reservation_is_never_released_or_promoted(self):
@@ -662,7 +678,7 @@ class ProtectedClaimRefProvider(unittest.TestCase):
         api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
                        self.SHA, fail_second=True)
         with self.assertRaisesRegex(ValueError, "CLAIM_CREATE_REF_COLLISION"):
-            reserve_protected_claim("tainex", self.SHA, api)
+            self.candidate("tainex", self.SHA, api)
         self.assertEqual(api.posts, 2)
         self.assertEqual(len(api.refs), 1)
         self.assertTrue(next(iter(api.refs)).startswith(
@@ -673,7 +689,7 @@ class ProtectedClaimRefProvider(unittest.TestCase):
         api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
                        "a" * 40)
         with self.assertRaisesRegex(ValueError, "CLAIM_ANCHOR_MAIN_DRIFT"):
-            reserve_protected_claim("tainex", self.SHA, api)
+            self.candidate("tainex", self.SHA, api)
         self.assertEqual(api.posts, 0)
 
 
