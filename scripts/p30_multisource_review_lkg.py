@@ -867,11 +867,33 @@ class GitHubClaimREST:
         if (not path.startswith(prefix) or "?" in path or "#" in path or
                 ".." in path or "//" in path):
             raise ValueError("CLAIM_REST_PATH_HOLD")
-        if method == "GET" and payload is not None:
-            raise ValueError("CLAIM_REST_GET_BODY_HOLD")
-        if method == "POST" and (not path.endswith("/git/refs") or
-                                 not isinstance(payload, dict)):
-            raise ValueError("CLAIM_REST_POST_SCOPE_HOLD")
+        # Security boundary: this credential must not become a generic
+        # GitHub ref writer. Only source-bucket Claim refs covered by the
+        # exact protected Ruleset are eligible for creation; never main,
+        # arbitrary branches, test/validation refs or other repository APIs.
+        sources = "(?:" + "|".join(sorted(CLAIM_SOURCES)) + ")"
+        bucket_ref = r"source-claims/" + sources + r"-b[0-9]{10}"
+        relative = path[len(prefix):]
+        if method == "GET":
+            if payload is not None:
+                raise ValueError("CLAIM_REST_GET_BODY_HOLD")
+            if not (relative in ("rulesets", "git/ref/heads/main")
+                    or re.fullmatch(r"rulesets/[1-9][0-9]*", relative, re.ASCII)
+                    or re.fullmatch(r"git/ref/heads/" + bucket_ref,
+                                    relative, re.ASCII)):
+                raise ValueError("CLAIM_REST_GET_SCOPE_HOLD")
+        else:
+            if (relative != "git/refs" or type(payload) is not dict
+                    or set(payload) != {"ref", "sha"}):
+                raise ValueError("CLAIM_REST_POST_SCOPE_HOLD")
+            if (not isinstance(payload["ref"], str)
+                    or re.fullmatch(r"refs/heads/" + bucket_ref,
+                                    payload["ref"], re.ASCII) is None):
+                raise ValueError("CLAIM_REST_POST_UNPROTECTED_REF_HOLD")
+            if (not isinstance(payload["sha"], str)
+                    or re.fullmatch(r"[0-9a-f]{40}", payload["sha"],
+                                    re.ASCII) is None):
+                raise ValueError("CLAIM_REST_POST_ANCHOR_HOLD")
         body = (json.dumps(payload, separators=(",", ":")).encode("utf-8")
                 if payload is not None else None)
         req = Request(
@@ -883,8 +905,16 @@ class GitHubClaimREST:
                      "User-Agent": "EventRadarSourceClaim/1.0",
                      **({"Content-Type": "application/json"}
                         if body is not None else {})})
+        # A GitHub API redirect must not forward the Claim credential to
+        # another host. Treat 3xx as terminal; no redirects or retries.
+        from urllib.request import HTTPRedirectHandler, build_opener
+
+        class NoRedirect(HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+
         try:
-            response = urlopen(req, timeout=12)
+            response = build_opener(NoRedirect).open(req, timeout=12)
         except HTTPError as exc:
             response = exc
         with response:
