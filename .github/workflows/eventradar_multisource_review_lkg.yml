@@ -1,0 +1,100 @@
+name: EventRadar cross-source historical REVIEW LKG integration (NO GET / NO PUBLISH)
+on:
+  pull_request:
+    paths:
+      - scripts/p30_venue02bo_tainex_exhibition.py
+      - scripts/p30_l9dc_famiticket_teca.py
+      - scripts/p30_multisource_review_lkg.py
+      - scripts/p30_tainex_archived_native_bridge.py
+      - tests/p30/test_p30_multisource_review_lkg.py
+      - tests/p30/test_p30_tainex_archived_native_bridge.py
+      - tests/p30/fixtures/tainex_689_native_audit.json
+      - tests/p30/fixtures/tainex_690_native_audit.json
+      - .github/workflows/eventradar_multisource_review_lkg.yml
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-multisource-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  review:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/eventradar-multisource-review-lkg-core'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Exact-head, historical source blob parity, no publication or scheduler
+        env:
+          EXPECTED: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test "$(git rev-parse HEAD:docs/data.json)" = 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git rev-parse HEAD:scripts/p30_venue02bo_tainex_exhibition.py)" = 26ec55ad4d8fb510a4b96df8a1a53ef74120260d
+          test "$(git rev-parse HEAD:scripts/p30_l9dc_famiticket_teca.py)" = 319a27f2a899e2b208d42b824fbbd5c57c1ce27e
+          base=4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+          test "$(git merge-base "$base" HEAD)" = "$base"
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_multisource_review_lkg.yml' 'scripts/p30_l9dc_famiticket_teca.py' 'scripts/p30_multisource_review_lkg.py' 'scripts/p30_tainex_archived_native_bridge.py' 'scripts/p30_venue02bo_tainex_exhibition.py' 'tests/p30/test_p30_multisource_review_lkg.py' 'tests/p30/test_p30_tainex_archived_native_bridge.py' 'tests/p30/fixtures/tainex_689_native_audit.json' 'tests/p30/fixtures/tainex_690_native_audit.json' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+          ! grep -Eq '^[[:space:]]*(schedule|workflow_dispatch):' .github/workflows/eventradar_multisource_review_lkg.yml
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reuse historical official-source reader contracts in shared candidate Core
+        run: |
+          python -m unittest discover -s tests/p30 -p test_p30_multisource_review_lkg.py -v
+          python -m unittest discover -s tests/p30 -p test_p30_tainex_archived_native_bridge.py -v
+      - name: Isolated historical REVIEW/LKG evidence, no native HTTP
+        run: |
+          set -euo pipefail
+          mkdir -p _isolated_review/multisource
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import runpy
+          t=runpy.run_path('tests/p30/test_p30_multisource_review_lkg.py')
+          from scripts.p30_multisource_review_lkg import plan,write_isolated,load_previous_snapshot
+          from scripts.p30_tainex_archived_native_bridge import archived_inputs
+          r=plan([t['tainex_packet'](),t['fami_packet']()],as_of=t['NOW'],
+                 archived_native=archived_inputs(Path('tests/p30/fixtures')))
+          assert r['source_reader_qualified']==2
+          assert r['archived_native_receipt_qualified']==2
+          assert r['new_review']==4 and len(r['review_rows'])==4
+          assert len(r['archived_native_receipts'])==2
+          assert r['archived_native_receipts'][0]['same_run_list_detail'] is True
+          assert r['archived_native_receipts'][1]['same_run_list_detail'] is False
+          assert r['independently_accepted_fields']==r['native_get']==r['published_delta']==0
+          assert r['commit_permitted'] is False and r['formal_data_mutated'] is False
+          first_path=Path('_isolated_review/multisource/plan.json')
+          sha=write_isolated(r,first_path,Path.cwd())
+          # Actual SHA-pinned isolated artifact restart; NOT a cross-host Claim/CAS.
+          previous=load_previous_snapshot(first_path,sha,Path.cwd())
+          resumed=plan([],previous=previous,as_of=t['NOW'])
+          assert resumed['new_review']==0 and resumed['retained_lkg']==4
+          assert resumed['review_rows']==r['review_rows']
+          assert resumed['decision']=='HOLD_NO_VALID_NEW_SOURCE'
+          assert resumed['native_get']==resumed['published_delta']==0
+          assert resumed['commit_permitted'] is False
+          resume_path=Path('_isolated_review/multisource/resumed.json')
+          resume_sha=write_isolated(resumed,resume_path,Path.cwd())
+          Path('_isolated_review/multisource/SHA256SUMS.txt').write_text(
+              sha+'  plan.json\n'+resume_sha+'  resumed.json\n')
+          print('HISTORICAL_REVIEW_4_SHA_PINNED_ISOLATED_RESTART_RETAINED_4_NEW_GET_0_ACCEPTED_0_PUBLISHED_0')
+          PY
+          (cd _isolated_review/multisource && sha256sum -c SHA256SUMS.txt)
+          git diff --exit-code -- docs/data.json docs/platform_status.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-multisource-review-lkg-evidence
+          path: |
+            _isolated_review/multisource/plan.json
+            _isolated_review/multisource/resumed.json
+            _isolated_review/multisource/SHA256SUMS.txt
+          retention-days: 14
+          if-no-files-found: error

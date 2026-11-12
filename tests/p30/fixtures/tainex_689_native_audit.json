@@ -1,0 +1,38 @@
+{
+  "acceptedFields": 0,
+  "decision": "REVIEW_LIVE_LIST_DETAIL_IDENTITY_NO_PROMOTION",
+  "detailExactHeadings": 1,
+  "goldenAccepted": 0,
+  "identity": "REVIEW_SAME_ORIGIN_PATH_AND_EXACT_TITLE",
+  "listExactAnchors": 1,
+  "observedAtUTC": "2026-10-29T22:57:20.076592+00:00",
+  "published": false,
+  "receipts": [
+    {
+      "bodyBytes": 29197,
+      "bodySHA256": "68480cc1076f8c78d431ff0ef1d57050a4285b1d59af5b968012a802676512cb",
+      "decision": "REVIEW_HTTP_200_HTML",
+      "httpStatus": 200,
+      "urlRole": "LIST"
+    },
+    {
+      "bodyBytes": 25632,
+      "bodySHA256": "b5bfaf3c9c87b89d319d227478df88629c1c1332ca325fd50107c9af5d749912",
+      "decision": "REVIEW_HTTP_200_HTML",
+      "httpStatus": 200,
+      "urlRole": "DETAIL"
+    }
+  ],
+  "releaseState": "HARD_HOLD_NO_PUBLICATION",
+  "requestBudget": 2,
+  "requestCount": 2,
+  "roleLabelPresence": {
+    "exhibitionPeriod": true,
+    "organizer": true,
+    "venue": true
+  },
+  "source": "TAINEX_OFFICIAL_VENUE",
+  "sourceQuality": "REVIEW_LIVE_TWO_HTTP_SOURCES",
+  "ticketEventId": null,
+  "venueLocalIdReview": "689"
+}
