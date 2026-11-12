@@ -1163,6 +1163,127 @@ def _tainex_journal_get(target, role, url, transport):
     return reply, _tainex_verified_response(reply, url, role)
 
 
+
+def verify_tainex_attempt_after_restart(repo_root, archive_id):
+    """Read a durable native-attempt journal after process death; NEVER resume GET.
+
+    This is a local filesystem integrity check, not proof of GitHub Claim,
+    native HTTP origin, cross-host retention, accepted FIELD or publication.
+    Incomplete intents and denied HTTP responses are terminal for this ID.
+    """
+    if not isinstance(archive_id, str) or re.fullmatch(
+            r"[a-z0-9][a-z0-9_-]{0,63}", archive_id, re.ASCII) is None:
+        raise ValueError("TAINEX_RESTART_ID_HOLD")
+    root = Path(repo_root).resolve(strict=True)
+    isolated = root / "_isolated_review"
+    base = isolated / "tainex_http_attempts"
+    target = base / archive_id
+    if (any(p.is_symlink() for p in (isolated, base, target))
+            or not target.is_dir() or not target.resolve().is_relative_to(root)):
+        raise ValueError("TAINEX_RESTART_PATH_HOLD")
+
+    def read_receipt(path):
+        raw = path.read_bytes()
+        if not 0 < len(raw) <= 8192:
+            raise ValueError("TAINEX_RESTART_JSON_SIZE_HOLD")
+        obj = json.loads(raw.decode("utf-8", errors="strict"))
+        if not isinstance(obj, dict):
+            raise ValueError("TAINEX_RESTART_JSON_SCHEMA_HOLD")
+        return obj
+
+    expected, completed, incomplete = set(), [], []
+    prior_seen, delay, selected = None, 10, None
+    terminal = False
+    try:
+        for role in ("ROBOTS", "LIST", "DETAIL"):
+            stem = role.lower()
+            intent_path = target / (stem + ".intent.json")
+            body_path = target / (stem + ".body")
+            receipt_path = target / (stem + ".receipt.json")
+            present = [p.exists() for p in (intent_path, body_path, receipt_path)]
+            if not any(present):
+                continue
+            if terminal or not present[0] or (role != "ROBOTS" and
+                    (not completed or completed[-1]["role"] !=
+                     ("ROBOTS" if role == "LIST" else "LIST"))):
+                raise ValueError("TAINEX_RESTART_CHAIN_HOLD")
+            for p, exists in zip((intent_path, body_path, receipt_path), present):
+                if exists:
+                    if p.is_symlink() or not p.is_file():
+                        raise ValueError("TAINEX_RESTART_SYMLINK_HOLD")
+                    expected.add(p.name)
+            intent = read_receipt(intent_path)
+            url = (TAINEX_ROBOTS if role == "ROBOTS" else
+                   REGISTRY["tainex"]["module"].LIST if role == "LIST"
+                   else selected)
+            if (not isinstance(url, str)
+                    or intent.get("kind") != "TAINEX_HTTP_INTENT_V1"
+                    or intent.get("role") != role or intent.get("url") != url
+                    or intent.get("native_source_accepted") is not False
+                    or intent.get("published") is not False):
+                raise ValueError("TAINEX_RESTART_INTENT_HOLD")
+            created = utc(intent.get("created_at"))
+            if created > datetime.now(timezone.utc) + __import__("datetime").timedelta(seconds=120):
+                raise ValueError("TAINEX_RESTART_FUTURE_CLOCK_HOLD")
+            if prior_seen is not None and (created - prior_seen).total_seconds() < delay:
+                raise ValueError("TAINEX_RESTART_RATE_HOLD")
+            if present[2] and not present[1]:
+                raise ValueError("TAINEX_RESTART_ORPHAN_RECEIPT_HOLD")
+            if not present[1] or not present[2]:
+                incomplete.append(role)
+                terminal = True
+                continue
+            raw = body_path.read_bytes()
+            cap = 65536 if role == "ROBOTS" else TAINEX_MAX_HTTP_BYTES
+            receipt = read_receipt(receipt_path)
+            if (not 0 < len(raw) <= cap + 1
+                    or receipt.get("kind") != "TAINEX_HTTP_UNVERIFIED_RECEIPT_V1"
+                    or receipt.get("role") != role or receipt.get("url") != url
+                    or type(receipt.get("http_status")) is not int
+                    or receipt.get("body_bytes") != len(raw)
+                    or receipt.get("body_sha256") != hashlib.sha256(raw).hexdigest()
+                    or receipt.get("native_source_accepted") is not False
+                    or receipt.get("published") is not False):
+                raise ValueError("TAINEX_RESTART_RECEIPT_HASH_HOLD")
+            seen = utc(receipt.get("observed_at"))
+            if seen < created or seen > datetime.now(timezone.utc) + __import__("datetime").timedelta(seconds=120):
+                raise ValueError("TAINEX_RESTART_RESPONSE_CLOCK_HOLD")
+            completed.append({"role": role, "url": url,
+                              "http_status": receipt["http_status"],
+                              "body_sha256": receipt["body_sha256"],
+                              "observed_at": seen.isoformat()})
+            prior_seen = seen
+            if receipt["http_status"] != 200:
+                terminal = True
+                continue
+            if len(raw) > cap or b"\x00" in raw:
+                raise ValueError("TAINEX_RESTART_BODY_HOLD")
+            media = receipt.get("content_type")
+            if media not in (("text/plain",) if role == "ROBOTS" else
+                             ("text/html", "application/xhtml+xml")):
+                raise ValueError("TAINEX_RESTART_MEDIA_HOLD")
+            if role == "ROBOTS":
+                delay = _tainex_robots_delay(raw)
+            elif role == "LIST":
+                selected = _tainex_select_list_detail(
+                    raw, REGISTRY["tainex"]["module"].LIST)
+                delay = max(delay, _tainex_robots_delay(
+                    (target / "robots.body").read_bytes(), selected))
+        if not expected or {p.name for p in target.iterdir()} != expected:
+            raise ValueError("TAINEX_RESTART_MEMBER_SET_HOLD")
+    except (OSError, UnicodeError, TypeError, KeyError, json.JSONDecodeError) as exc:
+        raise ValueError("TAINEX_RESTART_UNREADABLE_HOLD") from exc
+    return {
+        "decision": "HOLD_RESTART_READONLY_NO_SOURCE_AUTHORITY",
+        "completed": completed, "incomplete_roles": incomplete,
+        "native_get_replayed": 0, "claim_consumed": False,
+        "independent_cross_host_verified": False,
+        "native_http_attested": False, "accepted_fields": 0,
+        "source_ready": False, "published": False,
+        "commit_permitted": False,
+    }
+
+
 def tainex_native_capture_once(*, claim, repo_root, archive_id,
                                transport=None, pause=None):
     """Future controlled-host-only collector: robots 1, LIST 1, same-ID DETAIL 1.
