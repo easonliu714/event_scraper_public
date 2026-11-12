@@ -1276,7 +1276,7 @@ def verify_tainex_attempt_after_restart(repo_root, archive_id):
     return {
         "decision": "HOLD_RESTART_READONLY_NO_SOURCE_AUTHORITY",
         "completed": completed, "incomplete_roles": incomplete,
-        "native_get_replayed": 0, "claim_consumed": False,
+        "native_get_replayed": 0, "claim_consumption_verified": False,
         "independent_cross_host_verified": False,
         "native_http_attested": False, "accepted_fields": 0,
         "source_ready": False, "published": False,
