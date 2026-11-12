@@ -740,6 +740,15 @@ class TaiNEXNativeP0Collector(unittest.TestCase):
             _tainex_robots_delay, _tainex_verified_response)
         self.assertEqual(_tainex_robots_delay(
             b"User-agent: *\nDisallow:\nCrawl-delay: 12\n"), 12)
+        # Security regression: Python RobotFileParser ignores fractional
+        # Crawl-delay instead of enforcing it. Never silently use 10s.
+        for declared in (b"30.5", b"bogus", b"-1"):
+            with self.subTest(declared=declared):
+                with self.assertRaisesRegex(
+                        ValueError, "TAINEX_ROBOTS_DELAY_FORMAT_HOLD"):
+                    _tainex_robots_delay(
+                        b"User-agent: *\nDisallow:\nCrawl-delay: " +
+                        declared + b"\n")
         with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DISALLOW_HOLD"):
             _tainex_robots_delay(
                 b"User-agent: *\nDisallow: /event\n")
