@@ -4875,3 +4875,45 @@ Independent final GitHub readback: [exact-head run #41495782054](https://github.
 - **Actual source safety gap closed:** Prior `_tainex_robots_delay()` honored `Crawl-delay` but silently ignored the official robots `Request-rate` directive. A policy such as `Request-rate: 1/60` could therefore allow the native LIST/DETAIL path to sleep only 10 seconds instead of at least 60. The production parser now validates all declared request-rate syntax, rejects malformed/zero/unsupported rates before any subsequent LIST/DETAIL, applies conservative ceil(seconds/requests) spacing, and uses the longest of Owner minimum 10s, Crawl-delay and Request-rate. Unsupported >300s policy fails closed rather than issuing a request. This is a production source-policy fix; no new official HTTP GET was made.
 - **Exact-head evidence:** [Source Draft #247](https://github.com/easonliu714/event_scraper_public/pull/247) `bfca9c0868a4d19a1d0a3f2e5c0a66ea4568c563` → `8b2232a4388d42598d388c547e1145247a34b652`; only existing `scripts/p30_multisource_review_lkg.py` and `tests/p30/test_p30_multisource_review_lkg.py` changed. [CI #43305884326](https://github.com/easonliu714/event_scraper_public/actions/runs/43305884326), job `131488961244` SUCCESS: 45 Source/Core + 3 archived Bridge tests PASS, including robots Request-rate regression. Artifact `13984146362`, 4,491 bytes, GitHub metadata digest `sha256:968c400b3d32e99781db1fbf9ccd707cc1a1a9e501fd848e2fea476a05817c5a`; independent ZIP-byte verification not performed in this round.
 - **Gate boundaries unchanged:** Source main `4d207948526cd6a6e8ecd79ecd1251dcf44b31e8`; formal data/status blobs `342eb7c101115b05dbc6ff90de7bd97d5bd63d59` / `720cac528faacc9560a5ab41ce725bf8cc183166` unchanged. Ruleset #27026973 active; prior authenticated DELETE HTTP422 PASS retained, never retested. Independent Termux × GitHub-hosted Runner test-Claim collision, real sliding six hours, cross-host crash/restart/retention and mutable-admin/least-privilege authority still HOLD. Only Owner action: approve one dedicated non-source test Claim simultaneous create-ref race from two independent hosts. `CLAIM_REAL_ENFORCEMENT_RELEASED=False`, `TAINEX_OWNER_LIVE_GET_RELEASED=False`, `native_get_allowed=False`. New official LIST/DETAIL bytes=0; accepted FIELD=0; SOURCE_READY=0; Publisher staging=not triggered; no main/Golden/formal JSON/Pages/schedule writes. `HARD_HOLD_NO_PUBLICATION` retained.
+
+
+## 2026-11-13 — Owner Source Gate / Issue / 累積分支新工作模式（已實際建立 23 Issues）
+
+Owner 2026-11-13 指令：每個 Source 固定一個 Roadmap Gate 和 GitHub Issue，歷史 PASS 保留，只有實質新增的官方證據及工程結果可推進。Issue comments 是執行紀錄，不是第三份治理文件；仍以本 Repo Governance Draft #8 的兩份 canonical 文件為唯一正式進度／架構基線。現有 19 平台加 TPAC/TaiNEX/TICC/TMC，共 23 Gate，已建立並獨立讀回；後續新增 Source 先檢索重複再增量納管。
+
+| Gate | Source | Issue | Status |
+|---|---|---|---|
+| SRC-P01 | KKTIX | [#251](https://github.com/easonliu714/event_scraper_public/issues/251) | OPEN / SOURCE_READY HOLD |
+| SRC-P02 | ACCUPASS | [#252](https://github.com/easonliu714/event_scraper_public/issues/252) | OPEN / SOURCE_READY HOLD |
+| SRC-P03 | 拓元售票 | [#253](https://github.com/easonliu714/event_scraper_public/issues/253) | OPEN / SOURCE_READY HOLD |
+| SRC-P04 | 寬宏 | [#254](https://github.com/easonliu714/event_scraper_public/issues/254) | OPEN / SOURCE_READY HOLD |
+| SRC-P05 | OPENTIX | [#255](https://github.com/easonliu714/event_scraper_public/issues/255) | OPEN / SOURCE_READY HOLD |
+| SRC-P06 | UDN售票網 | [#256](https://github.com/easonliu714/event_scraper_public/issues/256) | OPEN / SOURCE_READY HOLD |
+| SRC-P07 | FamiTicket | [#257](https://github.com/easonliu714/event_scraper_public/issues/257) | OPEN / SOURCE_READY HOLD |
+| SRC-P08 | 年代售票 | [#258](https://github.com/easonliu714/event_scraper_public/issues/258) | OPEN / SOURCE_READY HOLD |
+| SRC-P09 | TixFun | [#259](https://github.com/easonliu714/event_scraper_public/issues/259) | OPEN / SOURCE_READY HOLD |
+| SRC-P10 | Event Go | [#260](https://github.com/easonliu714/event_scraper_public/issues/260) | OPEN / SOURCE_READY HOLD |
+| SRC-P11 | BeClass | [#261](https://github.com/easonliu714/event_scraper_public/issues/261) | OPEN / SOURCE_READY HOLD |
+| SRC-P12 | ibon | [#262](https://github.com/easonliu714/event_scraper_public/issues/262) | OPEN / SOURCE_READY HOLD |
+| SRC-P13 | 華山1914 | [#263](https://github.com/easonliu714/event_scraper_public/issues/263) | OPEN / SOURCE_READY HOLD |
+| SRC-P14 | 松山文創 | [#264](https://github.com/easonliu714/event_scraper_public/issues/264) | OPEN / SOURCE_READY HOLD |
+| SRC-P15 | KidsClub | [#265](https://github.com/easonliu714/event_scraper_public/issues/265) | OPEN / SOURCE_READY HOLD |
+| SRC-P16 | 台北世貿 TWTC | [#266](https://github.com/easonliu714/event_scraper_public/issues/266) | OPEN / SOURCE_READY HOLD |
+| SRC-P17 | 中正紀念堂 CKSMH | [#267](https://github.com/easonliu714/event_scraper_public/issues/267) | OPEN / SOURCE_READY HOLD |
+| SRC-P18 | iNDIEVOX | [#268](https://github.com/easonliu714/event_scraper_public/issues/268) | OPEN / SOURCE_READY HOLD |
+| SRC-P19 | StrollTimes | [#269](https://github.com/easonliu714/event_scraper_public/issues/269) | OPEN / SOURCE_READY HOLD |
+| SRC-V-TPAC | 臺北表演藝術中心 TPAC | [#250](https://github.com/easonliu714/event_scraper_public/issues/250) | OPEN / SOURCE_READY HOLD |
+| SRC-V-TAINEX | 南港展覽館 TaiNEX | [#270](https://github.com/easonliu714/event_scraper_public/issues/270) | OPEN / SOURCE_READY HOLD |
+| SRC-V-TICC | 台北國際會議中心 TICC | [#271](https://github.com/easonliu714/event_scraper_public/issues/271) | OPEN / SOURCE_READY HOLD |
+| SRC-V-TMC | 台北流行音樂中心 TMC | [#272](https://github.com/easonliu714/event_scraper_public/issues/272) | OPEN / SOURCE_READY HOLD |
+
+### 每個 Source 共同的五步循環與 PASS 條件
+1. LIST：依合法 robots／主機時限／Owner 限額，先使用 GitHub-hosted Actions 正常 HTTP／必要時正常 JS 取得官方多個入口的 LIST，留存原始 bytes、HTTP、final URL、UTC、SHA256、Event IDs、活動數。HTTP200 不能代替 LIST PASS。
+2. DETAIL／IDENTITY：針對每一個 LIST 活動建立狀態及剩餘 backlog，依每輪來源限額分批取得同 Event ID 官方 DETAIL，不能把 Event/Product/Session 或跨 catalog 同號混成同活動。兩筆 DETAIL 上限不等於只處理兩筆活動。
+3. CAPTURE FIX：清單／詳情失敗時分類 robots/403/429/Redirect/JS/DOM/URL drift/encoding/timeout，記錄嘗試方法與第一真因；修改 Source Adapter 並安全回歸。若 Action 可用的所有合法方法遭阻擋，標 BLOCKED_ACTIONS_TERMUX_PENDING，暫停該 Source、轉下一 Gate，留待 Owner 同意的 Termux 正常公開存取驗證，不繞過反爬或登入驗證。
+4. FIELD QUALITY：解析同一 Event ID 詳情中演出／展期、售票/入場時段、一般最低票價／優惠、場館／地址、官方連結／圖片／摘要；逐欄記錄 value/role/event_id/source_url/observed_at/decision/hold_reason。UNKNOWN、REVIEW、HOLD 不轉換成假接受。
+5. PARSER FIX：針對不合格欄位修最小 Parser/Core、重播官方原始證據、正／反／回歸／安全測試、exact-head CI/job/Artifact 與獨立讀回。修完同 Source 的下一活動，完成後下一 Source 復用共用解析／品質核心而非從零重做。
+
+每輪唯一工程 Writer（既有 Task 6ae1e6147e548191881f20e730ab0f11）對本輪實際處理 Source Issue **留一則含唯一 run_id 的 comment**，記錄 timestamp、確切來源方法/HTTP/請求數、LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION 新增量、首真因／修補函數前後、Branch/Commit/CI/Artifact/readback、PASS/HOLD/FAIL、下輪方法和 Owner 操作；即使 BLOCKED／0 增量也記一次。不得重複 run_id，不對未嘗試的全部 Issue 每小時灌水。完成來源的合法定期 LIST→DETAIL→FIELD→Quality Gate→LKG/CAS/rollback→經 Owner 授權 Publisher 及正式 Pages/Android 驗收後，才關閉該 Source Issue。Publisher 本身沿用既有 [#248](https://github.com/easonliu714/event_scraper_public/issues/248)。
+累積分支策略：下游工程 Gate 應使用上一個真正完成且已進入工程基線的 exact source tree/head，或建立明確依賴的 stacked Draft PR；不能因舊 Gate PR CI PASS 而假定它在 main，不能每輪從過期 main 再做一次。更新只允許既有授權 Draft branch，Owner 未批准不 merge、修改 main/Golden/正式 data/status 或啟用 Publisher/Scheduler/Notifier/Gateway。
+第一 Source 為 [TPAC #250](https://github.com/easonliu714/event_scraper_public/issues/250)，歷史已由 Actions 真實取得 /program LIST→#2040 DETAIL 及 /event LIST→#1301、#2072 DETAIL；Source Draft #243 在本決議前 2026-11-13 20:52 Head 14d77d60632c279f94ae5157f139fc6ada1ad228、exact-head CI #43428870463 SUCCESS（隔離 REVIEW/LKG，無新 GET）。下一產品缺口為 FIELD acceptance 與 Publisher #246 安全整合，TPAC 6h 跨主機 Claim/retention 仍 HOLD、正式新增 0、SOURCE_READY 0；HARD_HOLD_NO_PUBLICATION 不變。
