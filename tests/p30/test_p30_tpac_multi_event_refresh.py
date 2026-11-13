@@ -646,6 +646,13 @@ class PersistentInventoryContractTests(unittest.TestCase):
                 "event": {"list_file": str(root / "event.html"),
                           "list_receipt": receipt("https://tpac.org.taipei/event", event),
                           "details": {}}}}
+            # Seed actual REVIEW LKG; inventory CLI must never overwrite it.
+            from scripts.p30_tpac_multi_event_refresh import write_isolated_plan
+            source_raw, source_receipt, source_details = inputs()
+            seeded = refresh_plan(source_raw, source_receipt, source_details, empty_prior(), NOW)
+            write_isolated_plan(seeded, root)
+            lkg_path = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            lkg_before = lkg_path.read_bytes()
             (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
             command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
                        "--inventory-input", str(root / "manifest.json"),
@@ -661,6 +668,19 @@ class PersistentInventoryContractTests(unittest.TestCase):
             self.assertEqual(json.loads(second.stdout)["inventory"]["sha256"],
                              doc["inventory"]["sha256"])
             self.assertFalse((root / "docs/data.json").exists())
+            self.assertEqual(lkg_path.read_bytes(), lkg_before)
+            # Invalid DETAIL cannot pass solely because its identity exists in LKG.
+            bad_detail = b"<html>invalid detail</html>"
+            (root / "bad-detail.html").write_bytes(bad_detail)
+            manifest["catalogs"]["program"]["details"] = {
+                "2111": {"detail_file": str(root / "bad-detail.html"),
+                         "receipt": receipt(ROOT + "/2111", bad_detail)}}
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            invalid = subprocess.run(command, capture_output=True, text=True, check=True)
+            invalid_doc = json.loads(invalid.stdout)
+            self.assertEqual(invalid_doc["counts"]["parse_hold"], 1)
+            self.assertEqual(invalid_doc["diagnostics"]["tpac:program:2111"]["status"], "PARSE_HOLD")
+            self.assertEqual(lkg_path.read_bytes(), lkg_before)
             manifest["catalogs"]["event"]["list_receipt"]["http_status"] = 403
             (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
             failed = subprocess.run(command, capture_output=True, text=True)
