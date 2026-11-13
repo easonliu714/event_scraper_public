@@ -730,3 +730,128 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# Persistent LIST inventory is separate from REVIEW event LKG. It never grants
+# DETAIL network permission or formal field acceptance.
+INVENTORY_KIND = "TPAC_DUAL_CATALOG_PENDING_DETAIL_V1"
+
+
+def build_detail_inventory(catalog, raw, receipt, now, previous=None):
+    """Reconcile every visible LIST ID without discarding prior attempt history."""
+    from scripts.p30_tpac_catalog_topology import discover_catalog
+    if catalog not in ("program", "event"):
+        raise ValueError("TPAC_INVENTORY_CATALOG_HOLD")
+    if previous is not None and (not isinstance(previous, dict)
+            or previous.get("kind") != INVENTORY_KIND
+            or not isinstance(previous.get("items"), dict)):
+        raise ValueError("TPAC_INVENTORY_PRIOR_SCHEMA_HOLD")
+    cards = discover_catalog(catalog, raw, receipt, now)
+    prior_items = previous["items"] if previous else {}
+    current = dict(prior_items)
+    list_sha = _sha(raw)
+    observed = _time(receipt["observed_at"]).isoformat()
+    for sid, card in cards.items():
+        key = card["identity"]
+        old = prior_items.get(key, {})
+        if old and (old.get("detail_url") != card["detail_url"]
+                    or old.get("source_namespace") != catalog
+                    or old.get("source_event_id") != sid):
+            raise ValueError("TPAC_INVENTORY_IDENTITY_DRIFT_HOLD")
+        current[key] = {
+            "source_namespace": catalog, "source_event_id": sid,
+            "list_url": card["list_url"], "detail_url": card["detail_url"],
+            "list_sha": list_sha, "last_observed": observed,
+            "status": old.get("status", "PENDING_DETAIL_BUDGET"),
+            "attempts": old.get("attempts", 0),
+            "last_attempt": old.get("last_attempt"),
+            "reason": old.get("reason", "DETAIL_BYTES_NOT_CAPTURED"),
+        }
+    # Unobserved historical IDs are retained, but cannot be scheduled.
+    for key in set(prior_items) - {c["identity"] for c in cards.values()}:
+        current[key] = dict(prior_items[key], status="NOT_IN_LATEST_LIST_REVIEW")
+    return {"kind": INVENTORY_KIND, "items": current}
+
+
+def select_pending_details(inventory, limit=2):
+    """Fair, deterministic per-catalog round-robin; selection is not GET authority."""
+    if (not isinstance(inventory, dict) or inventory.get("kind") != INVENTORY_KIND
+            or not isinstance(inventory.get("items"), dict)
+            or not isinstance(limit, int) or isinstance(limit, bool)
+            or not 0 <= limit <= 2):
+        raise ValueError("TPAC_INVENTORY_SELECTION_SCHEMA_HOLD")
+    buckets = {}
+    for key, row in inventory["items"].items():
+        if (not isinstance(row, dict)
+                or row.get("source_namespace") not in ("program", "event")
+                or key != "tpac:" + row["source_namespace"] + ":" + str(row.get("source_event_id"))
+                or row.get("detail_url") != "https://tpac.org.taipei/" +
+                   row["source_namespace"] + "/" + str(row["source_event_id"])):
+            raise ValueError("TPAC_INVENTORY_ROW_IDENTITY_HOLD")
+        if row.get("status") == "PENDING_DETAIL_BUDGET":
+            buckets.setdefault(row["source_namespace"], []).append((key, row))
+    for entries in buckets.values():
+        entries.sort(key=lambda item: (item[1].get("attempts", 0),
+                                       item[1].get("last_attempt") or "", item[0]))
+    chosen = []
+    while len(chosen) < limit and any(buckets.values()):
+        for kind in ("program", "event"):
+            if len(chosen) < limit and buckets.get(kind):
+                chosen.append(buckets[kind].pop(0)[0])
+    return chosen
+
+
+def write_detail_inventory(inventory, repo_root, expected_sha=None):
+    """Local atomic CAS of inventory only; never touch the separate event LKG."""
+    if not isinstance(inventory, dict) or inventory.get("kind") != INVENTORY_KIND:
+        raise ValueError("TPAC_INVENTORY_WRITE_SCHEMA_HOLD")
+    select_pending_details(inventory, 0)  # Validate every row before any write.
+    root = Path(repo_root).resolve()
+    folder = root / "_isolated_review" / "tpac"
+    if any(p.is_symlink() for p in (root / "_isolated_review", folder)):
+        raise ValueError("TPAC_INVENTORY_SYMLINK_HOLD")
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / "tpac_detail_inventory.json"
+    lock = folder / ".inventory.lock"
+    if target.is_symlink() or lock.is_symlink():
+        raise ValueError("TPAC_INVENTORY_SYMLINK_HOLD")
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError as error:
+        raise ValueError("TPAC_INVENTORY_CONCURRENT_WRITER_HOLD") from error
+    try:
+        os.close(fd)
+        prior = target.read_bytes() if target.exists() else None
+        if (None if prior is None else _sha(prior)) != expected_sha:
+            raise ValueError("TPAC_INVENTORY_CAS_HOLD")
+        payload = _canonical(inventory)
+        with tempfile.NamedTemporaryFile(dir=folder, prefix=".inventory-", delete=False) as tmp:
+            temp_name = tmp.name
+            tmp.write(payload)
+            tmp.flush()
+            os.fsync(tmp.fileno())
+        try:
+            os.replace(temp_name, target)
+        finally:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
+        return {"sha256": _sha(payload), "items": len(inventory["items"])}
+    finally:
+        os.unlink(lock)
+
+
+def load_detail_inventory(repo_root):
+    """Read canonical persisted inventory and its CAS version."""
+    target = Path(repo_root).resolve() / "_isolated_review" / "tpac" / "tpac_detail_inventory.json"
+    if target.is_symlink() or target.parent.is_symlink():
+        raise ValueError("TPAC_INVENTORY_SYMLINK_HOLD")
+    if not target.exists():
+        return {"kind": INVENTORY_KIND, "items": {}}, None
+    raw = target.read_bytes()
+    if not 0 < len(raw) <= 16 * 1024 * 1024:
+        raise ValueError("TPAC_INVENTORY_SIZE_HOLD")
+    document = json.loads(raw)
+    if _canonical(document) != raw:
+        raise ValueError("TPAC_INVENTORY_NONCANONICAL_HOLD")
+    select_pending_details(document, 0)
+    return document, _sha(raw)
