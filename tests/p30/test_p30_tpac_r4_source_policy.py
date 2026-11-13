@@ -110,6 +110,19 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ROBOTS_DIRECTIVES_MISSING_HOLD"):
             review_two_catalog_plan(**inputs(robots=b"just text"))
 
+    def test_request_rate_is_enforced_and_unsupported_policy_fails_closed(self):
+        policy = b"User-agent: *\\nAllow: /\\nCrawl-delay: 4\\nRequest-rate: 1/30\\n"
+        result = review_two_catalog_plan(**inputs(robots=policy))
+        self.assertEqual(result["minimum_request_gap_seconds"], 30)
+        self.assertFalse(result["native_get_allowed"])
+        for policy in (
+            b"User-agent: *\\nAllow: /\\nRequest-rate: broken\\n",
+            b"User-agent: *\\nAllow: /\\nRequest-rate: 1/120\\n",
+        ):
+            with self.subTest(policy=policy):
+                with self.assertRaisesRegex(ValueError, "REQUEST_RATE_"):
+                    review_two_catalog_plan(**inputs(robots=policy))
+
     def test_403_429_and_any_non_200_stop_without_retry(self):
         stop_on_response(200)
         for status in (403, 429):
