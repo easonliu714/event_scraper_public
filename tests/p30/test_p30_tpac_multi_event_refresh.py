@@ -625,6 +625,51 @@ class PersistentInventoryContractTests(unittest.TestCase):
                 write_detail_inventory(inventory, root, expected_sha=None)
             self.assertFalse((Path(root) / "docs" / "data.json").exists())
 
+
+    def test_real_cli_offline_two_catalog_inventory_restart_and_cas(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            program = listing(("2111", "2112"))
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
+            (root / "program.html").write_bytes(program)
+            (root / "event.html").write_bytes(event)
+            manifest = {"now": NOW.isoformat(), "catalogs": {
+                "program": {"list_file": str(root / "program.html"),
+                            "list_receipt": receipt(ROOT, program), "details": {}},
+                "event": {"list_file": str(root / "event.html"),
+                          "list_receipt": receipt("https://tpac.org.taipei/event", event),
+                          "details": {}}}}
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--inventory-input", str(root / "manifest.json"),
+                       "--repo-root", str(root)]
+            first = subprocess.run(command, capture_output=True, text=True, check=True)
+            doc = json.loads(first.stdout)
+            self.assertEqual(doc["counts"]["source_cards"], 3)
+            self.assertEqual(doc["counts"]["pending_detail_budget"], 3)
+            self.assertEqual(doc["counts"]["parse_hold"], 0)
+            self.assertEqual(doc["published"], 0)
+            self.assertEqual(len(doc["next_detail_ids"]), 2)
+            second = subprocess.run(command, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(second.stdout)["inventory"]["sha256"],
+                             doc["inventory"]["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+            manifest["catalogs"]["event"]["list_receipt"]["http_status"] = 403
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            failed = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD", failed.stderr)
+            from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+            _, sha = load_detail_inventory(root)
+            self.assertEqual(sha, doc["inventory"]["sha256"])
+
     def test_cross_namespace_url_conflict_fails_closed(self):
         from scripts.p30_tpac_multi_event_refresh import (
             INVENTORY_KIND, select_pending_details,
