@@ -590,3 +590,54 @@ class VenueRoleReviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PersistentInventoryContractTests(unittest.TestCase):
+    """Offline contract: no HTTP, no publication, no mutation of REVIEW LKG."""
+
+    def test_dual_catalog_fairness_cas_and_restart(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, select_pending_details, write_detail_inventory,
+            load_detail_inventory,
+        )
+        rows = {}
+        for kind in ("program", "event"):
+            for sid in ("1301", "2072"):
+                key = f"tpac:{kind}:{sid}"
+                rows[key] = {
+                    "source_namespace": kind, "source_event_id": sid,
+                    "detail_url": f"https://tpac.org.taipei/{kind}/{sid}",
+                    "list_url": f"https://tpac.org.taipei/{kind}",
+                    "list_sha": "a" * 64, "last_observed": OBS,
+                    "status": "PENDING_DETAIL_BUDGET", "attempts": 0,
+                    "last_attempt": None, "reason": "DETAIL_BYTES_NOT_CAPTURED",
+                }
+        inventory = {"kind": INVENTORY_KIND, "items": rows}
+        selected = select_pending_details(inventory)
+        self.assertEqual(len(selected), 2)
+        self.assertEqual([rows[key]["source_namespace"] for key in selected],
+                         ["program", "event"])
+        with tempfile.TemporaryDirectory() as root:
+            first = write_detail_inventory(inventory, root)
+            restored, sha = load_detail_inventory(root)
+            self.assertEqual(sha, first["sha256"])
+            self.assertEqual(restored, inventory)
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                write_detail_inventory(inventory, root, expected_sha=None)
+            self.assertFalse((Path(root) / "docs" / "data.json").exists())
+
+    def test_cross_namespace_url_conflict_fails_closed(self):
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, select_pending_details,
+        )
+        bad = {"kind": INVENTORY_KIND, "items": {
+            "tpac:event:1301": {
+                "source_namespace": "event", "source_event_id": "1301",
+                "detail_url": "https://tpac.org.taipei/program/1301",
+                "status": "PENDING_DETAIL_BUDGET",
+            },
+        }}
+        with self.assertRaisesRegex(ValueError, "IDENTITY_HOLD"):
+            select_pending_details(bad)
