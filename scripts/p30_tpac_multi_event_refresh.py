@@ -875,6 +875,9 @@ def offline_inventory_cli(manifest_path, repo_root):
         raise ValueError("TPAC_INVENTORY_CLI_TWO_CATALOGS_HOLD")
     now = _time(data["now"])
     prior, expected = load_detail_inventory(repo_root)
+    # Use the actual isolated REVIEW LKG as parser prior; inventory is a separate CAS domain.
+    # Never persist a newly parsed event from this diagnostic-only CLI.
+    review_prior, review_sha = load_isolated_prior(repo_root)
     staged = prior
     counts = {"source_cards": 0, "detail_available": 0,
               "pending_detail_budget": 0, "parse_hold": 0, "review": 0}
@@ -901,7 +904,7 @@ def offline_inventory_cli(manifest_path, repo_root):
         if pairs:
             planner = refresh_event_plan if catalog == "event" else refresh_plan
             plan = planner(raw, entry["list_receipt"], pairs,
-                           {"kind": KIND, "events": {}}, now)
+                           review_prior, now)
         for sid, card in cards.items():
             key = card["identity"]
             row = staged["items"][key]
@@ -914,7 +917,10 @@ def offline_inventory_cli(manifest_path, repo_root):
                 continue
             counts["detail_available"] += 1
             event_key = "tpac:event:" + sid if catalog == "event" else "tpac:" + sid
-            accepted = plan is not None and event_key in plan["events"]
+            # A retained LKG entry is NOT evidence that this DETAIL parsed successfully.
+            accepted = (plan is not None and event_key in plan["events"]
+                        and sid not in plan.get("rejected", {})
+                        and plan.get("decision") == "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
             row["status"] = "REVIEW_DETAIL_PARSED" if accepted else "PARSE_HOLD"
             reason = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED" if accepted else "DETAIL_PARSER_REJECTED"
             if not accepted and plan is not None:
