@@ -774,7 +774,9 @@ def build_detail_inventory(catalog, raw, receipt, now, previous=None):
             "reason": old.get("reason", "DETAIL_BYTES_NOT_CAPTURED"),
         }
     # Unobserved historical IDs are retained, but cannot be scheduled.
-    for key in set(prior_items) - {c["identity"] for c in cards.values()}:
+    for key in (set(prior_items) - {c["identity"] for c in cards.values()}):
+        if prior_items[key].get("source_namespace") != catalog:
+            continue
         current[key] = dict(prior_items[key], status="NOT_IN_LATEST_LIST_REVIEW")
     return {"kind": INVENTORY_KIND, "items": current}
 
