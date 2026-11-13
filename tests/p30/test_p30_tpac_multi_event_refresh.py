@@ -588,9 +588,6 @@ class VenueRoleReviewTests(unittest.TestCase):
                     _venue_role_review(BeautifulSoup(markup, "html.parser"))
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class PersistentInventoryContractTests(unittest.TestCase):
     """Offline contract: no HTTP, no publication, no mutation of REVIEW LKG."""
@@ -641,3 +638,6 @@ class PersistentInventoryContractTests(unittest.TestCase):
         }}
         with self.assertRaisesRegex(ValueError, "IDENTITY_HOLD"):
             select_pending_details(bad)
+
+if __name__ == "__main__":
+    unittest.main()
