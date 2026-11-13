@@ -92,7 +92,7 @@ def _verify_robots(raw: bytes, urls: tuple[str, ...]) -> tuple[str, int]:
             intervals.append((rate.seconds + rate.requests - 1) // rate.requests)
     # An explicitly present but unsupported directive must not silently
     # downgrade to the minimum spacing.
-    if any(re.match(r"(?i)^\\s*request-rate\\s*:", line)
+    if any(re.match(r"(?i)^\s*request-rate\s*:", line)
            for line in lines) and not any(rate is not None for rate in rates):
         raise ValueError("TPAC_R4_ROBOTS_REQUEST_RATE_UNSUPPORTED_HOLD")
     gap = max(intervals)
