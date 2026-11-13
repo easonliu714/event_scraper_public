@@ -277,6 +277,21 @@ def parse_detail(card, body, receipt, now):
     return event
 
 
+
+def _semantic_event_payload(event):
+    """Compare display-relevant source fields, never receipt/observation metadata.
+
+    This is REVIEW-only diff accounting, not independent field acceptance.
+    Unknown fields and authority flags remain outside this comparison and
+    cannot grant Publisher eligibility.
+    """
+    if not isinstance(event, dict):
+        raise ValueError("TPAC_SEMANTIC_EVENT_SCHEMA_HOLD")
+    keys = ("source_event_id", "title", "url", "platform", "type",
+            "date", "location", "price", "img_url", "description")
+    return tuple((key, event.get(key)) for key in keys)
+
+
 def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
     """Stage multi-event source-owned candidates, with no destructive removals.
 
@@ -320,8 +335,10 @@ def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
         key = "tpac:" + sid
         if key not in updated:
             adds += 1
-        elif updated[key] == event:
+        elif _semantic_event_payload(updated[key]) == _semantic_event_payload(event):
+            # An observation-only receipt refresh must not create a content delta.
             same += 1
+            continue  # Preserve the prior LKG bytes and its provenance unchanged.
         else:
             changes += 1
         updated[key] = event
