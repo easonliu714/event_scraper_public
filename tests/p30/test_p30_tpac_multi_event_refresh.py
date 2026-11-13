@@ -679,6 +679,9 @@ class PersistentInventoryContractTests(unittest.TestCase):
             invalid = subprocess.run(command, capture_output=True, text=True, check=True)
             invalid_doc = json.loads(invalid.stdout)
             self.assertEqual(invalid_doc["counts"]["parse_hold"], 1)
+            # A legitimate offline PARSE_HOLD transition advances inventory CAS;
+            # a subsequent denied LIST must preserve that latest committed version.
+            self.assertNotEqual(invalid_doc["inventory"]["sha256"], doc["inventory"]["sha256"])
             self.assertEqual(invalid_doc["diagnostics"]["tpac:program:2111"]["status"], "PARSE_HOLD")
             self.assertEqual(lkg_path.read_bytes(), lkg_before)
             manifest["catalogs"]["event"]["list_receipt"]["http_status"] = 403
@@ -688,7 +691,7 @@ class PersistentInventoryContractTests(unittest.TestCase):
             self.assertIn("TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD", failed.stderr)
             from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
             _, sha = load_detail_inventory(root)
-            self.assertEqual(sha, doc["inventory"]["sha256"])
+            self.assertEqual(sha, invalid_doc["inventory"]["sha256"])
 
     def test_cross_namespace_url_conflict_fails_closed(self):
         from scripts.p30_tpac_multi_event_refresh import (
