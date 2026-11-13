@@ -444,8 +444,10 @@ def refresh_event_plan(list_body, list_receipt, detail_pairs, prior, now):
         valid += 1
         if identity not in updated:
             adds += 1
-        elif updated[identity] == event:
+        elif _semantic_event_payload(updated[identity]) == _semantic_event_payload(event):
+            # Preserve REVIEW LKG provenance on observation-only receipt changes.
             same += 1
+            continue
         else:
             changes += 1
         updated[identity] = event
