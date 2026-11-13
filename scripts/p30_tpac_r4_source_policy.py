@@ -80,7 +80,25 @@ def _verify_robots(raw: bytes, urls: tuple[str, ...]) -> tuple[str, int]:
         wait = 0
     if type(wait) not in (int, float) or not 0 <= wait <= MAX_CRAWL_DELAY_SECONDS:
         raise ValueError("TPAC_R4_ROBOTS_CRAWL_DELAY_EXCEEDS_BUDGET_HOLD")
-    return hashlib.sha256(raw).hexdigest(), max(MIN_REQUEST_GAP_SECONDS, int(wait))
+    # robotparser exposes Request-rate separately from Crawl-delay. Ignoring it
+    # can violate an official host-wide policy despite a valid Crawl-delay.
+    rates = [policy.request_rate(AGENT), policy.request_rate("*")]
+    intervals = [MIN_REQUEST_GAP_SECONDS, int(wait)]
+    for rate in rates:
+        if rate is not None:
+            if (type(rate.requests) is not int or type(rate.seconds) is not int
+                    or rate.requests <= 0 or rate.seconds <= 0):
+                raise ValueError("TPAC_R4_ROBOTS_REQUEST_RATE_INVALID_HOLD")
+            intervals.append((rate.seconds + rate.requests - 1) // rate.requests)
+    # An explicitly present but unsupported directive must not silently
+    # downgrade to the minimum spacing.
+    if any(re.match(r"(?i)^\\s*request-rate\\s*:", line)
+           for line in lines) and not any(rate is not None for rate in rates):
+        raise ValueError("TPAC_R4_ROBOTS_REQUEST_RATE_UNSUPPORTED_HOLD")
+    gap = max(intervals)
+    if gap > MAX_CRAWL_DELAY_SECONDS:
+        raise ValueError("TPAC_R4_ROBOTS_REQUEST_RATE_EXCEEDS_BUDGET_HOLD")
+    return hashlib.sha256(raw).hexdigest(), gap
 
 
 def enforce_elapsed(start_at: datetime, previous_claim_at: datetime | None) -> None:
