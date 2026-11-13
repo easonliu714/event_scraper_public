@@ -696,12 +696,22 @@ def main(argv=None):
     # Explicit namespace prevents a /event archive from silently entering the
     # legacy /program planner; the default preserves existing program callers.
     ap.add_argument("--catalog", choices=("program", "event"), default="program")
-    ap.add_argument("--input", type=Path, required=True)
+    ap.add_argument("--input", type=Path)
+    ap.add_argument("--inventory-input", type=Path,
+                    help="Offline two-catalog LIST/DETAIL receipt manifest; no network")
     ap.add_argument("--repo-root", type=Path, required=True)
     ap.add_argument("--expected-sha")
     ap.add_argument("--prior-from-lkg", action="store_true",
                     help="CAS-load the current isolated LKG instead of a manifest prior")
     args = ap.parse_args(argv)
+    if args.inventory_input is not None:
+        if args.input is not None or args.prior_from_lkg or args.expected_sha is not None:
+            raise ValueError("TPAC_INVENTORY_CLI_MODE_CONFLICT_HOLD")
+        result = offline_inventory_cli(args.inventory_input, args.repo_root)
+        print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+        return 0
+    if args.input is None:
+        raise ValueError("TPAC_INPUT_REQUIRED_HOLD")
     data = json.loads(args.input.read_text(encoding="utf-8"))
     if data.get("catalog", "program") != args.catalog:
         raise ValueError("TPAC_MANIFEST_CATALOG_MISMATCH_HOLD")
@@ -726,10 +736,6 @@ def main(argv=None):
                       "rejected": plan["rejected"],
                       "published": 0}, ensure_ascii=False, sort_keys=True))
     return 0 if result["decision"] == "ISOLATED_REVIEW_LKG_COMMITTED_NOT_FORMAL" else 49
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
 
 
 # Persistent LIST inventory is separate from REVIEW event LKG. It never grants
@@ -855,3 +861,71 @@ def load_detail_inventory(repo_root):
         raise ValueError("TPAC_INVENTORY_NONCANONICAL_HOLD")
     select_pending_details(document, 0)
     return document, _sha(raw)
+
+
+def offline_inventory_cli(manifest_path, repo_root):
+    """Replay sealed two-catalog LIST bytes, persist backlog CAS; never GET/publish."""
+    data = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or set(data) != {"now", "catalogs"}:
+        raise ValueError("TPAC_INVENTORY_CLI_MANIFEST_HOLD")
+    catalogs = data["catalogs"]
+    if not isinstance(catalogs, dict) or set(catalogs) != {"program", "event"}:
+        raise ValueError("TPAC_INVENTORY_CLI_TWO_CATALOGS_HOLD")
+    now = _time(data["now"])
+    prior, expected = load_detail_inventory(repo_root)
+    staged = prior
+    counts = {"source_cards": 0, "detail_available": 0,
+              "pending_detail_budget": 0, "parse_hold": 0, "review": 0}
+    diagnostics = {}
+    for catalog in ("program", "event"):
+        entry = catalogs[catalog]
+        if not isinstance(entry, dict) or set(entry) != {"list_file", "list_receipt", "details"}:
+            raise ValueError("TPAC_INVENTORY_CLI_CATALOG_SCHEMA_HOLD")
+        raw = Path(entry["list_file"]).read_bytes()
+        staged = build_detail_inventory(catalog, raw, entry["list_receipt"], now, staged)
+        from scripts.p30_tpac_catalog_topology import discover_catalog
+        cards = discover_catalog(catalog, raw, entry["list_receipt"], now)
+        details = entry["details"]
+        if not isinstance(details, dict) or set(details) - set(cards):
+            raise ValueError("TPAC_INVENTORY_CLI_DETAIL_ID_HOLD")
+        counts["source_cards"] += len(cards)
+        pairs = {}
+        for sid, record in details.items():
+            if not isinstance(record, dict) or set(record) != {"detail_file", "receipt"}:
+                raise ValueError("TPAC_INVENTORY_CLI_DETAIL_SCHEMA_HOLD")
+            pairs[sid] = {"body": Path(record["detail_file"]).read_bytes(),
+                          "receipt": record["receipt"]}
+        plan = None
+        if pairs:
+            planner = refresh_event_plan if catalog == "event" else refresh_plan
+            plan = planner(raw, entry["list_receipt"], pairs,
+                           {"kind": KIND, "events": {}}, now)
+        for sid, card in cards.items():
+            key = card["identity"]
+            row = staged["items"][key]
+            if sid not in pairs:
+                if row["status"] != "REVIEW_DETAIL_PARSED":
+                    row["status"] = "PENDING_DETAIL_BUDGET"
+                    row["reason"] = "DETAIL_BYTES_NOT_CAPTURED"
+                    counts["pending_detail_budget"] += 1
+                diagnostics[key] = {"status": row["status"], "reason": row["reason"]}
+                continue
+            counts["detail_available"] += 1
+            event_key = "tpac:event:" + sid if catalog == "event" else "tpac:" + sid
+            accepted = plan is not None and event_key in plan["events"]
+            row["status"] = "REVIEW_DETAIL_PARSED" if accepted else "PARSE_HOLD"
+            reason = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED" if accepted else "DETAIL_PARSER_REJECTED"
+            if not accepted and plan is not None:
+                reason = str(plan.get("rejected", {}).get(sid, reason))
+            row["reason"] = reason
+            counts["review" if accepted else "parse_hold"] += 1
+            diagnostics[key] = {"status": row["status"], "reason": reason}
+    result = write_detail_inventory(staged, repo_root, expected)
+    return {"decision": "ISOLATED_INVENTORY_ONLY_NO_PUBLICATION",
+            "inventory": result, "counts": counts,
+            "next_detail_ids": select_pending_details(staged),
+            "diagnostics": diagnostics, "published": 0}
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
