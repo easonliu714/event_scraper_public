@@ -930,7 +930,9 @@ def archived_inventory_cli(manifest_path, repo_root):
         raise ValueError("TPAC_ARCHIVE_MANIFEST_HOLD")
     if not isinstance(data["catalogs"], dict) or set(data["catalogs"]) != {"program", "event"}:
         raise ValueError("TPAC_ARCHIVE_TWO_CATALOG_HOLD")
-    previous, expected = load_detail_inventory(repo_root)
+    # Archive replay has its own CAS domain; never downgrade a LIVE inventory row.
+    archive_root = Path(repo_root).resolve() / "_isolated_archive_replay"
+    previous, expected = load_detail_inventory(archive_root)
     rows = dict(previous["items"]) if previous else {}
     counts = {"source_cards": 0, "detail_available": 0, "pending_detail_budget": 0,
               "archive_identity_hold": 0}
@@ -972,7 +974,7 @@ def archived_inventory_cli(manifest_path, repo_root):
             diagnostics[key] = {"status": status, "reason": reason}
     # Do not erase rows from other snapshots; archive replay is not LIVE reconciliation.
     inventory = {"kind": INVENTORY_KIND, "items": rows}
-    result = write_detail_inventory(inventory, repo_root, expected)
+    result = write_detail_inventory(inventory, archive_root, expected)
     return {"decision": "ARCHIVED_SOURCE_VERIFIED_BODY_ONLY_NO_PUBLICATION",
             "inventory": result, "counts": counts, "diagnostics": diagnostics,
             "next_detail_ids": select_pending_details(inventory),
