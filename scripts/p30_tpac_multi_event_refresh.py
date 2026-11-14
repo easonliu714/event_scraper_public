@@ -865,9 +865,124 @@ def load_detail_inventory(repo_root):
     return document, _sha(raw)
 
 
+
+def _archived_body(raw, receipt, url, catalog, event_id=None):
+    """Offline provenance only. Never converts an archive into a LIVE receipt."""
+    if not isinstance(receipt, dict) or receipt.get("evidence_class") != "VERIFIED_ARCHIVED_BODY_ONLY":
+        raise ValueError("TPAC_ARCHIVE_EVIDENCE_CLASS_HOLD")
+    if not isinstance(raw, bytes) or not 0 < len(raw) <= MAX_BODY:
+        raise ValueError("TPAC_ARCHIVE_BODY_HOLD")
+    expected = "https://tpac.org.taipei/" + catalog
+    if event_id is not None:
+        expected += "/" + str(event_id)
+    if url != expected or receipt.get("source_url") != expected:
+        raise ValueError("TPAC_ARCHIVE_IDENTITY_URL_HOLD")
+    if receipt.get("body_sha256") != _sha(raw) or receipt.get("body_bytes") != len(raw):
+        raise ValueError("TPAC_ARCHIVE_BYTES_SHA_HOLD")
+    # The one-shot /program receipt has no per-body observation, status or robots.
+    # Unknown fields must remain absent/null, not fabricated by a replay.
+    if any(receipt.get(k) is not None for k in ("observed_at", "http_status", "robots_allowed")):
+        raise ValueError("TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD")
+    stamp = receipt.get("capture_started_at")
+    if stamp is not None:
+        _time(stamp)  # validate provenance metadata, never treat as observed_at
+    return _body(raw)
+
+
+def _archived_cards(catalog, raw, receipt):
+    """Visible, exact first-party card inventory; no LIVE discovery or parser acceptance."""
+    soup = _archived_body(raw, receipt, "https://tpac.org.taipei/" + catalog, catalog)
+    selector = "a.card-program[href][title]" if catalog == "program" else "a.card-event[href][title]"
+    cards = soup.select(selector)
+    if not 1 <= len(cards) <= MAX_CARDS:
+        raise ValueError("TPAC_ARCHIVE_LIST_COUNT_HOLD")
+    results = {}
+    for card in cards:
+        if not _visible(card):
+            continue
+        href = card.get("href", "")
+        url = urljoin("https://tpac.org.taipei/" + catalog, href)
+        parts = urlsplit(url)
+        match = re.fullmatch("/" + catalog + r"/([1-9]\\d{0,9})", parts.path)
+        if (parts.scheme != "https" or parts.netloc != "tpac.org.taipei"
+                or parts.query or parts.fragment or match is None):
+            raise ValueError("TPAC_ARCHIVE_CARD_URL_HOLD")
+        sid = match.group(1)
+        if sid in results:
+            raise ValueError("TPAC_ARCHIVE_DUPLICATE_ID_HOLD")
+        title = card["title"].strip()
+        owned_selector = ".card-program__text-title" if catalog == "program" else ".card-event__text-title"
+        if not 3 <= len(title) <= 180 or title != _text(card.select_one(owned_selector)):
+            raise ValueError("TPAC_ARCHIVE_CARD_TITLE_HOLD")
+        results[sid] = {"identity": "tpac:" + catalog + ":" + sid,
+                        "source_event_id": sid, "source_namespace": catalog,
+                        "list_url": "https://tpac.org.taipei/" + catalog,
+                        "detail_url": url}
+    if not results:
+        raise ValueError("TPAC_ARCHIVE_NO_VISIBLE_CARDS_HOLD")
+    return results
+
+
+def archived_inventory_cli(manifest_path, repo_root):
+    """Separate archived-only CLI; never calls LIVE _receipt or creates accepted events."""
+    data = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or set(data) != {"mode", "catalogs"} or data["mode"] != "archived":
+        raise ValueError("TPAC_ARCHIVE_MANIFEST_HOLD")
+    if not isinstance(data["catalogs"], dict) or set(data["catalogs"]) != {"program", "event"}:
+        raise ValueError("TPAC_ARCHIVE_TWO_CATALOG_HOLD")
+    previous, expected = load_detail_inventory(repo_root)
+    rows = dict(previous["items"]) if previous else {}
+    counts = {"source_cards": 0, "detail_available": 0, "pending_detail_budget": 0,
+              "archive_identity_hold": 0}
+    diagnostics = {}
+    for catalog in ("program", "event"):
+        entry = data["catalogs"][catalog]
+        if not isinstance(entry, dict) or set(entry) != {"list_file", "list_receipt", "details"}:
+            raise ValueError("TPAC_ARCHIVE_CATALOG_SCHEMA_HOLD")
+        raw = Path(entry["list_file"]).read_bytes()
+        receipt = entry["list_receipt"]
+        cards = _archived_cards(catalog, raw, receipt)
+        details = entry["details"]
+        if not isinstance(details, dict) or set(details) - set(cards):
+            raise ValueError("TPAC_ARCHIVE_DETAIL_ID_HOLD")
+        counts["source_cards"] += len(cards)
+        for sid, card in cards.items():
+            key = card["identity"]
+            old = rows.get(key, {})
+            if old and (old.get("detail_url") != card["detail_url"]
+                        or old.get("source_namespace") != catalog):
+                raise ValueError("TPAC_ARCHIVE_IDENTITY_DRIFT_HOLD")
+            status, reason = "PENDING_DETAIL_BUDGET", "DETAIL_BYTES_NOT_CAPTURED"
+            if sid in details:
+                record = details[sid]
+                if not isinstance(record, dict) or set(record) != {"detail_file", "receipt"}:
+                    raise ValueError("TPAC_ARCHIVE_DETAIL_SCHEMA_HOLD")
+                body = Path(record["detail_file"]).read_bytes()
+                _archived_body(body, record["receipt"], card["detail_url"], catalog, sid)
+                # Only source-body identity is verified; semantic fields remain unaccepted.
+                status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
+                counts["detail_available"] += 1
+            else:
+                counts["pending_detail_budget"] += 1
+            rows[key] = {"source_namespace": catalog, "source_event_id": sid,
+                         "list_url": card["list_url"], "detail_url": card["detail_url"],
+                         "list_sha": _sha(raw), "last_observed": None,
+                         "status": status, "attempts": old.get("attempts", 0),
+                         "last_attempt": old.get("last_attempt"), "reason": reason}
+            diagnostics[key] = {"status": status, "reason": reason}
+    # Do not erase rows from other snapshots; archive replay is not LIVE reconciliation.
+    inventory = {"kind": INVENTORY_KIND, "items": rows}
+    result = write_detail_inventory(inventory, repo_root, expected)
+    return {"decision": "ARCHIVED_SOURCE_VERIFIED_BODY_ONLY_NO_PUBLICATION",
+            "inventory": result, "counts": counts, "diagnostics": diagnostics,
+            "next_detail_ids": select_pending_details(inventory),
+            "published": 0, "accepted_fields": 0}
+
 def offline_inventory_cli(manifest_path, repo_root):
     """Replay sealed two-catalog LIST bytes, persist backlog CAS; never GET/publish."""
     data = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    if isinstance(data, dict) and data.get("mode") == "archived":
+        return archived_inventory_cli(manifest_path, repo_root)
     if not isinstance(data, dict) or set(data) != {"now", "catalogs"}:
         raise ValueError("TPAC_INVENTORY_CLI_MANIFEST_HOLD")
     catalogs = data["catalogs"]
