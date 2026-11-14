@@ -883,9 +883,12 @@ def _archived_body(raw, receipt, url, catalog, event_id=None):
     # Unknown fields must remain absent/null, not fabricated by a replay.
     if any(receipt.get(k) is not None for k in ("observed_at", "http_status", "robots_allowed")):
         raise ValueError("TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD")
+    # Archive capture timestamp is provenance, not per-body observation.
+    # Missing capture provenance must fail closed instead of silently becoming UNKNOWN.
     stamp = receipt.get("capture_started_at")
-    if stamp is not None:
-        _time(stamp)  # validate provenance metadata, never treat as observed_at
+    if not isinstance(stamp, str) or not stamp.strip():
+        raise ValueError("TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD")
+    _time(stamp)  # validate only; never treat as observed_at or LIVE authority
     return _body(raw)
 
 
