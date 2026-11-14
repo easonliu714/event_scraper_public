@@ -903,7 +903,7 @@ def _archived_cards(catalog, raw, receipt):
         href = card.get("href", "")
         url = urljoin("https://tpac.org.taipei/" + catalog, href)
         parts = urlsplit(url)
-        match = re.fullmatch("/" + catalog + r"/([1-9]\\d{0,9})", parts.path)
+        match = re.fullmatch("/" + catalog + r"/([1-9]\d{0,9})", parts.path)
         if (parts.scheme != "https" or parts.netloc != "tpac.org.taipei"
                 or parts.query or parts.fragment or match is None):
             raise ValueError("TPAC_ARCHIVE_CARD_URL_HOLD")
