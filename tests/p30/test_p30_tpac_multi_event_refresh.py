@@ -707,5 +707,61 @@ class PersistentInventoryContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "IDENTITY_HOLD"):
             select_pending_details(bad)
 
+
+class ArchivedProvenanceCliTests(unittest.TestCase):
+    """Archive-only CLI is an evidence inventory, never a LIVE attestation."""
+
+    def test_archived_cli_subprocess_cas_restart_and_negative_authority(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bodies = {}
+            catalogs = {}
+            for catalog in ("program", "event"):
+                sid = "2040" if catalog == "program" else "1301"
+                title = "測試封存活動"
+                cls = "card-program" if catalog == "program" else "card-event"
+                text_cls = cls + "__text-title"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{text_cls}">{title}</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                           "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                           "body_bytes": len(raw), "capture_started_at": OBS,
+                           "observed_at": None, "http_status": None, "robots_allowed": None}
+                bodies[catalog] = receipt
+                catalogs[catalog] = {"list_file": str(path), "list_receipt": receipt, "details": {}}
+            manifest = {"mode": "archived", "catalogs": catalogs}
+            path = root / "manifest.json"
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--inventory-input", str(path), "--repo-root", str(root)]
+            first = subprocess.run(command, capture_output=True, text=True, check=True)
+            output = json.loads(first.stdout)
+            self.assertEqual(output["counts"]["source_cards"], 2)
+            self.assertEqual(output["counts"]["pending_detail_budget"], 2)
+            self.assertEqual(output["accepted_fields"], 0)
+            self.assertEqual(output["published"], 0)
+            second = subprocess.run(command, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(second.stdout)["inventory"]["sha256"],
+                             output["inventory"]["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+            for field, value in (("observed_at", OBS), ("http_status", 200),
+                                 ("robots_allowed", True)):
+                manifest["catalogs"]["program"]["list_receipt"][field] = value
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                denied = subprocess.run(command, capture_output=True, text=True)
+                self.assertNotEqual(denied.returncode, 0)
+                self.assertIn("TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD", denied.stderr)
+                manifest["catalogs"]["program"]["list_receipt"][field] = None
+            manifest["catalogs"]["program"]["list_receipt"]["body_sha256"] = "0" * 64
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            denied = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_BYTES_SHA_HOLD", denied.stderr)
+
 if __name__ == "__main__":
     unittest.main()
