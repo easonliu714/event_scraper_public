@@ -763,5 +763,62 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertNotEqual(denied.returncode, 0)
             self.assertIn("TPAC_ARCHIVE_BYTES_SHA_HOLD", denied.stderr)
 
+
+    def test_archived_cli_cannot_downgrade_existing_live_inventory(self):
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            live = {"kind": INVENTORY_KIND, "items": {
+                "tpac:program:2040": {
+                    "source_namespace": "program", "source_event_id": "2040",
+                    "list_url": "https://tpac.org.taipei/program",
+                    "detail_url": "https://tpac.org.taipei/program/2040",
+                    "list_sha": "a" * 64, "last_observed": OBS,
+                    "status": "REVIEW_DETAIL_PARSED", "attempts": 0,
+                    "last_attempt": None, "reason": "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED",
+                },
+            }}
+            before = write_detail_inventory(live, root)["sha256"]
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                title = "封存隔離回歸活動"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{cls}__text-title">{title}</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {
+                    "list_file": str(path), "details": {},
+                    "list_receipt": {
+                        "evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None, "robots_allowed": None,
+                    },
+                }
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--inventory-input", str(manifest), "--repo-root", str(root)]
+            first = subprocess.run(command, capture_output=True, text=True, check=True)
+            second = subprocess.run(command, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(first.stdout)["inventory"]["sha256"],
+                             json.loads(second.stdout)["inventory"]["sha256"])
+            restored, after = load_detail_inventory(root)
+            self.assertEqual(after, before)
+            self.assertEqual(restored, live)
+            archived, archived_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertIsNotNone(archived_sha)
+            self.assertEqual(len(archived["items"]), 2)
+            self.assertEqual(archived["items"]["tpac:program:2040"]["status"],
+                             "PENDING_DETAIL_BUDGET")
+            self.assertFalse((root / "docs" / "data.json").exists())
+
 if __name__ == "__main__":
     unittest.main()
