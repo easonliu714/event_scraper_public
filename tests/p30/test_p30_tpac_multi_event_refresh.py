@@ -757,6 +757,15 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                 self.assertNotEqual(denied.returncode, 0)
                 self.assertIn("TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD", denied.stderr)
                 manifest["catalogs"]["program"]["list_receipt"][field] = None
+            # An archived body without its original capture timestamp cannot
+            # acquire provenance merely by passing the byte hash checks.
+            program_receipt = manifest["catalogs"]["program"]["list_receipt"]
+            original_stamp = program_receipt.pop("capture_started_at")
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            missing_stamp = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(missing_stamp.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD", missing_stamp.stderr)
+            program_receipt["capture_started_at"] = original_stamp
             manifest["catalogs"]["program"]["list_receipt"]["body_sha256"] = "0" * 64
             path.write_text(json.dumps(manifest), encoding="utf-8")
             denied = subprocess.run(command, capture_output=True, text=True)
