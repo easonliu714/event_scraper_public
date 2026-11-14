@@ -931,7 +931,12 @@ def archived_inventory_cli(manifest_path, repo_root):
     if not isinstance(data["catalogs"], dict) or set(data["catalogs"]) != {"program", "event"}:
         raise ValueError("TPAC_ARCHIVE_TWO_CATALOG_HOLD")
     # Archive replay has its own CAS domain; never downgrade a LIVE inventory row.
-    archive_root = Path(repo_root).resolve() / "_isolated_archive_replay"
+    # Archive replay must not follow a pre-existing symlink outside the caller root.
+    # Check before load/write: their internal resolve() would otherwise escape.
+    base_root = Path(repo_root).resolve()
+    archive_root = base_root / "_isolated_archive_replay"
+    if archive_root.is_symlink():
+        raise ValueError("TPAC_ARCHIVE_ROOT_SYMLINK_HOLD")
     previous, expected = load_detail_inventory(archive_root)
     rows = dict(previous["items"]) if previous else {}
     counts = {"source_cards": 0, "detail_available": 0, "pending_detail_budget": 0,
