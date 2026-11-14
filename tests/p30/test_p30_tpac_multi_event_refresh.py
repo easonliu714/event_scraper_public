@@ -936,8 +936,10 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
         missing = dict(receipt, observed_at=None)
         with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD"):
             _archived_body(raw, missing, url, "event", "1301")
+        program_url = "https://tpac.org.taipei/program/1301"
+        program_receipt = dict(receipt, source_url=program_url)
         with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD"):
-            _archived_body(raw, receipt, "https://tpac.org.taipei/program/1301", "program", "1301")
+            _archived_body(raw, program_receipt, program_url, "program", "1301")
 
 
 if __name__ == "__main__":
