@@ -829,6 +829,47 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                              "PENDING_DETAIL_BUDGET")
             self.assertFalse((root / "docs" / "data.json").exists())
 
+    def test_archived_cli_rejects_new_list_snapshot_without_mutating_cas(self):
+        # Regression: an immutable archive replay must never replace a sealed
+        # LIST snapshot for the same event ID with different source bytes.
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                title = "封存快照不可變驗證"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{cls}__text-title">{title}</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {"list_file": str(path), "details": {},
+                    "list_receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None, "robots_allowed": None}}
+            manifest = root / "archive.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            cmd = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                   "--inventory-input", str(manifest), "--repo-root", str(root)]
+            first = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            original_sha = json.loads(first.stdout)["inventory"]["sha256"]
+            source = root / "program.html"
+            changed = source.read_bytes().replace("封存快照不可變驗證".encode(), "另一份封存快照驗證".encode())
+            source.write_bytes(changed)
+            receipt = catalogs["program"]["list_receipt"]
+            receipt["body_sha256"] = hashlib.sha256(changed).hexdigest()
+            receipt["body_bytes"] = len(changed)
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            denied = subprocess.run(cmd, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_SNAPSHOT_DRIFT_HOLD", denied.stderr)
+            _, after_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(after_sha, original_sha)
+
     def test_archived_cli_rejects_archive_root_symlink_before_any_write(self):
         # Regression: the archive CAS namespace must not resolve through a
         # symlink into an unrelated directory, even when receipts are valid.
