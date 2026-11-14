@@ -1,0 +1,470 @@
+name: EventRadar TPAC first-source multi-event REVIEW refresh exact-head (NO PUBLISH)
+on:
+  pull_request:
+    paths:
+      - scripts/p30_tpac_multi_event_refresh.py
+      - scripts/p30_tpac_catalog_topology.py
+      - scripts/p30_tpac_event_catalog_once.py
+      - scripts/p30_tpac_event_detail_review.py
+      - scripts/p30_tpac_price_reconcile.py
+      - scripts/p30_tpac_r4_source_policy.py
+      - tests/p30/test_p30_tpac_r4_source_policy.py
+      - tests/p30/test_p30_tpac_price_reconcile.py
+      - tests/p30/test_p30_tpac_event_detail_review.py
+      - tests/p30/test_p30_tpac_event_catalog_once.py
+      - tests/p30/test_p30_tpac_catalog_topology.py
+      - tests/p30/test_p30_tpac_multi_event_refresh.py
+      - .github/workflows/eventradar_tpac_multi_event_refresh.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  multi-id-review-refresh:
+    if: github.repository == 'easonliu714/event_scraper_public' && github.head_ref == 'feat/p30-tpac-multi-event-refresh-v1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exact PR HEAD and immutable released data / Golden / Publisher controls
+        env:
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PR_SHA"
+          base=5c744607ab4d9d1c1493377018c282982acac227
+          git merge-base --is-ancestor "$base" HEAD
+          test "$(git rev-parse HEAD:docs/data.json)" = 342eb7c101115b05dbc6ff90de7bd97d5bd63d59
+          test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
+          test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
+          test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
+          actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'scripts/p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
+          echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline multi-event parsing, positive, negative, CAS and retention
+        run: |
+          set -euo pipefail
+          python -m pip install 'beautifulsoup4==4.15.0'
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_multi_event_refresh.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_catalog_topology.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_catalog_once.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_detail_review.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_price_reconcile.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_r4_source_policy.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py scripts/p30_tpac_r4_source_policy.py
+          echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
+      - name: Preserve consumed TPAC /event source one-shot (NO NETWORK)
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/native_event
+          # The original one-shot was consumed by run 42491637804.
+          # Exact-head CI must only replay its SHA-pinned artifact.
+          printf '{"kind":"TPAC_EVENT_ONESHOT_ALREADY_CONSUMED","decision":"HOLD_DO_NOT_REPEAT","published":0}\n' > evidence/native_event/tpac_event_catalog_receipt.json
+          echo PASS_TPAC_EVENT_ONE_SHOT_CONSUMED_NO_NATIVE_GET
+      - name: Retrieve pinned earlier first-party /event LIST and two DETAIL bodies (NO REGET)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-tpac-multi-event-review-lkg-readiness
+          repository: easonliu714/event_scraper_public
+          run-id: 42491637804
+          github-token: ${{ github.token }}
+          path: pinned-event
+      - name: Independently replay first-party two activity types and conflicting periods
+        run: |
+          set -euo pipefail
+          (cd pinned-event && sha256sum -c SHA256SUMS.txt)
+          mkdir -p evidence
+          python -m scripts.p30_tpac_event_detail_review --source-dir pinned-event/native_event --out evidence/tpac_event_two_real_role_review.json
+          python - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          p=Path('pinned-event/native_event')
+          raw=json.loads((p/'tpac_event_catalog_receipt.json').read_text())
+          rows=json.loads(Path('evidence/tpac_event_two_real_role_review.json').read_text())
+          assert rows['kind']=='TPAC_EVENT_TWO_NATIVE_REPLAY_REVIEW_NOT_PUBLICATION'
+          assert rows['historical_replay_only'] is True
+          assert rows['source_list_count']==18 and rows['detail_count']==2
+          assert rows['native_again']==0 and rows['published']==0
+          assert set(rows['records'])=={'1301','2072'}
+          exhibit=rows['records']['1301']
+          tour=rows['records']['2072']
+          assert exhibit['identity']=='tpac:event:1301'
+          assert exhibit['verified_core_roles']['EXHIBITION_PERIOD']==['2025-07-24','2026-12-31']
+          assert 'NEXT_EVENT_SHOW_START' not in exhibit['verified_core_roles']
+          assert 'LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD' in exhibit['held_fields']
+          assert tour['identity']=='tpac:event:2072'
+          assert tour['verified_core_roles']['NEXT_EVENT_SHOW_START']=='2026-11-11T19:00:00+08:00'
+          assert tour['verified_core_roles']['EXACT_EVENT_SHOW_COUNT']==3
+          assert 'LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD' in tour['held_fields']
+          for key in ('1301','2072'):
+              assert rows['records'][key]['published'] is False
+              assert rows['records'][key]['formal_field_pass'] is False
+              assert rows['records'][key]['golden_accepted'] is False
+              assert rows['records'][key]['detail_body_sha256']==raw['source_receipts'][key]['body_sha256']
+              assert hashlib.sha256((p/('event_'+key+'_detail.html')).read_bytes()).hexdigest()==raw['source_receipts'][key]['body_sha256']
+          print('PASS_ARCHIVED_OFFICIAL_EVENT_2_IDS_EXHIBITION_VS_TOUR_ROLES_PERIOD_CONFLICT_HOLD_NO_PUBLISH')
+          PY
+      - name: Replay sealed native /event two IDs into two-cycle isolated CAS LKG (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, tempfile
+          from datetime import datetime, timedelta
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import (
+              KIND, refresh_event_plan, write_isolated_plan,
+          )
+          root = Path('pinned-event/native_event')
+          native = json.loads((root/'tpac_event_catalog_receipt.json').read_text())
+          source = native['source_receipts']
+          observed = datetime.fromisoformat(source['2072']['observed_at'].replace('Z','+00:00'))
+          now = observed + timedelta(seconds=1)
+          raw = (root/'event_list.html').read_bytes()
+          details = {
+              sid: {'body': (root/('event_'+sid+'_detail.html')).read_bytes(),
+                    'receipt': source[sid]}
+              for sid in ('1301','2072')
+          }
+          plan = refresh_event_plan(raw, source['list'], details,
+                                    {'kind':KIND,'events':{}}, now)
+          assert plan['decision']=='REVIEW_SNAPSHOT_READY_NOT_FORMAL',plan
+          assert plan['source_cards']==18 and plan['qualified']==2
+          assert plan['added']==2 and len(plan['rejected'])==16
+          assert not plan['source_coverage_complete']
+          assert set(plan['events'])=={'tpac:event:1301','tpac:event:2072'}
+          exhibition=plan['events']['tpac:event:1301']
+          tour=plan['events']['tpac:event:2072']
+          assert exhibition['date']=='' and exhibition['location']==''
+          assert 'EXHIBITION_PERIOD' in exhibition['_candidate']['field_roles']
+          assert 'NEXT_EVENT_SHOW_START' not in exhibition['_candidate']['field_roles']
+          assert tour['date']=='2026-11-11 19:00'
+          assert 'LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD' in tour['_candidate']['hold_reasons']
+          assert all(not e['published'] and not e['formal_field_pass']
+                     and not e['golden_accepted'] for e in plan['events'].values())
+          with tempfile.TemporaryDirectory() as directory:
+              first=write_isolated_plan(plan,directory,expected_sha=None)
+              prior={'kind':KIND,'events':plan['events']}
+              second=refresh_event_plan(raw,source['list'],details,prior,now)
+              assert (second['added'],second['changed'],second['unchanged'])==(0,0,2)
+              saved=write_isolated_plan(second,directory,expected_sha=first['sha256'])
+              assert saved['sha256']==first['sha256']
+              assert not (Path(directory)/'docs'/'data.json').exists()
+              details['2072']['receipt']=dict(details['2072']['receipt'],http_status=403)
+              partial=refresh_event_plan(raw,source['list'],details,prior,now)
+              assert partial['qualified']==1 and '2072' in partial['rejected']
+              assert 'tpac:event:2072' in partial['events']
+              report={'kind':'TPAC_EVENT_NATIVE_ARCHIVE_TO_ISOLATED_CAS_LKG',
+                      'archived_source_not_fresh_get':True,'native_http_new':0,
+                      'source_list_count':18,'native_detail_replayed':2,
+                      'qualified_review_rows':2,'rejected_missing_detail':16,
+                      'snapshot_sha256':saved['sha256'],
+                      'two_replay_cycles_not_independent_refresh':True,
+                      'accepted_formal_field_delta':0,'published_delta':0,
+                      'release_state':'HARD_HOLD_NO_PUBLICATION'}
+              Path('evidence/tpac_event_archived_to_cas_lkg.json').write_text(
+                  json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n')
+          print('PASS_ARCHIVED_NATIVE_2_EVENT_IDS_TO_REVIEW_CAS_LKG_TWO_REPLAYS_NO_GET')
+          PY
+      - name: CLI replay archived native TPAC /event 2 IDs into isolated CAS LKG (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from datetime import datetime, timedelta
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import KIND
+          root=Path('pinned-event/native_event')
+          sealed=json.loads((root/'tpac_event_catalog_receipt.json').read_text())
+          source=sealed['source_receipts']
+          observed=datetime.fromisoformat(source['2072']['observed_at'].replace('Z','+00:00'))
+          manifest={
+              'catalog':'event', 'list_file':str(root/'event_list.html'),
+              'list_receipt':source['list'],
+              'details':{sid:{'detail_file':str(root/('event_'+sid+'_detail.html')),
+                              'receipt':source[sid]} for sid in ('1301','2072')},
+              'prior':{'kind':KIND,'events':{}},
+              'now':(observed+timedelta(seconds=1)).isoformat(),
+          }
+          Path('evidence/tpac_event_archived_cli_manifest.json').write_text(
+              json.dumps(manifest,ensure_ascii=False,sort_keys=True,indent=2)+'\n')
+          PY
+          python -m scripts.p30_tpac_multi_event_refresh \
+            --catalog event --input evidence/tpac_event_archived_cli_manifest.json \
+            --repo-root evidence/tpac_event_archived_cli > evidence/tpac_event_archived_cli_result.json
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          report=json.loads(Path('evidence/tpac_event_archived_cli_result.json').read_text())
+          assert report['counts']['source_cards']==18
+          assert report['counts']['qualified']==2 and report['counts']['added']==2
+          assert report['published']==0 and len(report['rejected'])==16
+          target=Path('evidence/tpac_event_archived_cli/_isolated_review/tpac/tpac_multi_event_lkg.json')
+          raw=target.read_bytes()
+          assert hashlib.sha256(raw).hexdigest()==report['result']['sha256']
+          saved=json.loads(raw)
+          assert set(saved['events'])=={'tpac:event:1301','tpac:event:2072'}
+          assert saved['events']['tpac:event:1301']['date']==''
+          assert saved['events']['tpac:event:2072']['date']=='2026-11-11 19:00'
+          assert all(not v['published'] and not v['formal_field_pass']
+                     for v in saved['events'].values())
+          assert not Path('evidence/tpac_event_archived_cli/docs/data.json').exists()
+          print('PASS_ARCHIVED_NATIVE_EVENT_TO_REAL_CLI_CAS_LKG_TWO_IDS_NO_GET_NO_PUBLISH')
+          PY
+      - name: Verify real archived native event CAS version history without reGET
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import KIND, refresh_event_plan, write_isolated_plan
+          from datetime import datetime
+          source=Path('pinned-event/native_event')
+          receipts=json.loads((source/'tpac_event_catalog_receipt.json').read_text())['source_receipts']
+          manifest=json.loads(Path('evidence/tpac_event_archived_cli_manifest.json').read_text())
+          details={sid:{'body':(source/('event_'+sid+'_detail.html')).read_bytes(),
+                        'receipt':receipts[sid]} for sid in ('1301','2072')}
+          now=datetime.fromisoformat(manifest['now'])
+          raw=(source/'event_list.html').read_bytes()
+          plan=refresh_event_plan(raw,receipts['list'],details,{'kind':KIND,'events':{}},now)
+          target=Path('evidence/tpac_versioned_native_replay')
+          first=write_isolated_plan(plan,target)
+          repeat=refresh_event_plan(raw,receipts['list'],details,
+                                    {'kind':KIND,'events':plan['events']},now)
+          second=write_isolated_plan(repeat,target,first['sha256'])
+          archived=target/'_isolated_review/tpac/versions'/(first['sha256']+'.json')
+          assert hashlib.sha256(archived.read_bytes()).hexdigest()==first['sha256']
+          assert second['sha256']==first['sha256']
+          assert len(second['diff']['unchanged'])==2
+          assert second['diff']['changed']==second['diff']['removed']==[]
+          Path('evidence/tpac_native_versioned_diff.json').write_text(
+              json.dumps({'historical_replay_only':True,'new_native_get':0,
+                          'independent_refresh_cycles':0,'published':0,
+                          'snapshot_sha256':first['sha256'],
+                          'version_archive_sha256':first['sha256'],
+                          'diff':second['diff']},sort_keys=True,indent=2)+'\n')
+          print('PASS_ARCHIVED_NATIVE_VERSIONED_DIFF_CAS_NO_NEW_GET')
+          PY
+      - name: Read prior pinned TPAC programme native body (NO NEW GET)
+        uses: actions/download-artifact@v4
+        with:
+          name: eventradar-one-shot-publication-attempt-hold-evidence
+          repository: easonliu714/event_scraper_public
+          run-id: 42484103012
+          github-token: ${{ github.token }}
+          path: pinned-program
+      - name: Diagnose exact native TPAC price section and first-party ticket links
+        run: |
+          set -euo pipefail
+          (cd pinned-program && sha256sum -c SHA256SUMS.txt)
+          python - <<'PY'
+          import hashlib,json,re
+          from pathlib import Path
+          from bs4 import BeautifulSoup
+          root=Path("pinned-program/native")
+          receipt=json.loads((root/"tpac_2040_source_receipt.json").read_text())
+          data=(root/"tpac_2040_detail.html").read_bytes()
+          assert receipt['detail_sha256']==hashlib.sha256(data).hexdigest()
+          soup=BeautifulSoup(data,"html.parser")
+          nodes=[]
+          for e in soup.select("h1,h2,h3,h4,span,p,div,strong,dt,small"):
+              if e.string and e.string.strip() in ("票價","票價：","票價:","Ticket Price"):
+                  anc=e.parent
+                  for depth in range(3):
+                      if anc is None: break
+                      txt=anc.get_text(" ",strip=True)
+                      if len(txt)<400:
+                          nodes.append({'tag':e.name,'cls':e.get('class',[]),'ancestor':anc.name,
+                                        'ancestor_class':anc.get('class',[]),'depth':depth,
+                                        'text':txt[:330]})
+                      anc=anc.parent
+          links=[{'href':a.get('href',''), 'text':a.get_text(' ',strip=True)[:55]}
+                 for a in soup.select('a[href]')
+                 if 'opentix.life/event/' in a.get('href','')]
+          out={'kind':'TPAC_ARCHIVED_FIRST_PARTY_PRICE_DOM_DIAGNOSTIC',
+               'source_sha256':receipt['detail_sha256'],
+               'price_nodes':nodes[:24],
+               'opentix_direct_links':links[:12],
+               'new_http_requests':0,'published':0}
+          Path('evidence/tpac_2040_native_price_dom.json').write_text(
+              json.dumps(out,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          print('TPAC_PRICE_NODE_COUNT='+str(len(nodes)))
+          print('TPAC_PRICE_MATCHES='+json.dumps(nodes[:12],ensure_ascii=False))
+          print('TPAC_TICKET_LINKS='+json.dumps(links[:8],ensure_ascii=False))
+          print('PASS_PINNED_OFFICIAL_DETAIL_PRICE_DOM_AUDIT_NO_NEW_GET')
+          PY
+      - name: Replay native TPAC admission price and official OPENTIX direct link (REVIEW ONLY)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          from scripts.p30_tpac_price_reconcile import extract_tpac_price_review
+          p=Path('pinned-program/native')
+          receipt=json.loads((p/'tpac_2040_source_receipt.json').read_text(encoding='utf-8'))
+          original=(p/'tpac_2040_detail.html').read_bytes()
+          price=extract_tpac_price_review(original,receipt,'2040','沉浸式劇場《士林YES！》')
+          Path('evidence/tpac_2040_native_price_review.json').write_text(
+              json.dumps(price,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          assert price['decision']=='SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL',price
+          assert (price['min_price_ntd'],price['max_price_ntd'])==(1500,3500)
+          assert price['display_suggestion']=='NT$1,500 起（詳官方）'
+          assert price['linked_ticket']['ticket_event_id']=='2065059039769808896'
+          assert price['linked_ticket']['ticket_event_url']=='https://www.opentix.life/event/2065059039769808896'
+          assert price['source_body_sha256']==receipt['detail_sha256']
+          assert price['golden_accepted'] is False and price['published'] is False
+          assert price['formal_field_pass'] is False
+          # Independently replay real official 2026-11-08 DETAIL bytes: the
+          # performance space and starting-area note are distinct field roles.
+          import copy
+          from bs4 import BeautifulSoup
+          from scripts.p30_tpac_multi_event_refresh import _venue_role_review
+          native_soup=BeautifulSoup(original,'html.parser')
+          venue=_venue_role_review(native_soup)
+          assert venue['value']=='藍盒子'
+          assert venue['start_area_note']=='本演出將於一樓小戲台開演'
+          assert venue['role']=='EVENT_VENUE_SPACE'
+          assert venue['decision']=='REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE'
+          duplicate=BeautifulSoup(original,'html.parser')
+          node=duplicate.select_one('div.page-program__aside-place-venue')
+          node.insert_after(copy.deepcopy(node))
+          try:
+              _venue_role_review(duplicate)
+          except ValueError as error:
+              assert str(error)=='TPAC_VENUE_EXACT_EVENT_SCOPE_HOLD'
+          else:
+              raise AssertionError('DUPLICATE_EVENT_VENUE_MUST_HOLD')
+          Path('evidence/tpac_2040_native_venue_review.json').write_text(
+              json.dumps({'kind':'TPAC_2040_NATIVE_EVENT_VENUE_REVIEW',
+                          'source_url':receipt['detail_url'],
+                          'source_body_sha256':receipt['detail_sha256'],
+                          'source_observed_at':receipt['started_at'],
+                          'source_event_id':'2040',
+                          'role':venue['role'],'venue_space':venue['value'],
+                          'start_area_note':venue['start_area_note'],
+                          'formal_field_accepted':False,
+                          'new_native_http_get':0,'published':False,
+                          'release_state':'HARD_HOLD_NO_PUBLICATION'},
+                         ensure_ascii=False,sort_keys=True,indent=2)+'\n',
+              encoding='utf-8')
+          print('PASS_REAL_ARCHIVED_TPAC_2040_VENUE_ROLE_AND_START_AREA_NOTE_REVIEW')
+          print('HOLD_VENUE_FORMAL_ACCEPTANCE_AND_TPAC_CLAIM_NO_GET')
+          print('PASS_NATIVE_TPAC_PRICE_MIN_1500_AND_EXPLICIT_SAME_EVENT_OPENTIX_LINK_REVIEW')
+          print('HOLD_TICKET_NATIVE_PRICE_TIERS_AND_SESSION_PARITY_REQUIRED')
+          PY
+      - name: Produce two-ID isolated LKG fixture evidence, never native HTTP
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          from pathlib import Path
+          import json,subprocess,sys,tempfile
+          sys.path.insert(0,'tests/p30')
+          from test_p30_tpac_multi_event_refresh import inputs,empty_prior,NOW
+          from scripts.p30_tpac_multi_event_refresh import refresh_plan,write_isolated_plan
+          listing,receipt,details=inputs()
+          plan=refresh_plan(listing,receipt,details,empty_prior(),NOW)
+          assert plan['decision']=='REVIEW_SNAPSHOT_READY_NOT_FORMAL'
+          assert plan['qualified']==2 and plan['source_cards']==2 and plan['added']==2
+          assert plan['published']==0 and plan['source_coverage_complete']
+          with tempfile.TemporaryDirectory() as d:
+              persisted=write_isolated_plan(plan,d,expected_sha=None)
+              assert persisted['rows']==2
+              saved=json.loads((Path(d)/'_isolated_review'/'tpac'/'tpac_multi_event_lkg.json').read_text())
+              assert all(r['published'] is False for r in saved['events'].values())
+              report={'kind':'TPAC_MULTI_EVENT_OFFLINE_FIXTURE_DEMO_NOT_NATIVE',
+                      'exact_head':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+                      'synthetic_only':True, 'source_cards':2,'qualified':2,
+                      'added':2,'published':0,'release_state':'HARD_HOLD_NO_PUBLICATION',
+                      'snapshot_sha256':persisted['sha256'],
+                      'candidate_keys':sorted(saved['events']), 'native_http_new':0,
+                      'next_real_gate':'2 distinct independently evidenced TPAC native list/detail ID pairs'}
+              Path('evidence/tpac_multi_event_offline_demo.json').write_text(
+                  json.dumps(report,ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          # /program and /event are different official LIST/DETAIL namespaces.
+          from test_p30_tpac_catalog_topology import listing as catalog_listing, receipt as catalog_receipt
+          from scripts.p30_tpac_catalog_topology import discover_catalog,safe_union
+          p_raw=catalog_listing('program','1301','測試節目A')
+          e_raw=catalog_listing('event','1301','測試活動B')
+          programs=discover_catalog('program',p_raw,catalog_receipt('program',p_raw),NOW)
+          events=discover_catalog('event',e_raw,catalog_receipt('event',e_raw),NOW)
+          joined=safe_union(programs,events)
+          assert sorted(joined)==['tpac:event:1301','tpac:program:1301']
+          assert all(v['accepted_show_start'] is None for v in joined.values())
+          Path('evidence/tpac_catalog_topology_fixture.json').write_text(
+              json.dumps({'kind':'TPAC_DUAL_OFFICIAL_CATALOG_SCHEMATIC_NOT_NATIVE',
+                         'source_uris':['https://tpac.org.taipei/program',
+                                       'https://tpac.org.taipei/event'],
+                         'synthetic_only':True,'distinct_identity_keys':sorted(joined),
+                         'new_native_http':0,'formal_published':0,
+                         'event_list_date_role':'ACTIVITY_LIST_PERIOD_NOT_SHOW_START',
+                         'program_list_date_role':'PERFORMANCE_LIST_PERIOD_NOT_SHOW_START'},
+                         ensure_ascii=False,indent=2,sort_keys=True)+'\n')
+          print('PASS_DUAL_CATALOG_NONMERGE_DATE_ROLES_FIXTURE_NOT_NATIVE')
+          print('PASS_REUSABLE_2_ID_OFFLINE_REVIEW_NOT_NATIVE_OR_PUBLISHED')
+          PY
+      - name: Owner-approved TPAC two-catalog 6-hour R4 budget (CLAIM HOLD, NO GET)
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib,json,sys
+          from pathlib import Path
+          sys.path.insert(0,"tests/p30")
+          from test_p30_tpac_r4_source_policy import inputs
+          from scripts.p30_tpac_r4_source_policy import (
+              CLAIM_HOLD,review_two_catalog_plan,assert_no_untrusted_live_authority)
+          plan=review_two_catalog_plan(**inputs())
+          assert plan['decision']==CLAIM_HOLD
+          assert plan['detail_source_identities']==['tpac:program:1301','tpac:event:1301']
+          assert plan['budget']['interval_seconds']==21600
+          assert plan['budget']['robots']==1 and plan['budget']['program_list']==1
+          assert plan['budget']['event_list']==1 and plan['budget']['detail_total']==2
+          assert plan['budget']['concurrency']==1
+          assert plan['native_get_allowed'] is False and plan['published']==0
+          try:
+              assert_no_untrusted_live_authority(plan)
+          except ValueError as e:
+              assert str(e)=="TPAC_R4_IMMUTABLE_CLAIM_PROVIDER_MISSING_HOLD"
+          else:
+              raise AssertionError('UNVERIFIED_CLAIM_MUST_NEVER_ENABLE_NATIVE_GET')
+          plan['synthetic_offline_only']=True
+          plan['no_immutable_provider_available']=True
+          plan['repository_rulesets_readback']='NONE_OBSERVED_2026_11_09'
+          plan['branch_protection_readback']='PERMISSION_DENIED_403_UNVERIFIED'
+          plan['owner_publication_authorization']=False
+          Path('evidence/tpac_r4_owner_policy_claim_hold.json').write_text(
+              json.dumps(plan,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
+              encoding='utf-8')
+          print('PASS_OWNER_POLICY_LIMITS_6H_ROBOTS1_LIST2_DETAIL2_CONCURRENCY1')
+          print('HOLD_CROSS_HOST_IMMUTABLE_CLAIM_NOT_VERIFIED_NO_NATIVE_GET')
+          PY
+      - name: SHA256 evidence and formal outputs remain untouched
+        run: |
+          set -euo pipefail
+          # Fail closed on a syntactically invalid JSON artifact BEFORE hashing
+          # and upload. A literal backslash-n suffix previously passed CRC/SHA.
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          paths=sorted(Path('evidence').rglob('*.json'))
+          assert paths, 'HOLD_NO_JSON_EVIDENCE'
+          for path in paths:
+              json.loads(path.read_text(encoding='utf-8'))
+          print('PASS_EVIDENCE_JSON_STRICT_PARSE='+str(len(paths)))
+          PY
+          (cd evidence && find . -type f ! -name SHA256SUMS.txt -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          git diff --exit-code -- docs/data.json docs/platform_status.json docs/index.html scraper.py
+          echo PASS_ZERO_FORMAL_DATA_AND_AUTOMATIC_PUBLISHER_WRITES
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-tpac-multi-event-review-lkg-readiness
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
