@@ -820,5 +820,51 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                              "PENDING_DETAIL_BUDGET")
             self.assertFalse((root / "docs" / "data.json").exists())
 
+    def test_archived_cli_rejects_archive_root_symlink_before_any_write(self):
+        # Regression: the archive CAS namespace must not resolve through a
+        # symlink into an unrelated directory, even when receipts are valid.
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            foreign = root / "foreign"
+            foreign.mkdir()
+            archive_link = root / "_isolated_archive_replay"
+            try:
+                archive_link.symlink_to(foreign, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable on this host")
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                title = "封存符號連結回歸"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{cls}__text-title">{title}</div></a>').encode()
+                source = root / (catalog + ".html")
+                source.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {
+                    "list_file": str(source), "details": {},
+                    "list_receipt": {
+                        "evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None,
+                        "robots_allowed": None,
+                    },
+                }
+            manifest = root / "archive.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                 "--inventory-input", str(manifest), "--repo-root", str(root)],
+                capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_ROOT_SYMLINK_HOLD", result.stderr)
+            self.assertEqual(list(foreign.iterdir()), [])
+            self.assertFalse((root / "docs/data.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
