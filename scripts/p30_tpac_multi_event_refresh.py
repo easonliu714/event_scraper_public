@@ -881,14 +881,22 @@ def _archived_body(raw, receipt, url, catalog, event_id=None):
         raise ValueError("TPAC_ARCHIVE_BYTES_SHA_HOLD")
     # The one-shot /program receipt has no per-body observation, status or robots.
     # Unknown fields must remain absent/null, not fabricated by a replay.
-    if any(receipt.get(k) is not None for k in ("observed_at", "http_status", "robots_allowed")):
+    if any(receipt.get(k) is not None for k in ("http_status", "robots_allowed")):
         raise ValueError("TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD")
-    # Archive capture timestamp is provenance, not per-body observation.
-    # Missing capture provenance must fail closed instead of silently becoming UNKNOWN.
+    # Historical /program has capture_started_at but no per-body observation.
+    # Historical /event has original per-body observed_at but no capture_started_at.
+    # These are mutually exclusive, independently sourced archive evidence variants.
+    # Neither variant supplies native LIVE status/robots or publication authority.
     stamp = receipt.get("capture_started_at")
-    if not isinstance(stamp, str) or not stamp.strip():
+    observed = receipt.get("observed_at")
+    if stamp is not None:
+        if not isinstance(stamp, str) or not stamp.strip() or observed is not None:
+            raise ValueError("TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD")
+        _time(stamp)
+    elif catalog == "event" and isinstance(observed, str) and observed.strip():
+        _time(observed)
+    else:
         raise ValueError("TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD")
-    _time(stamp)  # validate only; never treat as observed_at or LIVE authority
     return _body(raw)
 
 
