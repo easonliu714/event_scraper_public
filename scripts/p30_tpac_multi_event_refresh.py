@@ -962,7 +962,7 @@ def archived_inventory_cli(manifest_path, repo_root):
             if old and (old.get("detail_url") != card["detail_url"]
                         or old.get("source_namespace") != catalog):
                 raise ValueError("TPAC_ARCHIVE_IDENTITY_DRIFT_HOLD")
-            status, reason = "PENDING_DETAIL_BUDGET", "DETAIL_BYTES_NOT_CAPTURED"
+            # A frozen archive CAS must not silently rebind an existing ID to\n            # another LIST body. New captures require a separate snapshot root.\n            if old and old.get("list_sha") != _sha(raw):\n                raise ValueError("TPAC_ARCHIVE_SNAPSHOT_DRIFT_HOLD")\n            status, reason = "PENDING_DETAIL_BUDGET", "DETAIL_BYTES_NOT_CAPTURED"
             if sid in details:
                 record = details[sid]
                 if not isinstance(record, dict) or set(record) != {"detail_file", "receipt"}:
