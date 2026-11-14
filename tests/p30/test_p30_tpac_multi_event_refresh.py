@@ -916,5 +916,29 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertFalse((root / "docs/data.json").exists())
 
 
+    def test_original_event_archive_observation_without_capture_start(self):
+        # Native /event receipt contains per-body observed_at, not capture_started_at.
+        # Preserve that distinction and reject any fabricated LIVE authority.
+        from scripts.p30_tpac_multi_event_refresh import _archived_body
+        raw = b"<html><body>Original event evidence</body></html>"
+        url = "https://tpac.org.taipei/event/1301"
+        receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                   "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                   "body_bytes": len(raw), "capture_started_at": None,
+                   "observed_at": "2026-11-08T14:49:08.662855+00:00",
+                   "http_status": None, "robots_allowed": None}
+        self.assertIsNotNone(_archived_body(raw, receipt, url, "event", "1301"))
+        for changes in ({"http_status": 200}, {"robots_allowed": True},
+                        {"capture_started_at": "2026-11-08T14:49:00+00:00"}):
+            bad = dict(receipt, **changes)
+            with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD"):
+                _archived_body(raw, bad, url, "event", "1301")
+        missing = dict(receipt, observed_at=None)
+        with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD"):
+            _archived_body(raw, missing, url, "event", "1301")
+        with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD"):
+            _archived_body(raw, receipt, "https://tpac.org.taipei/program/1301", "program", "1301")
+
+
 if __name__ == "__main__":
     unittest.main()
