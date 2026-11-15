@@ -195,7 +195,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
             with self.subTest(reason=reason):
                 with self.assertRaisesRegex(ValueError, reason):
                     validate_durable_source_attempt(now=NOW, ledger=record, lease=claim)
-        with self.assertRaisesRegex(ValueError, "LAST_ATTEMPT_MISSING"):
+        with self.assertRaisesRegex(ValueError, "CROSS_HOST_LEDGER_SCOPE"):
             validate_durable_source_attempt(now=NOW, ledger={}, lease=lease)
         with self.assertRaisesRegex(ValueError, "SOURCE_HOST_MISMATCH"):
             validate_durable_source_attempt(now=NOW, ledger=ledger, lease=lease, source_host="other.example")
