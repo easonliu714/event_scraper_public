@@ -2,10 +2,12 @@
 
 This module is a pure preflight. It makes zero network requests, claims no
 real retention authority and cannot enable the live Collector/Publisher.
-First-party TPAC /program and /event share ONE host-wide six-hour budget:
+First-party TPAC /program and /event share ONE host-wide request budget:
 one robots GET, one LIST per catalog, and at most TWO DETAIL GETs *total*.
-A real live executor must independently prove a cross-host, non-deletable
-atomic claim + prior claim timestamp before running any of these requests.
+A real live executor must independently prove a shared cross-host atomic
+source lease and durable last-attempt record before any request. The former
+six-hour owner interval was superseded on 2026-11-15; 3600s is only a
+conservative engineering throttle, NOT a verified official source limit.
 
 Existing GitHub lightweight tags are deletable. Github Actions artifacts,
 local tombstones and CI fixtures are not authority for source GET.
@@ -23,7 +25,7 @@ from scripts.p30_tpac_catalog_topology import CATALOGS, discover_catalog
 ROBOTS = "https://tpac.org.taipei/robots.txt"
 AGENT = "EventRadarTaiwan-SourceAudit/1.0"
 SOURCE_HOST = "tpac.org.taipei"
-MIN_INTERVAL_SECONDS = 6 * 60 * 60
+MIN_INTERVAL_SECONDS = 60 * 60
 MAX_REQUESTS = 5
 MAX_DETAIL_REQUESTS = 2
 MAX_CONCURRENT = 1
@@ -102,14 +104,14 @@ def _verify_robots(raw: bytes, urls: tuple[str, ...]) -> tuple[str, int]:
 
 
 def enforce_elapsed(start_at: datetime, previous_claim_at: datetime | None) -> None:
-    """Policy preflight; previous timestamp is NOT trusted without WORM readback."""
+    """Offline policy check; timestamp MUST come from a shared durable attempt ledger."""
     start = _aware(start_at, "START")
     if previous_claim_at is not None:
         previous = _aware(previous_claim_at, "PREVIOUS_CLAIM")
         if start < previous:
             raise ValueError("TPAC_R4_CLOCK_ROLLBACK_HOLD")
         if start - previous < timedelta(seconds=MIN_INTERVAL_SECONDS):
-            raise ValueError("TPAC_R4_SIX_HOUR_MIN_INTERVAL_HOLD")
+            raise ValueError("TPAC_R4_ENGINEERING_MIN_INTERVAL_HOLD")
 
 
 def stop_on_response(status: int) -> None:
@@ -176,7 +178,7 @@ def review_two_catalog_plan(*, cycle_id: str, start_at: datetime,
         "detail_source_identities": [x["identity"] for x in chosen],
         "detail_count": len(chosen),
         "first_failure": CLAIM_HOLD,
-        "next_gate": "independent immutable cross-host atomic Claim+6h prior-readback",
+        "next_gate": "shared cross-host atomic source lease and durable last-attempt readback",
     }
 
 
