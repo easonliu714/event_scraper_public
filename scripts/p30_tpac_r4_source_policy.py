@@ -114,6 +114,44 @@ def enforce_elapsed(start_at: datetime, previous_claim_at: datetime | None) -> N
             raise ValueError("TPAC_R4_ENGINEERING_MIN_INTERVAL_HOLD")
 
 
+
+def validate_durable_source_attempt(*, now: datetime, ledger: dict,
+                                    lease: dict, source_host: str = SOURCE_HOST) -> None:
+    """Fail-closed LIVE preflight over independently fetched durable records.
+
+    This function does not fetch/claim a lease, authenticate a provider or
+    authorize GET. The executor must atomically acquire the host-wide lease
+    and persist a new attempt BEFORE any network I/O. An empty history is
+    valid only when a trusted ledger explicitly attests first_attempt=True.
+    """
+    current = _aware(now, "START")
+    if type(source_host) is not str or source_host != SOURCE_HOST:
+        raise ValueError("TPAC_R4_SOURCE_HOST_MISMATCH_HOLD")
+    if type(ledger) is not dict or type(lease) is not dict:
+        raise ValueError("TPAC_R4_DURABLE_AUTHORITY_MISSING_HOLD")
+    if ledger.get("source_host") != source_host or lease.get("source_host") != source_host:
+        raise ValueError("TPAC_R4_CROSS_HOST_LEDGER_SCOPE_HOLD")
+    if ledger.get("durable_provider_verified") is not True or lease.get("atomic_acquire_verified") is not True:
+        raise ValueError("TPAC_R4_DURABLE_AUTHORITY_UNVERIFIED_HOLD")
+    if lease.get("exclusive") is not True or lease.get("fencing_token") in (None, ""):
+        raise ValueError("TPAC_R4_LEASE_NOT_EXCLUSIVE_HOLD")
+    if lease.get("owner_run_id") in (None, "") or lease.get("owner_run_id") != ledger.get("owner_run_id"):
+        raise ValueError("TPAC_R4_LEASE_OWNER_MISMATCH_HOLD")
+    acquired = lease.get("acquired_at")
+    if type(acquired) is not datetime or _aware(acquired, "LEASE_ACQUIRED") > current:
+        raise ValueError("TPAC_R4_LEASE_TIME_INVALID_HOLD")
+    if ledger.get("first_attempt") is True:
+        if ledger.get("last_attempt_at") is not None:
+            raise ValueError("TPAC_R4_FIRST_ATTEMPT_CONFLICT_HOLD")
+    else:
+        previous = ledger.get("last_attempt_at")
+        if type(previous) is not datetime:
+            raise ValueError("TPAC_R4_LAST_ATTEMPT_MISSING_HOLD")
+        enforce_elapsed(current, previous)
+    # Never return a live permission token: this is a structural preflight.
+    return None
+
+
 def stop_on_response(status: int) -> None:
     """No retry path exists. Codes other than HTTP 200 are fatal."""
     if type(status) is not int or status != 200:
