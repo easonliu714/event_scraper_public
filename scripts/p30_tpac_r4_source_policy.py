@@ -147,11 +147,10 @@ def validate_durable_source_attempt(*, now: datetime, ledger: dict,
     if type(written) is not datetime or _aware(written, "ATTEMPT_WRITTEN") > current:
         raise ValueError("TPAC_R4_ATTEMPT_WRITE_AHEAD_MISSING_HOLD")
     acquired = lease.get("acquired_at")
-    if type(acquired) is not datetime or _aware(acquired, "LEASE_ACQUIRED") > written:
-        raise ValueError("TPAC_R4_ATTEMPT_PRECEDES_LEASE_HOLD")
-    acquired = lease.get("acquired_at")
     if type(acquired) is not datetime or _aware(acquired, "LEASE_ACQUIRED") > current:
         raise ValueError("TPAC_R4_LEASE_TIME_INVALID_HOLD")
+    if _aware(acquired, "LEASE_ACQUIRED") > written:
+        raise ValueError("TPAC_R4_ATTEMPT_PRECEDES_LEASE_HOLD")
     if ledger.get("first_attempt") is True:
         if ledger.get("last_attempt_at") is not None:
             raise ValueError("TPAC_R4_FIRST_ATTEMPT_CONFLICT_HOLD")
