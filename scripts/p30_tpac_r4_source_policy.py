@@ -181,6 +181,19 @@ def reserve_durable_source_attempt(*, provider, now: datetime,
         lease = provider.acquire_atomic(source_host=source_host, owner_run_id=run_id)
         if type(lease) is not dict:
             raise ValueError("TPAC_R4_PROVIDER_LEASE_SCHEMA_HOLD")
+        # Fail closed BEFORE durable history or attempt write: an untrusted
+        # provider lease must never consume a request budget or cross-host slot.
+        if (lease.get("source_host") != source_host
+                or lease.get("atomic_acquire_verified") is not True
+                or lease.get("exclusive") is not True
+                or type(lease.get("fencing_token")) is not str
+                or not lease["fencing_token"]
+                or lease.get("owner_run_id") != run_id
+                or type(lease.get("acquired_at")) is not datetime):
+            raise ValueError("TPAC_R4_PROVIDER_ACQUIRED_LEASE_INVALID_HOLD")
+        acquired = _aware(lease["acquired_at"], "LEASE_ACQUIRED")
+        if acquired > current:
+            raise ValueError("TPAC_R4_LEASE_TIME_INVALID_HOLD")
         history = provider.read_last_attempt(source_host=source_host)
         if type(history) is not dict or history.get("source_host") != source_host:
             raise ValueError("TPAC_R4_PROVIDER_HISTORY_UNVERIFIED_HOLD")
