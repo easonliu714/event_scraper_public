@@ -259,6 +259,89 @@ jobs:
           run-id: 42484103012
           github-token: ${{ github.token }}
           path: pinned-program
+      - name: Replay exact 38-ID archived LIST DETAIL inventory CLI (NO GET)
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+
+          program=Path('pinned-program/native')
+          event=Path('pinned-event/native_event')
+          p_source=json.loads((program/'tpac_2040_source_receipt.json').read_text(encoding='utf-8'))
+          e_source=json.loads((event/'tpac_event_catalog_receipt.json').read_text(encoding='utf-8'))
+          assert isinstance(p_source.get('started_at'), str) and p_source['started_at']
+          e_receipts=e_source['source_receipts']
+          assert set(('list','1301','2072')).issubset(e_receipts)
+
+          def archived_record(path,url,sha,stamp,variant):
+              raw=path.read_bytes()
+              assert hashlib.sha256(raw).hexdigest()==sha, 'HOLD_PINNED_ORIGINAL_SHA_DRIFT'
+              assert variant in ('started','observed') and isinstance(stamp,str) and stamp
+              from datetime import datetime
+              datetime.fromisoformat(stamp.replace('Z','+00:00'))
+              receipt={'evidence_class':'VERIFIED_ARCHIVED_BODY_ONLY','source_url':url,
+                       'body_sha256':sha,'body_bytes':len(raw),
+                       'capture_started_at':stamp if variant=='started' else None,
+                       'observed_at':stamp if variant=='observed' else None,
+                       'http_status':None,'robots_allowed':None}
+              return {'path':str(path),'receipt':receipt}
+
+          p_list=archived_record(program/'tpac_2040_list.html',
+                   'https://tpac.org.taipei/program',p_source['list_sha256'],p_source['started_at'],'started')
+          p_detail=archived_record(program/'tpac_2040_detail.html',
+                   'https://tpac.org.taipei/program/2040',p_source['detail_sha256'],p_source['started_at'],'started')
+
+          def event_record(filename,sid,url):
+              source=e_receipts[sid]
+              raw=(event/filename).read_bytes()
+              assert source['body_sha256']==hashlib.sha256(raw).hexdigest()
+              assert source['body_bytes']==len(raw)
+              assert source.get('final_url')==url, 'HOLD_EVENT_RECEIPT_FINAL_URL'
+              return archived_record(event/filename,url,source['body_sha256'],source['observed_at'],'observed')
+
+          e_list=event_record('event_list.html','list','https://tpac.org.taipei/event')
+          e_1301=event_record('event_1301_detail.html','1301','https://tpac.org.taipei/event/1301')
+          e_2072=event_record('event_2072_detail.html','2072','https://tpac.org.taipei/event/2072')
+          manifest={'mode':'archived','catalogs':{
+            'program':{'list_file':p_list['path'],'list_receipt':p_list['receipt'],
+                       'details':{'2040':{'detail_file':p_detail['path'],'receipt':p_detail['receipt']}}},
+            'event':{'list_file':e_list['path'],'list_receipt':e_list['receipt'],
+                     'details':{'1301':{'detail_file':e_1301['path'],'receipt':e_1301['receipt']},
+                                '2072':{'detail_file':e_2072['path'],'receipt':e_2072['receipt']}}}}}
+          Path('evidence/tpac_archived_38_id_manifest.json').write_text(
+              json.dumps(manifest,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('PASS_ARCHIVED_ORIGINAL_FIVE_BODIES_SHA_AND_DISTINCT_PROVENANCE_NO_NEW_GET')
+          PY
+          python -m scripts.p30_tpac_multi_event_refresh \
+            --inventory-input evidence/tpac_archived_38_id_manifest.json \
+            --repo-root evidence/tpac_archived_38_id > evidence/tpac_archived_38_id_result.json
+          python -m scripts.p30_tpac_multi_event_refresh \
+            --inventory-input evidence/tpac_archived_38_id_manifest.json \
+            --repo-root evidence/tpac_archived_38_id > evidence/tpac_archived_38_id_restart.json
+          python - <<'PY'
+          import json,hashlib
+          from pathlib import Path
+          first=json.loads(Path('evidence/tpac_archived_38_id_result.json').read_text(encoding='utf-8'))
+          second=json.loads(Path('evidence/tpac_archived_38_id_restart.json').read_text(encoding='utf-8'))
+          expected={'source_cards':38,'detail_available':3,'pending_detail_budget':35,'archive_identity_hold':0}
+          assert first['decision']=='ARCHIVED_SOURCE_VERIFIED_BODY_ONLY_NO_PUBLICATION',first
+          assert first['counts']==expected,first['counts']
+          assert first['published']==0 and first['accepted_fields']==0
+          assert len(first['diagnostics'])==38
+          for name in ('tpac:program:2040','tpac:event:1301','tpac:event:2072'):
+              assert first['diagnostics'][name]['status']=='ARCHIVED_DETAIL_VERIFIED_ONLY',name
+          assert first['inventory']['sha256']==second['inventory']['sha256']
+          assert first['diagnostics']==second['diagnostics']
+          assert len(first['next_detail_ids'])==2
+          root=Path('evidence/tpac_archived_38_id')
+          assert not (root/'docs/data.json').exists()
+          assert not (root/'_isolated_review/tpac/tpac_detail_inventory.json').exists()
+          target=root/'_isolated_archive_replay/_isolated_review/tpac/tpac_detail_inventory.json'
+          assert hashlib.sha256(target.read_bytes()).hexdigest()==first['inventory']['sha256']
+          print('PASS_ORIGINAL_ARCHIVED_38_ID_CLI_E2E_CAS_RESTART_3_DETAIL_35_PENDING_NO_PUBLICATION')
+          PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
           set -euo pipefail
