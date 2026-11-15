@@ -175,12 +175,18 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         from scripts.p30_tpac_r4_source_policy import validate_durable_source_attempt
         ledger = dict(source_host="tpac.org.taipei", durable_provider_verified=True,
                       owner_run_id="runner-1", first_attempt=False,
-                      last_attempt_at=NOW-timedelta(hours=1))
+                      last_attempt_at=NOW-timedelta(hours=1),
+                      fencing_token="fence-001", attempt_written_at=NOW)
         lease = dict(source_host="tpac.org.taipei", atomic_acquire_verified=True,
                      exclusive=True, fencing_token="fence-001",
                      owner_run_id="runner-1", acquired_at=NOW-timedelta(seconds=1))
         self.assertIsNone(validate_durable_source_attempt(now=NOW, ledger=ledger, lease=lease))
         cases = [
+            (dict(ledger, fencing_token="old-run"), lease, "LEDGER_LEASE_FENCING_MISMATCH"),
+            (dict(ledger, attempt_written_at=None), lease, "ATTEMPT_WRITE_AHEAD_MISSING"),
+            (dict(ledger, attempt_written_at=NOW+timedelta(seconds=1)), lease, "ATTEMPT_WRITE_AHEAD_MISSING"),
+            (dict(ledger, attempt_written_at=NOW-timedelta(seconds=2)), lease, "ATTEMPT_PRECEDES_LEASE"),
+            (dict(ledger, fencing_token=1), lease, "LEDGER_LEASE_FENCING_MISMATCH"),
             (dict(ledger, last_attempt_at=None), lease, "LAST_ATTEMPT_MISSING"),
             (dict(ledger, last_attempt_at=NOW-timedelta(minutes=59)), lease, "ENGINEERING_MIN_INTERVAL"),
             (dict(ledger, first_attempt=True), lease, "FIRST_ATTEMPT_CONFLICT"),
