@@ -137,6 +137,18 @@ def validate_durable_source_attempt(*, now: datetime, ledger: dict,
         raise ValueError("TPAC_R4_LEASE_NOT_EXCLUSIVE_HOLD")
     if lease.get("owner_run_id") in (None, "") or lease.get("owner_run_id") != ledger.get("owner_run_id"):
         raise ValueError("TPAC_R4_LEASE_OWNER_MISMATCH_HOLD")
+    # The durable write-ahead request receipt must be bound to the exact
+    # atomic lease generation; a prior runner's ledger is never authority.
+    if (type(lease.get("fencing_token")) is not str
+            or type(ledger.get("fencing_token")) is not str
+            or ledger["fencing_token"] != lease["fencing_token"]):
+        raise ValueError("TPAC_R4_LEDGER_LEASE_FENCING_MISMATCH_HOLD")
+    written = ledger.get("attempt_written_at")
+    if type(written) is not datetime or _aware(written, "ATTEMPT_WRITTEN") > current:
+        raise ValueError("TPAC_R4_ATTEMPT_WRITE_AHEAD_MISSING_HOLD")
+    acquired = lease.get("acquired_at")
+    if type(acquired) is not datetime or _aware(acquired, "LEASE_ACQUIRED") > written:
+        raise ValueError("TPAC_R4_ATTEMPT_PRECEDES_LEASE_HOLD")
     acquired = lease.get("acquired_at")
     if type(acquired) is not datetime or _aware(acquired, "LEASE_ACQUIRED") > current:
         raise ValueError("TPAC_R4_LEASE_TIME_INVALID_HOLD")
