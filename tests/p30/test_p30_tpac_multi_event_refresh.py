@@ -711,6 +711,27 @@ class PersistentInventoryContractTests(unittest.TestCase):
 class ArchivedProvenanceCliTests(unittest.TestCase):
     """Archive-only CLI is an evidence inventory, never a LIVE attestation."""
 
+    def test_archived_real_event_link_prefix_preserves_source_owned_title(self):
+        # Official /event title attrs begin with a navigation prefix, but the
+        # event-owned visible title itself does not contain that prefix.
+        from scripts.p30_tpac_multi_event_refresh import _archived_cards
+        title = "北藝散步導覽"
+        raw = (f'<a class="card-event" href="/event/1301" title="連結到{title}">'
+               f'<div class="card-event__text-title">{title}</div></a>').encode()
+        url = "https://tpac.org.taipei/event"
+        receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                   "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                   "body_bytes": len(raw), "capture_started_at": None,
+                   "observed_at": OBS, "http_status": None, "robots_allowed": None}
+        cards = _archived_cards("event", raw, receipt)
+        self.assertEqual(set(cards), {"1301"})
+        self.assertEqual(cards["1301"]["identity"], "tpac:event:1301")
+        modified = raw.replace(title.encode(), "另一場活動".encode(), 1)
+        forged = dict(receipt, body_sha256=hashlib.sha256(modified).hexdigest(),
+                      body_bytes=len(modified))
+        with self.assertRaisesRegex(ValueError, "TPAC_CATALOG_TITLE_CONFLICT_HOLD"):
+            _archived_cards("event", modified, forged)
+
     def test_archived_cli_subprocess_cas_restart_and_negative_authority(self):
         import subprocess
         import sys
