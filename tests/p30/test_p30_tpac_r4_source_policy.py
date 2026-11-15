@@ -43,7 +43,7 @@ def inputs(**changes):
     p, e = program(), event()
     data = dict(cycle_id="tpac-r4-20261109-173500-a1b2c3d4",
                 start_at=NOW,
-                previous_claim_at=NOW-timedelta(hours=6),
+                previous_claim_at=NOW-timedelta(hours=1),
                 robots=ROBOT_ALLOW,
                 program_body=p, program_receipt=receipt(P_URL, p),
                 event_body=e, event_receipt=receipt(E_URL, e),
@@ -56,6 +56,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
     def test_exact_owner_budget_is_frozen_and_shared_across_both_catalogs(self):
         b = RequestBudget()
         self.assertEqual(b.interval_seconds, MIN_INTERVAL_SECONDS)
+        self.assertEqual(MIN_INTERVAL_SECONDS, 3600)  # engineering only; not official robots policy
         self.assertEqual((b.robots, b.program_list, b.event_list, b.detail_total),
                          (1, 1, 1, 2))
         self.assertEqual(b.concurrency, 1)
@@ -84,10 +85,10 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "IMMUTABLE_CLAIM_PROVIDER_MISSING_HOLD"):
             assert_no_untrusted_live_authority(plan)
 
-    def test_six_hours_is_host_wide_and_clock_must_be_aware(self):
-        enforce_elapsed(NOW, NOW-timedelta(hours=6))
-        with self.assertRaisesRegex(ValueError, "SIX_HOUR_MIN_INTERVAL_HOLD"):
-            review_two_catalog_plan(**inputs(previous_claim_at=NOW-timedelta(hours=5,minutes=59,seconds=59)))
+    def test_engineering_hour_is_host_wide_and_clock_must_be_aware(self):
+        enforce_elapsed(NOW, NOW-timedelta(hours=1))
+        with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
+            review_two_catalog_plan(**inputs(previous_claim_at=NOW-timedelta(minutes=59,seconds=59)))
         with self.assertRaisesRegex(ValueError, "CLOCK_ROLLBACK_HOLD"):
             review_two_catalog_plan(**inputs(previous_claim_at=NOW+timedelta(minutes=1)))
         with self.assertRaisesRegex(ValueError, "START_AWARE_UTC_REQUIRED_HOLD"):
