@@ -921,9 +921,12 @@ def _archived_cards(catalog, raw, receipt):
         sid = match.group(1)
         if sid in results:
             raise ValueError("TPAC_ARCHIVE_DUPLICATE_ID_HOLD")
-        title = card["title"].strip()
-        owned_selector = ".card-program__text-title" if catalog == "program" else ".card-event__text-title"
-        if not 3 <= len(title) <= 180 or title != _text(card.select_one(owned_selector)):
+        # Mirror the LIVE catalog title contract: official /event link title
+        # attributes begin with "連結到", while the event-owned visible title
+        # does not. Reject unowned/conflicting titles instead of stripping blindly.
+        from scripts.p30_tpac_catalog_topology import _title
+        title, title_owned = _title(card, catalog)
+        if not title_owned:
             raise ValueError("TPAC_ARCHIVE_CARD_TITLE_HOLD")
         results[sid] = {"identity": "tpac:" + catalog + ":" + sid,
                         "source_event_id": sid, "source_namespace": catalog,
