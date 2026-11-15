@@ -212,5 +212,54 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
             assert_no_untrusted_live_authority(review_two_catalog_plan(**inputs()))
 
 
+    def test_reserve_durable_attempt_real_lifecycle_and_fail_closed(self):
+        from scripts.p30_tpac_r4_source_policy import reserve_durable_source_attempt
+        class Provider:
+            def __init__(self):
+                self.calls = []
+                self.last = NOW-timedelta(hours=1)
+                self.written = None
+            def acquire_atomic(self, **kw):
+                self.calls.append("acquire")
+                return dict(source_host="tpac.org.taipei",
+                            atomic_acquire_verified=True, exclusive=True,
+                            fencing_token="generation-1", owner_run_id=kw["owner_run_id"],
+                            acquired_at=NOW-timedelta(seconds=1))
+            def read_last_attempt(self, **kw):
+                self.calls.append("history")
+                return dict(source_host=kw["source_host"], first_attempt=False,
+                            last_attempt_at=self.last)
+            def write_attempt(self, **kw):
+                self.calls.append("write")
+                self.written = kw
+            def read_attempt(self, **kw):
+                self.calls.append("readback")
+                return dict(source_host=kw["source_host"], durable_provider_verified=True,
+                            owner_run_id=kw["owner_run_id"], first_attempt=False,
+                            last_attempt_at=self.last, fencing_token="generation-1",
+                            attempt_written_at=self.written["attempted_at"])
+        p = Provider()
+        result = reserve_durable_source_attempt(provider=p, now=NOW, run_id="source-run-001")
+        self.assertEqual(p.calls, ["acquire","history","write","readback"])
+        self.assertTrue(result["attempt_reserved"])
+        self.assertFalse(result["native_get_allowed"])
+        self.assertEqual(result["decision"], CLAIM_HOLD)
+        p = Provider()
+        p.last = NOW-timedelta(seconds=3599)
+        with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
+            reserve_durable_source_attempt(provider=p, now=NOW, run_id="source-run-002")
+        self.assertEqual(p.calls, ["acquire","history"])
+        class Broken(Provider):
+            def read_attempt(self, **kw):
+                self.calls.append("readback")
+                raise RuntimeError("provider outage")
+        p = Broken()
+        with self.assertRaisesRegex(ValueError, "PROVIDER_OPERATION_FAILED_HOLD"):
+            reserve_durable_source_attempt(provider=p, now=NOW, run_id="source-run-003")
+        self.assertEqual(p.calls, ["acquire","history","write","readback"])
+        with self.assertRaisesRegex(ValueError, "SOURCE_RUN_ID_HOLD"):
+            reserve_durable_source_attempt(provider=Provider(), now=NOW, run_id="../")
+
+
 if __name__ == "__main__":
     unittest.main()
