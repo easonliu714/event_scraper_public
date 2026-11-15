@@ -244,6 +244,24 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         self.assertTrue(result["attempt_reserved"])
         self.assertFalse(result["native_get_allowed"])
         self.assertEqual(result["decision"], CLAIM_HOLD)
+        # Negative: malformed atomic lease must fail before reading history
+        # or persisting any source attempt; no mock success grants LIVE GET.
+        for override in ({"exclusive": False}, {"fencing_token": ""},
+                         {"source_host": "other.example"},
+                         {"owner_run_id": "wrong-run"},
+                         {"acquired_at": NOW+timedelta(seconds=1)}):
+            class InvalidLease(Provider):
+                def acquire_atomic(self, **kw):
+                    claim = super().acquire_atomic(**kw)
+                    claim.update(override)
+                    return claim
+            invalid = InvalidLease()
+            with self.subTest(override=override):
+                with self.assertRaisesRegex(ValueError, "PROVIDER_ACQUIRED_LEASE_INVALID|LEASE_TIME_INVALID"):
+                    reserve_durable_source_attempt(provider=invalid, now=NOW,
+                                                   run_id="source-run-invalid")
+                self.assertEqual(invalid.calls, ["acquire"])
+                self.assertIsNone(invalid.written)
         p = Provider()
         p.last = NOW-timedelta(seconds=3599)
         with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
