@@ -163,6 +163,55 @@ def validate_durable_source_attempt(*, now: datetime, ledger: dict,
     return None
 
 
+
+def reserve_durable_source_attempt(*, provider, now: datetime,
+                                   run_id: str, source_host: str = SOURCE_HOST) -> dict:
+    """Reserve a real source attempt before any GET; never grant live authority.
+
+    The provider must independently implement cross-runner atomic acquisition,
+    read-after-write durable receipts, and fencing. Any missing method, partial
+    write, stale readback or provider failure is a hard HOLD. A consumed attempt
+    is NEVER rolled back or retried automatically, including on crash.
+    """
+    current = _aware(now, "START")
+    if source_host != SOURCE_HOST or type(run_id) is not str or not re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9_.-]{7,127}", run_id):
+        raise ValueError("TPAC_R4_SOURCE_RUN_ID_HOLD")
+    try:
+        lease = provider.acquire_atomic(source_host=source_host, owner_run_id=run_id)
+        if type(lease) is not dict:
+            raise ValueError("TPAC_R4_PROVIDER_LEASE_SCHEMA_HOLD")
+        history = provider.read_last_attempt(source_host=source_host)
+        if type(history) is not dict or history.get("source_host") != source_host:
+            raise ValueError("TPAC_R4_PROVIDER_HISTORY_UNVERIFIED_HOLD")
+        if history.get("first_attempt") is True:
+            if history.get("last_attempt_at") is not None:
+                raise ValueError("TPAC_R4_FIRST_ATTEMPT_CONFLICT_HOLD")
+        else:
+            if type(history.get("last_attempt_at")) is not datetime:
+                raise ValueError("TPAC_R4_LAST_ATTEMPT_MISSING_HOLD")
+            enforce_elapsed(current, history["last_attempt_at"])
+        # Persist before a single network request. Provider must implement
+        # immutable fencing-bound write and independently verified readback.
+        provider.write_attempt(source_host=source_host, owner_run_id=run_id,
+                               fencing_token=lease["fencing_token"], attempted_at=current)
+        ledger = provider.read_attempt(source_host=source_host, owner_run_id=run_id)
+        if type(ledger) is not dict:
+            raise ValueError("TPAC_R4_PROVIDER_WRITE_READBACK_MISSING_HOLD")
+        if ledger.get("attempt_written_at") != current:
+            raise ValueError("TPAC_R4_PROVIDER_WRITE_READBACK_MISMATCH_HOLD")
+        validate_durable_source_attempt(now=current, ledger=ledger, lease=lease,
+                                        source_host=source_host)
+    except (ValueError, KeyError, TypeError):
+        raise
+    except Exception as exc:
+        raise ValueError("TPAC_R4_PROVIDER_OPERATION_FAILED_HOLD") from exc
+    # Deliberately NO live permission token. Executor remains fail-closed.
+    return {"source_host": source_host, "owner_run_id": run_id,
+            "attempt_reserved": True, "native_get_allowed": False,
+            "decision": CLAIM_HOLD}
+
+
 def stop_on_response(status: int) -> None:
     """No retry path exists. Codes other than HTTP 200 are fatal."""
     if type(status) is not int or status != 200:
