@@ -170,5 +170,41 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "UNVERIFIED_LIVE_AUTHORITY_HOLD"):
                 assert_no_untrusted_live_authority(forged)
 
+
+    def test_durable_attempt_preflight_rejects_missing_history_and_weak_lease(self):
+        from scripts.p30_tpac_r4_source_policy import validate_durable_source_attempt
+        ledger = dict(source_host="tpac.org.taipei", durable_provider_verified=True,
+                      owner_run_id="runner-1", first_attempt=False,
+                      last_attempt_at=NOW-timedelta(hours=1))
+        lease = dict(source_host="tpac.org.taipei", atomic_acquire_verified=True,
+                     exclusive=True, fencing_token="fence-001",
+                     owner_run_id="runner-1", acquired_at=NOW-timedelta(seconds=1))
+        self.assertIsNone(validate_durable_source_attempt(now=NOW, ledger=ledger, lease=lease))
+        cases = [
+            (dict(ledger, last_attempt_at=None), lease, "LAST_ATTEMPT_MISSING"),
+            (dict(ledger, last_attempt_at=NOW-timedelta(minutes=59)), lease, "ENGINEERING_MIN_INTERVAL"),
+            (dict(ledger, first_attempt=True), lease, "FIRST_ATTEMPT_CONFLICT"),
+            (dict(ledger, durable_provider_verified=False), lease, "DURABLE_AUTHORITY_UNVERIFIED"),
+            (ledger, dict(lease, atomic_acquire_verified=False), "DURABLE_AUTHORITY_UNVERIFIED"),
+            (ledger, dict(lease, exclusive=False), "LEASE_NOT_EXCLUSIVE"),
+            (ledger, dict(lease, owner_run_id="runner-2"), "LEASE_OWNER_MISMATCH"),
+            (ledger, dict(lease, acquired_at=NOW+timedelta(seconds=1)), "LEASE_TIME_INVALID"),
+            (ledger, dict(lease, fencing_token=None), "LEASE_NOT_EXCLUSIVE"),
+        ]
+        for record, claim, reason in cases:
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    validate_durable_source_attempt(now=NOW, ledger=record, lease=claim)
+        with self.assertRaisesRegex(ValueError, "LAST_ATTEMPT_MISSING"):
+            validate_durable_source_attempt(now=NOW, ledger={}, lease=lease)
+        with self.assertRaisesRegex(ValueError, "SOURCE_HOST_MISMATCH"):
+            validate_durable_source_attempt(now=NOW, ledger=ledger, lease=lease, source_host="other.example")
+        first = dict(ledger, first_attempt=True, last_attempt_at=None)
+        self.assertIsNone(validate_durable_source_attempt(now=NOW, ledger=first, lease=lease))
+        # A forged in-memory boolean cannot grant network authority.
+        with self.assertRaisesRegex(ValueError, "IMMUTABLE_CLAIM_PROVIDER_MISSING"):
+            assert_no_untrusted_live_authority(review_two_catalog_plan(**inputs()))
+
+
 if __name__ == "__main__":
     unittest.main()
