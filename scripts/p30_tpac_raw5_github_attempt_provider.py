@@ -108,7 +108,7 @@ class GitHubRaw5AttemptProvider:
             record = json.loads(raw)
         except (ValueError, TypeError, KeyError) as exc:
             raise ValueError("RAW5_FRESH_RECEIPT_DECODE_HOLD") from exc
-        actual_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\x00" + raw).hexdigest()
+        actual_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
         if actual_sha != expected_sha or type(record) is not dict or record != {
                 "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
                 "owner_run_id": owner_run_id,
