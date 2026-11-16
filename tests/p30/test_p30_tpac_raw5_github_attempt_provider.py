@@ -14,6 +14,7 @@ ANCHOR = "a" * 40
 class FakeGitHub:
     def __init__(self):
         self.refs = set()
+        self.tamper_lease_readback = False
         self.calls = []
         self.status = None
         self.server_time = NOW
@@ -23,7 +24,11 @@ class FakeGitHub:
         if method == "GET" and "/git/matching-refs/" in path:
             return 200, [], self.server_time
         if method == "GET" and "/git/ref/" in path:
-            return 404, {}, self.server_time
+            ref = "refs/" + path.split("/git/ref/", 1)[1]
+            if ref not in self.refs:
+                return 404, {}, self.server_time
+            return 200, {"object": {"type": "commit", "sha":
+                "f" * 40 if self.tamper_lease_readback else ANCHOR}}, self.server_time
         if method != "POST" or not path.endswith("/git/refs"):
             raise AssertionError("unexpected GitHub API")
         ref = payload["ref"]
@@ -48,14 +53,26 @@ class Raw5ProviderTests(unittest.TestCase):
         second = self.provider(api)
         with self.assertRaisesRegex(ValueError, "ATOMIC_SLOT_NOT_ACQUIRED_HOLD"):
             second.acquire_atomic(source_host=HOST, owner_run_id="runner-two-0002")
+        self.assertEqual(len(api.calls), 3)
+
+    def test_atomic_lease_requires_independent_ref_readback(self):
+        api = FakeGitHub()
+        api.tamper_lease_readback = True
+        with self.assertRaisesRegex(ValueError, "LEASE_REF_READBACK_HOLD"):
+            self.provider(api).acquire_atomic(
+                source_host=HOST, owner_run_id="runner-one-0001")
+        # A remotely created ref is never promoted to a verified local lease.
+        self.assertEqual(len(api.refs), 1)
         self.assertEqual(len(api.calls), 2)
+        with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
+            self.provider(api).read_last_attempt(source_host=HOST)
 
     def test_reserve_never_reads_history_or_writes_unverified_lease(self):
         api = FakeGitHub()
         with self.assertRaisesRegex(ValueError, "PROVIDER_ACQUIRED_LEASE_INVALID_HOLD"):
             reserve_durable_source_attempt(
                 provider=self.provider(api), now=NOW, run_id="runner-one-0001")
-        self.assertEqual(len(api.calls), 1)
+        self.assertEqual(len(api.calls), 2)
 
     def test_crash_restart_same_slot_does_not_retry_or_get(self):
         api = FakeGitHub()
