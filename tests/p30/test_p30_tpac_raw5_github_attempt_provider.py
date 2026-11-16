@@ -20,6 +20,10 @@ class FakeGitHub:
 
     def __call__(self, method, path, payload):
         self.calls.append((method, path, payload))
+        if method == "GET" and "/git/matching-refs/" in path:
+            return 200, [], self.server_time
+        if method == "GET" and "/git/ref/" in path:
+            return 404, {}, self.server_time
         if method != "POST" or not path.endswith("/git/refs"):
             raise AssertionError("unexpected GitHub API")
         ref = payload["ref"]
@@ -78,7 +82,7 @@ class Raw5ProviderTests(unittest.TestCase):
         api = FakeGitHub()
         p = self.provider(api)
         p.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
-        with self.assertRaisesRegex(ValueError, "DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD"):
+        with self.assertRaisesRegex(ValueError, "FIRST_ATTEMPT_UNATTESTED_HOLD"):
             p.read_last_attempt(source_host=HOST)
         with self.assertRaisesRegex(ValueError, "RECEIPT_SCOPE_OR_FENCE_HOLD"):
             p.write_attempt(source_host=HOST, owner_run_id="runner-one-0001", fencing_token="wrong", attempted_at=NOW)
@@ -99,6 +103,7 @@ class SharedGitHubCommitAPI:
             "parents": [], "message": "main"}}
         self.calls = []
         self.tamper_blob = False
+        self.server_time = NOW
 
     def __call__(self, method, path, payload):
         import base64
@@ -109,41 +114,49 @@ class SharedGitHubCommitAPI:
             raw = base64.b64decode(payload["content"], validate=True)
             sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
             self.blobs[sha] = payload["content"]
-            return 201, {"sha": sha}, NOW
+            return 201, {"sha": sha}, self.server_time
         if method == "POST" and path.endswith("/git/commits"):
             sha = hashlib.sha1(json.dumps(payload, sort_keys=True).encode()).hexdigest()
             self.commits[sha] = {
                 "sha": sha, "tree": {"sha": payload["tree"]},
                 "parents": [{"sha": p} for p in payload["parents"]],
                 "message": payload["message"]}
-            return 201, {"sha": sha}, NOW
+            return 201, {"sha": sha}, self.server_time
         if method == "GET" and "/git/commits/" in path:
             sha = path.rsplit("/", 1)[-1]
             if sha not in self.commits:
-                return 404, {}, NOW
-            return 200, self.commits[sha].copy(), NOW
+                return 404, {}, self.server_time
+            return 200, self.commits[sha].copy(), self.server_time
         if method == "POST" and path.endswith("/git/refs"):
             ref = payload["ref"]
             # GitHub must never accept a non-commit as refs/heads.
             if payload["sha"] not in self.commits:
-                return 422, {"message": "branch must reference commit"}, NOW
+                return 422, {"message": "branch must reference commit"}, self.server_time
             if ref in self.refs:
-                return 422, {"message": "Reference already exists"}, NOW
+                return 422, {"message": "Reference already exists"}, self.server_time
             self.refs[ref] = payload["sha"]
-            return 201, {"ref": ref}, NOW
+            return 201, {"ref": ref}, self.server_time
+        if method == "GET" and "/git/matching-refs/" in path:
+            prefix = "refs/" + path.split("/git/matching-refs/", 1)[1]
+            matches = [
+                {"ref": name, "object": {"type": "commit", "sha": sha}}
+                for name, sha in sorted(self.refs.items())
+                if name.startswith(prefix)
+            ]
+            return 200, matches, self.server_time
         if method == "GET" and "/git/ref/" in path:
             ref = "refs/" + path.split("/git/ref/", 1)[1]
             if ref not in self.refs:
-                return 404, {}, NOW
-            return 200, {"object": {"sha": self.refs[ref]}}, NOW
+                return 404, {}, self.server_time
+            return 200, {"object": {"sha": self.refs[ref]}}, self.server_time
         if method == "GET" and "/git/blobs/" in path:
             sha = path.rsplit("/", 1)[-1]
             if sha not in self.blobs:
-                return 404, {}, NOW
+                return 404, {}, self.server_time
             content = self.blobs[sha]
             if self.tamper_blob:
                 content = base64.b64encode(b'{"tampered":true}').decode()
-            return 200, {"encoding": "base64", "content": content}, NOW
+            return 200, {"encoding": "base64", "content": content}, self.server_time
         raise AssertionError((method, path))
 
 
@@ -234,7 +247,7 @@ class ReceiptRoundTripTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
             reader.read_last_attempt(source_host=HOST)
         api, writer = self._written()
-        with self.assertRaisesRegex(ValueError, "DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD"):
+        with self.assertRaisesRegex(ValueError, "FIRST_ATTEMPT_UNATTESTED_HOLD"):
             writer.read_last_attempt(source_host=HOST)
         with self.assertRaisesRegex(ValueError, "PROVIDER_ACQUIRED_LEASE_INVALID_HOLD"):
             reserve_durable_source_attempt(
@@ -242,6 +255,101 @@ class ReceiptRoundTripTests(unittest.TestCase):
                 now=NOW, run_id="runner-one-0001")
         self.assertFalse(writer.read_attempt(source_host=HOST,
                                              owner_run_id="runner-one-0001")["durable_provider_verified"])
+
+
+class HostHistoryRecoveryTests(unittest.TestCase):
+    """Host-wide elapsed recovery from actual remote ref/commit/blob records."""
+
+    def _previous_and_current(self, age_minutes=61):
+        prior = NOW - timedelta(minutes=age_minutes)
+        assert int(prior.timestamp()) // 3600 == int(NOW.timestamp()) // 3600 - 1
+        api = SharedGitHubCommitAPI()
+        api.server_time = prior
+        writer = GitHubRaw5AttemptProvider(api, ANCHOR, prior)
+        old = writer.acquire_atomic(source_host=HOST, owner_run_id="prior-run-0001")
+        writer.write_attempt(source_host=HOST, owner_run_id="prior-run-0001",
+                             fencing_token=old["fencing_token"], attempted_at=prior)
+        api.server_time = NOW
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        current = reader.acquire_atomic(source_host=HOST, owner_run_id="new-run-0002")
+        self.assertFalse(current["exclusive"])
+        return api, writer, reader, prior
+
+    def test_previous_protected_receipt_recovers_real_utc_for_next_runner(self):
+        from scripts.p30_tpac_r4_source_policy import enforce_elapsed
+        api, writer, reader, prior = self._previous_and_current(age_minutes=61)
+        history = reader.read_last_attempt(source_host=HOST)
+        self.assertFalse(history["first_attempt"])
+        self.assertEqual(history["last_attempt_at"], prior)
+        self.assertTrue(history["history_record_independently_verified"])
+        self.assertFalse(history["native_get_allowed"])
+        self.assertEqual(history["history_receipt_ref"], writer._receipt_ref)
+        self.assertEqual(history["history_receipt_commit_sha"], writer._receipt_commit_sha)
+        self.assertEqual(history["history_receipt_blob_sha"], writer._receipt_sha)
+        enforce_elapsed(NOW, history["last_attempt_at"])
+
+    def test_actual_utc_spacing_blocks_even_when_hour_slot_changes(self):
+        from scripts.p30_tpac_r4_source_policy import enforce_elapsed
+        api, writer, reader, prior = self._previous_and_current(age_minutes=56)
+        history = reader.read_last_attempt(source_host=HOST)
+        self.assertEqual(history["last_attempt_at"], prior)
+        with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
+            enforce_elapsed(NOW, history["last_attempt_at"])
+
+    def test_prior_claim_without_receipt_is_not_clean_history(self):
+        api = SharedGitHubCommitAPI()
+        past = NOW - timedelta(minutes=61)
+        api.server_time = past
+        orphan = GitHubRaw5AttemptProvider(api, ANCHOR, past)
+        orphan.acquire_atomic(source_host=HOST, owner_run_id="prior-run-0001")
+        api.server_time = NOW
+        current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        current.acquire_atomic(source_host=HOST, owner_run_id="new-run-0002")
+        with self.assertRaisesRegex(ValueError, "PREVIOUS_LEASE_WITHOUT_RECEIPT_HOLD"):
+            current.read_last_attempt(source_host=HOST)
+        self.assertEqual(len(api.refs), 2)
+
+    def test_no_prior_history_never_claims_first_attempt(self):
+        api = SharedGitHubCommitAPI()
+        current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        current.acquire_atomic(source_host=HOST, owner_run_id="new-run-0002")
+        with self.assertRaisesRegex(ValueError, "FIRST_ATTEMPT_UNATTESTED_HOLD"):
+            current.read_last_attempt(source_host=HOST)
+
+    def test_previous_receipt_ref_replacement_denied(self):
+        api, writer, reader, _ = self._previous_and_current()
+        api.refs[writer._receipt_ref] = ANCHOR
+        with self.assertRaisesRegex(ValueError, "HISTORY_COMMIT_INVALID_HOLD"):
+            reader.read_last_attempt(source_host=HOST)
+
+    def test_previous_body_sha_tamper_denied(self):
+        api, writer, reader, _ = self._previous_and_current()
+        api.tamper_blob = True
+        with self.assertRaisesRegex(ValueError, "GIT_BLOB_SHA_MISMATCH_HOLD"):
+            reader.read_last_attempt(source_host=HOST)
+
+    def test_duplicate_prior_slot_receipts_fail_closed(self):
+        api, writer, reader, _ = self._previous_and_current()
+        alias = writer._receipt_ref + "-duplicate"
+        api.refs[alias] = writer._receipt_commit_sha
+        with self.assertRaisesRegex(ValueError, "MULTIPLE_HOST_ATTEMPTS_IN_SLOT_HOLD"):
+            reader.read_last_attempt(source_host=HOST)
+
+    def test_wrong_namespace_and_network_error_not_treated_as_no_history(self):
+        api, writer, reader, _ = self._previous_and_current()
+        original = api.__call__
+        class BadStatusTransport:
+            def __call__(self, method, path, payload):
+                if "/git/matching-refs/" in path:
+                    return 206, [], NOW
+                return original(method, path, payload)
+        reader._request = BadStatusTransport()
+        with self.assertRaisesRegex(ValueError, "HISTORY_ENUMERATION_UNVERIFIED_HOLD"):
+            reader.read_last_attempt(source_host=HOST)
+        with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
+            GitHubRaw5AttemptProvider(api, ANCHOR, NOW).read_last_attempt(source_host=HOST)
+
+
 
 
 if __name__ == "__main__":
