@@ -70,15 +70,89 @@ class GitHubRaw5AttemptProvider:
                 "acquired_at": self._now}
 
     def read_last_attempt(self, *, source_host):
-        """Require independently protected history; never infer first use from absent refs.
+        """Independently recover the prior hourly slot's protected receipt.
 
-        A GitHub ref is deletable/mutable unless branch protection has been
-        independently established. Neither a 404 nor a successful POST is
-        evidence of first_attempt or host-wide elapsed time.
+        This is a forensic LAST_ATTEMPT reader, not release authorization.
+        Absence of history is never proof of first_attempt. The prior lease
+        without a matching durable attempt is an irreversible HOLD.
         """
-        if source_host != HOST or self._ref is None:
+        if source_host != HOST or self._ref is None or self._run is None:
             raise ValueError("RAW5_NO_LEASE_HOLD")
-        raise ValueError("RAW5_DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD")
+        slot = int(self._now.timestamp()) // 3600
+        if self._ref != REF_PREFIX + str(slot):
+            raise ValueError("RAW5_CURRENT_SLOT_SCOPE_HOLD")
+        previous = slot - 1
+        if previous < 0:
+            raise ValueError("RAW5_PREVIOUS_SLOT_RANGE_HOLD")
+        prefix = RECEIPT_REF_PREFIX + str(previous) + "-"
+        # GitHub's matching-refs endpoint returns an ARRAY; never mistake
+        # a truncated/invalid response for "no history".
+        status, refs, server_at = self._request(
+            "GET", PREFIX + "/git/matching-refs/heads/source-claims/raw5-receipt-"
+            + str(previous) + "-", None)
+        if (type(status) is not int or status != 200 or type(refs) is not list
+                or abs((_utc(server_at) - self._now).total_seconds()) > 120):
+            raise ValueError("RAW5_HISTORY_ENUMERATION_UNVERIFIED_HOLD")
+        if len(refs) > 1:
+            raise ValueError("RAW5_MULTIPLE_HOST_ATTEMPTS_IN_SLOT_HOLD")
+        if not refs:
+            # A prior lease with no durable request record may be a crash
+            # after reservation. Never treat 404 as an empty source history.
+            status, obj = self._call(
+                "GET", "/git/ref/heads/source-claims/raw5-tpac-" + str(previous))
+            if status == 200:
+                raise ValueError("RAW5_PREVIOUS_LEASE_WITHOUT_RECEIPT_HOLD")
+            if status != 404 or obj:
+                raise ValueError("RAW5_PREVIOUS_LEASE_READ_UNVERIFIED_HOLD")
+            raise ValueError("RAW5_FIRST_ATTEMPT_UNATTESTED_HOLD")
+        entry = refs[0]
+        name = entry.get("ref") if type(entry) is dict else None
+        pointed = entry.get("object") if type(entry) is dict else None
+        commit_sha = pointed.get("sha") if type(pointed) is dict else None
+        if (type(name) is not str or not name.startswith(prefix)
+                or type(commit_sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", commit_sha)
+                or pointed.get("type") != "commit"):
+            raise ValueError("RAW5_HISTORY_REF_INVALID_HOLD")
+        run_id = name[len(prefix):]
+        if not RUN_RE.fullmatch(run_id):
+            raise ValueError("RAW5_HISTORY_RUN_INVALID_HOLD")
+        status, obj = self._call("GET", "/git/commits/" + commit_sha)
+        message = obj.get("message")
+        if status != 200 or type(message) is not str or not message.startswith(
+                RECEIPT_MSG_PREFIX):
+            raise ValueError("RAW5_HISTORY_COMMIT_INVALID_HOLD")
+        blob_sha = message[len(RECEIPT_MSG_PREFIX):]
+        self._read_commit_binding(commit_sha, blob_sha)
+        record = self._read_verified_blob(blob_sha)
+        try:
+            attempted_at = _utc(datetime.fromisoformat(record["attempted_at"]))
+        except (KeyError, TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("RAW5_HISTORY_TIME_INVALID_HOLD") from exc
+        expected = {
+            "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
+            "owner_run_id": run_id,
+            "fencing_token": hashlib.sha256(
+                (REF_PREFIX + str(previous)).encode()).hexdigest(),
+            "attempted_at": attempted_at.isoformat(),
+            "slot_ref": REF_PREFIX + str(previous),
+            "native_get_allowed": False,
+        }
+        if (record != expected
+                or int(attempted_at.timestamp()) // 3600 != previous
+                or attempted_at > self._now):
+            raise ValueError("RAW5_HISTORY_RECEIPT_BINDING_HOLD")
+        return {
+            "source_host": HOST,
+            "first_attempt": False,
+            "last_attempt_at": attempted_at,
+            "history_receipt_ref": name,
+            "history_receipt_commit_sha": commit_sha,
+            "history_receipt_blob_sha": blob_sha,
+            "history_record_independently_verified": True,
+            # No single-host/cross-host privilege is granted by this reader.
+            "native_get_allowed": False,
+        }
 
     @staticmethod
     def _receipt_branch(slot_ref, run_id):
