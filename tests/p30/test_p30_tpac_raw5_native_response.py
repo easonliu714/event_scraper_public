@@ -52,6 +52,29 @@ class NativeResponseTests(unittest.TestCase):
             with self.subTest(change=list(change)), self.assertRaises(ValueError):
                 seal_native_detail_response(**{**BASE, **change})
 
+    def test_manifest_identity_and_http_fields_cannot_be_substituted(self):
+        manifest, body = seal_native_detail_response(**BASE)
+        for field, replacement in (
+                ("requested_url", "https://evil.example/program/2083"),
+                ("final_url", "https://tpac.org.taipei/program/2084"),
+                ("namespace", "event"), ("event_id", "2084"),
+                ("http_status", 429), ("method", "POST"),
+                ("observed_at_utc", "2026-11-16T16:00:00+08:00"),
+                ("executor_id", "../fake"), ("claim_id", "fake"),
+                ("content_type", "application/json")):
+            with self.subTest(field=field):
+                altered = json.loads(manifest)
+                altered[field] = replacement
+                with self.assertRaisesRegex(ValueError, "RAW5_NATIVE_"):
+                    verify_native_detail_receipt(json.dumps(altered).encode(), body)
+
+    def test_manifest_rejects_extra_field_and_boolean_length(self):
+        manifest, body = seal_native_detail_response(**BASE)
+        for change in ({"extra": "unattested"}, {"raw_body_length": True}):
+            altered = {**json.loads(manifest), **change}
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "RAW5_NATIVE_"):
+                verify_native_detail_receipt(json.dumps(altered).encode(), body)
+
     def test_manifest_false_publication_cannot_be_changed(self):
         manifest, body = seal_native_detail_response(**BASE)
         record = json.loads(manifest)
