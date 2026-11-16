@@ -138,6 +138,58 @@ class ReceiptRoundTripTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD"):
             p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
 
+
+    def test_fresh_executor_receipt_readback_and_ref_substitution(self):
+        """Two provider instances share only remote refs/blobs, not local state."""
+        import base64
+        import hashlib
+        class SharedAPI:
+            def __init__(self):
+                self.refs = {}
+                self.blobs = {}
+            def __call__(self, method, path, payload):
+                if method == "POST" and path.endswith("/git/blobs"):
+                    raw = base64.b64decode(payload["content"], validate=True)
+                    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\x00" + raw).hexdigest()
+                    self.blobs[sha] = payload["content"]
+                    return 201, {"sha": sha}, NOW
+                if method == "POST" and path.endswith("/git/refs"):
+                    ref = payload["ref"]
+                    if ref in self.refs:
+                        return 422, {}, NOW
+                    self.refs[ref] = payload["sha"]
+                    return 201, {}, NOW
+                if method == "GET" and "/git/ref/" in path:
+                    ref = "refs/" + path.split("/git/ref/", 1)[1]
+                    return (200, {"object": {"sha": self.refs[ref]}}, NOW) if ref in self.refs else (404, {}, NOW)
+                if method == "GET" and "/git/blobs/" in path:
+                    sha = path.rsplit("/", 1)[-1]
+                    return (200, {"encoding": "base64", "content": self.blobs[sha]}, NOW) if sha in self.blobs else (404, {}, NOW)
+                raise AssertionError((method, path))
+        api = SharedAPI()
+        writer = self.provider(api)
+        lease = writer.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
+        writer.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
+                             fencing_token=lease["fencing_token"], attempted_at=NOW)
+        reader = self.provider(api)
+        args = dict(source_host=HOST, owner_run_id="runner-one-0001",
+                    receipt_ref=writer._receipt_ref, expected_sha=writer._receipt_sha,
+                    slot_ref=writer._ref, expected_at=NOW)
+        verified = reader.verify_receipt_from_fresh_executor(**args)
+        self.assertTrue(verified["receipt_verified"])
+        self.assertFalse(verified["native_get_allowed"])
+        self.assertFalse(verified["durable_provider_verified"])
+        api.refs[writer._receipt_ref] = "b" * 40
+        with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_REF_HOLD"):
+            reader.verify_receipt_from_fresh_executor(**args)
+        api.refs[writer._receipt_ref] = writer._receipt_sha
+        with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_PARITY_HOLD"):
+            reader.verify_receipt_from_fresh_executor(**dict(args, owner_run_id="runner-two-0002"))
+        with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_SCOPE_HOLD"):
+            reader.verify_receipt_from_fresh_executor(**dict(args, receipt_ref="refs/heads/other"))
+        with self.assertRaisesRegex(ValueError, "DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD"):
+            reader.read_last_attempt(source_host=HOST)
+
     def test_receipt_rejects_wrong_fence_before_write(self):
         api = FakeGitHub()
         p = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
