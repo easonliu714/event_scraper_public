@@ -80,10 +80,10 @@ class Raw5ProviderTests(unittest.TestCase):
         p.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
         with self.assertRaisesRegex(ValueError, "DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD"):
             p.read_last_attempt(source_host=HOST)
-        with self.assertRaisesRegex(ValueError, "WRITE_AHEAD_RECEIPT_NOT_IMPLEMENTED_HOLD"):
-            p.write_attempt(source_host=HOST)
-        with self.assertRaisesRegex(ValueError, "INDEPENDENT_RECEIPT_UNAVAILABLE_HOLD"):
-            p.read_attempt(source_host=HOST)
+        with self.assertRaisesRegex(ValueError, "RECEIPT_SCOPE_OR_FENCE_HOLD"):
+            p.write_attempt(source_host=HOST, owner_run_id="runner-one-0001", fencing_token="wrong", attempted_at=NOW)
+        with self.assertRaisesRegex(ValueError, "RECEIPT_READ_SCOPE_HOLD"):
+            p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
 
 
 class ReceiptRoundTripTests(unittest.TestCase):
