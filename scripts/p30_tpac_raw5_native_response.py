@@ -100,3 +100,100 @@ def verify_native_detail_receipt(manifest: bytes, body: bytes) -> dict:
             or json.loads(expected)["event_id"] != receipt["event_id"]):
         raise ValueError("RAW5_NATIVE_MANIFEST_FIELDS_HOLD")
     return receipt
+
+
+# Isolated artifact transport: consumes already captured native response bytes.
+# Never initiates a request, creates a claim, or grants publication.
+def build_isolated_native_zip(records: list[tuple[bytes, bytes]]) -> bytes:
+    """Package 1-5 independently valid DETAIL responses without fabricating provenance."""
+    import io
+    import zipfile
+    if type(records) is not list or not 1 <= len(records) <= 5:
+        raise ValueError("RAW5_ZIP_RECORD_COUNT_HOLD")
+    index = []
+    payloads = []
+    identities = set()
+    for manifest, body in records:
+        receipt = verify_native_detail_receipt(manifest, body)
+        identity = (receipt["namespace"], receipt["event_id"])
+        if identity in identities:
+            raise ValueError("RAW5_ZIP_DUPLICATE_ID_HOLD")
+        identities.add(identity)
+        stem = f'{receipt["namespace"]}-{receipt["event_id"]}'
+        payloads.extend([(f"responses/{stem}.json", manifest),
+                         (f"responses/{stem}.html", body)])
+        index.append({"namespace": identity[0], "event_id": identity[1],
+                      "manifest": f"responses/{stem}.json",
+                      "body": f"responses/{stem}.html",
+                      "manifest_sha256": hashlib.sha256(manifest).hexdigest(),
+                      "body_sha256": hashlib.sha256(body).hexdigest()})
+    index_bytes = json.dumps({"schema": "RAW5_ISOLATED_ZIP_V1",
+                              "formal_publish_allowed": False,
+                              "records": index}, sort_keys=True,
+                             separators=(",", ":")).encode("utf-8")
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+        for name, data in [("index.json", index_bytes), *payloads]:
+            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_STORED
+            archive.writestr(entry, data)
+    return output.getvalue()
+
+
+def verify_isolated_native_zip(archive_bytes: bytes) -> list[dict]:
+    """Independently check ZIP member allowlist, CRC, SHA and native receipt parity."""
+    import io
+    import zipfile
+    if type(archive_bytes) is not bytes or not archive_bytes:
+        raise ValueError("RAW5_ZIP_BYTES_HOLD")
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_bytes), "r") as archive:
+            infos = archive.infolist()
+            names = [info.filename for info in infos]
+            if (len(names) != len(set(names)) or "index.json" not in names
+                    or len(names) > 11 or any(info.file_size > MAX_BODY for info in infos)
+                    or any(info.compress_type != zipfile.ZIP_STORED for info in infos)
+                    or archive.testzip() is not None):
+                raise ValueError("RAW5_ZIP_STRUCTURE_OR_CRC_HOLD")
+            index_bytes = archive.read("index.json")
+            index = json.loads(index_bytes.decode("utf-8", "strict"))
+            if (type(index) is not dict or set(index) !=
+                    {"schema", "formal_publish_allowed", "records"}
+                    or index["schema"] != "RAW5_ISOLATED_ZIP_V1"
+                    or index["formal_publish_allowed"] is not False
+                    or type(index["records"]) is not list
+                    or not 1 <= len(index["records"]) <= 5):
+                raise ValueError("RAW5_ZIP_INDEX_HOLD")
+            expected = {"index.json"}
+            seen = set()
+            verified = []
+            for item in index["records"]:
+                if type(item) is not dict or set(item) != {
+                    "namespace", "event_id", "manifest", "body",
+                    "manifest_sha256", "body_sha256"}:
+                    raise ValueError("RAW5_ZIP_INDEX_ENTRY_HOLD")
+                namespace, event_id = item["namespace"], item["event_id"]
+                if (namespace not in ("program", "event")
+                        or type(event_id) is not str or not re.fullmatch(r"[1-9][0-9]*", event_id)
+                        or (namespace, event_id) in seen):
+                    raise ValueError("RAW5_ZIP_IDENTITY_HOLD")
+                seen.add((namespace, event_id))
+                stem = f"{namespace}-{event_id}"
+                if (item["manifest"] != f"responses/{stem}.json"
+                        or item["body"] != f"responses/{stem}.html"):
+                    raise ValueError("RAW5_ZIP_PATH_HOLD")
+                expected.update((item["manifest"], item["body"]))
+                manifest = archive.read(item["manifest"])
+                body = archive.read(item["body"])
+                if (hashlib.sha256(manifest).hexdigest() != item["manifest_sha256"]
+                        or hashlib.sha256(body).hexdigest() != item["body_sha256"]):
+                    raise ValueError("RAW5_ZIP_SHA256_HOLD")
+                receipt = verify_native_detail_receipt(manifest, body)
+                if (receipt["namespace"], receipt["event_id"]) != (namespace, event_id):
+                    raise ValueError("RAW5_ZIP_RECEIPT_IDENTITY_HOLD")
+                verified.append(receipt)
+            if set(names) != expected or len(names) != len(expected):
+                raise ValueError("RAW5_ZIP_MEMBER_ALLOWLIST_HOLD")
+            return verified
+    except (zipfile.BadZipFile, KeyError, UnicodeError, TypeError, OverflowError) as exc:
+        raise ValueError("RAW5_ZIP_INVALID_HOLD") from exc
