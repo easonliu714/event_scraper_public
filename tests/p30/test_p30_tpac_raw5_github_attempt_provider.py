@@ -69,7 +69,7 @@ class Raw5ProviderTests(unittest.TestCase):
         second = self.provider(api)
         with self.assertRaisesRegex(ValueError, "ATOMIC_SLOT_NOT_ACQUIRED_HOLD"):
             second.acquire_atomic(source_host=HOST, owner_run_id="runner-two-0002")
-        self.assertEqual(len(api.calls), 7)
+        self.assertEqual(len(api.calls), 8)
 
     def test_atomic_lease_requires_independent_ref_readback(self):
         api = FakeGitHub()
