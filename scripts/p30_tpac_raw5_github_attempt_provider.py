@@ -61,6 +61,16 @@ class GitHubRaw5AttemptProvider:
         status, _ = self._call("POST", "/git/refs", {"ref": ref, "sha": self._anchor})
         if status != 201:
             raise ValueError("RAW5_ATOMIC_SLOT_NOT_ACQUIRED_HOLD")
+        # A successful POST alone is not a verified lease. Read back the
+        # exact shared ref and require its commit target to match the anchor.
+        # Any proxy/transport substitution or ref race remains fail-closed.
+        status, readback = self._call(
+            "GET", "/git/ref/" + ref.removeprefix("refs/"))
+        pointed = readback.get("object")
+        if (status != 200 or type(pointed) is not dict
+                or pointed.get("sha") != self._anchor
+                or pointed.get("type") not in (None, "commit")):
+            raise ValueError("RAW5_LEASE_REF_READBACK_HOLD")
         self._run, self._ref = owner_run_id, ref
         # No 'atomic_acquire_verified=True': actual protection has not been
         # proven on two independent runners, and refs may be deleted.
