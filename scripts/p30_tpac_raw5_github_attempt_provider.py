@@ -21,6 +21,14 @@ RECEIPT_MSG_PREFIX = "RAW5_ATTEMPT_V1_BLOB "
 RUN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,127}\Z")
 
 
+def _owner_fence(slot_ref, owner_run_id):
+    """Bind fencing to the winning owner as well as the host-wide slot."""
+    if (type(slot_ref) is not str or not re.fullmatch(re.escape(REF_PREFIX) + r"[0-9]{1,12}", slot_ref)
+            or type(owner_run_id) is not str or not RUN_RE.fullmatch(owner_run_id)):
+        raise ValueError("RAW5_FENCE_SCOPE_HOLD")
+    return hashlib.sha256((slot_ref + "\\n" + owner_run_id).encode()).hexdigest()
+
+
 def _utc(value):
     if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("RAW5_UTC_REQUIRED_HOLD")
@@ -97,7 +105,7 @@ class GitHubRaw5AttemptProvider:
         # proven on two independent runners, and refs may be deleted.
         return {"source_host": HOST, "owner_run_id": owner_run_id,
                 "exclusive": False, "atomic_acquire_verified": False,
-                "fencing_token": hashlib.sha256(ref.encode()).hexdigest(),
+                "fencing_token": _owner_fence(ref, owner_run_id),
                 "acquired_at": self._now}
 
     def read_last_attempt(self, *, source_host):
@@ -258,7 +266,7 @@ class GitHubRaw5AttemptProvider:
         if record != {
                 "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
                 "owner_run_id": owner_run_id,
-                "fencing_token": hashlib.sha256(slot_ref.encode()).hexdigest(),
+                "fencing_token": _owner_fence(slot_ref, owner_run_id),
                 "attempted_at": when.isoformat(), "slot_ref": slot_ref,
                 "native_get_allowed": False}:
             raise ValueError("RAW5_FRESH_RECEIPT_PARITY_HOLD")
@@ -274,7 +282,7 @@ class GitHubRaw5AttemptProvider:
         import base64
         if (source_host != HOST or owner_run_id != self._run
                 or self._ref is None or type(fencing_token) is not str
-                or fencing_token != hashlib.sha256(self._ref.encode()).hexdigest()
+                or fencing_token != _owner_fence(self._ref, self._run)
                 or _utc(attempted_at) != self._now):
             raise ValueError("RAW5_RECEIPT_SCOPE_OR_FENCE_HOLD")
         receipt = {"schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
