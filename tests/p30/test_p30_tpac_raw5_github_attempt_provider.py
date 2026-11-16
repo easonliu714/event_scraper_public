@@ -166,6 +166,7 @@ class ReceiptRoundTripTests(unittest.TestCase):
     def test_protected_commit_ref_and_full_byte_roundtrip(self):
         api, writer = self._written()
         self.assertTrue(writer._receipt_ref.startswith(RECEIPT_REF_PREFIX))
+        self.assertNotIn("/", writer._receipt_ref[len("refs/heads/source-claims/"):])
         self.assertNotEqual(writer._receipt_commit_sha, writer._receipt_sha)
         self.assertEqual(api.refs[writer._receipt_ref], writer._receipt_commit_sha)
         record = writer.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
@@ -217,6 +218,7 @@ class ReceiptRoundTripTests(unittest.TestCase):
         for change in (
             {"receipt_ref": "refs/heads/raw5-receipts/" + writer._ref.split("/")[-1]},
             {"receipt_ref": "refs/heads/other"},
+            {"receipt_ref": "refs/heads/source-claims/raw5-receipts/nested"},
             {"receipt_ref": writer._receipt_ref + "-foreign"},
             {"slot_ref": REF_PREFIX + "../bad"},
             {"owner_run_id": "runner-two-0002"},
