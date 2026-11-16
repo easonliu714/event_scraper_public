@@ -115,12 +115,12 @@ class GitHubRaw5AttemptProvider:
             raise ValueError("RAW5_RECEIPT_BLOB_READBACK_HOLD")
         try:
             raw = base64.b64decode(blob["content"], validate=True)
-            actual_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
-            if actual_sha != sha:
-                raise ValueError("RAW5_RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD")
             record = json.loads(raw)
         except (ValueError, KeyError, TypeError) as exc:
             raise ValueError("RAW5_RECEIPT_BYTES_INVALID_HOLD") from exc
+        actual_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
+        if actual_sha != sha:
+            raise ValueError("RAW5_RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD")
         if (type(record) is not dict or record.get("schema") != "RAW5_ATTEMPT_V1"
                 or record.get("source_host") != HOST or record.get("owner_run_id") != self._run
                 or record.get("slot_ref") != self._ref
