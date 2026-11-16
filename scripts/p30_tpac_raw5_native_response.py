@@ -73,8 +73,30 @@ def verify_native_detail_receipt(manifest: bytes, body: bytes) -> dict:
         raise ValueError("RAW5_NATIVE_RECEIPT_PARSE_HOLD") from exc
     if type(receipt) is not dict or receipt.get("schema") != "RAW5_NATIVE_DETAIL_V1":
         raise ValueError("RAW5_NATIVE_RECEIPT_SCHEMA_HOLD")
-    if (receipt.get("raw_body_length") != len(body)
-            or receipt.get("raw_body_sha256") != hashlib.sha256(body).hexdigest()
-            or receipt.get("formal_publish_allowed") is not False):
+    # Revalidate the complete untrusted manifest, not only its body hash.
+    expected_keys = {
+        "schema", "method", "requested_url", "final_url", "http_status",
+        "content_type", "observed_at_utc", "namespace", "event_id",
+        "executor_id", "claim_id", "run_id", "raw_body_length",
+        "raw_body_sha256", "formal_publish_allowed",
+    }
+    if set(receipt) != expected_keys or receipt.get("formal_publish_allowed") is not False:
         raise ValueError("RAW5_NATIVE_BYTES_PARITY_HOLD")
+    if (type(receipt["raw_body_length"]) is not int
+            or receipt["raw_body_length"] != len(body)
+            or receipt["raw_body_sha256"] != hashlib.sha256(body).hexdigest()):
+        raise ValueError("RAW5_NATIVE_BYTES_PARITY_HOLD")
+    try:
+        timestamp = datetime.fromisoformat(receipt["observed_at_utc"])
+        expected, _ = seal_native_detail_response(
+            requested_url=receipt["requested_url"], final_url=receipt["final_url"],
+            status=receipt["http_status"], content_type=receipt["content_type"],
+            body=body, observed_at=timestamp, executor_id=receipt["executor_id"],
+            claim_id=receipt["claim_id"], run_id=receipt["run_id"])
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("RAW5_NATIVE_MANIFEST_FIELDS_HOLD") from exc
+    if (receipt["method"] != "GET" or expected != manifest
+            or json.loads(expected)["namespace"] != receipt["namespace"]
+            or json.loads(expected)["event_id"] != receipt["event_id"]):
+        raise ValueError("RAW5_NATIVE_MANIFEST_FIELDS_HOLD")
     return receipt
