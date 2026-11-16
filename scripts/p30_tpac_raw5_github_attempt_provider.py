@@ -171,8 +171,7 @@ class GitHubRaw5AttemptProvider:
         expected = {
             "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
             "owner_run_id": run_id,
-            "fencing_token": hashlib.sha256(
-                (REF_PREFIX + str(previous)).encode()).hexdigest(),
+            "fencing_token": _owner_fence(REF_PREFIX + str(previous), run_id),
             "attempted_at": attempted_at.isoformat(),
             "slot_ref": REF_PREFIX + str(previous),
             "native_get_allowed": False,
@@ -335,7 +334,7 @@ class GitHubRaw5AttemptProvider:
         if record != {
                 "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
                 "owner_run_id": self._run,
-                "fencing_token": hashlib.sha256(self._ref.encode()).hexdigest(),
+                "fencing_token": _owner_fence(self._ref, self._run),
                 "attempted_at": self._now.isoformat(), "slot_ref": self._ref,
                 "native_get_allowed": False}:
             raise ValueError("RAW5_RECEIPT_INDEPENDENT_PARITY_HOLD")
