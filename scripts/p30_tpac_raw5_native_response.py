@@ -197,3 +197,52 @@ def verify_isolated_native_zip(archive_bytes: bytes) -> list[dict]:
             return verified
     except (zipfile.BadZipFile, KeyError, UnicodeError, TypeError, OverflowError) as exc:
         raise ValueError("RAW5_ZIP_INVALID_HOLD") from exc
+
+
+# Current LIST/DETAIL same-ID REVIEW gate. Caller must independently attest
+# native LIST provenance; HTML text alone never constitutes an HTTP receipt.
+def verify_native_list_detail_identity(*, list_url: str, list_body: bytes,
+                                       detail_manifest: bytes, detail_body: bytes) -> dict:
+    """Check one canonical official LIST anchor against an independently sealed DETAIL."""
+    from html.parser import HTMLParser
+    if type(list_url) is not str or type(list_body) is not bytes or not list_body or len(list_body) > MAX_BODY:
+        raise ValueError("RAW5_LIST_BYTES_OR_URL_HOLD")
+    parsed = urlsplit(list_url)
+    if (parsed.scheme != "https" or parsed.netloc != HOST
+            or parsed.path not in ("/program", "/event")
+            or parsed.query or parsed.fragment or parsed.username or parsed.password):
+        raise ValueError("RAW5_LIST_ORIGIN_HOLD")
+    detail = verify_native_detail_receipt(detail_manifest, detail_body)
+    if detail["namespace"] != parsed.path[1:]:
+        raise ValueError("RAW5_LIST_NAMESPACE_HOLD")
+    class Links(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.hrefs = []
+        def handle_starttag(self, tag, attrs):
+            if tag.lower() == "a":
+                self.hrefs.extend(v for k, v in attrs if k.lower() == "href" and v is not None)
+    parser = Links()
+    try:
+        parser.feed(list_body.decode("utf-8", "strict"))
+        parser.close()
+    except (UnicodeError, ValueError) as exc:
+        raise ValueError("RAW5_LIST_HTML_PARSE_HOLD") from exc
+    expected = f'/{detail["namespace"]}/{detail["event_id"]}'
+    matched = 0
+    for href in parser.hrefs:
+        link = urlsplit(href)
+        if (link.scheme or link.netloc) and (link.scheme != "https" or link.netloc != HOST):
+            continue
+        if link.query or link.fragment or link.username or link.password:
+            continue
+        if link.path.rstrip("/") == expected:
+            matched += 1
+    if matched != 1:
+        raise ValueError("RAW5_LIST_DETAIL_LINK_CARDINALITY_HOLD")
+    return {"namespace": detail["namespace"], "event_id": detail["event_id"],
+            "list_url": list_url, "detail_url": detail["requested_url"],
+            "list_body_sha256": hashlib.sha256(list_body).hexdigest(),
+            "detail_body_sha256": detail["raw_body_sha256"],
+            "identity_review_verified": True, "native_list_provenance_attested": False,
+            "formal_publish_allowed": False}
