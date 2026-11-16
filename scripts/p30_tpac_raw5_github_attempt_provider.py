@@ -68,11 +68,56 @@ class GitHubRaw5AttemptProvider:
                 "acquired_at": self._now}
 
     def read_last_attempt(self, *, source_host):
+        """Require independently protected history; never infer first use from absent refs.
+
+        A GitHub ref is deletable/mutable unless branch protection has been
+        independently established. Neither a 404 nor a successful POST is
+        evidence of first_attempt or host-wide elapsed time.
+        """
         if source_host != HOST or self._ref is None:
             raise ValueError("RAW5_NO_LEASE_HOLD")
-        # A ref collision alone cannot provide durable history, so fail
-        # closed rather than inventing a first-attempt assertion.
         raise ValueError("RAW5_DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD")
+
+    def verify_receipt_from_fresh_executor(self, *, source_host, owner_run_id,
+                                           receipt_ref, expected_sha, slot_ref,
+                                           expected_at):
+        """Independent cross-process receipt audit; NEVER authorizes LIVE GET.
+
+        This does not rely on in-memory _receipt_sha or _receipt_ref. A caller
+        must provide the exact expected SHA from separately preserved evidence.
+        """
+        import base64
+        if (source_host != HOST or type(owner_run_id) is not str
+                or not RUN_RE.fullmatch(owner_run_id)
+                or type(receipt_ref) is not str
+                or not receipt_ref.startswith("refs/heads/raw5-receipts/")
+                or type(slot_ref) is not str or not slot_ref.startswith(REF_PREFIX)
+                or type(expected_sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", expected_sha)):
+            raise ValueError("RAW5_FRESH_RECEIPT_SCOPE_HOLD")
+        when = _utc(expected_at)
+        status, ref = self._call("GET", "/git/ref/" + receipt_ref.removeprefix("refs/"))
+        actual = ref.get("object", {}).get("sha") if type(ref.get("object")) is dict else None
+        if status != 200 or actual != expected_sha:
+            raise ValueError("RAW5_FRESH_RECEIPT_REF_HOLD")
+        status, blob = self._call("GET", "/git/blobs/" + expected_sha)
+        if status != 200 or blob.get("encoding") != "base64":
+            raise ValueError("RAW5_FRESH_RECEIPT_BLOB_HOLD")
+        try:
+            raw = base64.b64decode(blob["content"], validate=True)
+            record = json.loads(raw)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ValueError("RAW5_FRESH_RECEIPT_DECODE_HOLD") from exc
+        actual_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\x00" + raw).hexdigest()
+        if actual_sha != expected_sha or type(record) is not dict or record != {
+                "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
+                "owner_run_id": owner_run_id,
+                "fencing_token": hashlib.sha256(slot_ref.encode()).hexdigest(),
+                "attempted_at": when.isoformat(), "slot_ref": slot_ref,
+                "native_get_allowed": False}:
+            raise ValueError("RAW5_FRESH_RECEIPT_PARITY_HOLD")
+        return {"receipt_verified": True, "native_get_allowed": False,
+                "durable_provider_verified": False, "attempt_written_at": when}
 
     def write_attempt(self, *, source_host, owner_run_id, fencing_token, attempted_at):
         """Persist a fenced, per-run receipt before network I/O; never authorize GET."""
