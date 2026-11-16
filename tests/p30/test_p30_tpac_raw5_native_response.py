@@ -83,5 +83,44 @@ class NativeResponseTests(unittest.TestCase):
             verify_native_detail_receipt(json.dumps(record).encode(), body)
 
 
+
+    def test_isolated_zip_real_bytes_roundtrip_and_duplicate_rejection(self):
+        from scripts.p30_tpac_raw5_native_response import (
+            build_isolated_native_zip, verify_isolated_native_zip)
+        one = seal_native_detail_response(**BASE)
+        two = seal_native_detail_response(**{**BASE,
+            "requested_url": "https://tpac.org.taipei/event/2101",
+            "final_url": "https://tpac.org.taipei/event/2101",
+            "body": b"<html>different original bytes</html>"})
+        archive = build_isolated_native_zip([one, two])
+        receipts = verify_isolated_native_zip(archive)
+        self.assertEqual([(r["namespace"], r["event_id"]) for r in receipts],
+                         [("program", "2083"), ("event", "2101")])
+        with self.assertRaisesRegex(ValueError, "DUPLICATE_ID_HOLD"):
+            build_isolated_native_zip([one, one])
+
+    def test_isolated_zip_rejects_member_mutation_and_extra_members(self):
+        import io
+        import zipfile
+        from scripts.p30_tpac_raw5_native_response import (
+            build_isolated_native_zip, verify_isolated_native_zip)
+        original = build_isolated_native_zip([seal_native_detail_response(**BASE)])
+        for mutate in ("body", "extra"):
+            with zipfile.ZipFile(io.BytesIO(original)) as src:
+                members = [(n, src.read(n)) for n in src.namelist()]
+            if mutate == "body":
+                members = [(n, b"tampered" if n.endswith(".html") else b)
+                           for n, b in members]
+            else:
+                members.append(("../unexpected", b"bad"))
+            output = io.BytesIO()
+            with zipfile.ZipFile(output, "w") as dst:
+                for name, data in members:
+                    dst.writestr(name, data)
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(
+                    ValueError, "RAW5_ZIP_"):
+                verify_isolated_native_zip(output.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()
