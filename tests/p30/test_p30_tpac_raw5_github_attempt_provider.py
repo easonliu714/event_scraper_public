@@ -12,29 +12,45 @@ ANCHOR = "a" * 40
 
 
 class FakeGitHub:
+    """Minimal commit-aware REST transport; no real source GET."""
+    TREE = "c" * 40
+
     def __init__(self):
-        self.refs = set()
+        self.refs = {}
+        self.commits = {ANCHOR: {"sha": ANCHOR, "tree": {"sha": self.TREE},
+                                 "parents": [], "message": "anchor"}}
         self.tamper_lease_readback = False
         self.calls = []
         self.status = None
         self.server_time = NOW
 
     def __call__(self, method, path, payload):
+        import hashlib
+        import json
         self.calls.append((method, path, payload))
+        if method == "GET" and "/git/commits/" in path:
+            sha = path.rsplit("/", 1)[-1]
+            return (200, self.commits[sha], self.server_time) if sha in self.commits else (404, {}, self.server_time)
+        if method == "POST" and path.endswith("/git/commits"):
+            sha = hashlib.sha1(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+            self.commits[sha] = {"sha": sha, "tree": {"sha": payload["tree"]},
+                                 "parents": [{"sha": p} for p in payload["parents"]],
+                                 "message": payload["message"]}
+            return 201, {"sha": sha}, self.server_time
         if method == "GET" and "/git/matching-refs/" in path:
             return 200, [], self.server_time
         if method == "GET" and "/git/ref/" in path:
             ref = "refs/" + path.split("/git/ref/", 1)[1]
             if ref not in self.refs:
                 return 404, {}, self.server_time
-            return 200, {"object": {"type": "commit", "sha":
-                "f" * 40 if self.tamper_lease_readback else ANCHOR}}, self.server_time
+            sha = "f" * 40 if self.tamper_lease_readback else self.refs[ref]
+            return 200, {"object": {"type": "commit", "sha": sha}}, self.server_time
         if method != "POST" or not path.endswith("/git/refs"):
             raise AssertionError("unexpected GitHub API")
         ref = payload["ref"]
         status = self.status if self.status is not None else (422 if ref in self.refs else 201)
         if status == 201:
-            self.refs.add(ref)
+            self.refs[ref] = payload["sha"]
         return status, {}, self.server_time
 
 
@@ -53,7 +69,7 @@ class Raw5ProviderTests(unittest.TestCase):
         second = self.provider(api)
         with self.assertRaisesRegex(ValueError, "ATOMIC_SLOT_NOT_ACQUIRED_HOLD"):
             second.acquire_atomic(source_host=HOST, owner_run_id="runner-two-0002")
-        self.assertEqual(len(api.calls), 3)
+        self.assertEqual(len(api.calls), 7)
 
     def test_atomic_lease_requires_independent_ref_readback(self):
         api = FakeGitHub()
@@ -61,9 +77,9 @@ class Raw5ProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "LEASE_REF_READBACK_HOLD"):
             self.provider(api).acquire_atomic(
                 source_host=HOST, owner_run_id="runner-one-0001")
-        # A remotely created ref is never promoted to a verified local lease.
+        # Owner-bound commit ref cannot be accepted after retargeting.
         self.assertEqual(len(api.refs), 1)
-        self.assertEqual(len(api.calls), 2)
+        self.assertEqual(len(api.calls), 5)
         with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
             self.provider(api).read_last_attempt(source_host=HOST)
 
@@ -199,6 +215,10 @@ class ReceiptRoundTripTests(unittest.TestCase):
         self.assertNotIn("/", writer._receipt_ref[len("refs/heads/source-claims/"):])
         self.assertNotEqual(writer._receipt_commit_sha, writer._receipt_sha)
         self.assertEqual(api.refs[writer._receipt_ref], writer._receipt_commit_sha)
+        lease_commit = api.commits[writer._lease_commit_sha]
+        self.assertEqual(api.refs[writer._ref], writer._lease_commit_sha)
+        self.assertEqual(lease_commit["parents"], [{"sha": ANCHOR}])
+        self.assertIn("runner-one-0001", lease_commit["message"])
         record = writer.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
         self.assertEqual(record["attempt_written_at"], NOW)
         self.assertFalse(record["durable_provider_verified"])
