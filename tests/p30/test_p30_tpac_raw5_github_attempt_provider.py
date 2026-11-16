@@ -167,11 +167,11 @@ class ReceiptRoundTripTests(unittest.TestCase):
                     return (200, {"encoding": "base64", "content": self.blobs[sha]}, NOW) if sha in self.blobs else (404, {}, NOW)
                 raise AssertionError((method, path))
         api = SharedAPI()
-        writer = self.provider(api)
+        writer = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
         lease = writer.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
         writer.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
                              fencing_token=lease["fencing_token"], attempted_at=NOW)
-        reader = self.provider(api)
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
         args = dict(source_host=HOST, owner_run_id="runner-one-0001",
                     receipt_ref=writer._receipt_ref, expected_sha=writer._receipt_sha,
                     slot_ref=writer._ref, expected_at=NOW)
