@@ -58,20 +58,41 @@ class GitHubRaw5AttemptProvider:
         # not proof of permanent exclusivity or a grant of network authority.
         slot = int(self._now.timestamp()) // 3600
         ref = REF_PREFIX + str(slot)
-        status, _ = self._call("POST", "/git/refs", {"ref": ref, "sha": self._anchor})
+        # Bind the unique source-host slot to the winning run, not a generic
+        # anchor SHA. Still fail closed until Ruleset and two-runner attestation.
+        status, anchor = self._call("GET", "/git/commits/" + self._anchor)
+        tree = anchor.get("tree") if type(anchor) is dict else None
+        tree_sha = tree.get("sha") if type(tree) is dict else None
+        if (status != 200 or type(tree_sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", tree_sha)):
+            raise ValueError("RAW5_LEASE_ANCHOR_TREE_HOLD")
+        message = "RAW5_HOST_LEASE_V1 " + HOST + " " + str(slot) + " " + owner_run_id
+        status, commit = self._call("POST", "/git/commits", {
+            "message": message, "tree": tree_sha, "parents": [self._anchor]})
+        lease_sha = commit.get("sha") if type(commit) is dict else None
+        if (status != 201 or type(lease_sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", lease_sha)):
+            raise ValueError("RAW5_LEASE_COMMIT_CREATE_HOLD")
+        status, _ = self._call("POST", "/git/refs", {"ref": ref, "sha": lease_sha})
         if status != 201:
             raise ValueError("RAW5_ATOMIC_SLOT_NOT_ACQUIRED_HOLD")
-        # A successful POST alone is not a verified lease. Read back the
-        # exact shared ref and require its commit target to match the anchor.
-        # Any proxy/transport substitution or ref race remains fail-closed.
-        status, readback = self._call(
-            "GET", "/git/ref/" + ref.removeprefix("refs/"))
-        pointed = readback.get("object")
+        status, readback = self._call("GET", "/git/ref/" + ref.removeprefix("refs/"))
+        pointed = readback.get("object") if type(readback) is dict else None
         if (status != 200 or type(pointed) is not dict
-                or pointed.get("sha") != self._anchor
+                or pointed.get("sha") != lease_sha
                 or pointed.get("type") not in (None, "commit")):
             raise ValueError("RAW5_LEASE_REF_READBACK_HOLD")
+        status, bound = self._call("GET", "/git/commits/" + lease_sha)
+        parents = bound.get("parents") if type(bound) is dict else None
+        bound_tree = bound.get("tree") if type(bound) is dict else None
+        if (status != 200 or bound.get("sha") != lease_sha
+                or bound.get("message") != message
+                or type(parents) is not list or len(parents) != 1
+                or type(parents[0]) is not dict or parents[0].get("sha") != self._anchor
+                or type(bound_tree) is not dict or bound_tree.get("sha") != tree_sha):
+            raise ValueError("RAW5_LEASE_OWNER_COMMIT_BINDING_HOLD")
         self._run, self._ref = owner_run_id, ref
+        self._lease_commit_sha = lease_sha
         # No 'atomic_acquire_verified=True': actual protection has not been
         # proven on two independent runners, and refs may be deleted.
         return {"source_host": HOST, "owner_run_id": owner_run_id,
