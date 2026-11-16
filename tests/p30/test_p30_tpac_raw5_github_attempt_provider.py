@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from scripts.p30_tpac_raw5_github_attempt_provider import (
-    GitHubRaw5AttemptProvider, HOST, REF_PREFIX,
+    GitHubRaw5AttemptProvider, HOST, REF_PREFIX, RECEIPT_REF_PREFIX,
 )
 from scripts.p30_tpac_r4_source_policy import reserve_durable_source_attempt
 
@@ -86,118 +86,160 @@ class Raw5ProviderTests(unittest.TestCase):
             p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
 
 
-class ReceiptRoundTripTests(unittest.TestCase):
-    def test_write_ahead_independent_ref_blob_readback_and_tamper_hold(self):
+class SharedGitHubCommitAPI:
+    """Realistic Git REST object-type model: branch refs point to commits."""
+    TREE = "c" * 40
+
+    def __init__(self):
+        import copy
+        self.refs = {}
+        self.blobs = {}
+        self.commits = {ANCHOR: {
+            "sha": ANCHOR, "tree": {"sha": self.TREE},
+            "parents": [], "message": "main"}}
+        self.calls = []
+        self.tamper_blob = False
+
+    def __call__(self, method, path, payload):
         import base64
         import hashlib
         import json
-        class ReceiptAPI:
-            def __init__(self):
-                self.refs = {}
-                self.blobs = {}
-                self.tamper = False
-            def __call__(self, method, path, payload):
-                if method == "POST" and path.endswith("/git/blobs"):
-                    raw = base64.b64decode(payload["content"])
-                    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
-                    self.blobs[sha] = payload["content"]
-                    return 201, {"sha": sha}, NOW
-                if method == "POST" and path.endswith("/git/refs"):
-                    ref = payload["ref"]
-                    if ref in self.refs:
-                        return 422, {}, NOW
-                    self.refs[ref] = payload["sha"]
-                    return 201, {}, NOW
-                if method == "GET" and "/git/ref/" in path:
-                    ref = "refs/" + path.split("/git/ref/", 1)[1]
-                    return 200, {"object": {"sha": self.refs[ref]}}, NOW
-                if method == "GET" and "/git/blobs/" in path:
-                    sha = path.rsplit("/", 1)[-1]
-                    content = self.blobs[sha]
-                    if self.tamper:
-                        content = base64.b64encode(b'{"tampered":true}').decode()
-                    return 200, {"encoding": "base64", "content": content}, NOW
-                raise AssertionError((method, path))
-        api = ReceiptAPI()
-        p = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
-        lease = p.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
-        p.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
-                        fencing_token=lease["fencing_token"], attempted_at=NOW)
-        record = p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
-        self.assertEqual(record["attempt_written_at"], NOW)
-        self.assertFalse(record["durable_provider_verified"])
-        # An attacker may retarget the ref to another valid Git blob. Even
-        # when the replacement blob hashes correctly, it is not our receipt.
-        ref = p._receipt_ref
-        original_sha = api.refs[ref]
-        api.refs[ref] = "b" * 40
-        with self.assertRaisesRegex(ValueError, "RECEIPT_REF_READBACK_HOLD"):
-            p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
-        api.refs[ref] = original_sha
-        api.tamper = True
-        with self.assertRaisesRegex(ValueError, "RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD"):
-            p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+        self.calls.append((method, path))
+        if method == "POST" and path.endswith("/git/blobs"):
+            raw = base64.b64decode(payload["content"], validate=True)
+            sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
+            self.blobs[sha] = payload["content"]
+            return 201, {"sha": sha}, NOW
+        if method == "POST" and path.endswith("/git/commits"):
+            sha = hashlib.sha1(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+            self.commits[sha] = {
+                "sha": sha, "tree": {"sha": payload["tree"]},
+                "parents": [{"sha": p} for p in payload["parents"]],
+                "message": payload["message"]}
+            return 201, {"sha": sha}, NOW
+        if method == "GET" and "/git/commits/" in path:
+            sha = path.rsplit("/", 1)[-1]
+            if sha not in self.commits:
+                return 404, {}, NOW
+            return 200, self.commits[sha].copy(), NOW
+        if method == "POST" and path.endswith("/git/refs"):
+            ref = payload["ref"]
+            # GitHub must never accept a non-commit as refs/heads.
+            if payload["sha"] not in self.commits:
+                return 422, {"message": "branch must reference commit"}, NOW
+            if ref in self.refs:
+                return 422, {"message": "Reference already exists"}, NOW
+            self.refs[ref] = payload["sha"]
+            return 201, {"ref": ref}, NOW
+        if method == "GET" and "/git/ref/" in path:
+            ref = "refs/" + path.split("/git/ref/", 1)[1]
+            if ref not in self.refs:
+                return 404, {}, NOW
+            return 200, {"object": {"sha": self.refs[ref]}}, NOW
+        if method == "GET" and "/git/blobs/" in path:
+            sha = path.rsplit("/", 1)[-1]
+            if sha not in self.blobs:
+                return 404, {}, NOW
+            content = self.blobs[sha]
+            if self.tamper_blob:
+                content = base64.b64encode(b'{"tampered":true}').decode()
+            return 200, {"encoding": "base64", "content": content}, NOW
+        raise AssertionError((method, path))
 
 
-    def test_fresh_executor_receipt_readback_and_ref_substitution(self):
-        """Two provider instances share only remote refs/blobs, not local state."""
-        import base64
-        import hashlib
-        class SharedAPI:
-            def __init__(self):
-                self.refs = {}
-                self.blobs = {}
-            def __call__(self, method, path, payload):
-                if method == "POST" and path.endswith("/git/blobs"):
-                    raw = base64.b64decode(payload["content"], validate=True)
-                    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
-                    self.blobs[sha] = payload["content"]
-                    return 201, {"sha": sha}, NOW
-                if method == "POST" and path.endswith("/git/refs"):
-                    ref = payload["ref"]
-                    if ref in self.refs:
-                        return 422, {}, NOW
-                    self.refs[ref] = payload["sha"]
-                    return 201, {}, NOW
-                if method == "GET" and "/git/ref/" in path:
-                    ref = "refs/" + path.split("/git/ref/", 1)[1]
-                    return (200, {"object": {"sha": self.refs[ref]}}, NOW) if ref in self.refs else (404, {}, NOW)
-                if method == "GET" and "/git/blobs/" in path:
-                    sha = path.rsplit("/", 1)[-1]
-                    return (200, {"encoding": "base64", "content": self.blobs[sha]}, NOW) if sha in self.blobs else (404, {}, NOW)
-                raise AssertionError((method, path))
-        api = SharedAPI()
+class ReceiptRoundTripTests(unittest.TestCase):
+    def _written(self):
+        api = SharedGitHubCommitAPI()
         writer = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
         lease = writer.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
         writer.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
                              fencing_token=lease["fencing_token"], attempted_at=NOW)
-        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
-        args = dict(source_host=HOST, owner_run_id="runner-one-0001",
-                    receipt_ref=writer._receipt_ref, expected_sha=writer._receipt_sha,
-                    slot_ref=writer._ref, expected_at=NOW)
-        verified = reader.verify_receipt_from_fresh_executor(**args)
-        self.assertTrue(verified["receipt_verified"])
-        self.assertFalse(verified["native_get_allowed"])
-        self.assertFalse(verified["durable_provider_verified"])
-        api.refs[writer._receipt_ref] = "b" * 40
-        with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_REF_HOLD"):
-            reader.verify_receipt_from_fresh_executor(**args)
-        api.refs[writer._receipt_ref] = writer._receipt_sha
-        with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_PARITY_HOLD"):
-            reader.verify_receipt_from_fresh_executor(**dict(args, owner_run_id="runner-two-0002"))
-        with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_SCOPE_HOLD"):
-            reader.verify_receipt_from_fresh_executor(**dict(args, receipt_ref="refs/heads/other"))
-        with self.assertRaisesRegex(ValueError, "RAW5_NO_LEASE_HOLD"):
-            reader.read_last_attempt(source_host=HOST)
+        return api, writer
 
-    def test_receipt_rejects_wrong_fence_before_write(self):
-        api = FakeGitHub()
-        p = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
-        p.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
-        with self.assertRaisesRegex(ValueError, "RECEIPT_SCOPE_OR_FENCE_HOLD"):
-            p.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
-                            fencing_token="wrong", attempted_at=NOW)
-        self.assertEqual(len(api.calls), 1)
+    def _fresh(self, writer):
+        return dict(source_host=HOST, owner_run_id="runner-one-0001",
+                    receipt_ref=writer._receipt_ref,
+                    expected_sha=writer._receipt_sha,
+                    expected_commit_sha=writer._receipt_commit_sha,
+                    slot_ref=writer._ref, expected_at=NOW)
+
+    def test_protected_commit_ref_and_full_byte_roundtrip(self):
+        api, writer = self._written()
+        self.assertTrue(writer._receipt_ref.startswith(RECEIPT_REF_PREFIX))
+        self.assertNotEqual(writer._receipt_commit_sha, writer._receipt_sha)
+        self.assertEqual(api.refs[writer._receipt_ref], writer._receipt_commit_sha)
+        record = writer.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+        self.assertEqual(record["attempt_written_at"], NOW)
+        self.assertFalse(record["durable_provider_verified"])
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        audit = reader.verify_receipt_from_fresh_executor(**self._fresh(writer))
+        self.assertTrue(audit["receipt_verified"])
+        self.assertFalse(audit["native_get_allowed"])
+        # The transport explicitly forbids non-commit branch refs.
+        self.assertTrue(all(sha in api.commits for sha in api.refs.values()))
+
+    def test_ref_retarget_to_another_valid_commit_rejected(self):
+        api, writer = self._written()
+        ref = writer._receipt_ref
+        api.refs[ref] = ANCHOR
+        with self.assertRaisesRegex(ValueError, "RECEIPT_REF_READBACK_HOLD"):
+            writer.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_REF_HOLD"):
+            reader.verify_receipt_from_fresh_executor(**self._fresh(writer))
+
+    def test_commit_parent_tree_and_message_tamper_rejected(self):
+        api, writer = self._written()
+        commit = api.commits[writer._receipt_commit_sha]
+        saved = dict(commit)
+        for replacement in (
+            {"parents": [{"sha": "f" * 40}]},
+            {"tree": {"sha": "f" * 40}},
+            {"message": "RAW5_ATTEMPT_V1_BLOB " + "f" * 40},
+        ):
+            commit.update(replacement)
+            with self.subTest(replacement=replacement), self.assertRaisesRegex(
+                    ValueError, "RECEIPT_COMMIT_BINDING_HOLD|RECEIPT_ANCHOR_TREE_HOLD"):
+                writer.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+            commit.clear()
+            commit.update(saved)
+
+    def test_blob_bytes_substitution_is_detected(self):
+        api, writer = self._written()
+        api.tamper_blob = True
+        with self.assertRaisesRegex(ValueError, "RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD"):
+            writer.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+
+    def test_foreign_or_unprotected_receipt_ref_rejected_before_rest(self):
+        api, writer = self._written()
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        before = len(api.calls)
+        for change in (
+            {"receipt_ref": "refs/heads/raw5-receipts/" + writer._ref.split("/")[-1]},
+            {"receipt_ref": "refs/heads/other"},
+            {"receipt_ref": writer._receipt_ref + "-foreign"},
+            {"slot_ref": REF_PREFIX + "../bad"},
+            {"owner_run_id": "runner-two-0002"},
+        ):
+            with self.subTest(change=change), self.assertRaisesRegex(
+                    ValueError, "FRESH_RECEIPT_SCOPE_HOLD|RECEIPT_REF_SCOPE_HOLD"):
+                reader.verify_receipt_from_fresh_executor(**{**self._fresh(writer), **change})
+        self.assertEqual(len(api.calls), before)
+
+    def test_no_claim_is_not_a_live_authority(self):
+        api = SharedGitHubCommitAPI()
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
+            reader.read_last_attempt(source_host=HOST)
+        api, writer = self._written()
+        with self.assertRaisesRegex(ValueError, "DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD"):
+            writer.read_last_attempt(source_host=HOST)
+        with self.assertRaisesRegex(ValueError, "PROVIDER_ACQUIRED_LEASE_INVALID_HOLD"):
+            reserve_durable_source_attempt(
+                provider=GitHubRaw5AttemptProvider(SharedGitHubCommitAPI(), ANCHOR, NOW),
+                now=NOW, run_id="runner-one-0001")
+        self.assertFalse(writer.read_attempt(source_host=HOST,
+                                             owner_run_id="runner-one-0001")["durable_provider_verified"])
 
 
 if __name__ == "__main__":
