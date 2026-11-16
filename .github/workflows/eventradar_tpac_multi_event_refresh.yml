@@ -9,8 +9,10 @@ on:
       - scripts/p30_tpac_price_reconcile.py
       - scripts/p30_tpac_r4_source_policy.py
       - scripts/p30_tpac_raw5_github_attempt_provider.py
+      - scripts/p30_tpac_raw5_native_response.py
       - tests/p30/test_p30_tpac_r4_source_policy.py
       - tests/p30/test_p30_tpac_raw5_github_attempt_provider.py
+      - tests/p30/test_p30_tpac_raw5_native_response.py
       - tests/p30/test_p30_tpac_price_reconcile.py
       - tests/p30/test_p30_tpac_event_detail_review.py
       - tests/p30/test_p30_tpac_event_catalog_once.py
@@ -44,7 +46,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'scripts/p30_tpac_r4_source_policy.py' 'scripts/p30_tpac_raw5_github_attempt_provider.py' 'tests/p30/test_p30_tpac_raw5_github_attempt_provider.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'scripts/p30_tpac_r4_source_policy.py' 'scripts/p30_tpac_raw5_github_attempt_provider.py' 'scripts/p30_tpac_raw5_native_response.py' 'tests/p30/test_p30_tpac_raw5_github_attempt_provider.py' 'tests/p30/test_p30_tpac_raw5_native_response.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
       - uses: actions/setup-python@v5
@@ -61,7 +63,8 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_price_reconcile.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_r4_source_policy.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_raw5_github_attempt_provider.py' -v
-          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py scripts/p30_tpac_r4_source_policy.py scripts/p30_tpac_raw5_github_attempt_provider.py
+          python -m unittest discover -s tests/p30 -p 'test_p30_tpac_raw5_native_response.py' -v
+          python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py scripts/p30_tpac_r4_source_policy.py scripts/p30_tpac_raw5_github_attempt_provider.py scripts/p30_tpac_raw5_native_response.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
       - name: Preserve consumed TPAC /event source one-shot (NO NETWORK)
         run: |
