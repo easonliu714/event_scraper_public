@@ -16,6 +16,8 @@ REPO = "easonliu714/event_scraper_public"
 HOST = "tpac.org.taipei"
 PREFIX = "/repos/" + REPO
 REF_PREFIX = "refs/heads/source-claims/raw5-tpac-"
+RECEIPT_REF_PREFIX = "refs/heads/source-claims/raw5-receipts/"
+RECEIPT_MSG_PREFIX = "RAW5_ATTEMPT_V1_BLOB "
 RUN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,127}\Z")
 
 
@@ -78,38 +80,77 @@ class GitHubRaw5AttemptProvider:
             raise ValueError("RAW5_NO_LEASE_HOLD")
         raise ValueError("RAW5_DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD")
 
-    def verify_receipt_from_fresh_executor(self, *, source_host, owner_run_id,
-                                           receipt_ref, expected_sha, slot_ref,
-                                           expected_at):
-        """Independent cross-process receipt audit; NEVER authorizes LIVE GET.
+    @staticmethod
+    def _receipt_branch(slot_ref, run_id):
+        """Protected branch scope; a raw Git blob cannot be a branch tip."""
+        if (type(slot_ref) is not str
+                or not re.fullmatch(re.escape(REF_PREFIX) + r"[0-9]{1,12}", slot_ref)
+                or type(run_id) is not str or not RUN_RE.fullmatch(run_id)):
+            raise ValueError("RAW5_RECEIPT_REF_SCOPE_HOLD")
+        return RECEIPT_REF_PREFIX + slot_ref[len(REF_PREFIX):] + "-" + run_id
 
-        This does not rely on in-memory _receipt_sha or _receipt_ref. A caller
-        must provide the exact expected SHA from separately preserved evidence.
-        """
+    def _read_commit_binding(self, commit_sha, blob_sha):
+        """Require a real Git commit with pinned parent/tree and blob identity."""
+        if (type(commit_sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", commit_sha)
+                or type(blob_sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", blob_sha)):
+            raise ValueError("RAW5_RECEIPT_COMMIT_SHA_HOLD")
+        status, obj = self._call("GET", "/git/commits/" + commit_sha)
+        if status != 200 or obj.get("sha") != commit_sha:
+            raise ValueError("RAW5_RECEIPT_COMMIT_MISSING_HOLD")
+        tree = obj.get("tree")
+        parents = obj.get("parents")
+        if (type(tree) is not dict or type(tree.get("sha")) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", tree["sha"])
+                or type(parents) is not list or len(parents) != 1
+                or type(parents[0]) is not dict or parents[0].get("sha") != self._anchor
+                or obj.get("message") != RECEIPT_MSG_PREFIX + blob_sha):
+            raise ValueError("RAW5_RECEIPT_COMMIT_BINDING_HOLD")
+        status, anchor = self._call("GET", "/git/commits/" + self._anchor)
+        if (status != 200 or type(anchor.get("tree")) is not dict
+                or anchor["tree"].get("sha") != tree["sha"]):
+            raise ValueError("RAW5_RECEIPT_ANCHOR_TREE_HOLD")
+
+    def _read_verified_blob(self, blob_sha):
         import base64
-        if (source_host != HOST or type(owner_run_id) is not str
-                or not RUN_RE.fullmatch(owner_run_id)
-                or type(receipt_ref) is not str
-                or not receipt_ref.startswith("refs/heads/raw5-receipts/")
-                or type(slot_ref) is not str or not slot_ref.startswith(REF_PREFIX)
-                or type(expected_sha) is not str
-                or not re.fullmatch(r"[0-9a-f]{40}", expected_sha)):
-            raise ValueError("RAW5_FRESH_RECEIPT_SCOPE_HOLD")
-        when = _utc(expected_at)
-        status, ref = self._call("GET", "/git/ref/" + receipt_ref.removeprefix("refs/"))
-        actual = ref.get("object", {}).get("sha") if type(ref.get("object")) is dict else None
-        if status != 200 or actual != expected_sha:
-            raise ValueError("RAW5_FRESH_RECEIPT_REF_HOLD")
-        status, blob = self._call("GET", "/git/blobs/" + expected_sha)
+        status, blob = self._call("GET", "/git/blobs/" + blob_sha)
         if status != 200 or blob.get("encoding") != "base64":
-            raise ValueError("RAW5_FRESH_RECEIPT_BLOB_HOLD")
+            raise ValueError("RAW5_RECEIPT_BLOB_READBACK_HOLD")
         try:
             raw = base64.b64decode(blob["content"], validate=True)
             record = json.loads(raw)
         except (ValueError, TypeError, KeyError) as exc:
-            raise ValueError("RAW5_FRESH_RECEIPT_DECODE_HOLD") from exc
-        actual_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
-        if actual_sha != expected_sha or type(record) is not dict or record != {
+            raise ValueError("RAW5_RECEIPT_BYTES_INVALID_HOLD") from exc
+        actual = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
+        if actual != blob_sha:
+            raise ValueError("RAW5_RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD")
+        if type(record) is not dict:
+            raise ValueError("RAW5_RECEIPT_SCHEMA_HOLD")
+        return record
+
+    def verify_receipt_from_fresh_executor(self, *, source_host, owner_run_id,
+                                           receipt_ref, expected_sha, expected_commit_sha,
+                                           slot_ref, expected_at):
+        """Verify protected receipt commit and raw blob from a separate executor.
+
+        This does NOT attest real branch protection or grant LIVE HTTP authority.
+        """
+        if (source_host != HOST or type(owner_run_id) is not str
+                or not RUN_RE.fullmatch(owner_run_id)
+                or type(receipt_ref) is not str
+                or receipt_ref != self._receipt_branch(slot_ref, owner_run_id)
+                or type(expected_sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", expected_sha)
+                or type(expected_commit_sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", expected_commit_sha)):
+            raise ValueError("RAW5_FRESH_RECEIPT_SCOPE_HOLD")
+        when = _utc(expected_at)
+        status, ref = self._call("GET", "/git/ref/" + receipt_ref.removeprefix("refs/"))
+        actual = ref.get("object", {}).get("sha") if type(ref.get("object")) is dict else None
+        if status != 200 or actual != expected_commit_sha:
+            raise ValueError("RAW5_FRESH_RECEIPT_REF_HOLD")
+        self._read_commit_binding(expected_commit_sha, expected_sha)
+        record = self._read_verified_blob(expected_sha)
+        if record != {
                 "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
                 "owner_run_id": owner_run_id,
                 "fencing_token": hashlib.sha256(slot_ref.encode()).hexdigest(),
@@ -120,7 +161,11 @@ class GitHubRaw5AttemptProvider:
                 "durable_provider_verified": False, "attempt_written_at": when}
 
     def write_attempt(self, *, source_host, owner_run_id, fencing_token, attempted_at):
-        """Persist a fenced, per-run receipt before network I/O; never authorize GET."""
+        """Store canonical JSON blob behind a real protected-scope Git commit.
+
+        Creating a refs/heads branch directly at a Git blob SHA is not valid
+        branch storage. Use a commit with the pinned anchor tree and parent.
+        """
         import base64
         if (source_host != HOST or owner_run_id != self._run
                 or self._ref is None or type(fencing_token) is not str
@@ -131,54 +176,57 @@ class GitHubRaw5AttemptProvider:
                    "owner_run_id": self._run, "fencing_token": fencing_token,
                    "attempted_at": self._now.isoformat(),
                    "slot_ref": self._ref, "native_get_allowed": False}
-        encoded = base64.b64encode(json.dumps(receipt, sort_keys=True,
-                                    separators=(",", ":")).encode()).decode()
+        raw = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+        encoded = base64.b64encode(raw).decode()
+        expected_blob_sha = hashlib.sha1(
+            b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
         status, blob = self._call("POST", "/git/blobs",
                                   {"content": encoded, "encoding": "base64"})
-        sha = blob.get("sha")
-        if status != 201 or type(sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        if status != 201 or blob.get("sha") != expected_blob_sha:
             raise ValueError("RAW5_RECEIPT_BLOB_NOT_DURABLE_HOLD")
-        ref = self._ref.replace("refs/heads/", "refs/heads/raw5-receipts/", 1)
-        status, _ = self._call("POST", "/git/refs", {"ref": ref, "sha": sha})
+        status, anchor = self._call("GET", "/git/commits/" + self._anchor)
+        tree = anchor.get("tree") if type(anchor) is dict else None
+        tree_sha = tree.get("sha") if type(tree) is dict else None
+        if status != 200 or type(tree_sha) is not str or not re.fullmatch(
+                r"[0-9a-f]{40}", tree_sha):
+            raise ValueError("RAW5_RECEIPT_ANCHOR_TREE_HOLD")
+        status, commit = self._call("POST", "/git/commits", {
+            "message": RECEIPT_MSG_PREFIX + expected_blob_sha,
+            "tree": tree_sha, "parents": [self._anchor]})
+        commit_sha = commit.get("sha")
+        if status != 201 or type(commit_sha) is not str or not re.fullmatch(
+                r"[0-9a-f]{40}", commit_sha):
+            raise ValueError("RAW5_RECEIPT_COMMIT_CREATE_HOLD")
+        ref = self._receipt_branch(self._ref, self._run)
+        status, _ = self._call("POST", "/git/refs", {"ref": ref, "sha": commit_sha})
         if status != 201:
             raise ValueError("RAW5_RECEIPT_REF_NOT_ATOMIC_HOLD")
         self._receipt_ref = ref
-        self._receipt_sha = sha
+        self._receipt_sha = expected_blob_sha
+        self._receipt_commit_sha = commit_sha
 
     def read_attempt(self, *, source_host, owner_run_id):
-        """Independently re-fetch the Git ref and blob, never trust a write response."""
-        import base64
+        """Re-fetch protected receipt branch -> commit -> blob, not cached bytes."""
         if (source_host != HOST or owner_run_id != self._run
                 or not getattr(self, "_receipt_ref", None)):
             raise ValueError("RAW5_RECEIPT_READ_SCOPE_HOLD")
+        if self._receipt_ref != self._receipt_branch(self._ref, self._run):
+            raise ValueError("RAW5_RECEIPT_REF_SCOPE_HOLD")
         path = "/git/ref/" + self._receipt_ref.removeprefix("refs/")
         status, ref = self._call("GET", path)
         sha = ref.get("object", {}).get("sha") if type(ref.get("object")) is dict else None
-        if (status != 200 or type(sha) is not str
-                or not re.fullmatch(r"[0-9a-f]{40}", sha)
-                or sha != getattr(self, "_receipt_sha", None)):
-            # Ref replacement to a different *valid* blob must never pass.
-            # Git blob self-hashing alone cannot establish original receipt identity.
+        if status != 200 or sha != getattr(self, "_receipt_commit_sha", None):
             raise ValueError("RAW5_RECEIPT_REF_READBACK_HOLD")
-        status, blob = self._call("GET", "/git/blobs/" + sha)
-        if status != 200 or blob.get("encoding") != "base64":
-            raise ValueError("RAW5_RECEIPT_BLOB_READBACK_HOLD")
-        try:
-            raw = base64.b64decode(blob["content"], validate=True)
-            record = json.loads(raw)
-        except (ValueError, KeyError, TypeError) as exc:
-            raise ValueError("RAW5_RECEIPT_BYTES_INVALID_HOLD") from exc
-        actual_sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
-        if actual_sha != sha:
-            raise ValueError("RAW5_RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD")
-        if (type(record) is not dict or record.get("schema") != "RAW5_ATTEMPT_V1"
-                or record.get("source_host") != HOST or record.get("owner_run_id") != self._run
-                or record.get("slot_ref") != self._ref
-                or record.get("fencing_token") != hashlib.sha256(self._ref.encode()).hexdigest()
-                or record.get("attempted_at") != self._now.isoformat()
-                or record.get("native_get_allowed") is not False):
+        self._read_commit_binding(sha, self._receipt_sha)
+        record = self._read_verified_blob(self._receipt_sha)
+        if record != {
+                "schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
+                "owner_run_id": self._run,
+                "fencing_token": hashlib.sha256(self._ref.encode()).hexdigest(),
+                "attempted_at": self._now.isoformat(), "slot_ref": self._ref,
+                "native_get_allowed": False}:
             raise ValueError("RAW5_RECEIPT_INDEPENDENT_PARITY_HOLD")
-        # The durable history provider remains unverified; this is not a grant.
+        # Still not attested: two-runner lease / durable LAST_ATTEMPT not ready.
         return {"source_host": HOST, "owner_run_id": self._run,
                 "fencing_token": record["fencing_token"],
                 "attempt_written_at": self._now,
