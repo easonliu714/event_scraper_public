@@ -127,7 +127,7 @@ class ReceiptRoundTripTests(unittest.TestCase):
         self.assertEqual(record["attempt_written_at"], NOW)
         self.assertFalse(record["durable_provider_verified"])
         api.tamper = True
-        with self.assertRaisesRegex(ValueError, "RECEIPT_INDEPENDENT_PARITY_HOLD"):
+        with self.assertRaisesRegex(ValueError, "RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD"):
             p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
 
     def test_receipt_rejects_wrong_fence_before_write(self):
