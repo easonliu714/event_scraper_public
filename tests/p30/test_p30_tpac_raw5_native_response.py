@@ -122,5 +122,32 @@ class NativeResponseTests(unittest.TestCase):
                 verify_isolated_native_zip(output.getvalue())
 
 
+
+class CurrentListDetailIdentityTests(unittest.TestCase):
+    def test_same_id_and_reject_cross_namespace_duplicate_foreign(self):
+        from scripts.p30_tpac_raw5_native_response import verify_native_list_detail_identity
+        manifest, body = seal_native_detail_response(**BASE)
+        html = b'<html><a href="/program/2083">Official event</a></html>'
+        result = verify_native_list_detail_identity(
+            list_url="https://tpac.org.taipei/program", list_body=html,
+            detail_manifest=manifest, detail_body=body)
+        self.assertEqual(result["event_id"], "2083")
+        self.assertTrue(result["identity_review_verified"])
+        self.assertFalse(result["native_list_provenance_attested"])
+        self.assertFalse(result["formal_publish_allowed"])
+        for url, content in (
+            ("https://tpac.org.taipei/event", html),
+            ("https://tpac.org.taipei/program", b'<a href="/program/2084">Other</a>'),
+            ("https://tpac.org.taipei/program", html + html),
+            ("https://evil.example/program", html),
+            ("https://tpac.org.taipei/program", b'<a href="https://evil.example/program/2083">Other</a>'),
+            ("https://tpac.org.taipei/program", b'<a href="/program/2083?token=1">Other</a>'),
+        ):
+            with self.subTest(url=url, content=content), self.assertRaises(ValueError):
+                verify_native_list_detail_identity(
+                    list_url=url, list_body=content,
+                    detail_manifest=manifest, detail_body=body)
+
+
 if __name__ == "__main__":
     unittest.main()
