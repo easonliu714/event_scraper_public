@@ -187,7 +187,7 @@ class ReceiptRoundTripTests(unittest.TestCase):
             reader.verify_receipt_from_fresh_executor(**dict(args, owner_run_id="runner-two-0002"))
         with self.assertRaisesRegex(ValueError, "FRESH_RECEIPT_SCOPE_HOLD"):
             reader.verify_receipt_from_fresh_executor(**dict(args, receipt_ref="refs/heads/other"))
-        with self.assertRaisesRegex(ValueError, "DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD"):
+        with self.assertRaisesRegex(ValueError, "RAW5_NO_LEASE_HOLD"):
             reader.read_last_attempt(source_host=HOST)
 
     def test_receipt_rejects_wrong_fence_before_write(self):
