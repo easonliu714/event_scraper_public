@@ -71,6 +71,15 @@ class Raw5ProviderTests(unittest.TestCase):
             second.acquire_atomic(source_host=HOST, owner_run_id="runner-two-0002")
         self.assertEqual(len(api.calls), 8)
 
+    def test_fencing_token_is_owner_bound_and_rejects_stale_owner(self):
+        from scripts.p30_tpac_raw5_github_attempt_provider import _owner_fence
+        slot = REF_PREFIX + str(int(NOW.timestamp()) // 3600)
+        first = _owner_fence(slot, "runner-one-0001")
+        second = _owner_fence(slot, "runner-two-0002")
+        self.assertNotEqual(first, second)
+        with self.assertRaisesRegex(ValueError, "RAW5_FENCE_SCOPE_HOLD"):
+            _owner_fence(slot, "../invalid")
+
     def test_atomic_lease_requires_independent_ref_readback(self):
         api = FakeGitHub()
         api.tamper_lease_readback = True
