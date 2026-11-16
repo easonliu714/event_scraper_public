@@ -126,6 +126,14 @@ class ReceiptRoundTripTests(unittest.TestCase):
         record = p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
         self.assertEqual(record["attempt_written_at"], NOW)
         self.assertFalse(record["durable_provider_verified"])
+        # An attacker may retarget the ref to another valid Git blob. Even
+        # when the replacement blob hashes correctly, it is not our receipt.
+        ref = p._receipt_ref
+        original_sha = api.refs[ref]
+        api.refs[ref] = "b" * 40
+        with self.assertRaisesRegex(ValueError, "RECEIPT_REF_READBACK_HOLD"):
+            p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+        api.refs[ref] = original_sha
         api.tamper = True
         with self.assertRaisesRegex(ValueError, "RECEIPT_GIT_BLOB_SHA_MISMATCH_HOLD"):
             p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
