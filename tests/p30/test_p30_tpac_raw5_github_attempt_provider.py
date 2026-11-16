@@ -79,7 +79,8 @@ class Raw5ProviderTests(unittest.TestCase):
                 source_host=HOST, owner_run_id="runner-one-0001")
         # Owner-bound commit ref cannot be accepted after retargeting.
         self.assertEqual(len(api.refs), 1)
-        self.assertEqual(len(api.calls), 5)
+        self.assertEqual(len(api.calls), 4)
+        self.assertEqual([call[0] for call in api.calls], ["GET", "POST", "POST", "GET"])
         with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
             self.provider(api).read_last_attempt(source_host=HOST)
 
@@ -88,7 +89,9 @@ class Raw5ProviderTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "PROVIDER_ACQUIRED_LEASE_INVALID_HOLD"):
             reserve_durable_source_attempt(
                 provider=self.provider(api), now=NOW, run_id="runner-one-0001")
-        self.assertEqual(len(api.calls), 2)
+        self.assertEqual(len(api.calls), 5)
+        self.assertEqual([call[0] for call in api.calls], ["GET", "POST", "POST", "GET", "GET"])
+        self.assertFalse(any("matching-refs" in call[1] for call in api.calls))
 
     def test_crash_restart_same_slot_does_not_retry_or_get(self):
         api = FakeGitHub()
