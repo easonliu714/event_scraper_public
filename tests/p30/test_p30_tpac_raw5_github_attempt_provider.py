@@ -86,5 +86,59 @@ class Raw5ProviderTests(unittest.TestCase):
             p.read_attempt(source_host=HOST)
 
 
+class ReceiptRoundTripTests(unittest.TestCase):
+    def test_write_ahead_independent_ref_blob_readback_and_tamper_hold(self):
+        import base64
+        import hashlib
+        import json
+        class ReceiptAPI:
+            def __init__(self):
+                self.refs = {}
+                self.blobs = {}
+                self.tamper = False
+            def __call__(self, method, path, payload):
+                if method == "POST" and path.endswith("/git/blobs"):
+                    raw = base64.b64decode(payload["content"])
+                    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\0" + raw).hexdigest()
+                    self.blobs[sha] = payload["content"]
+                    return 201, {"sha": sha}, NOW
+                if method == "POST" and path.endswith("/git/refs"):
+                    ref = payload["ref"]
+                    if ref in self.refs:
+                        return 422, {}, NOW
+                    self.refs[ref] = payload["sha"]
+                    return 201, {}, NOW
+                if method == "GET" and "/git/ref/" in path:
+                    ref = "refs/" + path.split("/git/ref/", 1)[1]
+                    return 200, {"object": {"sha": self.refs[ref]}}, NOW
+                if method == "GET" and "/git/blobs/" in path:
+                    sha = path.rsplit("/", 1)[-1]
+                    content = self.blobs[sha]
+                    if self.tamper:
+                        content = base64.b64encode(b'{"tampered":true}').decode()
+                    return 200, {"encoding": "base64", "content": content}, NOW
+                raise AssertionError((method, path))
+        api = ReceiptAPI()
+        p = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        lease = p.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
+        p.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
+                        fencing_token=lease["fencing_token"], attempted_at=NOW)
+        record = p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+        self.assertEqual(record["attempt_written_at"], NOW)
+        self.assertFalse(record["durable_provider_verified"])
+        api.tamper = True
+        with self.assertRaisesRegex(ValueError, "RECEIPT_INDEPENDENT_PARITY_HOLD"):
+            p.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
+
+    def test_receipt_rejects_wrong_fence_before_write(self):
+        api = FakeGitHub()
+        p = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        p.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
+        with self.assertRaisesRegex(ValueError, "RECEIPT_SCOPE_OR_FENCE_HOLD"):
+            p.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
+                            fencing_token="wrong", attempted_at=NOW)
+        self.assertEqual(len(api.calls), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
