@@ -150,7 +150,7 @@ class ReceiptRoundTripTests(unittest.TestCase):
             def __call__(self, method, path, payload):
                 if method == "POST" and path.endswith("/git/blobs"):
                     raw = base64.b64decode(payload["content"], validate=True)
-                    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\\x00" + raw).hexdigest()
+                    sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
                     self.blobs[sha] = payload["content"]
                     return 201, {"sha": sha}, NOW
                 if method == "POST" and path.endswith("/git/refs"):
