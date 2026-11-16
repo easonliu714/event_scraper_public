@@ -98,6 +98,7 @@ class GitHubRaw5AttemptProvider:
         if status != 201:
             raise ValueError("RAW5_RECEIPT_REF_NOT_ATOMIC_HOLD")
         self._receipt_ref = ref
+        self._receipt_sha = sha
 
     def read_attempt(self, *, source_host, owner_run_id):
         """Independently re-fetch the Git ref and blob, never trust a write response."""
@@ -108,7 +109,11 @@ class GitHubRaw5AttemptProvider:
         path = "/git/ref/" + self._receipt_ref.removeprefix("refs/")
         status, ref = self._call("GET", path)
         sha = ref.get("object", {}).get("sha") if type(ref.get("object")) is dict else None
-        if status != 200 or type(sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        if (status != 200 or type(sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", sha)
+                or sha != getattr(self, "_receipt_sha", None)):
+            # Ref replacement to a different *valid* blob must never pass.
+            # Git blob self-hashing alone cannot establish original receipt identity.
             raise ValueError("RAW5_RECEIPT_REF_READBACK_HOLD")
         status, blob = self._call("GET", "/git/blobs/" + sha)
         if status != 200 or blob.get("encoding") != "base64":
