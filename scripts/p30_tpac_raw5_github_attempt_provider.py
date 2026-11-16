@@ -16,7 +16,7 @@ REPO = "easonliu714/event_scraper_public"
 HOST = "tpac.org.taipei"
 PREFIX = "/repos/" + REPO
 REF_PREFIX = "refs/heads/source-claims/raw5-tpac-"
-RECEIPT_REF_PREFIX = "refs/heads/source-claims/raw5-receipts/"
+RECEIPT_REF_PREFIX = "refs/heads/source-claims/raw5-receipt-"
 RECEIPT_MSG_PREFIX = "RAW5_ATTEMPT_V1_BLOB "
 RUN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,127}\Z")
 
