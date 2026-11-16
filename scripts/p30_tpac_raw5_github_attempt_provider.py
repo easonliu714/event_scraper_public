@@ -74,8 +74,59 @@ class GitHubRaw5AttemptProvider:
         # closed rather than inventing a first-attempt assertion.
         raise ValueError("RAW5_DURABLE_LAST_ATTEMPT_UNAVAILABLE_HOLD")
 
-    def write_attempt(self, **kwargs):
-        raise ValueError("RAW5_WRITE_AHEAD_RECEIPT_NOT_IMPLEMENTED_HOLD")
+    def write_attempt(self, *, source_host, owner_run_id, fencing_token, attempted_at):
+        """Persist a fenced, per-run receipt before network I/O; never authorize GET."""
+        import base64
+        if (source_host != HOST or owner_run_id != self._run
+                or self._ref is None or type(fencing_token) is not str
+                or fencing_token != hashlib.sha256(self._ref.encode()).hexdigest()
+                or _utc(attempted_at) != self._now):
+            raise ValueError("RAW5_RECEIPT_SCOPE_OR_FENCE_HOLD")
+        receipt = {"schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
+                   "owner_run_id": self._run, "fencing_token": fencing_token,
+                   "attempted_at": self._now.isoformat(),
+                   "slot_ref": self._ref, "native_get_allowed": False}
+        encoded = base64.b64encode(json.dumps(receipt, sort_keys=True,
+                                    separators=(",", ":")).encode()).decode()
+        status, blob = self._call("POST", "/git/blobs",
+                                  {"content": encoded, "encoding": "base64"})
+        sha = blob.get("sha")
+        if status != 201 or type(sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", sha):
+            raise ValueError("RAW5_RECEIPT_BLOB_NOT_DURABLE_HOLD")
+        ref = self._ref.replace("refs/heads/", "refs/heads/raw5-receipts/", 1)
+        status, _ = self._call("POST", "/git/refs", {"ref": ref, "sha": sha})
+        if status != 201:
+            raise ValueError("RAW5_RECEIPT_REF_NOT_ATOMIC_HOLD")
+        self._receipt_ref = ref
 
-    def read_attempt(self, **kwargs):
-        raise ValueError("RAW5_INDEPENDENT_RECEIPT_UNAVAILABLE_HOLD")
+    def read_attempt(self, *, source_host, owner_run_id):
+        """Independently re-fetch the Git ref and blob, never trust a write response."""
+        import base64
+        if (source_host != HOST or owner_run_id != self._run
+                or not getattr(self, "_receipt_ref", None)):
+            raise ValueError("RAW5_RECEIPT_READ_SCOPE_HOLD")
+        path = "/git/ref/" + self._receipt_ref.removeprefix("refs/")
+        status, ref = self._call("GET", path)
+        sha = ref.get("object", {}).get("sha") if type(ref.get("object")) is dict else None
+        if status != 200 or type(sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", sha):
+            raise ValueError("RAW5_RECEIPT_REF_READBACK_HOLD")
+        status, blob = self._call("GET", "/git/blobs/" + sha)
+        if status != 200 or blob.get("encoding") != "base64":
+            raise ValueError("RAW5_RECEIPT_BLOB_READBACK_HOLD")
+        try:
+            raw = base64.b64decode(blob["content"], validate=True)
+            record = json.loads(raw)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ValueError("RAW5_RECEIPT_BYTES_INVALID_HOLD") from exc
+        if (type(record) is not dict or record.get("schema") != "RAW5_ATTEMPT_V1"
+                or record.get("source_host") != HOST or record.get("owner_run_id") != self._run
+                or record.get("slot_ref") != self._ref
+                or record.get("fencing_token") != hashlib.sha256(self._ref.encode()).hexdigest()
+                or record.get("attempted_at") != self._now.isoformat()
+                or record.get("native_get_allowed") is not False):
+            raise ValueError("RAW5_RECEIPT_INDEPENDENT_PARITY_HOLD")
+        # The durable history provider remains unverified; this is not a grant.
+        return {"source_host": HOST, "owner_run_id": self._run,
+                "fencing_token": record["fencing_token"],
+                "attempt_written_at": self._now,
+                "durable_provider_verified": False, "first_attempt": False}
