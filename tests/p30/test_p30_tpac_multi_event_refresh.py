@@ -91,6 +91,29 @@ class MultiEventRefreshTests(unittest.TestCase):
         self.assertEqual(again["changed"], 0)
         self.assertEqual(again["unchanged"], 2)
 
+    def test_corrupt_prior_event_semantics_isolated_without_batch_abort(self):
+        # A damaged persisted REVIEW record cannot overwrite itself or
+        # prevent an independent valid event from entering isolated LKG.
+        body, rr, details = inputs()
+        corrupt = {"source_event_id": "2111", "_candidate": {
+            "field_roles": {"date": None}, "hold_reasons": []}}
+        old = {"kind": KIND, "events": {"tpac:2111": corrupt}}
+        plan = refresh_plan(body, rr, details, old, NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(plan["events"]["tpac:2111"], corrupt)
+        self.assertIn("TPAC_PRIOR_EVENT_SEMANTIC_HOLD", plan["rejected"]["2111"])
+        self.assertEqual(plan["qualified"], 1)
+        self.assertEqual(plan["added"], 1)
+        self.assertEqual(plan["events"]["tpac:2112"]["source_event_id"], "2112")
+        self.assertFalse(plan["source_coverage_complete"])
+        self.assertEqual(plan["published"], 0)
+
+        only_body, only_rr, only_details = inputs(("2111",))
+        held = refresh_plan(only_body, only_rr, only_details, old, NOW)
+        self.assertEqual(held["decision"], "HOLD_NO_QUALIFIED_DETAILS_PRESERVE_LKG")
+        self.assertEqual(held["events"], old["events"])
+        self.assertEqual(held["published"], 0)
+
     def test_out_of_range_showtime_hours_fail_closed(self):
         # The official-looking show label must HOLD before datetime parsing;
         # 24:00 through 29:59 are invalid, never a REVIEW candidate.
