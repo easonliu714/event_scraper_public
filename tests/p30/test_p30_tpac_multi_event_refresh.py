@@ -1113,5 +1113,33 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertFalse((root / "docs" / "data.json").exists())
 
 
+
+class PersistedHoldSchemaRegressionTests(unittest.TestCase):
+    def test_falsey_malformed_hold_values_fail_closed(self):
+        # A corrupt persisted HOLD field must not be silently normalized to
+        # an empty list, which would hide a LIST/DETAIL quality conflict.
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        for malformed in (None, "", 0, False, {}, ()):
+            with self.subTest(malformed=repr(malformed)):
+                event = {"_candidate": {"field_roles": {},
+                                        "hold_reasons": malformed}}
+                with self.assertRaisesRegex(
+                        ValueError, "TPAC_SEMANTIC_HOLD_REASONS_SCHEMA_HOLD"):
+                    _semantic_event_payload(event)
+
+    def test_absent_and_valid_hold_semantics_remain_stable(self):
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        absent = {"_candidate": {"field_roles": {}}}
+        empty = {"_candidate": {"field_roles": {}, "hold_reasons": []}}
+        self.assertEqual(_semantic_event_payload(absent),
+                         _semantic_event_payload(empty))
+        a = {"_candidate": {"field_roles": {},
+                            "hold_reasons": ["LIST_DETAIL_PERIOD_CONFLICT", "VENUE_HOLD"]}}
+        b = {"_candidate": {"field_roles": {},
+                            "hold_reasons": ["VENUE_HOLD", "LIST_DETAIL_PERIOD_CONFLICT",
+                                             "VENUE_HOLD"]}}
+        self.assertEqual(_semantic_event_payload(a), _semantic_event_payload(b))
+        self.assertNotEqual(_semantic_event_payload(a), _semantic_event_payload(empty))
+
 if __name__ == "__main__":
     unittest.main()
