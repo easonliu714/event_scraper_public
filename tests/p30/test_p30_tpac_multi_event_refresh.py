@@ -91,6 +91,24 @@ class MultiEventRefreshTests(unittest.TestCase):
         self.assertEqual(again["changed"], 0)
         self.assertEqual(again["unchanged"], 2)
 
+    def test_out_of_range_showtime_hours_fail_closed(self):
+        # The official-looking show label must HOLD before datetime parsing;
+        # 24:00 through 29:59 are invalid, never a REVIEW candidate.
+        body, rr, details = inputs(("2111",))
+        for hour in (24, 25, 29):
+            with self.subTest(hour=hour):
+                raw = detail("2111", show=f"2026-11-21 (六) {hour:02d}:30")
+                details["2111"] = {"body": raw, "receipt": receipt(ROOT + "/2111", raw)}
+                plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+                self.assertEqual(plan["qualified"], 0)
+                self.assertEqual(plan["rejected"]["2111"], "TPAC_SHOW_LABEL_OR_ROLE_HOLD")
+                self.assertEqual(plan["published"], 0)
+        valid = detail("2111", show="2026-11-21 (六) 23:30")
+        details["2111"] = {"body": valid, "receipt": receipt(ROOT + "/2111", valid)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["qualified"], 1)
+        self.assertEqual(plan["published"], 0)
+
     def test_hidden_showtime_cannot_become_review_event(self):
         body, rr, details = inputs(("2111",))
         original = details["2111"]["body"]
