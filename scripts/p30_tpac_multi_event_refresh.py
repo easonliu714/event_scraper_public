@@ -988,7 +988,14 @@ def archived_inventory_cli(manifest_path, repo_root):
                 status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
                 counts["detail_available"] += 1
             else:
-                counts["pending_detail_budget"] += 1
+                # Partial archived manifests cannot revoke an earlier SHA-verified
+                # DETAIL for the identical immutable LIST snapshot.
+                if (old.get("status") == "ARCHIVED_DETAIL_VERIFIED_ONLY"
+                        and old.get("list_sha") == _sha(raw)
+                        and old.get("reason") == "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"):
+                    status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
+                else:
+                    counts["pending_detail_budget"] += 1
             rows[key] = {"source_namespace": catalog, "source_event_id": sid,
                          "list_url": card["list_url"], "detail_url": card["detail_url"],
                          "list_sha": _sha(raw), "last_observed": None,
