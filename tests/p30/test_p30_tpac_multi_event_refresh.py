@@ -569,6 +569,20 @@ class ReviewRoleDeltaRegressionTests(unittest.TestCase):
         self.assertEqual(base["price"], "")
 
 
+    def test_malformed_persisted_review_role_fails_closed(self):
+        # Persisted REVIEW evidence with a scalar role must not crash with
+        # AttributeError or silently be classified as unchanged.
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_event_id": "2040", "title": "北藝演出",
+                "_candidate": {"field_roles": {"venue_space": "invalid"}}}
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_FIELD_ROLE_SCHEMA_HOLD:venue_space"):
+            _semantic_event_payload(base)
+        base["_candidate"]["field_roles"] = {"price": None}
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_FIELD_ROLE_SCHEMA_HOLD:price"):
+            _semantic_event_payload(base)
+        base["_candidate"]["field_roles"] = {"venue_space": {"role": "EVENT_VENUE_SPACE", "value": "藍盒子"}}
+        self.assertIsInstance(_semantic_event_payload(base), tuple)
+
     def test_list_detail_conflict_resolution_and_reappearance_are_not_discarded(self):
         """A quality HOLD transition must update REVIEW even with same display date."""
         body, list_receipt, details = inputs(("2111",))
