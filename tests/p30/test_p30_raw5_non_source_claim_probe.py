@@ -10,9 +10,12 @@ spec.loader.exec_module(module)
 A = "a" * 40
 T = "b" * 40
 C = "c" * 40
+D = "d" * 40  # Loser candidate must be a different owner-bound Git commit.
 
 def transport_for(outcome, winner_owner="runner-one", ref_status=200,
-                  ruleset_status=200, ruleset_override=None):
+                  ruleset_status=200, ruleset_override=None,
+                  collision_message="Reference already exists",
+                  same_candidate=False, ref_type="commit"):
     calls = []
     def call(method, path, token, payload=None):
         calls.append((method, path, payload))
@@ -32,13 +35,17 @@ def transport_for(outcome, winner_owner="runner-one", ref_status=200,
         if method == "GET" and path.endswith("/git/commits/" + A):
             return 200, {"tree": {"sha": T}}
         if method == "POST" and path.endswith("/git/commits"):
-            return 201, {"sha": C}
+            return 201, {"sha": D}
         if method == "POST" and path.endswith("/git/refs"):
-            return outcome, {} if outcome == 201 else {"message": "Reference already exists"}
+            return outcome, {} if outcome == 201 else {"message": collision_message}
         if method == "GET" and "/git/ref/" in path:
-            return ref_status, {"object": {"sha": C}} if ref_status == 200 else {}
+            pointed = D if outcome == 201 or same_candidate else C
+            return ref_status, {"object": {"sha": pointed, "type": ref_type}} if ref_status == 200 else {}
         if method == "GET" and path.endswith("/git/commits/" + C):
-            return 200, {"message": "NON_SOURCE_RAW5_TEST_V1 isolated-run-01 " + winner_owner,
+            return 200, {"sha": C, "message": "NON_SOURCE_RAW5_TEST_V1 isolated-run-01 " + winner_owner,
+                         "parents": [{"sha": A}], "tree": {"sha": T}}
+        if method == "GET" and path.endswith("/git/commits/" + D):
+            return 200, {"sha": D, "message": "NON_SOURCE_RAW5_TEST_V1 isolated-run-01 runner-two",
                          "parents": [{"sha": A}], "tree": {"sha": T}}
         raise AssertionError((method, path))
     return call, calls
@@ -55,8 +62,29 @@ class NonSourceClaimProbeTests(unittest.TestCase):
         result = module.probe("isolated-run-01", A, "runner-two", "token", transport)
         self.assertEqual(result["decision"], "LOST_COLLISION")
         self.assertEqual(result["winner_run"], "runner-one")
+        self.assertEqual(result["winner_commit_sha"], C)
+        self.assertEqual(result["loser_commit_sha"], D)
         self.assertFalse(result["native_get_allowed"])
         self.assertEqual(len(calls), 6)
+    def test_422_ruleset_or_validation_reason_never_counts_as_collision(self):
+        for reason in ("Validation Failed", "Repository ruleset violations", "", None):
+            transport, calls = transport_for(422, collision_message=reason)
+            with self.subTest(reason=reason), self.assertRaisesRegex(
+                    RuntimeError, "COLLISION_REASON_UNVERIFIED_HOLD"):
+                module.probe("isolated-run-01", A, "runner-two", "token", transport)
+            # Ref and winner must not be read after an invalid 422 reason.
+            self.assertFalse(any("/git/ref/" in path for _, path, _ in calls))
+
+    def test_422_same_commit_cannot_be_two_distinct_owners(self):
+        transport, _ = transport_for(422, same_candidate=True)
+        with self.assertRaisesRegex(RuntimeError, "COLLISION_REF_UNPROVEN_HOLD"):
+            module.probe("isolated-run-01", A, "runner-two", "token", transport)
+
+    def test_422_non_commit_ref_object_not_a_valid_winner(self):
+        transport, _ = transport_for(422, ref_type="blob")
+        with self.assertRaisesRegex(RuntimeError, "COLLISION_REF_UNPROVEN_HOLD"):
+            module.probe("isolated-run-01", A, "runner-two", "token", transport)
+
     def test_422_without_existing_ref_is_not_a_collision(self):
         transport, _ = transport_for(422, ref_status=404)
         with self.assertRaisesRegex(RuntimeError, "COLLISION_REF_UNPROVEN_HOLD:404"):
