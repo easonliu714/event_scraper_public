@@ -1141,5 +1141,23 @@ class PersistedHoldSchemaRegressionTests(unittest.TestCase):
         self.assertEqual(_semantic_event_payload(a), _semantic_event_payload(b))
         self.assertNotEqual(_semantic_event_payload(a), _semantic_event_payload(empty))
 
+class EventCoreRoleSemanticRegressionTests(unittest.TestCase):
+    def test_event_owned_core_role_change_is_not_discarded(self):
+        # A /event verified period may change while public display fields
+        # remain empty. The REVIEW LKG must see this as a real source delta.
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_namespace": "event", "date": "", "_candidate": {
+            "field_roles": {"EVENT_ACTIVITY_PERIOD": {
+                "role": "EVENT_ACTIVITY_PERIOD", "value": "2026-11-20 - 2026-11-21",
+                "source_body_sha256": "old", "observed_at": "2026-11-08T00:00:00Z"}}}}
+        import copy
+        changed = copy.deepcopy(base)
+        changed["_candidate"]["field_roles"]["EVENT_ACTIVITY_PERIOD"]["value"] = "2026-11-20 - 2026-11-22"
+        self.assertNotEqual(_semantic_event_payload(base), _semantic_event_payload(changed))
+        receipt_only = copy.deepcopy(base)
+        receipt_only["_candidate"]["field_roles"]["EVENT_ACTIVITY_PERIOD"]["source_body_sha256"] = "new"
+        receipt_only["_candidate"]["field_roles"]["EVENT_ACTIVITY_PERIOD"]["observed_at"] = "2026-11-09T00:00:00Z"
+        self.assertEqual(_semantic_event_payload(base), _semantic_event_payload(receipt_only))
+
 if __name__ == "__main__":
     unittest.main()
