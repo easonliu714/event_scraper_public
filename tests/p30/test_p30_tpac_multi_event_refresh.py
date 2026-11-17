@@ -963,5 +963,47 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             _archived_body(raw, program_receipt, program_url, "program", "1301")
 
 
+
+    def test_partial_archived_manifest_preserves_previously_verified_detail(self):
+        # Same immutable LIST, missing DETAIL in later manifest: retain REVIEW evidence.
+        from scripts.p30_tpac_multi_event_refresh import archived_inventory_cli, load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="封存活動">'
+                       f'<div class="{cls}__text-title">封存活動</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {"list_file": str(path), "details": {},
+                    "list_receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None, "robots_allowed": None}}
+            body = b"<html>archived detail</html>"
+            detail_path = root / "detail.html"
+            detail_path.write_bytes(body)
+            detail_url = "https://tpac.org.taipei/program/2040"
+            catalogs["program"]["details"]["2040"] = {"detail_file": str(detail_path),
+                "receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                    "source_url": detail_url, "body_sha256": hashlib.sha256(body).hexdigest(),
+                    "body_bytes": len(body), "capture_started_at": OBS,
+                    "observed_at": None, "http_status": None, "robots_allowed": None}}
+            manifest = root / "archive.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            first = archived_inventory_cli(manifest, root)
+            self.assertEqual(first["counts"]["detail_available"], 1)
+            catalogs["program"]["details"] = {}
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            second = archived_inventory_cli(manifest, root)
+            saved, _ = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(saved["items"]["tpac:program:2040"]["status"], "ARCHIVED_DETAIL_VERIFIED_ONLY")
+            self.assertEqual(second["counts"]["pending_detail_budget"], 1)
+            self.assertEqual(first["inventory"]["sha256"], second["inventory"]["sha256"])
+            self.assertFalse((root / "docs" / "data.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
