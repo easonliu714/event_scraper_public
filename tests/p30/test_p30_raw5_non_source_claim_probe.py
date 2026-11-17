@@ -11,7 +11,7 @@ A = "a" * 40
 T = "b" * 40
 C = "c" * 40
 
-def transport_for(outcome):
+def transport_for(outcome, winner_owner="runner-one", ref_status=200):
     calls = []
     def call(method, path, token, payload=None):
         calls.append((method, path, payload))
@@ -22,9 +22,9 @@ def transport_for(outcome):
         if method == "POST" and path.endswith("/git/refs"):
             return outcome, {} if outcome == 201 else {"message": "Reference already exists"}
         if method == "GET" and "/git/ref/" in path:
-            return 200, {"object": {"sha": C}}
+            return ref_status, {"object": {"sha": C}} if ref_status == 200 else {}
         if method == "GET" and path.endswith("/git/commits/" + C):
-            return 200, {"message": "NON_SOURCE_RAW5_TEST_V1 isolated-run-01 runner-one",
+            return 200, {"message": "NON_SOURCE_RAW5_TEST_V1 isolated-run-01 " + winner_owner,
                          "parents": [{"sha": A}], "tree": {"sha": T}}
         raise AssertionError((method, path))
     return call, calls
@@ -40,7 +40,17 @@ class NonSourceClaimProbeTests(unittest.TestCase):
         transport, calls = transport_for(422)
         result = module.probe("isolated-run-01", A, "runner-two", "token", transport)
         self.assertEqual(result["decision"], "LOST_COLLISION")
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(result["winner_run"], "runner-one")
+        self.assertFalse(result["native_get_allowed"])
+        self.assertEqual(len(calls), 5)
+    def test_422_without_existing_ref_is_not_a_collision(self):
+        transport, _ = transport_for(422, ref_status=404)
+        with self.assertRaisesRegex(RuntimeError, "COLLISION_REF_UNPROVEN_HOLD:404"):
+            module.probe("isolated-run-01", A, "runner-two", "token", transport)
+    def test_422_self_owned_ref_is_not_an_independent_loser(self):
+        transport, _ = transport_for(422, winner_owner="runner-two")
+        with self.assertRaisesRegex(RuntimeError, "COLLISION_WINNER_UNPROVEN_HOLD"):
+            module.probe("isolated-run-01", A, "runner-two", "token", transport)
     def test_scope_validation_rejects_source_or_short_id(self):
         for scope in ("tpac", "../source-claims/raw5-tpac-123", "A" * 12):
             with self.assertRaises(ValueError):
