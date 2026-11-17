@@ -289,7 +289,16 @@ def _semantic_event_payload(event):
         raise ValueError("TPAC_SEMANTIC_EVENT_SCHEMA_HOLD")
     keys = ("source_event_id", "title", "url", "platform", "type",
             "date", "location", "price", "img_url", "description")
-    return tuple((key, event.get(key)) for key in keys)
+    # Source-owned REVIEW roles can change without changing formal display fields.
+    # Compare stable role values, never receipt SHA/timestamps or release flags.
+    roles = (event.get("_candidate") or {}).get("field_roles") or {}
+    stable_roles = ("price", "venue_space")
+    role_values = tuple((role, json.dumps({
+        key: roles.get(role, {}).get(key)
+        for key in ("role", "value", "min_price_ntd", "max_price_ntd",
+                    "start_area_note", "start_area_role", "decision")
+    }, ensure_ascii=False, sort_keys=True)) for role in stable_roles)
+    return tuple((key, event.get(key)) for key in keys) + role_values
 
 
 def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
