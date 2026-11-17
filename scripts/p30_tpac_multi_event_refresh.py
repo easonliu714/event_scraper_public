@@ -483,15 +483,23 @@ def refresh_event_plan(list_body, list_receipt, detail_pairs, prior, now):
         except (ValueError, KeyError, TypeError, AttributeError, OverflowError) as error:
             report["rejected"][sid] = str(error)
             continue
-        valid += 1
-        if identity not in updated:
-            adds += 1
-        elif _semantic_event_payload(updated[identity]) == _semantic_event_payload(event):
-            # Preserve REVIEW LKG provenance on observation-only receipt changes.
-            same += 1
-            continue
-        else:
+        # An invalid persisted /event LKG must isolate only its own identity.
+        # Keep the previous row and continue processing unrelated valid DETAILs.
+        if identity in updated:
+            try:
+                previous_semantics = _semantic_event_payload(updated[identity])
+                current_semantics = _semantic_event_payload(event)
+            except (ValueError, TypeError, KeyError) as error:
+                report["rejected"][sid] = "TPAC_PRIOR_EVENT_SEMANTIC_HOLD:" + str(error)
+                continue
+            if previous_semantics == current_semantics:
+                valid += 1
+                same += 1
+                continue  # Receipt-only change: retain original LKG provenance.
             changes += 1
+        else:
+            adds += 1
+        valid += 1
         updated[identity] = event
     if valid == 0:
         report["decision"] = "HOLD_NO_QUALIFIED_EVENT_DETAILS_PRESERVE_LKG"
