@@ -83,23 +83,32 @@ def probe(scope, anchor, run, token, transport=api):
     sha = commit["sha"]
     status, result = transport("POST", "/git/refs", token, {"ref": ref, "sha": sha})
     if status == 422:
-        # A 422 can mean ruleset rejection or invalid ref, not just a collision.
-        # Only a separately read, owner-bound winning commit proves a lost race.
+        # GitHub uses HTTP 422 for several distinct failures. Do not classify
+        # ruleset/validation errors as collisions merely because a ref exists.
+        # The losing candidate MUST also be a different owner-bound commit.
+        if (type(result) is not dict
+                or result.get("message") != "Reference already exists"):
+            raise RuntimeError("COLLISION_REASON_UNVERIFIED_HOLD:422")
         check, existing = transport("GET", "/git/ref/" + ref.removeprefix("refs/"), token)
-        winner_sha = existing.get("object", {}).get("sha", "") if check == 200 else ""
-        if not SHA.fullmatch(winner_sha):
+        pointed = existing.get("object") if check == 200 and type(existing) is dict else None
+        winner_sha = pointed.get("sha") if type(pointed) is dict else None
+        if (type(winner_sha) is not str or not SHA.fullmatch(winner_sha)
+                or pointed.get("type", "commit") != "commit"
+                or winner_sha == sha):
             raise RuntimeError("COLLISION_REF_UNPROVEN_HOLD:" + str(check))
         check, winner = transport("GET", "/git/commits/" + winner_sha, token)
-        winner_message = winner.get("message", "") if check == 200 else ""
+        winner_message = winner.get("message", "") if check == 200 and type(winner) is dict else ""
         prefix = "NON_SOURCE_RAW5_TEST_V1 " + scope + " "
         owner = winner_message[len(prefix):] if winner_message.startswith(prefix) else ""
-        if (check != 200 or not TOKEN.fullmatch(owner) or owner == run or
-            [p.get("sha") for p in winner.get("parents", [])] != [anchor] or
-            winner.get("tree", {}).get("sha") != tree):
+        if (check != 200 or type(winner) is not dict
+                or winner.get("sha", winner_sha) != winner_sha
+                or not TOKEN.fullmatch(owner) or owner == run
+                or [p.get("sha") for p in winner.get("parents", [])] != [anchor]
+                or winner.get("tree", {}).get("sha") != tree):
             raise RuntimeError("COLLISION_WINNER_UNPROVEN_HOLD:" + str(check))
         return {"decision": "LOST_COLLISION", "status": 422, "ref": ref,
-                "run": run, "winner_run": owner, "winner_commit_sha": winner_sha,
-                "native_get_allowed": False}
+                "run": run, "loser_commit_sha": sha, "winner_run": owner,
+                "winner_commit_sha": winner_sha, "native_get_allowed": False}
     if status != 201:
         raise RuntimeError("REF_CREATE_HOLD:" + str(status) + ":" + str(result.get("message")))
     status, got = transport("GET", "/git/ref/" + ref.removeprefix("refs/"), token)
