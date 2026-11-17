@@ -91,7 +91,23 @@ class MultiEventRefreshTests(unittest.TestCase):
         self.assertEqual(again["changed"], 0)
         self.assertEqual(again["unchanged"], 2)
 
-    def test_general_admission_price_is_reusable_review_field_not_formal(self):
+    def test_hidden_showtime_cannot_become_review_event(self):
+        body, rr, details = inputs(("2111",))
+        original = details["2111"]["body"]
+        # The hidden node has a valid-looking earlier date. It must never
+        # override the actual visible event schedule.
+        injected = original.replace(
+            b"<ul><li><p>",
+            b'<ul><li hidden><p>2026-11-20 (\\xe4\\xba\\x94) 12:30</p></li><li><p>',
+        )
+        details["2111"] = {"body": injected, "receipt": receipt(ROOT + "/2111", injected)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["qualified"], 0)
+        self.assertEqual(plan["decision"], "HOLD_NO_QUALIFIED_DETAILS_PRESERVE_LKG")
+        self.assertEqual(plan["rejected"]["2111"], "TPAC_HIDDEN_SHOWTIME_EVIDENCE_HOLD")
+        self.assertEqual(plan["published"], 0)
+
+
         body, rr, details = inputs()
         price_html = (
             '<div class="page-program__aside-ticket">'
