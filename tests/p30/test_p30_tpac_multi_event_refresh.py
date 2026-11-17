@@ -542,6 +542,33 @@ class MultiEventRefreshTests(unittest.TestCase):
 
 
 
+class ReviewRoleDeltaRegressionTests(unittest.TestCase):
+    """REVIEW source role changes are meaningful even when formal fields are blank."""
+
+    def test_venue_and_price_review_changes_are_not_discarded(self):
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        import copy
+        base = {"source_event_id": "2040", "title": "北藝演出", "url": ROOT + "/2040",
+                "date": "2026-11-20 19:30", "location": "", "price": "",
+                "_candidate": {"field_roles": {"venue_space": {
+                    "role": "EVENT_VENUE_SPACE", "value": "藍盒子",
+                    "source_body_sha256": "a" * 64, "observed_at": OBS,
+                    "decision": "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE"}}}}
+        changed = copy.deepcopy(base)
+        changed["_candidate"]["field_roles"]["venue_space"]["value"] = "球劇場"
+        self.assertNotEqual(_semantic_event_payload(base), _semantic_event_payload(changed))
+        receipt_only = copy.deepcopy(base)
+        receipt_only["_candidate"]["field_roles"]["venue_space"]["observed_at"] = "2026-11-17T13:00:00Z"
+        receipt_only["_candidate"]["field_roles"]["venue_space"]["source_body_sha256"] = "b" * 64
+        self.assertEqual(_semantic_event_payload(base), _semantic_event_payload(receipt_only))
+        price = copy.deepcopy(base)
+        price["_candidate"]["field_roles"]["price"] = {
+            "role": "EVENT_GENERAL_ADMISSION_PRICE_RANGE", "min_price_ntd": 1500,
+            "max_price_ntd": 3500, "decision": "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE"}
+        self.assertNotEqual(_semantic_event_payload(base), _semantic_event_payload(price))
+        self.assertEqual(base["price"], "")
+
+
 class VenueRoleReviewTests(unittest.TestCase):
     """Fixture regressions are not first-party native field acceptance."""
 
