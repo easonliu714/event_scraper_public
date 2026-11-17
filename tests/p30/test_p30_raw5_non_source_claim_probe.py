@@ -17,6 +17,7 @@ def transport_for(outcome, winner_owner="runner-one", ref_status=200,
                   collision_message="Reference already exists",
                   same_candidate=False, ref_type="commit"):
     calls = []
+    created = {"message": None}
     def call(method, path, token, payload=None):
         calls.append((method, path, payload))
         if method == "GET" and path.endswith("/rulesets/27026973"):
@@ -35,6 +36,7 @@ def transport_for(outcome, winner_owner="runner-one", ref_status=200,
         if method == "GET" and path.endswith("/git/commits/" + A):
             return 200, {"tree": {"sha": T}}
         if method == "POST" and path.endswith("/git/commits"):
+            created["message"] = payload["message"]
             return 201, {"sha": D}
         if method == "POST" and path.endswith("/git/refs"):
             return outcome, {} if outcome == 201 else {"message": collision_message}
@@ -45,7 +47,7 @@ def transport_for(outcome, winner_owner="runner-one", ref_status=200,
             return 200, {"sha": C, "message": "NON_SOURCE_RAW5_TEST_V1 isolated-run-01 " + winner_owner,
                          "parents": [{"sha": A}], "tree": {"sha": T}}
         if method == "GET" and path.endswith("/git/commits/" + D):
-            return 200, {"sha": D, "message": "NON_SOURCE_RAW5_TEST_V1 isolated-run-01 runner-two",
+            return 200, {"sha": D, "message": created["message"],
                          "parents": [{"sha": A}], "tree": {"sha": T}}
         raise AssertionError((method, path))
     return call, calls
