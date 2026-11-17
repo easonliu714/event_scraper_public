@@ -50,9 +50,12 @@ def verify_protected_claim_ruleset(ref, token, transport=api):
     rule_items = ruleset.get("rules")
     bypass = ruleset.get("bypass_actors")
     if (ruleset.get("id") != RULESET_ID
+            or ruleset.get("target") != "branch"
             or ruleset.get("enforcement") != "active"
+            or ruleset.get("current_user_can_bypass") != "never"
             or type(ref_name) is not dict
-            or "refs/heads/source-claims/*" not in ref_name.get("include", [])
+            or type(ref_name.get("include")) is not list
+            or "refs/heads/source-claims/*" not in ref_name["include"]
             or ref_name.get("exclude") != []
             or bypass != []
             or type(rule_items) is not list
