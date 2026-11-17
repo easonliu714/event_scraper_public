@@ -296,9 +296,11 @@ def _semantic_event_payload(event):
     roles = candidate.get("field_roles") or {}
     if not isinstance(roles, dict):
         raise ValueError("TPAC_SEMANTIC_FIELD_ROLES_SCHEMA_HOLD")
-    stable_roles = ("price", "venue_space")
-    # A persisted REVIEW role must be an object; malformed LKG must HOLD
-    # rather than crash the refresh with AttributeError or silently lose data.
+    # Compare all event-owned REVIEW roles, including /event verified core roles.
+    # Previously only programme price/venue were compared, so a changed
+    # /event period or show-role value could silently retain stale LKG.
+    # Exclude receipt-only URL/SHA/UTC metadata from activity semantics.
+    stable_roles = tuple(sorted(set(roles) | {"price", "venue_space"}))
     for role in stable_roles:
         if role in roles and not isinstance(roles[role], dict):
             raise ValueError("TPAC_SEMANTIC_FIELD_ROLE_SCHEMA_HOLD:" + role)
