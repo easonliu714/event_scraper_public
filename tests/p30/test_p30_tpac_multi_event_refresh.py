@@ -1216,5 +1216,83 @@ class EventCoreRoleSemanticRegressionTests(unittest.TestCase):
         receipt_only["_candidate"]["field_roles"]["EVENT_ACTIVITY_PERIOD"]["observed_at"] = "2026-11-09T00:00:00Z"
         self.assertEqual(_semantic_event_payload(base), _semantic_event_payload(receipt_only))
 
+
+class EventPriorLkgIsolationRegressionTests(unittest.TestCase):
+    def test_corrupt_event_lkg_does_not_abort_other_verified_detail(self):
+        # Two independent /event identities: corrupted persisted semantics
+        # must not prevent the second valid archived DETAIL from being staged.
+        from unittest.mock import patch
+        from datetime import datetime, timezone
+        from scripts.p30_tpac_multi_event_refresh import (
+            KIND, refresh_event_plan,
+        )
+        now = datetime(2026, 11, 18, tzinfo=timezone.utc)
+        old_bad = {"source_event_id": "1301", "_candidate": {
+            "field_roles": {"EVENT_ACTIVITY_PERIOD": None}}}
+        prior = {"kind": KIND, "events": {"tpac:event:1301": old_bad}}
+        cards = {sid: {"source_event_id": sid, "title": "隔離活動" + sid}
+                 for sid in ("1301", "2072")}
+        def inspect(card, body, receipt, clock):
+            sid = card["source_event_id"]
+            import hashlib
+            return {
+                "identity": "tpac:event:" + sid, "source_event_id": sid,
+                "url": "https://tpac.org.taipei/event/" + sid,
+                "detail_body_sha256": hashlib.sha256(body).hexdigest(),
+                "decision": "SOURCE_OWNED_PARTIAL_FIELDS_REQUIRE_INDEPENDENT_ACCEPTANCE",
+                "verified_core_roles": {"EVENT_ACTIVITY_PERIOD": "2026-11-20 - 2026-11-21"},
+                "observed_at": "2026-11-18T00:00:00+00:00",
+                "title": card["title"], "activity_kind": "展覽",
+                "held_fields": ["FORMAL_FIELD_HOLD"],
+                "list_period": "2026-11-20 - 2026-11-21",
+                "detail_period": "2026-11-20 - 2026-11-21",
+            }
+        pairs = {sid: {"body": b"sealed archive detail", "receipt": {}}
+                 for sid in cards}
+        with patch("scripts.p30_tpac_catalog_topology.discover_catalog",
+                   return_value=cards), patch(
+                   "scripts.p30_tpac_event_detail_review.inspect_event_detail",
+                   side_effect=inspect):
+            report = refresh_event_plan(b"sealed archive list", {}, pairs, prior, now)
+        self.assertEqual(report["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(report["qualified"], 1)
+        self.assertEqual(report["added"], 1)
+        self.assertEqual(report["changed"], 0)
+        self.assertEqual(report["retained_previous"], 1)
+        self.assertFalse(report["source_coverage_complete"])
+        self.assertIn("TPAC_PRIOR_EVENT_SEMANTIC_HOLD", report["rejected"]["1301"])
+        self.assertEqual(report["events"]["tpac:event:1301"], old_bad)
+        self.assertIn("tpac:event:2072", report["events"])
+        self.assertFalse(report["events"]["tpac:event:2072"]["published"])
+
+    def test_all_corrupt_event_lkg_preserves_original_snapshot(self):
+        from unittest.mock import patch
+        from datetime import datetime, timezone
+        from scripts.p30_tpac_multi_event_refresh import KIND, refresh_event_plan
+        bad = {"_candidate": {"field_roles": {"EVENT_ACTIVITY_PERIOD": None}}}
+        prior = {"kind": KIND, "events": {"tpac:event:1301": bad}}
+        card = {"source_event_id": "1301", "title": "封存活動"}
+        import hashlib
+        body = b"archived detail"
+        review = {"identity": "tpac:event:1301", "source_event_id": "1301",
+                  "url": "https://tpac.org.taipei/event/1301",
+                  "detail_body_sha256": hashlib.sha256(body).hexdigest(),
+                  "decision": "SOURCE_OWNED_PARTIAL_FIELDS_REQUIRE_INDEPENDENT_ACCEPTANCE",
+                  "verified_core_roles": {}, "observed_at": "2026-11-18T00:00:00+00:00",
+                  "title": "封存活動", "activity_kind": "展覽",
+                  "held_fields": [], "list_period": "", "detail_period": ""}
+        with patch("scripts.p30_tpac_catalog_topology.discover_catalog",
+                   return_value={"1301": card}), patch(
+                   "scripts.p30_tpac_event_detail_review.inspect_event_detail",
+                   return_value=review):
+            result = refresh_event_plan(b"archive", {},
+                                        {"1301": {"body": body, "receipt": {}}},
+                                        prior, datetime(2026, 11, 18, tzinfo=timezone.utc))
+        self.assertEqual(result["decision"], "HOLD_NO_QUALIFIED_EVENT_DETAILS_PRESERVE_LKG")
+        self.assertEqual(result["events"], prior["events"])
+        self.assertEqual(result["qualified"], 0)
+        self.assertEqual(result["added"], 0)
+        self.assertEqual(result["changed"], 0)
+
 if __name__ == "__main__":
     unittest.main()
