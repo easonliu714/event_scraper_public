@@ -10,6 +10,7 @@ import urllib.request
 
 REPO = "easonliu714/event_scraper_public"
 REF_PREFIX = "refs/heads/source-claims/validation-raw5-"
+RULESET_ID = 27026973
 SHA = re.compile(r"[0-9a-f]{40}\Z")
 TOKEN = re.compile(r"[a-z0-9][a-z0-9-]{7,63}\Z")
 
@@ -30,10 +31,43 @@ def api(method, path, token, payload=None):
     except urllib.error.HTTPError as exc:
         return exc.code, json.loads(exc.read().decode())
 
+def verify_protected_claim_ruleset(ref, token, transport=api):
+    """Check actual GitHub branch protection before ANY claim write.
+
+    A successful branch creation is not proof that another executor cannot
+    update/delete it. Fail closed if the exact expected protection changes.
+    This is point-in-time policy evidence, NOT a live source GET grant.
+    """
+    if not isinstance(ref, str) or not ref.startswith(REF_PREFIX):
+        raise ValueError("NON_SOURCE_RULESET_REF_SCOPE_HOLD")
+    if "/" in ref[len("refs/heads/source-claims/"):]:
+        raise ValueError("NON_SOURCE_RULESET_NESTED_REF_HOLD")
+    status, ruleset = transport("GET", "/rulesets/" + str(RULESET_ID), token)
+    if type(status) is not int or type(ruleset) is not dict or status != 200:
+        raise RuntimeError("NON_SOURCE_RULESET_UNREADABLE_HOLD:" + str(status))
+    conditions = ruleset.get("conditions")
+    ref_name = conditions.get("ref_name") if type(conditions) is dict else None
+    rule_items = ruleset.get("rules")
+    bypass = ruleset.get("bypass_actors")
+    if (ruleset.get("id") != RULESET_ID
+            or ruleset.get("enforcement") != "active"
+            or type(ref_name) is not dict
+            or "refs/heads/source-claims/*" not in ref_name.get("include", [])
+            or ref_name.get("exclude") != []
+            or bypass != []
+            or type(rule_items) is not list
+            or not {"deletion", "update", "non_fast_forward"}.issubset(
+                {r.get("type") for r in rule_items if type(r) is dict})):
+        raise RuntimeError("NON_SOURCE_RULESET_PROTECTION_UNVERIFIED_HOLD")
+    return {"ruleset_id": RULESET_ID, "protected_ref": ref,
+            "verified": True, "native_get_allowed": False}
+
+
 def probe(scope, anchor, run, token, transport=api):
     ref = validate(scope, anchor, run)
     if not token:
         raise ValueError("MISSING_GITHUB_TOKEN")
+    verify_protected_claim_ruleset(ref, token, transport)
     status, base = transport("GET", "/git/commits/" + anchor, token)
     if status != 200 or not SHA.fullmatch(base.get("tree", {}).get("sha", "")):
         raise RuntimeError("ANCHOR_READ_HOLD:" + str(status))
