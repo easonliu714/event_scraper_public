@@ -569,6 +569,73 @@ class ReviewRoleDeltaRegressionTests(unittest.TestCase):
         self.assertEqual(base["price"], "")
 
 
+    def test_list_detail_conflict_resolution_and_reappearance_are_not_discarded(self):
+        """A quality HOLD transition must update REVIEW even with same display date."""
+        body, list_receipt, details = inputs(("2111",))
+        first = refresh_plan(body, list_receipt, details, empty_prior(), NOW)
+        self.assertEqual(first["qualified"], 1)
+        previous = first["events"]["tpac:2111"]
+        self.assertIn("LIST_DETAIL_PERIOD_CONFLICT_HOLD",
+                      previous["_candidate"]["hold_reasons"])
+
+        # Actual showtime/official DETAIL stays identical; only official LIST
+        # period is brought into alignment with the same-event DETAIL.
+        aligned_list = body.replace(
+            b"2026-11-19 - 2026-11-28",
+            b"2026-11-20 - 2026-11-30")
+        self.assertNotEqual(aligned_list, body)
+        aligned_receipt = receipt(ROOT, aligned_list)
+        resolved = refresh_plan(
+            aligned_list, aligned_receipt, details,
+            {"kind": KIND, "events": first["events"]}, NOW)
+        self.assertEqual((resolved["added"], resolved["changed"],
+                          resolved["unchanged"]), (0, 1, 0))
+        current = resolved["events"]["tpac:2111"]
+        self.assertNotIn("LIST_DETAIL_PERIOD_CONFLICT_HOLD",
+                         current["_candidate"]["hold_reasons"])
+        self.assertEqual(current["date"], previous["date"])
+        self.assertEqual(current["title"], previous["title"])
+        self.assertEqual(current["price"], "")
+        self.assertEqual(current["location"], "")
+        self.assertFalse(current["published"])
+        self.assertFalse(current["formal_field_pass"])
+        self.assertFalse(current["golden_accepted"])
+        self.assertEqual(resolved["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+        replay = refresh_plan(
+            aligned_list, aligned_receipt, details,
+            {"kind": KIND, "events": resolved["events"]}, NOW)
+        self.assertEqual((replay["changed"], replay["unchanged"]), (0, 1))
+        self.assertEqual(replay["events"], resolved["events"])
+        regression = refresh_plan(
+            body, list_receipt, details,
+            {"kind": KIND, "events": resolved["events"]}, NOW)
+        self.assertEqual((regression["changed"], regression["unchanged"]), (1, 0))
+        self.assertIn("LIST_DETAIL_PERIOD_CONFLICT_HOLD",
+                      regression["events"]["tpac:2111"]["_candidate"]["hold_reasons"])
+        self.assertEqual(regression["published"], 0)
+
+    def test_hold_reason_order_and_receipt_only_change_do_not_create_deltas(self):
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        import copy
+        body, list_receipt, details = inputs(("2111",))
+        event = refresh_plan(body, list_receipt, details, empty_prior(), NOW)[
+            "events"]["tpac:2111"]
+        shuffled = copy.deepcopy(event)
+        shuffled["_candidate"]["hold_reasons"] = list(
+            reversed(event["_candidate"]["hold_reasons"]))
+        shuffled["_candidate"]["hold_reasons"].append(
+            shuffled["_candidate"]["hold_reasons"][0])
+        shuffled["_candidate"]["source_list_sha256"] = "f" * 64
+        shuffled["_candidate"]["observed_at"] = "2026-11-17T15:00:00+00:00"
+        self.assertEqual(_semantic_event_payload(event),
+                         _semantic_event_payload(shuffled))
+        tampered_hold = copy.deepcopy(event)
+        tampered_hold["_candidate"]["hold_reasons"] = [None]
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_HOLD_REASONS_SCHEMA_HOLD"):
+            _semantic_event_payload(tampered_hold)
+
+
 class VenueRoleReviewTests(unittest.TestCase):
     """Fixture regressions are not first-party native field acceptance."""
 
