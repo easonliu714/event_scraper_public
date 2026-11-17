@@ -365,16 +365,24 @@ def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
         except (ValueError, KeyError, TypeError, OverflowError) as e:
             report["rejected"][sid] = str(e)
             continue
-        valid += 1
         key = "tpac:" + sid
-        if key not in updated:
-            adds += 1
-        elif _semantic_event_payload(updated[key]) == _semantic_event_payload(event):
-            # An observation-only receipt refresh must not create a content delta.
-            same += 1
-            continue  # Preserve the prior LKG bytes and its provenance unchanged.
-        else:
+        if key in updated:
+            # A malformed persisted LKG entry must not abort the entire batch
+            # or be overwritten by an otherwise valid new observation.
+            try:
+                previous_semantics = _semantic_event_payload(updated[key])
+                current_semantics = _semantic_event_payload(event)
+            except (ValueError, TypeError, KeyError) as exc:
+                report["rejected"][sid] = "TPAC_PRIOR_EVENT_SEMANTIC_HOLD:" + str(exc)
+                continue
+            if previous_semantics == current_semantics:
+                valid += 1
+                same += 1
+                continue  # Preserve the prior LKG bytes and provenance unchanged.
             changes += 1
+        else:
+            adds += 1
+        valid += 1
         updated[key] = event
     if valid == 0:
         report["decision"] = "HOLD_NO_QUALIFIED_DETAILS_PRESERVE_LKG"
