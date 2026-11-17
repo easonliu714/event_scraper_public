@@ -184,6 +184,10 @@ def parse_detail(card, body, receipt, now):
     if len(blocks) != 1:
         raise ValueError("TPAC_SHOW_SECTION_HOLD")
     labels = blocks[0].select("ul > li > p")
+    # Hidden showtime nodes are not source-visible evidence. Reject the entire
+    # ambiguous section rather than treating hidden dates as accepted events.
+    if any(not _visible(node) for node in labels):
+        raise ValueError("TPAC_HIDDEN_SHOWTIME_EVIDENCE_HOLD")
     if not 1 <= len(labels) <= 40:
         raise ValueError("TPAC_SHOW_COUNT_HOLD")
     times = []
