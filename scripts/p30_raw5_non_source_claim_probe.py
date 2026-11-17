@@ -10,8 +10,8 @@ import urllib.request
 
 REPO = "easonliu714/event_scraper_public"
 REF_PREFIX = "refs/heads/source-claims/validation-raw5-"
-SHA = re.compile(r"[0-9a-f]{40}\\Z")
-TOKEN = re.compile(r"[a-z0-9][a-z0-9-]{7,63}\\Z")
+SHA = re.compile(r"[0-9a-f]{40}\Z")
+TOKEN = re.compile(r"[a-z0-9][a-z0-9-]{7,63}\Z")
 
 def validate(scope, anchor, run):
     if not TOKEN.fullmatch(scope) or not TOKEN.fullmatch(run) or not SHA.fullmatch(anchor):
