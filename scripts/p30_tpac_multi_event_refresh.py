@@ -307,7 +307,9 @@ def _semantic_event_payload(event):
         for key in ("role", "value", "min_price_ntd", "max_price_ntd",
                     "start_area_note", "start_area_role", "decision")
     }, ensure_ascii=False, sort_keys=True)) for role in stable_roles)
-    holds = candidate.get("hold_reasons") or []
+    # Persisted HOLD authority must be an explicit list. Falsey malformed
+    # values (None, "", 0, False) must not erase a prior safety decision.
+    holds = candidate.get("hold_reasons", [])
     if (not isinstance(holds, list)
             or any(not isinstance(reason, str) or not reason for reason in holds)):
         raise ValueError("TPAC_SEMANTIC_HOLD_REASONS_SCHEMA_HOLD")
