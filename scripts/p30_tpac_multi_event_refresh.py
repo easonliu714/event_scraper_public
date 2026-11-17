@@ -279,26 +279,37 @@ def parse_detail(card, body, receipt, now):
 
 
 def _semantic_event_payload(event):
-    """Compare display-relevant source fields, never receipt/observation metadata.
+    """Compare stable REVIEW semantics, including quality HOLD transitions.
 
-    This is REVIEW-only diff accounting, not independent field acceptance.
-    Unknown fields and authority flags remain outside this comparison and
-    cannot grant Publisher eligibility.
+    A LIST/DETAIL period conflict can appear or resolve while the displayed
+    next showtime stays identical. Dropping that change preserves stale safety
+    evidence in LKG. Receipt hashes, observation timestamps, and publication
+    flags are deliberately excluded from the semantic comparison.
     """
     if not isinstance(event, dict):
         raise ValueError("TPAC_SEMANTIC_EVENT_SCHEMA_HOLD")
     keys = ("source_event_id", "title", "url", "platform", "type",
             "date", "location", "price", "img_url", "description")
-    # Source-owned REVIEW roles can change without changing formal display fields.
-    # Compare stable role values, never receipt SHA/timestamps or release flags.
-    roles = (event.get("_candidate") or {}).get("field_roles") or {}
+    candidate = event.get("_candidate") or {}
+    if not isinstance(candidate, dict):
+        raise ValueError("TPAC_SEMANTIC_CANDIDATE_SCHEMA_HOLD")
+    roles = candidate.get("field_roles") or {}
+    if not isinstance(roles, dict):
+        raise ValueError("TPAC_SEMANTIC_FIELD_ROLES_SCHEMA_HOLD")
     stable_roles = ("price", "venue_space")
     role_values = tuple((role, json.dumps({
         key: roles.get(role, {}).get(key)
         for key in ("role", "value", "min_price_ntd", "max_price_ntd",
                     "start_area_note", "start_area_role", "decision")
     }, ensure_ascii=False, sort_keys=True)) for role in stable_roles)
-    return tuple((key, event.get(key)) for key in keys) + role_values
+    holds = candidate.get("hold_reasons") or []
+    if (not isinstance(holds, list)
+            or any(not isinstance(reason, str) or not reason for reason in holds)):
+        raise ValueError("TPAC_SEMANTIC_HOLD_REASONS_SCHEMA_HOLD")
+    # HOLD reasons are a set of stable safety decisions: order and duplicated
+    # identical strings must not create false new activity.
+    hold_semantics = ("quality_hold_reasons", tuple(sorted(set(holds))))
+    return tuple((key, event.get(key)) for key in keys) + role_values + (hold_semantics,)
 
 
 def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
