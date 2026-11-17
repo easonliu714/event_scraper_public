@@ -297,6 +297,11 @@ def _semantic_event_payload(event):
     if not isinstance(roles, dict):
         raise ValueError("TPAC_SEMANTIC_FIELD_ROLES_SCHEMA_HOLD")
     stable_roles = ("price", "venue_space")
+    # A persisted REVIEW role must be an object; malformed LKG must HOLD
+    # rather than crash the refresh with AttributeError or silently lose data.
+    for role in stable_roles:
+        if role in roles and not isinstance(roles[role], dict):
+            raise ValueError("TPAC_SEMANTIC_FIELD_ROLE_SCHEMA_HOLD:" + role)
     role_values = tuple((role, json.dumps({
         key: roles.get(role, {}).get(key)
         for key in ("role", "value", "min_price_ntd", "max_price_ntd",
