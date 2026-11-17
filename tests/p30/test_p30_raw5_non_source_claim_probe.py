@@ -18,7 +18,8 @@ def transport_for(outcome, winner_owner="runner-one", ref_status=200,
         calls.append((method, path, payload))
         if method == "GET" and path.endswith("/rulesets/27026973"):
             policy = {
-                "id": 27026973, "enforcement": "active",
+                "id": 27026973, "target": "branch", "enforcement": "active",
+                "current_user_can_bypass": "never",
                 "conditions": {"ref_name": {
                     "include": ["refs/heads/source-claims/*"], "exclude": []}},
                 "bypass_actors": [],
@@ -78,6 +79,9 @@ class NonSourceClaimProbeTests(unittest.TestCase):
 
     def test_ruleset_inactive_bypass_or_missing_protection_blocks_writes(self):
         cases = (
+            {"target": "tag"},
+            {"current_user_can_bypass": "always"},
+            {"conditions": {"ref_name": {"include": "refs/heads/source-claims/*", "exclude": []}}},
             {"enforcement": "disabled"},
             {"id": 111},
             {"bypass_actors": [{"actor_id": 42, "actor_type": "Integration"}]},
