@@ -24,7 +24,8 @@ ROOT = "https://tpac.org.taipei/program"
 KIND = "TPAC_SOURCE_OWNED_MULTI_EVENT_REVIEW_V1"
 TIMEZONE = timezone(timedelta(hours=8))
 DAY = "一二三四五六日"
-SHOW = re.compile(r"^(20\d{2}-\d{2}-\d{2})\s*\(([一二三四五六日])\)\s*([0-2]\d:[0-5]\d)$")
+# Reject hours 24-29 before datetime parsing so malformed source labels HOLD deterministically.
+SHOW = re.compile(r"^(20\d{2}-\d{2}-\d{2})\s*\(([一二三四五六日])\)\s*((?:[01]\d|2[0-3]):[0-5]\d)$")
 PERIOD = re.compile(r"^(20\d{2}-\d{2}-\d{2})\s*[-–]\s*(20\d{2}-\d{2}-\d{2})$")
 PATH = re.compile(r"^/program/([1-9]\d{0,9})$")
 MAX_BODY = 2 * 1024 * 1024
