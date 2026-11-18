@@ -192,6 +192,91 @@ class GitHubRaw5AttemptProvider:
             "native_get_allowed": False,
         }
 
+    def audit_host_wide_attempts(self, *, source_host):
+        """Audit every visible protected host lease and receipt across UTC slots.
+
+        This is forensic evidence only. A missing first-attempt anchor, a
+        partial listing, or any lease without a receipt must never grant GET.
+        """
+        if source_host != HOST or self._ref is None or self._run is None:
+            raise ValueError("RAW5_NO_LEASE_HOLD")
+
+        def listing(prefix):
+            status, refs, server_at = self._request(
+                "GET", PREFIX + "/git/matching-refs/heads/source-claims/" + prefix, None)
+            if (type(status) is not int or status != 200 or type(refs) is not list
+                    or abs((_utc(server_at) - self._now).total_seconds()) > 120):
+                raise ValueError("RAW5_HOST_WIDE_ENUMERATION_HOLD")
+            return refs
+
+        leases = {}
+        receipts = {}
+        for entry in listing("raw5-tpac-"):
+            name = entry.get("ref") if type(entry) is dict else None
+            obj = entry.get("object") if type(entry) is dict else None
+            if (type(name) is not str or not name.startswith(REF_PREFIX)
+                    or not re.fullmatch(r"[0-9]{1,12}", name[len(REF_PREFIX):])
+                    or type(obj) is not dict or obj.get("type") != "commit"
+                    or not re.fullmatch(r"[0-9a-f]{40}", str(obj.get("sha")))):
+                raise ValueError("RAW5_HOST_WIDE_LEASE_SCHEMA_HOLD")
+            slot = int(name[len(REF_PREFIX):])
+            if slot in leases or slot > int(self._now.timestamp()) // 3600:
+                raise ValueError("RAW5_HOST_WIDE_LEASE_SLOT_HOLD")
+            leases[slot] = obj["sha"]
+        for entry in listing("raw5-receipt-"):
+            name = entry.get("ref") if type(entry) is dict else None
+            obj = entry.get("object") if type(entry) is dict else None
+            match = (re.fullmatch(re.escape(RECEIPT_REF_PREFIX)
+                                  + r"([0-9]{1,12})-([A-Za-z0-9][A-Za-z0-9_.-]{7,127})",
+                                  name) if type(name) is str else None)
+            if (match is None or type(obj) is not dict
+                    or obj.get("type") != "commit"
+                    or not re.fullmatch(r"[0-9a-f]{40}", str(obj.get("sha")))):
+                raise ValueError("RAW5_HOST_WIDE_RECEIPT_SCHEMA_HOLD")
+            slot = int(match.group(1))
+            if slot in receipts:
+                raise ValueError("RAW5_MULTIPLE_HOST_ATTEMPTS_IN_SLOT_HOLD")
+            receipts[slot] = (name, match.group(2), obj["sha"])
+        if not leases or self._ref not in [REF_PREFIX + str(s) for s in leases]:
+            raise ValueError("RAW5_HOST_WIDE_CURRENT_LEASE_HOLD")
+        if set(receipts) - set(leases):
+            raise ValueError("RAW5_HOST_WIDE_ORPHAN_RECEIPT_HOLD")
+        # A previous lease without a durable receipt may represent a crash.
+        current = int(self._now.timestamp()) // 3600
+        if any(slot != current and slot not in receipts for slot in leases):
+            raise ValueError("RAW5_HOST_WIDE_CRASH_GAP_HOLD")
+        latest = None
+        for slot, (ref, run_id, sha) in sorted(receipts.items()):
+            status, commit = self._call("GET", "/git/commits/" + sha)
+            if status != 200 or commit.get("sha") != sha:
+                raise ValueError("RAW5_HOST_WIDE_COMMIT_HOLD")
+            message = commit.get("message")
+            if type(message) is not str or not message.startswith(RECEIPT_MSG_PREFIX):
+                raise ValueError("RAW5_HOST_WIDE_COMMIT_HOLD")
+            blob_sha = message[len(RECEIPT_MSG_PREFIX):]
+            self._read_commit_binding(sha, blob_sha)
+            record = self._read_verified_blob(blob_sha)
+            try:
+                attempted = _utc(datetime.fromisoformat(record["attempted_at"]))
+            except (KeyError, TypeError, ValueError, OverflowError) as exc:
+                raise ValueError("RAW5_HOST_WIDE_TIME_HOLD") from exc
+            expected = {"schema": "RAW5_ATTEMPT_V1", "source_host": HOST,
+                        "owner_run_id": run_id,
+                        "fencing_token": _owner_fence(REF_PREFIX + str(slot), run_id),
+                        "attempted_at": attempted.isoformat(),
+                        "slot_ref": REF_PREFIX + str(slot),
+                        "native_get_allowed": False}
+            if (record != expected or int(attempted.timestamp()) // 3600 != slot
+                    or attempted > self._now):
+                raise ValueError("RAW5_HOST_WIDE_BINDING_HOLD")
+            latest = attempted if latest is None or attempted > latest else latest
+        if latest is None:
+            raise ValueError("RAW5_FIRST_ATTEMPT_UNATTESTED_HOLD")
+        return {"source_host": HOST, "last_attempt_at": latest,
+                "first_attempt": False, "native_get_allowed": False,
+                "host_wide_receipts_verified": True,
+                "history_complete_attested": False}
+
     @staticmethod
     def _receipt_branch(slot_ref, run_id):
         """Protected branch scope; a raw Git blob cannot be a branch tip."""
