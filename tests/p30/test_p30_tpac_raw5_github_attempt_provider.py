@@ -444,6 +444,22 @@ class HostWideAttemptAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "HOST_WIDE_ORPHAN_RECEIPT_HOLD"):
             current.audit_host_wide_attempts(source_host=HOST)
 
+    def test_historical_lease_commit_and_owner_mismatch_hold(self):
+        api, old, current, _ = self._history()
+        original = api.commits[old._lease_commit_sha]
+        api.commits[old._lease_commit_sha] = {**original, "message": "FORGED_LEASE"}
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_LEASE_BINDING_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+        api.commits[old._lease_commit_sha] = {**original,
+            "message": original["message"].replace("older-run-0001", "another-run-0003")}
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_OWNER_MISMATCH_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+        api.commits[old._lease_commit_sha] = {**original,
+            "parents": [{"sha": "f" * 40}]}
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_LEASE_BINDING_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+        api.commits[old._lease_commit_sha] = original
+
     def test_empty_history_cannot_attest_first_attempt(self):
         api = SharedGitHubCommitAPI()
         current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
