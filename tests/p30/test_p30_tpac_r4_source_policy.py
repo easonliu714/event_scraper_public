@@ -43,7 +43,7 @@ def inputs(**changes):
     p, e = program(), event()
     data = dict(cycle_id="tpac-r4-20261109-173500-a1b2c3d4",
                 start_at=NOW,
-                previous_claim_at=NOW-timedelta(hours=1),
+                previous_claim_at=NOW-timedelta(hours=6),
                 robots=ROBOT_ALLOW,
                 program_body=p, program_receipt=receipt(P_URL, p),
                 event_body=e, event_receipt=receipt(E_URL, e),
@@ -56,7 +56,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
     def test_exact_owner_budget_is_frozen_and_shared_across_both_catalogs(self):
         b = RequestBudget()
         self.assertEqual(b.interval_seconds, MIN_INTERVAL_SECONDS)
-        self.assertEqual(MIN_INTERVAL_SECONDS, 3600)  # engineering only; not official robots policy
+        self.assertEqual(MIN_INTERVAL_SECONDS, 21600)  # Owner host-wide 6h, robots may be stricter
         self.assertEqual((b.robots, b.program_list, b.event_list, b.detail_total),
                          (1, 1, 1, 2))
         self.assertEqual(b.concurrency, 1)
@@ -85,11 +85,11 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "IMMUTABLE_CLAIM_PROVIDER_MISSING_HOLD"):
             assert_no_untrusted_live_authority(plan)
 
-    def test_engineering_hour_is_host_wide_and_clock_must_be_aware(self):
-        enforce_elapsed(NOW, NOW-timedelta(hours=1))
+    def test_owner_six_hours_is_host_wide_and_clock_must_be_aware(self):
+        enforce_elapsed(NOW, NOW-timedelta(hours=6))
         with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
-            review_two_catalog_plan(**inputs(previous_claim_at=NOW-timedelta(minutes=59,seconds=59)))
-        with self.assertRaisesRegex(ValueError, "CLOCK_ROLLBACK_HOLD"):
+            review_two_catalog_plan(**inputs(previous_claim_at=NOW-timedelta(hours=5,minutes=59,seconds=59)))
+        # A prior attempt 1h or 5h ago must never pass the Owner 6h rule.\n        for elapsed in (timedelta(hours=1), timedelta(hours=5)):\n            with self.subTest(elapsed=elapsed):\n                with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):\n                    enforce_elapsed(NOW, NOW-elapsed)\n        with self.assertRaisesRegex(ValueError, "CLOCK_ROLLBACK_HOLD"):
             review_two_catalog_plan(**inputs(previous_claim_at=NOW+timedelta(minutes=1)))
         with self.assertRaisesRegex(ValueError, "START_AWARE_UTC_REQUIRED_HOLD"):
             review_two_catalog_plan(**inputs(start_at=NOW.replace(tzinfo=None)))
@@ -175,7 +175,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         from scripts.p30_tpac_r4_source_policy import validate_durable_source_attempt
         ledger = dict(source_host="tpac.org.taipei", durable_provider_verified=True,
                       owner_run_id="runner-1", first_attempt=False,
-                      last_attempt_at=NOW-timedelta(hours=1),
+                      last_attempt_at=NOW-timedelta(hours=6),
                       fencing_token="fence-001", attempt_written_at=NOW)
         lease = dict(source_host="tpac.org.taipei", atomic_acquire_verified=True,
                      exclusive=True, fencing_token="fence-001",
@@ -217,7 +217,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         class Provider:
             def __init__(self):
                 self.calls = []
-                self.last = NOW-timedelta(hours=1)
+                self.last = NOW-timedelta(hours=6)
                 self.written = None
             def acquire_atomic(self, **kw):
                 self.calls.append("acquire")
@@ -263,7 +263,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
                 self.assertEqual(invalid.calls, ["acquire"])
                 self.assertIsNone(invalid.written)
         p = Provider()
-        p.last = NOW-timedelta(seconds=3599)
+        p.last = NOW-timedelta(seconds=21599)
         with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
             reserve_durable_source_attempt(provider=p, now=NOW, run_id="source-run-002")
         self.assertEqual(p.calls, ["acquire","history"])
