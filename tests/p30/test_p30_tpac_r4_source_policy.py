@@ -89,7 +89,12 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         enforce_elapsed(NOW, NOW-timedelta(hours=6))
         with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
             review_two_catalog_plan(**inputs(previous_claim_at=NOW-timedelta(hours=5,minutes=59,seconds=59)))
-        # A prior attempt 1h or 5h ago must never pass the Owner 6h rule.\n        for elapsed in (timedelta(hours=1), timedelta(hours=5)):\n            with self.subTest(elapsed=elapsed):\n                with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):\n                    enforce_elapsed(NOW, NOW-elapsed)\n        with self.assertRaisesRegex(ValueError, "CLOCK_ROLLBACK_HOLD"):
+        # A prior attempt 1h or 5h ago must never pass the Owner 6h rule.
+        for elapsed in (timedelta(hours=1), timedelta(hours=5)):
+            with self.subTest(elapsed=elapsed):
+                with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
+                    enforce_elapsed(NOW, NOW-elapsed)
+        with self.assertRaisesRegex(ValueError, "CLOCK_ROLLBACK_HOLD"):
             review_two_catalog_plan(**inputs(previous_claim_at=NOW+timedelta(minutes=1)))
         with self.assertRaisesRegex(ValueError, "START_AWARE_UTC_REQUIRED_HOLD"):
             review_two_catalog_plan(**inputs(start_at=NOW.replace(tzinfo=None)))
