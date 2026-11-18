@@ -25,7 +25,7 @@ from scripts.p30_tpac_catalog_topology import CATALOGS, discover_catalog
 ROBOTS = "https://tpac.org.taipei/robots.txt"
 AGENT = "EventRadarTaiwan-SourceAudit/1.0"
 SOURCE_HOST = "tpac.org.taipei"
-MIN_INTERVAL_SECONDS = 60 * 60
+MIN_INTERVAL_SECONDS = 6 * 60 * 60  # Owner TPAC-R4 host-wide minimum; never hourly
 MAX_REQUESTS = 5
 MAX_DETAIL_REQUESTS = 2
 MAX_CONCURRENT = 1
@@ -104,7 +104,7 @@ def _verify_robots(raw: bytes, urls: tuple[str, ...]) -> tuple[str, int]:
 
 
 def enforce_elapsed(start_at: datetime, previous_claim_at: datetime | None) -> None:
-    """Offline policy check; timestamp MUST come from a shared durable attempt ledger."""
+    """Enforce Owner six-hour host-wide minimum using a durable UTC ledger."""
     start = _aware(start_at, "START")
     if previous_claim_at is not None:
         previous = _aware(previous_claim_at, "PREVIOUS_CLAIM")
