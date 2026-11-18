@@ -239,6 +239,29 @@ class GitHubRaw5AttemptProvider:
             receipts[slot] = (name, match.group(2), obj["sha"])
         if not leases or self._ref not in [REF_PREFIX + str(s) for s in leases]:
             raise ValueError("RAW5_HOST_WIDE_CURRENT_LEASE_HOLD")
+        # A matching ref name is not proof of an owner-bound lease.
+        # Verify every historical lease commit, parent, tree, slot and owner.
+        status, anchor = self._call("GET", "/git/commits/" + self._anchor)
+        anchor_tree = anchor.get("tree") if type(anchor) is dict else None
+        tree_sha = anchor_tree.get("sha") if type(anchor_tree) is dict else None
+        if (status != 200 or type(tree_sha) is not str
+                or not re.fullmatch(r"[0-9a-f]{40}", tree_sha)):
+            raise ValueError("RAW5_HOST_WIDE_ANCHOR_HOLD")
+        for slot, lease_sha in sorted(leases.items()):
+            status, lease = self._call("GET", "/git/commits/" + lease_sha)
+            parents = lease.get("parents") if type(lease) is dict else None
+            tree = lease.get("tree") if type(lease) is dict else None
+            message = lease.get("message") if type(lease) is dict else None
+            prefix = "RAW5_HOST_LEASE_V1 " + HOST + " " + str(slot) + " "
+            owner = message[len(prefix):] if type(message) is str and message.startswith(prefix) else None
+            if (status != 200 or lease.get("sha") != lease_sha
+                    or type(owner) is not str or not RUN_RE.fullmatch(owner)
+                    or type(parents) is not list or len(parents) != 1
+                    or type(parents[0]) is not dict or parents[0].get("sha") != self._anchor
+                    or type(tree) is not dict or tree.get("sha") != tree_sha):
+                raise ValueError("RAW5_HOST_WIDE_LEASE_BINDING_HOLD")
+            if slot in receipts and receipts[slot][1] != owner:
+                raise ValueError("RAW5_HOST_WIDE_OWNER_MISMATCH_HOLD")
         if set(receipts) - set(leases):
             raise ValueError("RAW5_HOST_WIDE_ORPHAN_RECEIPT_HOLD")
         # A previous lease without a durable receipt may represent a crash.
