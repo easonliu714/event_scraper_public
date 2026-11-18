@@ -401,5 +401,68 @@ class HostHistoryRecoveryTests(unittest.TestCase):
 
 
 
+class HostWideAttemptAuditTests(unittest.TestCase):
+    """Realistic multi-slot REST history; never grants source HTTP."""
+
+    def _history(self, age_minutes=121, write=True):
+        prior = NOW - timedelta(minutes=age_minutes)
+        api = SharedGitHubCommitAPI()
+        api.server_time = prior
+        old = GitHubRaw5AttemptProvider(api, ANCHOR, prior)
+        lease = old.acquire_atomic(source_host=HOST, owner_run_id="older-run-0001")
+        if write:
+            old.write_attempt(source_host=HOST, owner_run_id="older-run-0001",
+                              fencing_token=lease["fencing_token"], attempted_at=prior)
+        api.server_time = NOW
+        current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        current.acquire_atomic(source_host=HOST, owner_run_id="current-run-0002")
+        return api, old, current, prior
+
+    def test_older_than_previous_hour_is_recovered_not_first_attempt(self):
+        api, old, current, prior = self._history()
+        result = current.audit_host_wide_attempts(source_host=HOST)
+        self.assertEqual(result["last_attempt_at"], prior)
+        self.assertTrue(result["host_wide_receipts_verified"])
+        self.assertFalse(result["history_complete_attested"])
+        self.assertFalse(result["first_attempt"])
+        self.assertFalse(result["native_get_allowed"])
+        self.assertEqual(len([c for c in api.calls if "matching-refs" in c[1]]), 2)
+
+    def test_crash_two_hours_ago_blocks_recovery(self):
+        _, _, current, _ = self._history(write=False)
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_CRASH_GAP_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+
+    def test_orphan_and_duplicate_receipts_are_rejected(self):
+        api, old, current, _ = self._history()
+        alias = old._receipt_ref + "-duplicate"
+        api.refs[alias] = old._receipt_commit_sha
+        with self.assertRaisesRegex(ValueError, "MULTIPLE_HOST_ATTEMPTS_IN_SLOT_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+        del api.refs[alias]
+        del api.refs[old._ref]
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_ORPHAN_RECEIPT_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+
+    def test_empty_history_cannot_attest_first_attempt(self):
+        api = SharedGitHubCommitAPI()
+        current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        current.acquire_atomic(source_host=HOST, owner_run_id="current-run-0002")
+        with self.assertRaisesRegex(ValueError, "FIRST_ATTEMPT_UNATTESTED_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+
+    def test_partial_rest_enumeration_is_not_empty_history(self):
+        api, _, current, _ = self._history()
+        original = api.__call__
+        def partial(method, path, payload):
+            if "matching-refs" in path:
+                return 206, [], NOW
+            return original(method, path, payload)
+        current._request = partial
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_ENUMERATION_HOLD"):
+            current.audit_host_wide_attempts(source_host=HOST)
+
+
+
 if __name__ == "__main__":
     unittest.main()
