@@ -335,7 +335,10 @@ class HostHistoryRecoveryTests(unittest.TestCase):
         self.assertEqual(history["history_receipt_ref"], writer._receipt_ref)
         self.assertEqual(history["history_receipt_commit_sha"], writer._receipt_commit_sha)
         self.assertEqual(history["history_receipt_blob_sha"], writer._receipt_sha)
-        enforce_elapsed(NOW, history["last_attempt_at"])
+        # A verified historical receipt proves recovery, not six-hour GET eligibility.
+        # Preserve the recovered UTC while refusing a source request only 61 minutes later.
+        with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
+            enforce_elapsed(NOW, history["last_attempt_at"])
 
     def test_actual_utc_spacing_blocks_even_when_hour_slot_changes(self):
         from scripts.p30_tpac_r4_source_policy import enforce_elapsed
