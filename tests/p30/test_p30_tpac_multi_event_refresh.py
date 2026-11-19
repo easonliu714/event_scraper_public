@@ -936,7 +936,10 @@ class PersistentInventoryContractTests(unittest.TestCase):
             self.assertEqual(row["last_attempt"], OBS)
             self.assertEqual(result["counts"]["pending_detail_budget"], 2)
             self.assertIn("tpac:program:2111", result["next_detail_ids"])
-            self.assertFalse((root / "_isolated_review").exists())
+            # Inventory CAS legitimately creates _isolated_review/tpac; only
+            # the independent REVIEW LKG must remain absent.
+            self.assertTrue((root / "_isolated_review" / "tpac" / "tpac_detail_inventory.json").is_file())
+            self.assertFalse((root / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json").exists())
             self.assertFalse((root / "docs/data.json").exists())
 
     def test_cross_namespace_url_conflict_fails_closed(self):
