@@ -1294,5 +1294,45 @@ class EventPriorLkgIsolationRegressionTests(unittest.TestCase):
         self.assertEqual(result["added"], 0)
         self.assertEqual(result["changed"], 0)
 
+class EventPeriodSemanticDriftRegressionTests(unittest.TestCase):
+    def test_changed_list_period_is_not_receipt_only(self):
+        # Source-owned LIST period drift must be retained as a semantic change,
+        # even when DETAIL and accepted core roles are otherwise identical.
+        import copy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        prior = {
+            "source_namespace": "event", "identity": "tpac:event:1301",
+            "source_event_id": "1301",
+            "_candidate": {
+                "field_roles": {"EVENT_ACTIVITY_PERIOD": {
+                    "role": "EVENT_ACTIVITY_PERIOD", "value": "2026-11-20 - 2026-11-21"}},
+                "hold_reasons": ["LIST_DETAIL_PERIOD_CONFLICT_HOLD"],
+                "list_period": "2026-11-19 - 2026-11-21",
+                "detail_period": "2026-11-20 - 2026-11-21",
+                "observed_at": "2026-11-08T00:00:00Z",
+            },
+        }
+        drift = copy.deepcopy(prior)
+        drift["_candidate"]["list_period"] = "2026-11-18 - 2026-11-21"
+        self.assertNotEqual(_semantic_event_payload(prior),
+                            _semantic_event_payload(drift))
+        receipt_only = copy.deepcopy(prior)
+        receipt_only["_candidate"]["observed_at"] = "2026-11-09T00:00:00Z"
+        self.assertEqual(_semantic_event_payload(prior),
+                         _semantic_event_payload(receipt_only))
+
+    def test_changed_detail_period_is_not_receipt_only(self):
+        import copy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        prior = {"source_event_id": "2072", "_candidate": {
+            "field_roles": {}, "hold_reasons": ["FIELD_REVIEW_HOLD"],
+            "list_period": "2026-11-20 - 2026-11-21",
+            "detail_period": "2026-11-20 - 2026-11-21"}}
+        changed = copy.deepcopy(prior)
+        changed["_candidate"]["detail_period"] = "2026-11-20 - 2026-11-22"
+        self.assertNotEqual(_semantic_event_payload(prior),
+                            _semantic_event_payload(changed))
+
+
 if __name__ == "__main__":
     unittest.main()
