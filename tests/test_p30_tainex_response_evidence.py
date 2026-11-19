@@ -30,6 +30,31 @@ class ResponseEvidenceTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             evidence.ingest_response(**self.args)
 
+    def test_metadata_collision_rolls_back_new_raw_file(self):
+        import hashlib
+        digest = hashlib.sha256((self.root / "response.raw").read_bytes()).hexdigest()
+        out = self.root / "isolated"
+        out.mkdir()
+        metadata = out / ("tainex-" + digest + ".json")
+        metadata.write_bytes(b"existing-owner")
+        with self.assertRaises(FileExistsError):
+            evidence.ingest_response(**self.args)
+        self.assertEqual(metadata.read_bytes(), b"existing-owner")
+        self.assertFalse((out / ("tainex-" + digest + ".bin")).exists())
+
+    def test_symlink_output_rejected_before_write(self):
+        actual = self.root / "actual"
+        actual.mkdir()
+        link = self.root / "linked"
+        try:
+            link.symlink_to(actual, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("symlink creation unavailable")
+        self.args["output_dir"] = link
+        with self.assertRaisesRegex(ValueError, "OUTPUT_SYMLINK_HOLD"):
+            evidence.ingest_response(**self.args)
+        self.assertEqual(list(actual.iterdir()), [])
+
     def test_rejects_unapproved_host(self):
         self.args["final_url"] = "https://evil.example/robots.txt"
         with self.assertRaises(ValueError):
