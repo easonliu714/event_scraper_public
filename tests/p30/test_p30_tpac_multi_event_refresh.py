@@ -1164,8 +1164,8 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
 
 
 
-    def test_partial_archived_manifest_preserves_previously_verified_detail(self):
-        # Same immutable LIST, missing DETAIL in later manifest: retain REVIEW evidence.
+    def test_partial_archived_manifest_requires_raw_detail_replay(self):
+        # Prior archive status alone must not masquerade as replayable DETAIL bytes.
         from scripts.p30_tpac_multi_event_refresh import archived_inventory_cli, load_detail_inventory
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1195,22 +1195,36 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
             first = archived_inventory_cli(manifest, root)
             self.assertEqual(first["counts"]["detail_available"], 1)
+            verified_record = catalogs["program"]["details"]["2040"]
             catalogs["program"]["details"] = {}
             manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
             second = archived_inventory_cli(manifest, root)
-            saved, _ = load_detail_inventory(root / "_isolated_archive_replay")
-            self.assertEqual(saved["items"]["tpac:program:2040"]["status"], "ARCHIVED_DETAIL_VERIFIED_ONLY")
-            self.assertEqual(second["counts"]["pending_detail_budget"], 1)
-            # The retained, SHA-verified /program DETAIL is still available;
-            # the partial manifest must not falsely report 0/2 coverage.
-            self.assertEqual(second["counts"]["detail_available"], 1)
+            saved, second_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(saved["items"]["tpac:program:2040"]["status"],
+                             "PENDING_DETAIL_BUDGET")
+            self.assertEqual(saved["items"]["tpac:program:2040"]["reason"],
+                             "PRIOR_ARCHIVED_DETAIL_BYTES_NOT_REPLAYED_HOLD")
+            self.assertEqual(second["counts"]["detail_available"], 0)
+            self.assertEqual(second["counts"]["pending_detail_budget"], 2)
             self.assertEqual(second["counts"]["source_cards"], 2)
-            self.assertEqual(second["counts"]["detail_available"] +
-                             second["counts"]["pending_detail_budget"], 2)
-            self.assertEqual(first["inventory"]["sha256"], second["inventory"]["sha256"])
+            self.assertNotEqual(first["inventory"]["sha256"], second_sha)
+            self.assertIn("tpac:program:2040", second["next_detail_ids"])
+            # The historical CAS remains auditable, but only a re-supplied
+            # identical raw body/receipt may restore current archive coverage.
+            catalogs["program"]["details"]["2040"] = verified_record
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            third = archived_inventory_cli(manifest, root)
+            self.assertEqual(third["counts"]["detail_available"], 1)
+            self.assertEqual(third["counts"]["pending_detail_budget"], 1)
+            self.assertEqual(third["inventory"]["sha256"], first["inventory"]["sha256"])
+            # A tampered body may not promote a forged archive status or mutate CAS.
+            detail_path.write_bytes(b"<html>tampered archive body</html>")
+            with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_BYTES_SHA_HOLD"):
+                archived_inventory_cli(manifest, root)
+            _, after_tamper_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(after_tamper_sha, third["inventory"]["sha256"])
             self.assertFalse((root / "docs" / "data.json").exists())
-
-
 
 class PersistedHoldSchemaRegressionTests(unittest.TestCase):
     def test_falsey_malformed_hold_values_fail_closed(self):
