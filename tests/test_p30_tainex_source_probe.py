@@ -124,7 +124,8 @@ class ProbeTests(unittest.TestCase):
             self.run_probe(execute=True, detail_id="691")
         self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
         # The failed ID check must not erase the actual official LIST bytes.
-        self.assertEqual(len(list(self.out.glob("*.bin"))), 1)
+        # Robots + LIST are now both retained even when DETAIL ID is rejected.
+        self.assertEqual(len(list(self.out.glob("*.bin"))), 2)
         self.assertEqual(len(list(self.out.glob("*.json"))), 2)
         self.assertIn(b"<html>no matching event</html>",
                       [p.read_bytes() for p in self.out.glob("*.bin")])
