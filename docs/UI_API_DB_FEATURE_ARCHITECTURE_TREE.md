@@ -1,5 +1,14 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+### 2026-11-19｜TPAC 雙 Catalog Capture Inventory 重現恢復契約
+
+- Gate `TPAC-C20-REAPPEARANCE-20261119`｜既有 Engineering Draft PR #243 exact-head `f319ca8ac9e6092c435dd4f0a78c7854258450f7`，Source `1d916910a176c8d364ab2febdfc1bf540b53ade7`，CI #44532308006 / Job 135588540200 SUCCESS，Artifact 14533987047；Source/Test Blob 獨立讀回 PASS。
+- SOURCE `scripts/p30_tpac_multi_event_refresh.py::build_detail_inventory()`：`/program` 與 `/event` 各自 namespace／identity。已消失 `NOT_IN_LATEST_LIST_REVIEW` 的相同 ID 再次出現，恢復 `PENDING_DETAIL_BUDGET` 待同 ID DETAIL，保留 attempts／last_attempt 與來源 LIST SHA／URL／觀測時間，沒有自動 GET。
+- CORE `select_pending_details()`：待處理 ID 可在受限 ≤2 佇列選取；舊已解析 REVIEW 詳情狀態維持，不把曾消失的活動自動視為已驗收 FIELD 或正式發布。
+- STORAGE：僅隔離 `tpac_detail_inventory.json` CAS 進度語意；不動 REVIEW LKG／正式 `docs/data.json`／`docs/platform_status.json`／Golden。TEST `PersistentInventoryContractTests.test_list_reappearance_restores_pending_detail_without_losing_history` 驗證出現→消失→重現及保留歷史。
+- 驗證邊界：本次 SOURCE_FIX_CI_PASS、真新官方 GET=0、LIVE LIST/DETAIL=0；歷史 38 IDs / 3 sealed DETAIL 不代表 C20 成功；TPAC 官方 R4 跨主機 Claim/21600秒與 Owner 新 GET 授權仍 HOLD；正式主線、Pages、Publisher、Android 不動。
+- 下個未完 Gate：TPAC Capture C20 需可稽核、已授權的 35 DETAIL 待辦逐輪完成；保留 `HARD_HOLD_NO_PUBLICATION`。
+
 ## 2026-10-29 23:55 — Dual-line source topology addendum (P30-L9-AN / VENUE-02A)
 
 ```text
