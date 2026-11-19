@@ -1122,10 +1122,12 @@ def offline_inventory_cli(manifest_path, repo_root):
             key = card["identity"]
             row = staged["items"][key]
             if sid not in pairs:
-                if row["status"] != "REVIEW_DETAIL_PARSED":
-                    row["status"] = "PENDING_DETAIL_BUDGET"
-                    row["reason"] = "DETAIL_BYTES_NOT_CAPTURED"
-                    counts["pending_detail_budget"] += 1
+                # A prior REVIEW status is not proof of replayable DETAIL bytes
+                # in this manifest. Preserve the separate REVIEW LKG, but
+                # restore this identity to the capture backlog (no LIVE GET).
+                row["status"] = "PENDING_DETAIL_BUDGET"
+                row["reason"] = "DETAIL_BYTES_NOT_REPLAYED_HOLD"
+                counts["pending_detail_budget"] += 1
                 diagnostics[key] = {"status": row["status"], "reason": row["reason"]}
                 continue
             counts["detail_available"] += 1
