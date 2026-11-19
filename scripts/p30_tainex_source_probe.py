@@ -115,10 +115,28 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
         robots_temp = Path(stream.name)
         stream.write(robots_raw)
     try:
-        robots_evidence = ingest_response(
-            raw_path=robots_temp, output_dir=output_dir,
-            source_url=ROBOTS, final_url=ROBOTS,
-            http_status=200, observed_at=clock())
+        # A byte-identical robots response may recur on the next legitimate cycle.
+        # Reuse only an independently checked prior isolated receipt, never overwrite.
+        digest = hashlib.sha256(robots_raw).hexdigest()
+        previous_bin = output_dir / ("tainex-" + digest + ".bin")
+        previous_json = output_dir / ("tainex-" + digest + ".json")
+        if previous_bin.exists() or previous_json.exists():
+            if (not previous_bin.is_file() or not previous_json.is_file()
+                    or previous_bin.is_symlink() or previous_json.is_symlink()
+                    or previous_bin.read_bytes() != robots_raw):
+                raise ValueError("ROBOTS_EVIDENCE_COLLISION_HOLD")
+            robots_evidence = json.loads(previous_json.read_text(encoding="utf-8"))
+            if (robots_evidence.get("raw_sha256") != digest
+                    or robots_evidence.get("requested_url") != ROBOTS
+                    or robots_evidence.get("final_url") != ROBOTS
+                    or robots_evidence.get("http_status") != 200
+                    or robots_evidence.get("native_http_attested") is not False):
+                raise ValueError("ROBOTS_EVIDENCE_COLLISION_HOLD")
+        else:
+            robots_evidence = ingest_response(
+                raw_path=robots_temp, output_dir=output_dir,
+                source_url=ROBOTS, final_url=ROBOTS,
+                http_status=200, observed_at=clock())
     finally:
         robots_temp.unlink(missing_ok=True)
     robots = RobotFileParser()
