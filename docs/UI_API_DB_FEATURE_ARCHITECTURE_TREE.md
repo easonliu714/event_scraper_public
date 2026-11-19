@@ -9569,3 +9569,31 @@ Source Adapter 架構延伸（既有 Source/Parser/Core/PWA 不重寫）：
 
 TPAC 是第一個 MVP Source：/program 及 /event 的獨立 LIST + 同 ID DETAIL 已有歷史官方 HTML、現存 Source Draft #243 解析程式；discover_list() / parse_detail() / refresh_plan() / refresh_event_plan() / _semantic_event_payload() / write_isolated_plan() 已有離線 REVIEW/LKG 功能。這不等於多活動每輪合法新 GET、正式 FIELD 接受或 Publisher 完成；跨主機 6h Claim 與 Publisher #246 契約仍 HOLD。其他 Source 沿用已完成 Gate 的同一共用 Core，不以 fixture / CI 次數當活動增量。
 GitHub Branch 應以已驗證且實際納入的上游程式樹累積，對未合併 Draft 明確標示上游 PR/SHA dependency；不得從舊 main 重新實作。正式 main/Golden/data/status/Pages 不變；HARD_HOLD_NO_PUBLICATION 維持。 
+
+---
+
+## 2026-11-19 23:55（Asia/Taipei）｜TPAC-C20-ARCHIVE-RAW-REPLAY-COVERAGE｜架構增量
+
+```text
+TPAC Source Adapter（既有 Draft PR #243，非 main）
+  ├── /program LIST 與 /event LIST → 兩組獨立 identity namespace
+  ├── Source archived manifest + 原始 body / receipt（隔離、無新官方 GET）
+  ├── archived_inventory_cli()
+  │   ├── [PASS] 本輪帶有效 raw DETAIL bytes + matching receipt
+  │   │       → SHA/官方 URL/時間校驗 → ARCHIVED_DETAIL_VERIFIED_ONLY
+  │   │       → detail_available +1（僅當輪可重播證據）
+  │   ├── [FIXED] partial manifest 缺 DETAIL raw/receipt，即使過去 Inventory
+  │   │       曾 ARCHIVED_DETAIL_VERIFIED_ONLY
+  │   │       → PENDING_DETAIL_BUDGET
+  │   │       → PRIOR_ARCHIVED_DETAIL_BYTES_NOT_REPLAYED_HOLD
+  │   │       → pending_detail_budget +1；不可虛增 detail_available
+  │   └── [PASS] tampered raw/receipt → FAIL-CLOSED；不寫入新 CAS
+  ├── _isolated_archive_replay 版本化 Inventory / CAS：舊版本可追溯
+  └── 獨立 REVIEW LKG：不因本 Gate 清空、覆寫或自動正式發布
+```
+
+- **函數／Diff：** `scripts/p30_tpac_multi_event_refresh.py::archived_inventory_cli()` 不再依「上一輪狀態」直接增加當輪 DETAIL 覆蓋率，改需本輪完整 raw bytes＋receipt 重播；`tests/p30/test_p30_tpac_multi_event_refresh.py::ArchivedProvenanceCliTests.test_partial_archived_manifest_requires_raw_detail_replay()` 驗證首次有 bytes、partial manifest 省略、補回 bytes、篡改失敗且 CAS 保持原樣。
+- **工程權威：** [Draft #243 HEAD ad06a89ee1119edeb018ee04655e64b5a7a51721](https://github.com/easonliu714/event_scraper_public/pull/243)；Source Commit `9e4effad85c5ae6ed86b77474c8e161ad4acb55a`，Test Commit `ad06a89ee1119edeb018ee04655e64b5a7a51721`。Source Blob `ba1432518e274ece956fa94e4bd0e9e361ad76a4`、Test Blob `11c9c62f76b726a3819613ac30c6280f702eae32`，獨立讀回 PASS。
+- **Exact-head CI：** [Run 44560472310](https://github.com/easonliu714/event_scraper_public/actions/runs/44560472310) SUCCESS，Job `135688036028` SUCCESS，Artifact `14548680231` GitHub digest `sha256:2b62458d9257fc4534f7c6653cb36a860d03129f4e0fd21317335909d1beb34d`。
+- **品質與發布隔離：** 僅 Archive Replay C20 Coverage 漏洞修補 PASS；新來源 HTTP/LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION 皆新增 0。既有封存 2 LIST 38 IDs、3 DETAILS 不變；正式 JSON/Golden/main/Pages/Android 無新部署驗收，`native_get_allowed=false`、`HARD_HOLD_NO_PUBLICATION` 不變。Source C20 仍待官方受控擷取與更多同 ID 原始 DETAIL；不以離線測試冒充產品發布。
+- **排程角色：** 原唯一 TPAC-FIRST Engineering Writer Task `6ae1e6147e548191881f20e730ab0f11` 每小時只選真實缺口修補，先 Fresh Read / exact-head CI / 第一真因；不新增第二 Writer 或自動觸發正式 Publisher。
