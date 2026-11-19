@@ -1057,6 +1057,10 @@ def archived_inventory_cli(manifest_path, repo_root):
                         and old.get("list_sha") == _sha(raw)
                         and old.get("reason") == "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"):
                     status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
+                    # Previously verified bytes remain available in this immutable
+                    # snapshot even when a later partial manifest omits the file.
+                    # Count retained evidence, not just files in this invocation.
+                    counts["detail_available"] += 1
                 else:
                     counts["pending_detail_budget"] += 1
             rows[key] = {"source_namespace": catalog, "source_event_id": sid,
