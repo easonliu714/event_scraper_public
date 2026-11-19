@@ -8,6 +8,8 @@ import hashlib
 import json
 import time
 from datetime import datetime, timezone
+from html.parser import HTMLParser
+from urllib.parse import urljoin
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -22,6 +24,18 @@ LIST = ORIGIN + "/event"
 USER_AGENT = "EventRadarTaiwanSourceResearch/1.0"
 MAX_BYTES = 2_000_000
 MIN_DELAY = 10.0
+
+
+class ListLinks(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.hrefs = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a":
+            href = dict(attrs).get("href")
+            if href:
+                self.hrefs.append(href)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -85,6 +99,11 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
         if index:
             sleeper(max(MIN_DELAY, float(robots.crawl_delay(USER_AGENT) or 0)))
         raw = fetch_bounded(url, opener)
+        if role == "LIST" and detail_url:
+            links = ListLinks()
+            links.feed(raw.decode("utf-8", "strict"))
+            if sum(urljoin(LIST, href) == detail_url for href in links.hrefs) != 1:
+                raise ValueError("DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD")
         observed_at = clock()
         # Store in isolated location only; never claim native HTTP attestation.
         temporary = output_dir / ("incoming-" + role.lower() + ".tmp")
