@@ -106,6 +106,19 @@ class ProbeTests(unittest.TestCase):
             self.run_probe(execute=True, detail_id="691")
         self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
 
+    def test_html_robots_response_cannot_authorize_list(self):
+        # A CDN HTML challenge with HTTP 200 is not a robots policy.
+        self.opener.bodies[probe.ROBOTS] = b"<html><title>challenge</title></html>"
+        with self.assertRaisesRegex(ValueError, "ROBOTS_INVALID_RESPONSE_HOLD"):
+            self.run_probe(execute=True)
+        self.assertEqual(self.opener.calls, [probe.ROBOTS])
+
+    def test_unrelated_text_robots_response_cannot_authorize_list(self):
+        self.opener.bodies[probe.ROBOTS] = b"service unavailable"
+        with self.assertRaisesRegex(ValueError, "ROBOTS_INVALID_RESPONSE_HOLD"):
+            self.run_probe(execute=True, detail_id="691")
+        self.assertEqual(self.opener.calls, [probe.ROBOTS])
+
     def test_robots_denial_stops_before_list(self):
         self.opener.bodies[probe.ROBOTS] = b"User-agent: *\nDisallow: /event\n"
         with self.assertRaisesRegex(ValueError, "ROBOTS_LIST_DENIED_HOLD"):
