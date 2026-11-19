@@ -7,9 +7,11 @@ on:
       - scripts/p30_multisource_review_lkg.py
       - scripts/p30_tainex_archived_native_bridge.py
       - scripts/p30_tainex_response_evidence.py
+      - scripts/p30_tainex_source_probe.py
       - tests/p30/test_p30_multisource_review_lkg.py
       - tests/p30/test_p30_tainex_archived_native_bridge.py
       - tests/test_p30_tainex_response_evidence.py
+      - tests/test_p30_tainex_source_probe.py
       - tests/p30/fixtures/tainex_689_native_audit.json
       - tests/p30/fixtures/tainex_690_native_audit.json
       - .github/workflows/eventradar_multisource_review_lkg.yml
@@ -42,7 +44,7 @@ jobs:
           base=4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
           test "$(git merge-base "$base" HEAD)" = "$base"
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_multisource_review_lkg.yml' 'scripts/p30_l9dc_famiticket_teca.py' 'scripts/p30_multisource_review_lkg.py' 'scripts/p30_tainex_archived_native_bridge.py' 'scripts/p30_tainex_response_evidence.py' 'scripts/p30_venue02bo_tainex_exhibition.py' 'tests/p30/test_p30_multisource_review_lkg.py' 'tests/p30/test_p30_tainex_archived_native_bridge.py' 'tests/test_p30_tainex_response_evidence.py' 'tests/p30/fixtures/tainex_689_native_audit.json' 'tests/p30/fixtures/tainex_690_native_audit.json' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/eventradar_multisource_review_lkg.yml' 'scripts/p30_l9dc_famiticket_teca.py' 'scripts/p30_multisource_review_lkg.py' 'scripts/p30_tainex_archived_native_bridge.py' 'scripts/p30_tainex_response_evidence.py' 'scripts/p30_tainex_source_probe.py' 'scripts/p30_venue02bo_tainex_exhibition.py' 'tests/p30/test_p30_multisource_review_lkg.py' 'tests/p30/test_p30_tainex_archived_native_bridge.py' 'tests/test_p30_tainex_response_evidence.py' 'tests/test_p30_tainex_source_probe.py' 'tests/p30/fixtures/tainex_689_native_audit.json' 'tests/p30/fixtures/tainex_690_native_audit.json' | LC_ALL=C sort)"
           test "$actual" = "$expected"
           ! grep -Eq '^[[:space:]]*(schedule|workflow_dispatch):' .github/workflows/eventradar_multisource_review_lkg.yml
       - uses: actions/setup-python@v5
@@ -53,6 +55,7 @@ jobs:
           python -m unittest discover -s tests/p30 -p test_p30_multisource_review_lkg.py -v
           python -m unittest discover -s tests/p30 -p test_p30_tainex_archived_native_bridge.py -v
           python -m unittest discover -s tests -p test_p30_tainex_response_evidence.py -v
+          python -m unittest discover -s tests -p test_p30_tainex_source_probe.py -v
       - name: Isolated historical REVIEW/LKG evidence, no native HTTP
         run: |
           set -euo pipefail
