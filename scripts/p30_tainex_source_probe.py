@@ -108,11 +108,8 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
             continue
         sleeper(delay)
         raw = fetch_bounded(url, opener)
-        if role == "LIST" and detail_url:
-            links = ListLinks()
-            links.feed(raw.decode("utf-8", "strict"))
-            if sum(urljoin(LIST, href) == detail_url for href in links.hrefs) != 1:
-                raise ValueError("DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD")
+        # Persist the actual LIST bytes before checking the requested DETAIL ID.
+        # Otherwise a stale ID discards the only evidence needed to diagnose drift.
         observed_at = clock()
         # Store in isolated location only; never claim native HTTP attestation.
         # A fixed incoming-ROLE.tmp blocks recovery after an interrupted run.
@@ -131,6 +128,11 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
             temporary.unlink(missing_ok=True)
         receipt["role"] = role
         receipts.append(receipt)
+        if role == "LIST" and detail_url:
+            links = ListLinks()
+            links.feed(raw.decode("utf-8", "strict"))
+            if sum(urljoin(LIST, href) == detail_url for href in links.hrefs) != 1:
+                raise ValueError("DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD")
     return {"decision": "ISOLATED_CAPTURE_NO_PUBLICATION",
             "native_http_attested": False, "receipts": receipts,
             "robots_sha256": hashlib.sha256(robots_raw).hexdigest(),
