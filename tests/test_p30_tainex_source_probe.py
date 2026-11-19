@@ -64,6 +64,24 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(len(list(self.out.glob("*.bin"))), 2)
         self.assertEqual(len(list(self.out.glob("*.json"))), 2)
 
+    def test_list_only_exposes_unique_safe_current_event_ids(self):
+        self.opener.bodies[probe.LIST] = (
+            b'<a href="/event/691">a</a><a href="/event/691">duplicate</a>'
+            b'<a href="/event/22">b</a><a href="https://evil.example/event/99">bad</a>'
+            b'<a href="/event/23?preview=1">query</a>'
+            b'<a href="/event/not-numeric">invalid</a>')
+        result = self.run_probe(execute=True)
+        self.assertEqual(result["current_list_event_ids"], ["22", "691"])
+        self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
+        self.assertEqual(len(list(self.out.glob("*.bin"))), 1)
+
+    def test_discovery_rejects_cross_origin_and_noncanonical_links(self):
+        raw = (b'<a href="//evil.example/event/5">cross</a>'
+               b'<a href="/event/123#fragment">fragment</a>'
+               b'<a href="/event/1/extra">nested</a>'
+               b'<a href="/event/42">valid</a>')
+        self.assertEqual(probe.discover_current_list_ids(raw), ["42"])
+
     def test_delay_applies_after_robots_before_list_and_detail(self):
         delays = []
         result = probe.capture(
