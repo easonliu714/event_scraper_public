@@ -105,6 +105,11 @@ class ProbeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD"):
             self.run_probe(execute=True, detail_id="691")
         self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
+        # The failed ID check must not erase the actual official LIST bytes.
+        self.assertEqual(len(list(self.out.glob("*.bin"))), 1)
+        self.assertEqual(len(list(self.out.glob("*.json"))), 1)
+        self.assertEqual(next(self.out.glob("*.bin")).read_bytes(),
+                         b"<html>no matching event</html>")
 
     def test_html_robots_response_cannot_authorize_list(self):
         # A CDN HTML challenge with HTTP 200 is not a robots policy.
