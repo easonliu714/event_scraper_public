@@ -41,7 +41,7 @@ class ProbeTests(unittest.TestCase):
         self.robots = b"User-agent: *\nAllow: /event\n"
         self.opener = Opener({
             probe.ROBOTS: self.robots,
-            probe.LIST: b"<html>list</html>",
+            probe.LIST: b'<html><a href="/event/691">event</a></html>',
             probe.ORIGIN + "/event/691": b"<html>detail</html>",
         })
 
@@ -63,6 +63,12 @@ class ProbeTests(unittest.TestCase):
         self.assertFalse(result["native_http_attested"])
         self.assertEqual(len(list(self.out.glob("*.bin"))), 2)
         self.assertEqual(len(list(self.out.glob("*.json"))), 2)
+
+    def test_detail_must_be_in_current_list(self):
+        self.opener.bodies[probe.LIST] = b"<html>no matching event</html>"
+        with self.assertRaisesRegex(ValueError, "DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD"):
+            self.run_probe(execute=True, detail_id="691")
+        self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
 
     def test_robots_denial_stops_before_list(self):
         self.opener.bodies[probe.ROBOTS] = b"User-agent: *\nDisallow: /event\n"
