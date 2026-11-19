@@ -1,0 +1,1030 @@
+"""Integration tests reuse historical #217/#221 reader contracts, no HTTP."""
+import base64
+import copy
+import hashlib
+import json
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+
+from scripts import p30_venue02bo_tainex_exhibition as tainex
+from scripts import p30_l9dc_famiticket_teca as fami
+from scripts.p30_multisource_review_lkg import (
+    REGISTRY, inspect_raw_pair, archive_raw_pair, verify_raw_pair_archive,
+    plan, write_isolated, load_previous_snapshot)
+from scripts.p30_tainex_archived_native_bridge import archived_inputs
+
+NOW = datetime(2026, 11, 10, 5, 55, tzinfo=timezone.utc)
+TAINEX_STAMP = "2026-11-02T06:57:00+08:00"
+FAMI_STAMP = "2026-11-02T06:55:00+08:00"
+
+
+def tainex_packet():
+    obs = dict(list_url=tainex.LIST, list_detail_href=tainex.DETAIL,
+               detail_url=tainex.DETAIL, list_title=tainex.TITLE,
+               detail_title=tainex.TITLE, period_label="展覽活動期間",
+               period_start=tainex.START, period_end=tainex.END,
+               venue_label="活動地點", venue_hall=tainex.HALL,
+               floors=list(tainex.FLOORS), organizer_label="主辦單位",
+               organizer=tainex.ORGANIZER, external_website_label="官方網站",
+               external_website=tainex.ORGANIZER_SITE)
+    return {"source": "tainex", "observation": obs, "observed_at": TAINEX_STAMP}
+
+
+def fami_packet():
+    obs = dict(list_url=fami.LIST, list_detail_href=fami.DETAIL,
+               detail_url=fami.DETAIL, list_title=fami.TITLE,
+               detail_title=fami.TITLE, period_start=fami.PERIOD[0],
+               period_end=fami.PERIOD[1], exhibition_hours="10:00-18:00",
+               venue=fami.VENUE, prices=dict(fami.PRICES),
+               purchase_control="我要購票")
+    return {"source": "famiticket", "observation": obs, "observed_at": FAMI_STAMP}
+
+
+class MultiSourceBridge(unittest.TestCase):
+    def test_two_real_historical_source_reader_contracts_to_common_core(self):
+        r = plan([tainex_packet(), fami_packet()], as_of=NOW)
+        self.assertEqual(r["source_reader_qualified"], 2)
+        self.assertEqual(r["source_platforms"], ["FAMITICKET", "TAINEX"])
+        self.assertEqual(r["source_gates"], ["P30-L9-DC", "P30-VENUE-02BO"])
+        self.assertEqual(r["new_review"], 2)
+        self.assertEqual(len(r["review_rows"]), 2)
+        self.assertEqual(r["independently_accepted_fields"], 0)
+        self.assertEqual(r["independent_native_detail_new"], 0)
+        self.assertEqual(r["native_get"], r["published_delta"])
+        self.assertFalse(r["commit_permitted"])
+        for row in r["review_rows"]:
+            self.assertEqual(row["date"], "未確認")
+            self.assertEqual(row["price"], "未確認")
+            self.assertEqual(row["location"], "未確認")
+            self.assertEqual(row["_candidate"]["decision"], "REVIEW_WITH_HOLD")
+            self.assertFalse(row["_candidate"]["published"])
+            self.assertIn("SOURCE_READER_NOT_INDEPENDENT_NATIVE_ATTESTATION",
+                          row["_candidate"]["hold_reasons"])
+
+    def test_duplicate_same_id_cannot_override_lkg(self):
+        p = tainex_packet()
+        r = plan([p, copy.deepcopy(p)], as_of=NOW)
+        self.assertEqual(len(r["review_rows"]), 1)
+        self.assertEqual(r["source_reader_qualified"], 1)
+        self.assertEqual(r["new_review"], 1)
+        self.assertEqual(len(r["rejected"]), 1)
+
+    def test_prior_lkg_retained_on_source_failure(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        bad = fami_packet()
+        bad["observation"]["detail_title"] = "unrelated"
+        r = plan([bad], previous=old, as_of=NOW)
+        self.assertEqual(r["decision"], "HOLD_NO_VALID_NEW_SOURCE")
+        self.assertEqual(r["retained_lkg"], 1)
+        self.assertEqual(r["review_rows"], old)
+        self.assertEqual(len(r["rejected"]), 1)
+
+    def test_source_namespace_and_role_fail_closed(self):
+        for key, value in [
+            ("list_detail_href", tainex.DETAIL.replace("691", "690")),
+            ("period_label", "演出開始"),
+            ("venue_hall", "南港展覽館2館"),
+            ("ticket_session_id", "691"),
+            ("admission_price", 100),
+        ]:
+            p = tainex_packet()
+            p["observation"][key] = value
+            r = plan([p], as_of=NOW)
+            self.assertEqual(r["source_reader_qualified"], 0, key)
+            self.assertEqual(len(r["rejected"]), 1, key)
+
+    def test_famiticket_presale_not_general_minimum(self):
+        for key, value in [
+            ("list_detail_href", fami.DETAIL + "#bad"),
+            ("prices", {"presale_single_day": 150}),
+            ("general_admission_price", 150),
+            ("ticket_session_id", "fake"),
+        ]:
+            p = fami_packet()
+            p["observation"][key] = value
+            r = plan([p], as_of=NOW)
+            self.assertEqual(r["source_reader_qualified"], 0, key)
+
+    def test_future_time_and_unregistered_source(self):
+        p = tainex_packet()
+        p["observed_at"] = "2026-11-11T00:00:00Z"
+        self.assertEqual(plan([p], as_of=NOW)["source_reader_qualified"], 0)
+        p = tainex_packet()
+        p["source"] = "unknown"
+        self.assertEqual(plan([p], as_of=NOW)["source_reader_qualified"], 0)
+
+    def test_historical_replay_cannot_masquerade_as_new_live_observation(self):
+        # Same historical content with a 2026-11-10 clock must never replace LKG.
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        replay = tainex_packet()
+        replay["observed_at"] = "2026-11-10T12:00:00+08:00"
+        r = plan([replay], previous=old, as_of=NOW)
+        self.assertEqual(r["source_reader_qualified"], 0)
+        self.assertEqual(r["changed_review"], 0)
+        self.assertEqual(r["retained_lkg"], 1)
+        self.assertEqual(r["review_rows"], old)
+        self.assertIn("HISTORICAL_REPLAY_CLOCK_ESCALATION_HOLD", r["rejected"][0]["reason"])
+        fami_replay = fami_packet()
+        fami_replay["observed_at"] = "2026-11-03T00:00:00+08:00"
+        r2 = plan([fami_replay], as_of=NOW)
+        self.assertEqual(r2["source_reader_qualified"], 0)
+        self.assertEqual(r2["new_review"], 0)
+
+    def test_reconstructed_replay_clock_is_exactly_bound_not_only_day_bounded(self):
+        # Neither a fabricated later clock nor a backdated clock may create
+        # a new REVIEW LKG revision from the same unaudited source packet.
+        old = plan([tainex_packet(), fami_packet()], as_of=NOW)["review_rows"]
+        for make, stamp in ((tainex_packet, "2026-11-02T15:59:00+08:00"),
+                            (tainex_packet, "2026-11-01T06:57:00+08:00"),
+                            (fami_packet, "2026-11-02T07:55:00+08:00"),
+                            (fami_packet, "2026-11-01T06:55:00+08:00")):
+            packet = make()
+            packet["observed_at"] = stamp
+            result = plan([packet], previous=old, as_of=NOW)
+            self.assertEqual(result["changed_review"], 0)
+            self.assertEqual(result["new_review"], 0)
+            self.assertEqual(result["review_rows"], old)
+            self.assertIn("HISTORICAL_REPLAY_CLOCK_BINDING_HOLD",
+                          result["rejected"][0]["reason"])
+        for key, stamp in (("TAINEX", "2026-11-02T07:57:00+08:00"),
+                           ("FAMITICKET", "2026-11-01T06:55:00+08:00")):
+            altered = copy.deepcopy(old)
+            row = next(r for r in altered if r["_candidate"]["platform_id"] == key)
+            row["scraped_at"] = stamp
+            with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+                plan([], previous=altered, as_of=NOW)
+
+    def test_prior_replay_clock_escalation_rejected_on_restart(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        old[0]["scraped_at"] = "2026-11-03T00:00:00+08:00"
+        with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+            plan([], previous=old, as_of=NOW)
+
+    def test_prior_lkg_tampering_is_hard_failure(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        old[0]["_candidate"]["published"] = True
+        with self.assertRaisesRegex(ValueError, "PRIOR_LKG_INTEGRITY_HOLD"):
+            plan([fami_packet()], previous=old, as_of=NOW)
+
+    def test_replay_does_not_claim_native_or_field_authority(self):
+        r = plan([fami_packet()], as_of=NOW)
+        self.assertEqual(r["source_platforms"], ["FAMITICKET"])
+        self.assertEqual(r["review_rows"][0]["_candidate"]["field_evidence"], {})
+        self.assertFalse(r["cross_host_cas_attested"])
+        self.assertFalse(r["formal_data_mutated"])
+        self.assertFalse(r["scheduler_enabled"])
+
+    def test_atomic_isolated_output_and_docs_forbidden(self):
+        r = plan([tainex_packet(), fami_packet()], as_of=NOW)
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            out = root / "_isolated_review" / "multi" / "plan.json"
+            digest = write_isolated(r, out, root)
+            self.assertEqual(len(digest), 64)
+            self.assertTrue(out.is_file())
+            with self.assertRaisesRegex(ValueError, "ISOLATED_OUTPUT_ONLY_HOLD"):
+                write_isolated(r, root / "docs" / "data.json", root)
+            self.assertFalse((root / "docs" / "data.json").exists())
+
+
+    def test_source_owned_role_receipts_survive_core_normalization(self):
+        r = plan([tainex_packet(), fami_packet()], as_of=NOW)
+        self.assertEqual(r["source_review_field_count"], 15)
+        self.assertEqual(len(r["source_review_receipts"]), 2)
+        roles = {f["role"] for item in r["source_review_receipts"]
+                 for f in item["source_reader_fields"]}
+        self.assertIn("EXHIBITION_PERIOD_START", roles)
+        self.assertIn("PRESALE_PRICE", roles)
+        self.assertIn("VENUE_HALL", roles)
+        for item in r["source_review_receipts"]:
+            self.assertEqual(len(item["source_reader_fields_sha256"]), 64)
+            self.assertFalse(item["native_http_attested"])
+            self.assertFalse(item["formal_field_accepted"])
+            self.assertTrue(all(f["decision"] == "REVIEW"
+                                for f in item["source_reader_fields"]))
+        self.assertEqual(r["independently_accepted_fields"], 0)
+        self.assertEqual(r["published_delta"], 0)
+
+    def test_prior_lkg_rejects_foreign_identity_and_role_forgery(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        changes = [
+            ("url", "https://example.com/event/691"),
+            ("title", "Other event title"),
+            ("platform", "Other platform"),
+            ("date", "2026-11-13"),
+        ]
+        for key, value in changes:
+            altered = copy.deepcopy(old)
+            altered[0][key] = value
+            with self.assertRaisesRegex(
+                ValueError,
+                "PRIOR_LKG_(?:SOURCE_BINDING|INTEGRITY|NONCANONICAL)_HOLD"
+            ):
+                plan([fami_packet()], previous=altered, as_of=NOW)
+        for key, value in [
+            ("source_event_id", "690"),
+            ("record_id", "TAINEX:event:690"),
+            ("source_class", "NATIVE_ATTESTED"),
+            ("sources", ["https://example.com", tainex.DETAIL]),
+            ("field_evidence", {"price": {"decision": "ACCEPTED"}}),
+            ("hold_reasons", ["OTHER_HOLD"]),
+        ]:
+            altered = copy.deepcopy(old)
+            altered[0]["_candidate"][key] = value
+            with self.assertRaisesRegex(
+                ValueError,
+                "PRIOR_LKG_(?:SOURCE_BINDING|INTEGRITY|NONCANONICAL)_HOLD"
+            ):
+                plan([fami_packet()], previous=altered, as_of=NOW)
+
+    def test_prior_future_lkg_cannot_poison_isolated_snapshot(self):
+        old = plan([fami_packet()], as_of=NOW)["review_rows"]
+        old[0]["scraped_at"] = "2026-11-11T00:00:00+00:00"
+        with self.assertRaisesRegex(ValueError, "PRIOR_LKG_SOURCE_BINDING_HOLD"):
+            plan([tainex_packet()], previous=old, as_of=NOW)
+
+
+    def test_persisted_real_historical_four_id_lkg_resume(self):
+        """Persist real historical receipt review, restart with no source GET."""
+        fixture_dir = Path(__file__).parent / "fixtures"
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first = plan([tainex_packet(), fami_packet()], as_of=NOW,
+                         archived_native=archived_inputs(fixture_dir))
+            self.assertEqual(first["new_review"], 4)
+            path = root / "_isolated_review" / "multi" / "first.json"
+            sha = write_isolated(first, path, root)
+            previous = load_previous_snapshot(path, sha, root)
+            second = plan([], previous=previous, as_of=NOW)
+            self.assertEqual(second["new_review"], 0)
+            self.assertEqual(second["retained_lkg"], 4)
+            self.assertEqual(second["review_rows"], first["review_rows"])
+            self.assertEqual(second["decision"], "HOLD_NO_VALID_NEW_SOURCE")
+            self.assertEqual(second["native_get"], 0)
+            self.assertEqual(second["published_delta"], 0)
+            self.assertFalse(second["commit_permitted"])
+            out = root / "_isolated_review" / "multi" / "second.json"
+            self.assertEqual(len(write_isolated(second, out, root)), 64)
+            self.assertNotEqual(path.read_bytes(), out.read_bytes())
+
+    def test_persisted_snapshot_integrity_and_authority_fail_closed(self):
+        fixture_dir = Path(__file__).parent / "fixtures"
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first = plan([tainex_packet(), fami_packet()], as_of=NOW,
+                         archived_native=archived_inputs(fixture_dir))
+            path = root / "_isolated_review" / "multi" / "first.json"
+            sha = write_isolated(first, path, root)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_SHA_FORMAT_HOLD"):
+                load_previous_snapshot(path, "bad", root)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_ISOLATION_HOLD"):
+                load_previous_snapshot(root / "docs" / "data.json", sha, root)
+            path.write_bytes(path.read_bytes() + b" ")
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_SHA_MISMATCH_HOLD"):
+                load_previous_snapshot(path, sha, root)
+            import hashlib
+            import json
+            forged = copy.deepcopy(first)
+            forged["commit_permitted"] = True
+            raw = (json.dumps(forged, sort_keys=True) + "\n").encode("utf-8")
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_AUTHORITY_HOLD"):
+                load_previous_snapshot(path, hashlib.sha256(raw).hexdigest(), root)
+            forged = copy.deepcopy(first)
+            forged["review_rows"].append(copy.deepcopy(forged["review_rows"][0]))
+            raw = (json.dumps(forged, sort_keys=True) + "\n").encode("utf-8")
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError, "PRIOR_SNAPSHOT_IDENTITY_HOLD"):
+                load_previous_snapshot(path, hashlib.sha256(raw).hexdigest(), root)
+
+
+
+def raw_pair_packet(source):
+    """Synthetic HTML tests parser behavior; not native HTTP evidence."""
+    module = REGISTRY[source]["module"]
+    list_html = ('<html><body><a href="' + module.DETAIL + '">' +
+                 module.TITLE + '</a></body></html>').encode("utf-8")
+    detail_html = ('<html><body><h1>' + module.TITLE +
+                   '</h1></body></html>').encode("utf-8")
+    return {
+        "source": source, "list_url": module.LIST, "detail_url": module.DETAIL,
+        "observed_at": "2026-11-09T08:00:00Z",
+        "list_html_b64": base64.b64encode(list_html).decode("ascii"),
+        "detail_html_b64": base64.b64encode(detail_html).decode("ascii"),
+    }
+
+
+class RawPairIdentityAdapter(unittest.TestCase):
+    def test_two_source_raw_bytes_identity_only_no_authority(self):
+        import hashlib
+        for source in ("tainex", "famiticket"):
+            p = raw_pair_packet(source)
+            receipt = inspect_raw_pair(p, NOW)
+            self.assertEqual(receipt["decision"], "REVIEW_RAW_PAIR_IDENTITY_ONLY")
+            self.assertEqual(receipt["source_authority"], "CALLER_SUPPLIED_UNATTESTED_BYTES")
+            self.assertEqual(receipt["source_time_authority"], "UNATTESTED")
+            self.assertFalse(receipt["native_http_attested"])
+            self.assertFalse(receipt["raw_html_retention_verified"])
+            self.assertEqual(receipt["accepted_fields"], 0)
+            self.assertFalse(receipt["lkg_promoted"])
+            self.assertFalse(receipt["commit_permitted"])
+            self.assertEqual(receipt["raw_bodies"][0]["sha256"], hashlib.sha256(
+                base64.b64decode(p["list_html_b64"])).hexdigest())
+        result = plan([], as_of=NOW, raw_pairs=[
+            raw_pair_packet("tainex"), raw_pair_packet("famiticket")])
+        self.assertEqual(result["raw_pair_identity_parsed_unattested"], 2)
+        self.assertEqual(result["new_review"], 0)
+        self.assertEqual(result["independently_accepted_fields"], 0)
+        self.assertEqual(result["native_get"], 0)
+        self.assertEqual(result["review_rows"], [])
+        self.assertFalse(result["commit_permitted"])
+
+    def test_cross_source_wrong_link_and_detail_title_fail_closed(self):
+        p = raw_pair_packet("tainex")
+        other = REGISTRY["famiticket"]["module"].DETAIL
+        p["list_html_b64"] = base64.b64encode(
+            ('<a href="' + other + '">' + tainex.TITLE + '</a>').encode()
+        ).decode("ascii")
+        self.assertIn("RAW_LIST_EXACT_ID_TITLE_HOLD",
+                      plan([], as_of=NOW, raw_pairs=[p])["rejected"][0]["reason"])
+        p = raw_pair_packet("famiticket")
+        p["detail_html_b64"] = base64.b64encode(
+            b"<h1>Unrelated exhibition</h1>").decode("ascii")
+        self.assertIn("RAW_DETAIL_EXACT_TITLE_HOLD",
+                      plan([], as_of=NOW, raw_pairs=[p])["rejected"][0]["reason"])
+
+    def test_untrusted_bytes_clock_script_and_duplicate_edges_fail_closed(self):
+        p = raw_pair_packet("tainex")
+        p["native_http_attested"] = True  # Caller claims cannot grant authority.
+        p["published"] = True
+        self.assertFalse(inspect_raw_pair(p, NOW)["native_http_attested"])
+        self.assertFalse(inspect_raw_pair(p, NOW)["published"])
+        for change, expected in (
+            ({"observed_at": "2026-11-11T00:00:00Z"}, "RAW_CLOCK_FUTURE_HOLD"),
+            ({"list_html_b64": "not-base64!"}, "RAW_BODY_ENCODING_HOLD"),
+            ({"list_html_b64": base64.b64encode(b"\xff").decode()}, "RAW_BODY_ENCODING_HOLD"),
+            ({"list_url": "https://example.org/event"}, "RAW_URL_EXACT_HOLD"),
+        ):
+            damaged = dict(p, **change)
+            with self.assertRaisesRegex(ValueError, expected):
+                inspect_raw_pair(damaged, NOW)
+        title = tainex.TITLE
+        href = tainex.DETAIL
+        for markup in (
+            '<script><a href="' + href + '">' + title + '</a></script>',
+            ('<a href="' + href + '">' + title + '</a>') * 2,
+        ):
+            damaged = dict(p, list_html_b64=base64.b64encode(
+                markup.encode("utf-8")).decode("ascii"))
+            with self.assertRaisesRegex(ValueError, "RAW_LIST_EXACT_ID_TITLE_HOLD"):
+                inspect_raw_pair(damaged, NOW)
+
+    def test_hidden_dom_cannot_forge_official_list_detail_identity(self):
+        # Synthetic safety regression only; NOT native official evidence.
+        for source in ("tainex", "famiticket"):
+            packet = raw_pair_packet(source)
+            module = REGISTRY[source]["module"]
+            href, title = module.DETAIL, module.TITLE
+            visible_link = '<a href="' + href + '">' + title + '</a>'
+            visible_heading = '<h1>' + title + '</h1>'
+            hidden_links = (
+                '<a hidden href="' + href + '">' + title + '</a>',
+                '<div aria-hidden="true">' + visible_link + '</div>',
+                '<div aria-hidden="true"><div></div>' + visible_link + '</div>',
+                '<section style="display:none!important">' + visible_link + '</section>',
+                '<div class="d-none">' + visible_link + '</div>',
+                '<template>' + visible_link + '</template>',
+                '<div inert><img src="unused.png">' + visible_link + '</div>',
+            )
+            hidden_headings = (
+                '<h1 hidden>' + title + '</h1>',
+                '<div aria-hidden="true">' + visible_heading + '</div>',
+                '<section hidden><section></section>' + visible_heading + '</section>',
+                '<div style="visibility:hidden">' + visible_heading + '</div>',
+                '<template>' + visible_heading + '</template>',
+            )
+            for hidden in hidden_links:
+                bad = dict(packet, list_html_b64=base64.b64encode(
+                    hidden.encode("utf-8")).decode("ascii"))
+                with self.assertRaisesRegex(ValueError, "RAW_LIST_EXACT_ID_TITLE_HOLD"):
+                    inspect_raw_pair(bad, NOW)
+                clean = dict(packet, list_html_b64=base64.b64encode(
+                    (hidden + visible_link).encode("utf-8")).decode("ascii"))
+                self.assertEqual(inspect_raw_pair(clean, NOW)["accepted_fields"], 0)
+            for hidden in hidden_headings:
+                bad = dict(packet, detail_html_b64=base64.b64encode(
+                    hidden.encode("utf-8")).decode("ascii"))
+                with self.assertRaisesRegex(ValueError, "RAW_DETAIL_EXACT_TITLE_HOLD"):
+                    inspect_raw_pair(bad, NOW)
+                clean = dict(packet, detail_html_b64=base64.b64encode(
+                    (hidden + visible_heading).encode("utf-8")).decode("ascii"))
+                self.assertFalse(inspect_raw_pair(clean, NOW)["native_http_attested"])
+
+    def test_raw_pair_cannot_override_prior_review_lkg(self):
+        old = plan([tainex_packet()], as_of=NOW)["review_rows"]
+        result = plan([], previous=old, as_of=NOW,
+                      raw_pairs=[raw_pair_packet("tainex")])
+        self.assertEqual(result["raw_pair_identity_parsed_unattested"], 1)
+        self.assertEqual(result["retained_lkg"], 1)
+        self.assertEqual(result["new_review"], 0)
+        self.assertEqual(result["review_rows"], old)
+        self.assertEqual(result["independently_accepted_fields"], 0)
+
+
+    def test_dynamic_same_source_ids_beyond_frozen_historical_readers(self):
+        # Source/Core capability for multiple official namespace IDs.
+        # These HTML strings are synthetic, never official native evidence.
+        t = raw_pair_packet("tainex")
+        t["detail_url"] = "https://www.tainex.com.tw/event/692"
+        title_t = "Additional exhibition (synthetic, not verified)"
+        t["list_html_b64"] = base64.b64encode(
+            ('<a href="/event/692">' + title_t + '</a>').encode()).decode()
+        t["detail_html_b64"] = base64.b64encode(
+            ('<h1>' + title_t + '</h1>').encode()).decode()
+        f = raw_pair_packet("famiticket")
+        f["detail_url"] = REGISTRY["famiticket"]["module"].DETAIL + "X"
+        title_f = "Additional ticket activity (synthetic, not verified)"
+        f["list_html_b64"] = base64.b64encode(
+            ('<a href="' + f["detail_url"] + '">' + title_f + '</a>').encode()).decode()
+        f["detail_html_b64"] = base64.b64encode(
+            ('<h2>' + title_f + '</h2>').encode()).decode()
+        r = plan([], as_of=NOW, raw_pairs=[t, f])
+        self.assertEqual(r["raw_pair_identity_parsed_unattested"], 2)
+        self.assertEqual(r["raw_pair_reviews_unattested"][0]["source_event_id"], "692")
+        self.assertEqual(r["raw_pair_reviews_unattested"][1]["source_event_id"],
+                         f["detail_url"].split("/")[-1])
+        self.assertEqual(r["raw_pair_reviews_unattested"][0]["source_title_unattested"], title_t)
+        self.assertEqual(r["raw_pair_reviews_unattested"][1]["source_title_unattested"], title_f)
+        self.assertEqual(r["new_review"], 0)
+        self.assertEqual(r["independently_accepted_fields"], 0)
+        self.assertEqual(r["native_get"], 0)
+        self.assertFalse(r["commit_permitted"])
+
+    def test_dynamic_identity_host_namespace_and_duplicate_rejected(self):
+        p = raw_pair_packet("tainex")
+        for url in ("https://www.famiticket.com.tw/event/691",
+                    "https://www.tainex.com.tw:443/event/691",
+                    "https://www.tainex.com.tw/event/691?session=1",
+                    "https://www.tainex.com.tw/event/691/extra",
+                    "https://www.tainex.com.tw/event/abc",
+                    "https://www.tainex.com.tw/event/691#frag"):
+            with self.assertRaisesRegex(ValueError, "RAW_DETAIL_ID_NAMESPACE_HOLD"):
+                inspect_raw_pair(dict(p, detail_url=url), NOW)
+        result = plan([], as_of=NOW, raw_pairs=[p, dict(p)])
+        self.assertEqual(result["raw_pair_identity_parsed_unattested"], 1)
+        self.assertEqual(len(result["rejected"]), 1)
+        self.assertIn("RAW_PAIR_DUPLICATE_ID_HOLD", result["rejected"][0]["reason"])
+        self.assertEqual(result["new_review"], 0)
+        self.assertFalse(result["commit_permitted"])
+
+
+class IsolatedRawByteRetention(unittest.TestCase):
+    """Actual disk byte retention, not native HTTP/field attestation."""
+
+    def test_exact_bytes_survive_restart_without_promoting_source_authority(self):
+        import hashlib
+        for source in ("tainex", "famiticket"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as td:
+                packet = raw_pair_packet(source)
+                packet["native_http_attested"] = True  # Never trusted.
+                packet["published"] = True
+                saved = archive_raw_pair(
+                    packet, repo_root=td, archive_id="raw-pair-01", as_of=NOW)
+                readback = verify_raw_pair_archive(td, "raw-pair-01", NOW)
+                self.assertEqual(saved, readback)
+                for role in ("list", "detail"):
+                    original = base64.b64decode(packet[role + "_html_b64"])
+                    actual = (Path(td) / "_isolated_review" / "raw_pairs" /
+                              "raw-pair-01" / (role + ".html")).read_bytes()
+                    self.assertEqual(actual, original)
+                    self.assertEqual(
+                        hashlib.sha256(actual).hexdigest(),
+                        next(x["sha256"] for x in saved["raw_bodies"]
+                             if x["role"] == role.upper()))
+                self.assertTrue(saved["raw_html_retention_verified"])
+                self.assertFalse(saved["native_http_attested"])
+                self.assertFalse(saved["commit_permitted"])
+                self.assertFalse(saved["published"])
+                self.assertFalse(saved["lkg_promoted"])
+                self.assertEqual(saved["independently_accepted_fields"], 0)
+
+    def test_archive_is_write_once_and_fails_closed_on_tampering(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = raw_pair_packet("tainex")
+            archive_raw_pair(p, repo_root=td, archive_id="raw-pair-02", as_of=NOW)
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_REPLAY_OR_COLLISION_HOLD"):
+                archive_raw_pair(p, repo_root=td, archive_id="raw-pair-02", as_of=NOW)
+            target = Path(td) / "_isolated_review" / "raw_pairs" / "raw-pair-02"
+            with (target / "detail.html").open("ab") as stream:
+                stream.write(b"tamper")
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_HASH_OR_ID_HOLD"):
+                verify_raw_pair_archive(td, "raw-pair-02", NOW)
+            (target / "detail.html").write_bytes(
+                base64.b64decode(p["detail_html_b64"]))
+            manifest_path = target / "manifest.json"
+            manifest = __import__("json").loads(manifest_path.read_text())
+            manifest["native_http_attested"] = True
+            manifest_path.write_text(__import__("json").dumps(manifest))
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_AUTHORITY_HOLD"):
+                verify_raw_pair_archive(td, "raw-pair-02", NOW)
+
+    def test_archive_path_and_symlink_cannot_escape_isolation(self):
+        with tempfile.TemporaryDirectory() as td, tempfile.TemporaryDirectory() as outside:
+            p = raw_pair_packet("famiticket")
+            for bad_id in ("../docs", "a/b", "", ".hidden", "A", "x" * 65):
+                with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_ID_HOLD"):
+                    archive_raw_pair(p, repo_root=td, archive_id=bad_id, as_of=NOW)
+            base = Path(td) / "_isolated_review"
+            base.symlink_to(outside, target_is_directory=True) if not base.exists() else None
+            with self.assertRaisesRegex(ValueError, "RAW_ARCHIVE_SYMLINK_HOLD"):
+                archive_raw_pair(p, repo_root=td, archive_id="safe", as_of=NOW)
+
+
+
+# Source-claim provider contract tests; these are NOT source coverage or
+# official HTTP evidence. Real ruleset refusal and two-host race remain HOLD.
+class ProtectedClaimRefProvider(unittest.TestCase):
+    SHA = "4d207948526cd6a6e8ecd79ecd1251dcf44b31e8"
+
+    def candidate(self, source, anchor, api):
+        # Existing simulated collision tests are not a real Gate release.
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        with patch("scripts.p30_multisource_review_lkg.CLAIM_REAL_ENFORCEMENT_RELEASED", True):
+            return reserve_protected_claim(source, anchor, api)
+
+    def test_claim_rest_credential_is_limited_to_protected_source_bucket_refs(self):
+        # Real source defect: the previous POST transport accepted arbitrary
+        # refs/heads/main or other unprotected branches. This checks that the
+        # network boundary rejects unsafe requests BEFORE any HTTP call.
+        # It does NOT certify live two-host competition or release native GET.
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import GitHubClaimREST
+        transport = GitHubClaimREST("controlled-test-token-123456")
+        root = "/repos/easonliu714/event_scraper_public/"
+        bucket = "refs/heads/source-claims/tainex-b0000001234"
+        cases = (
+            ("POST", root + "git/refs",
+             {"ref": "refs/heads/main", "sha": self.SHA},
+             "CLAIM_REST_POST_UNPROTECTED_REF_HOLD"),
+            ("POST", root + "git/refs",
+             {"ref": "refs/heads/source-claims/validation-b0000001234",
+              "sha": self.SHA}, "CLAIM_REST_POST_UNPROTECTED_REF_HOLD"),
+            ("POST", root + "git/refs",
+             {"ref": bucket, "sha": self.SHA, "force": True},
+             "CLAIM_REST_POST_SCOPE_HOLD"),
+            ("POST", root + "git/refs",
+             {"ref": bucket, "sha": "invalid"},
+             "CLAIM_REST_POST_ANCHOR_HOLD"),
+            ("GET", root + "contents/docs/data.json", None,
+             "CLAIM_REST_GET_SCOPE_HOLD"),
+        )
+        with patch("urllib.request.build_opener",
+                   side_effect=AssertionError("UNAUTHORIZED_HTTP_CALL")):
+            for method, path, payload, expected in cases:
+                with self.subTest(method=method, path=path, expected=expected):
+                    with self.assertRaisesRegex(ValueError, expected):
+                        transport(method, path, payload)
+
+    def test_direct_rest_post_cannot_consume_real_source_claim_before_release(self):
+        # Real transport-layer defect: a direct valid POST previously bypassed
+        # reserve_protected_claim() and could consume a source Claim during HOLD.
+        # This is a no-network negative guard, NOT a two-host Claim PASS.
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import GitHubClaimREST
+        transport = GitHubClaimREST("controlled-test-token-123456")
+        root = "/repos/easonliu714/event_scraper_public/git/refs"
+        payload = {"ref": "refs/heads/source-claims/tainex-b0000001234",
+                   "sha": self.SHA}
+        with patch("urllib.request.build_opener",
+                   side_effect=AssertionError("SOURCE_CLAIM_HTTP_FORBIDDEN")):
+            with self.assertRaisesRegex(
+                    ValueError, "CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD"):
+                transport("POST", root, payload)
+
+    def test_unverified_real_gate_never_consumes_claim_or_calls_api(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        class ForbiddenNetwork:
+            def __call__(self, method, path, payload):
+                raise AssertionError("NO_NETWORK_OR_CLAIM_CONSUMPTION_ALLOWED")
+        with self.assertRaisesRegex(
+                ValueError, "CLAIM_REAL_ENFORCEMENT_UNVERIFIED_NO_RESERVATION_HOLD"):
+            reserve_protected_claim("tainex", self.SHA, ForbiddenNetwork())
+
+    class API:
+        def __init__(self, when, sha, rules=True, fail_second=False):
+            self.when, self.sha = when, sha
+            self.refs = {}
+            self.rules = rules
+            self.fail_second = fail_second
+            self.posts = 0
+
+        def __call__(self, method, path, payload):
+            at = self.when
+            if path.endswith("/rulesets") and method == "GET":
+                return 200, ([{"id": 1}] if self.rules else []), at
+            if path.endswith("/rulesets/1") and method == "GET":
+                return 200, {
+                    "target": "branch", "enforcement": "active",
+                    "conditions": {"ref_name": {
+                        "include": ["refs/heads/source-claims/*"],
+                        "exclude": []}},
+                    "bypass_actors": [],
+                    "current_user_can_bypass": "never",
+                    "rules": [{"type": v} for v in
+                              ("update", "deletion", "non_fast_forward")]
+                }, at
+            if path.endswith("/git/ref/heads/main") and method == "GET":
+                return 200, {"object": {"sha": self.sha}}, at
+            if path.endswith("/git/refs") and method == "POST":
+                self.posts += 1
+                ref = payload["ref"]
+                if ref in self.refs or (self.fail_second and self.posts == 2):
+                    return 422, {"message": "Reference already exists"}, at
+                self.refs[ref] = payload["sha"]
+                return 201, {"ref": ref, "object": {"sha": payload["sha"]}}, at
+            if "/git/ref/heads/source-claims/" in path and method == "GET":
+                ref = "refs/" + path.split("/git/ref/", 1)[1]
+                if ref not in self.refs:
+                    return 404, {}, at
+                return 200, {"ref": ref, "object": {"sha": self.refs[ref]}}, at
+            raise AssertionError((method, path))
+
+    def test_sliding_six_hour_cross_bucket_exclusion(self):
+        from datetime import timedelta
+        from scripts.p30_multisource_review_lkg import claim_ref_plan
+        start = datetime(2026, 11, 11, 5, 59, tzinfo=timezone.utc)
+        first = set(claim_ref_plan("tainex", start))
+        # All later starts within six hours, including a UTC bucket boundary,
+        # must compete for at least one same ref.
+        for minutes in range(0, 360):
+            second = set(claim_ref_plan(
+                "tainex", start + timedelta(minutes=minutes)))
+            self.assertTrue(first & second, minutes)
+        self.assertNotEqual(
+            claim_ref_plan("tainex", start),
+            claim_ref_plan("famiticket", start))
+
+    def test_two_host_collision_cannot_issue_two_claims(self):
+        from datetime import timedelta
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        start = datetime(2026, 11, 11, 5, 59, tzinfo=timezone.utc)
+        api = self.API(start, self.SHA)
+        first = self.candidate("tainex", self.SHA, api)
+        self.assertEqual(first["reserved_ref_count"], 2)
+        self.assertFalse(first["native_get_allowed"])
+        self.assertFalse(first["independent_cross_host_verified"])
+        self.assertEqual(len(api.refs), 2)
+        api.when = start + timedelta(minutes=2)  # next UTC 6h bucket
+        with self.assertRaisesRegex(ValueError, "CLAIM_CREATE_REF_COLLISION"):
+            self.candidate("tainex", self.SHA, api)
+        self.assertEqual(len(api.refs), 2)
+
+    def test_real_ruleset_scope_exclusion_and_actor_bypass_hold(self):
+        # Actual Ruleset 27026973 has one include, no exclusions and
+        # current_user_can_bypass=never. Regression protects this authority.
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        when = datetime(2026, 11, 11, tzinfo=timezone.utc)
+        for variant, expected in (
+            ("excluded_source", "CLAIM_RULESET_SCOPE_GAP_HOLD"),
+            ("extra_include", "CLAIM_RULESET_SCOPE_GAP_HOLD"),
+            ("actor_bypass", "CLAIM_RULESET_BYPASS_HOLD"),
+        ):
+            with self.subTest(variant=variant):
+                base = self.API(when, self.SHA)
+                class AlteredRuleset:
+                    def __init__(self):
+                        self.posts = 0
+                    def __call__(self, method, path, payload):
+                        status, data, stamp = base(method, path, payload)
+                        if method == "POST":
+                            self.posts += 1
+                        if path.endswith("/rulesets/1") and method == "GET":
+                            if variant == "excluded_source":
+                                data["conditions"]["ref_name"]["exclude"] = [
+                                    "refs/heads/source-claims/tainex-*"]
+                            elif variant == "extra_include":
+                                data["conditions"]["ref_name"]["include"].append(
+                                    "refs/heads/other/*")
+                            else:
+                                data["current_user_can_bypass"] = "always"
+                        return status, data, stamp
+                api = AlteredRuleset()
+                with self.assertRaisesRegex(ValueError, expected):
+                    self.candidate("tainex", self.SHA, api)
+                self.assertEqual(api.posts, 0)
+
+    def test_missing_ruleset_denies_all_create_refs(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
+                       self.SHA, rules=False)
+        with self.assertRaisesRegex(ValueError, "CLAIM_RULESET_NOT_EXACTLY_ONE"):
+            self.candidate("tainex", self.SHA, api)
+        self.assertEqual(api.posts, 0)
+
+    def test_partial_reservation_is_never_released_or_promoted(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
+                       self.SHA, fail_second=True)
+        with self.assertRaisesRegex(ValueError, "CLAIM_CREATE_REF_COLLISION"):
+            self.candidate("tainex", self.SHA, api)
+        self.assertEqual(api.posts, 2)
+        self.assertEqual(len(api.refs), 1)
+        self.assertTrue(next(iter(api.refs)).startswith(
+            "refs/heads/source-claims/tainex-b"))
+
+    def test_main_head_drift_denies_before_create(self):
+        from scripts.p30_multisource_review_lkg import reserve_protected_claim
+        api = self.API(datetime(2026, 11, 11, tzinfo=timezone.utc),
+                       "a" * 40)
+        with self.assertRaisesRegex(ValueError, "CLAIM_ANCHOR_MAIN_DRIFT"):
+            self.candidate("tainex", self.SHA, api)
+        self.assertEqual(api.posts, 0)
+
+
+
+class TaiNEXNativeP0Collector(unittest.TestCase):
+    """Source-specific transport safety, NOT official capture or SOURCE_READY."""
+
+    def test_owner_hold_prevents_all_official_requests_and_claim_consumption(self):
+        from scripts.p30_multisource_review_lkg import tainex_native_capture_once
+        calls = []
+        def forbidden_get(url):
+            calls.append(url)
+            raise AssertionError("OFFICIAL_GET_MUST_NOT_OCCUR")
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(
+                    ValueError, "TAINEX_OWNER_NATIVE_GET_NOT_RELEASED_HOLD"):
+                tainex_native_capture_once(
+                    claim={"source": "tainex", "native_get_allowed": True,
+                           "independent_cross_host_verified": True,
+                           "source_policy_verified": True,
+                           "source_request_budget": 3,
+                           "cleanup_allowed": False},
+                    repo_root=directory, archive_id="tainex-test",
+                    transport=forbidden_get)
+        self.assertEqual(calls, [])
+
+    def test_future_owner_release_cannot_inject_http_or_skip_robots_delay(self):
+        # Even a future separately approved release must not accept a fake
+        # transport or no-op sleep from a caller; no official GET occurs here.
+        from unittest.mock import patch
+        from scripts import p30_multisource_review_lkg as source
+        with tempfile.TemporaryDirectory() as directory:
+            for kwargs in (
+                    {"transport": lambda url: (_ for _ in ()).throw(
+                        AssertionError("INJECTED_GET_MUST_NOT_RUN"))},
+                    {"pause": lambda seconds: None}):
+                with self.subTest(injection=tuple(kwargs)):
+                    with patch.object(source, "TAINEX_OWNER_LIVE_GET_RELEASED", True):
+                        with self.assertRaisesRegex(
+                                ValueError, "TAINEX_LIVE_IO_INJECTION_HOLD"):
+                            source.tainex_native_capture_once(
+                                claim={}, repo_root=directory,
+                                archive_id="not-created", **kwargs)
+            self.assertFalse((Path(directory) / "_isolated_review").exists())
+
+    def test_robots_and_http_receipt_fail_closed_before_detail(self):
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_robots_delay, _tainex_verified_response)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\nDisallow:\nCrawl-delay: 12\n"), 12)
+        # Security regression: Python RobotFileParser ignores fractional
+        # Crawl-delay instead of enforcing it. Never silently use 10s.
+        for declared in (b"30.5", b"bogus", b"-1"):
+            with self.subTest(declared=declared):
+                with self.assertRaisesRegex(
+                        ValueError, "TAINEX_ROBOTS_DELAY_FORMAT_HOLD"):
+                    _tainex_robots_delay(
+                        b"User-agent: *\nDisallow:\nCrawl-delay: " +
+                        declared + b"\n")
+        # Production policy gap: Request-rate is a real robots directive.
+        # A 1/60 policy must not be treated as the default 10-second delay.
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\nDisallow:\nRequest-rate: 1/60\n"), 60)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\nDisallow:\nCrawl-delay: 15\n"
+            b"Request-rate: 2/90\n"), 45)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: EventRadarSourceReview\nRequest-rate: 1/75\n"
+            b"\nUser-agent: *\nRequest-rate: 1/120\n"), 75)
+        for bad_rate in (b"bogus", b"1.5/60", b"0/60", b"1/0",
+                         b"999999999/1"):
+            with self.subTest(request_rate=bad_rate):
+                with self.assertRaisesRegex(
+                        ValueError, "TAINEX_ROBOTS_RATE_FORMAT_HOLD"):
+                    _tainex_robots_delay(
+                        b"User-agent: *\nDisallow:\nRequest-rate: " +
+                        bad_rate + b"\n")
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_RATE_HOLD"):
+            _tainex_robots_delay(
+                b"User-agent: *\nDisallow:\nRequest-rate: 1/301\n")
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DISALLOW_HOLD"):
+            _tainex_robots_delay(
+                b"User-agent: *\nDisallow: /event\n")
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DIRECTIVES_MISSING_HOLD"):
+            _tainex_robots_delay(b"unverified")
+        from scripts.p30_multisource_review_lkg import TAINEX_ROBOTS
+        stamp = datetime.now(timezone.utc).isoformat()
+        for status, url, expected in (
+            (403, TAINEX_ROBOTS, "HTTP_STATUS"),
+            (429, TAINEX_ROBOTS, "HTTP_STATUS"),
+            (200, "https://other.invalid/robots.txt", "REDIRECT_OR_URL"),
+        ):
+            with self.subTest(status=status, url=url):
+                with self.assertRaisesRegex(ValueError, expected):
+                    _tainex_verified_response(
+                        {"status": status, "url": url,
+                         "content_type": "text/plain",
+                         "body": b"User-agent: *\nDisallow:\n",
+                         "observed_at": stamp},
+                        TAINEX_ROBOTS, "ROBOTS")
+
+
+    def test_live_list_selects_new_id_and_rechecks_detail_robots(self):
+        # Product regression: LIST can advance beyond historical /event/691.
+        # Local HTML is synthetic; this does NOT count as official source bytes.
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_select_list_detail, _tainex_robots_delay,
+            _tainex_bounded_http_get, REGISTRY)
+        listing = REGISTRY["tainex"]["module"].LIST
+        raw = (b'<a href="/event/692">Current Exhibition</a>'
+               b'<a href="/event/693">Other Exhibition</a>')
+        detail = _tainex_select_list_detail(raw, listing)
+        self.assertEqual(detail, "https://www.tainex.com.tw/event/692")
+        with self.assertRaisesRegex(ValueError, "TAINEX_ROBOTS_DISALLOW_HOLD"):
+            _tainex_robots_delay(
+                b"User-agent: *\nDisallow: /event/692\n", detail)
+        self.assertEqual(_tainex_robots_delay(
+            b"User-agent: *\nDisallow:\n", detail), 10)
+        for bad, reason in (
+            (b'<a href="/event/692">One</a><a href="/event/692">Two</a>',
+             "TAINEX_LIST_DUPLICATE_ID_HOLD"),
+            (b'<a href="https://evil.invalid/event/692">Wrong</a>',
+             "TAINEX_LIST_NO_CANONICAL_EVENT_HOLD"),
+            (b'<a href="/event/692?token=1">Wrong</a>',
+             "TAINEX_LIST_NO_CANONICAL_EVENT_HOLD"),
+            (b'<a href="/event/692"></a>', "TAINEX_LIST_TITLE_HOLD"),
+        ):
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    _tainex_select_list_detail(bad, listing)
+
+    def test_partial_http_429_keeps_exact_list_receipt_without_detail(self):
+        # A real 429 must remain inspectable after a failed attempt; this
+        # exercises the durable local journal only, never an official GET.
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, _tainex_journal_get,
+            REGISTRY)
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "partial-429")
+            url = REGISTRY["tainex"]["module"].LIST
+            calls = []
+            def denied_get(requested):
+                calls.append(requested)
+                return {"status": 429, "url": requested,
+                        "content_type": "text/html", "body": b"rate limited",
+                        "observed_at": datetime.now(timezone.utc).isoformat()}
+            with self.assertRaisesRegex(ValueError, "TAINEX_LIST_HTTP_STATUS_HOLD"):
+                _tainex_journal_get(attempt, "LIST", url, denied_get)
+            self.assertEqual(calls, [url])
+            self.assertTrue((attempt / "list.intent.json").exists())
+            raw = (attempt / "list.body").read_bytes()
+            self.assertEqual(raw, b"rate limited")
+            receipt = json.loads((attempt / "list.receipt.json").read_text("utf-8"))
+            self.assertEqual(receipt["http_status"], 429)
+            self.assertFalse(receipt["native_source_accepted"])
+            self.assertEqual(receipt["body_sha256"], hashlib.sha256(raw).hexdigest())
+            self.assertFalse((attempt / "detail.intent.json").exists())
+            with self.assertRaisesRegex(ValueError, "TAINEX_ATTEMPT_REPLAY_HOLD"):
+                _tainex_attempt_directory(directory, "partial-429")
+
+    def test_directory_fsync_precedes_get_and_failure_blocks_get(self):
+        # Crash durability regression; no official GET, Claim or SOURCE_READY.
+        import os
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, _tainex_journal_get,
+            _tainex_sync_directory, TAINEX_ROBOTS)
+        if (os.name != "posix" or not hasattr(os, "O_DIRECTORY")
+                or not hasattr(os, "O_NOFOLLOW")):
+            self.skipTest("POSIX directory fsync required; live GET stays HOLD")
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "durable-intent")
+            order = []
+            def synced(path):
+                order.append("directory_fsync")
+                _tainex_sync_directory(path)
+            def crashed(_):
+                order.append("transport")
+                raise OSError("simulated transport loss")
+            with patch("scripts.p30_multisource_review_lkg._tainex_sync_directory",
+                       side_effect=synced):
+                with self.assertRaisesRegex(OSError, "simulated transport loss"):
+                    _tainex_journal_get(attempt, "ROBOTS", TAINEX_ROBOTS, crashed)
+            self.assertEqual(order, ["directory_fsync", "transport"])
+            self.assertTrue((attempt / "robots.intent.json").exists())
+            self.assertFalse((attempt / "robots.receipt.json").exists())
+            denied = _tainex_attempt_directory(directory, "sync-denied")
+            calls = []
+            with patch("scripts.p30_multisource_review_lkg._tainex_sync_directory",
+                       side_effect=ValueError("TAINEX_DIRECTORY_FSYNC_HOLD")):
+                with self.assertRaisesRegex(ValueError, "TAINEX_DIRECTORY_FSYNC_HOLD"):
+                    _tainex_journal_get(
+                        denied, "ROBOTS", TAINEX_ROBOTS,
+                        lambda url: calls.append(url))
+            self.assertEqual(calls, [])
+            self.assertTrue((denied / "robots.intent.json").exists())
+            self.assertFalse((denied / "robots.body").exists())
+
+    def test_transport_crash_retains_pre_get_intent_without_forged_receipt(self):
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, _tainex_journal_get, TAINEX_ROBOTS)
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "crash-before-response")
+            def crashed(_):
+                raise OSError("simulated transport loss")
+            with self.assertRaises(OSError):
+                _tainex_journal_get(attempt, "ROBOTS", TAINEX_ROBOTS, crashed)
+            intent = json.loads((attempt / "robots.intent.json").read_text("utf-8"))
+            self.assertEqual(intent["url"], TAINEX_ROBOTS)
+            self.assertFalse(intent["native_source_accepted"])
+            self.assertFalse((attempt / "robots.body").exists())
+            self.assertFalse((attempt / "robots.receipt.json").exists())
+
+
+
+    def test_real_process_exit_and_fresh_restart_audit_never_replays_get(self):
+        """Actual os._exit after fsynced intent; no simulated exception or HTTP."""
+        import os
+        import subprocess
+        import sys
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_attempt_directory, verify_tainex_attempt_after_restart)
+        if (os.name != "posix" or not hasattr(os, "O_DIRECTORY")
+                or not hasattr(os, "O_NOFOLLOW")):
+            self.skipTest("POSIX fsync host required; native GET remains HOLD")
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = _tainex_attempt_directory(directory, "real-process-exit")
+            # The child exits from the transport call without creating a
+            # response. The durable intent must be independently readable.
+            code = (
+                "import os,sys\n"
+                "from pathlib import Path\n"
+                "from scripts.p30_multisource_review_lkg import "
+                "_tainex_journal_get, TAINEX_ROBOTS\n"
+                "_tainex_journal_get(Path(sys.argv[1]), 'ROBOTS', "
+                "TAINEX_ROBOTS, lambda url: os._exit(73))\n"
+            )
+            child = subprocess.run(
+                [sys.executable, "-c", code, str(attempt)],
+                cwd=Path(__file__).resolve().parents[2],
+                capture_output=True, text=True, timeout=15, check=False)
+            self.assertEqual(child.returncode, 73, child.stderr)
+            audit = verify_tainex_attempt_after_restart(
+                directory, "real-process-exit")
+            self.assertEqual(audit["completed"], [])
+            self.assertEqual(audit["incomplete_roles"], ["ROBOTS"])
+            self.assertEqual(audit["native_get_replayed"], 0)
+            self.assertFalse(audit["source_ready"])
+            self.assertFalse(audit["native_http_attested"])
+            self.assertFalse(audit["commit_permitted"])
+            self.assertFalse((attempt / "robots.body").exists())
+            with self.assertRaisesRegex(ValueError, "TAINEX_ATTEMPT_REPLAY_HOLD"):
+                _tainex_attempt_directory(directory, "real-process-exit")
+            # Tampering with the intent after restart cannot create authority.
+            intent = attempt / "robots.intent.json"
+            data = json.loads(intent.read_text("utf-8"))
+            data["url"] = "https://other.invalid/robots.txt"
+            intent.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "TAINEX_RESTART_INTENT_HOLD"):
+                verify_tainex_attempt_after_restart(
+                    directory, "real-process-exit")
+
+
+    def test_direct_native_http_transport_requires_both_real_release_gates(self):
+        """Actual production GET function cannot bypass either release gate."""
+        from unittest.mock import patch
+        from scripts.p30_multisource_review_lkg import (
+            _tainex_bounded_http_get, TAINEX_ROBOTS)
+        # No urllib request may be constructed/opened in any denied case.
+        with patch("urllib.request.build_opener") as opener, \
+             patch("urllib.request.urlopen") as urlopen:
+            for claim_released, source_released in (
+                    (False, False), (True, False), (False, True)):
+                with self.subTest(claim=claim_released, source=source_released):
+                    with patch("scripts.p30_multisource_review_lkg.CLAIM_REAL_ENFORCEMENT_RELEASED",
+                               claim_released), \
+                         patch("scripts.p30_multisource_review_lkg.TAINEX_OWNER_LIVE_GET_RELEASED",
+                               source_released):
+                        with self.assertRaisesRegex(
+                                ValueError, "TAINEX_NATIVE_TRANSPORT_RELEASE_HOLD"):
+                            _tainex_bounded_http_get(TAINEX_ROBOTS)
+            opener.assert_not_called()
+            urlopen.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
