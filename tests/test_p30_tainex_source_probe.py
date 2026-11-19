@@ -64,6 +64,25 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(len(list(self.out.glob("*.bin"))), 2)
         self.assertEqual(len(list(self.out.glob("*.json"))), 2)
 
+    def test_delay_applies_after_robots_before_list_and_detail(self):
+        delays = []
+        result = probe.capture(
+            output_dir=self.out, opener=self.opener,
+            clock=lambda: "2026-11-19T03:00:00Z",
+            sleeper=delays.append, execute=True, detail_id="691")
+        self.assertEqual([r["role"] for r in result["receipts"]], ["LIST", "DETAIL"])
+        self.assertEqual(delays, [probe.MIN_DELAY, probe.MIN_DELAY])
+        self.assertEqual(self.opener.calls,
+                         [probe.ROBOTS, probe.LIST, probe.ORIGIN + "/event/691"])
+
+    def test_delay_applies_to_list_only(self):
+        delays = []
+        probe.capture(output_dir=self.out, opener=self.opener,
+                      clock=lambda: "2026-11-19T03:00:00Z",
+                      sleeper=delays.append, execute=True)
+        self.assertEqual(delays, [probe.MIN_DELAY])
+        self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
+
     def test_detail_must_be_in_current_list(self):
         self.opener.bodies[probe.LIST] = b"<html>no matching event</html>"
         with self.assertRaisesRegex(ValueError, "DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD"):
