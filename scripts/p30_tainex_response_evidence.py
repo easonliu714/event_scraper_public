@@ -39,6 +39,8 @@ def ingest_response(*, raw_path, output_dir, source_url, final_url,
         raise ValueError("BODY_SIZE_HOLD")
     digest = hashlib.sha256(raw).hexdigest()
     directory = Path(output_dir)
+    if directory.is_symlink():
+        raise ValueError("OUTPUT_SYMLINK_HOLD")
     directory.mkdir(parents=True, exist_ok=True)
     if directory.is_symlink():
         raise ValueError("OUTPUT_SYMLINK_HOLD")
@@ -49,16 +51,23 @@ def ingest_response(*, raw_path, output_dir, source_url, final_url,
                 "raw_sha256": digest, "raw_bytes": len(raw),
                 "native_http_attested": False,
                 "decision": "ISOLATED_UNATTESTED_NO_PUBLICATION"}
-    # Exclusive creation: never replace previous evidence.
-    for suffix, content in ((".bin", raw),
-                            (".json", (json.dumps(evidence, sort_keys=True,
-                                                  ensure_ascii=False) + "\n").encode("utf-8"))):
-        fd = os.open(str(directory / (name + suffix)),
-                     os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
+    # Roll back files created by this attempt if the second write fails.
+    created = []
+    try:
+        for suffix, content in ((".bin", raw),
+                                (".json", (json.dumps(evidence, sort_keys=True,
+                                                      ensure_ascii=False) + "\n").encode("utf-8"))):
+            path = directory / (name + suffix)
+            fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            created.append(path)
+            with os.fdopen(fd, "wb") as stream:
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+    except BaseException:
+        for path in reversed(created):
+            path.unlink(missing_ok=True)
+        raise
     return evidence
 
 
