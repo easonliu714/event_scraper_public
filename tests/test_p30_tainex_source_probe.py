@@ -129,6 +129,26 @@ class ProbeTests(unittest.TestCase):
         self.assertIn(b"<html>no matching event</html>",
                       [p.read_bytes() for p in self.out.glob("*.bin")])
 
+    def test_repeated_identical_robots_does_not_block_new_list(self):
+        self.run_probe(execute=True)
+        self.opener.bodies[probe.LIST] = b'<a href="/event/692">new event</a>'
+        result = self.run_probe(execute=True)
+        self.assertEqual(result["current_list_event_ids"], ["692"])
+        self.assertEqual(len(list(self.out.glob("*.bin"))), 3)
+        self.assertEqual(list(self.out.glob("incoming-robots-*.tmp")), [])
+
+    def test_tampered_prior_robots_receipt_holds(self):
+        self.run_probe(execute=True)
+        import json
+        receipt_path = next(p for p in self.out.glob("*.json")
+                            if json.loads(p.read_text())["requested_url"] == probe.ROBOTS)
+        receipt = json.loads(receipt_path.read_text())
+        receipt["requested_url"] = "https://evil.example/robots.txt"
+        receipt_path.write_text(json.dumps(receipt))
+        with self.assertRaisesRegex(ValueError, "ROBOTS_EVIDENCE_COLLISION_HOLD"):
+            self.run_probe(execute=True)
+        self.assertEqual(list(self.out.glob("incoming-robots-*.tmp")), [])
+
     def test_robots_raw_preserved_even_when_policy_denies_list(self):
         self.opener.bodies[probe.ROBOTS] = b"User-agent: *\nDisallow: /event\n"
         with self.assertRaisesRegex(ValueError, "ROBOTS_LIST_DENIED_HOLD"):
