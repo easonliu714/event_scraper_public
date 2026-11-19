@@ -105,6 +105,22 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
     clock = clock or (lambda: datetime.now(timezone.utc).isoformat())
     # Robots must be fetched and parsed before any event request.
     robots_raw = fetch_bounded(ROBOTS, opener)
+    # Preserve the native robots body even when the policy is malformed or denies LIST.
+    output_dir = Path(output_dir)
+    if output_dir.is_symlink():
+        raise ValueError("OUTPUT_SYMLINK_HOLD")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="wb", prefix="incoming-robots-",
+                                     suffix=".tmp", dir=output_dir, delete=False) as stream:
+        robots_temp = Path(stream.name)
+        stream.write(robots_raw)
+    try:
+        robots_evidence = ingest_response(
+            raw_path=robots_temp, output_dir=output_dir,
+            source_url=ROBOTS, final_url=ROBOTS,
+            http_status=200, observed_at=clock())
+    finally:
+        robots_temp.unlink(missing_ok=True)
     robots = RobotFileParser()
     # A malformed or non-robots HTML response must never authorize LIST.
     # RobotFileParser defaults to permissive behavior without valid groups.
@@ -160,6 +176,7 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
     return {"decision": "ISOLATED_CAPTURE_NO_PUBLICATION",
             "native_http_attested": False, "receipts": receipts,
             "current_list_event_ids": list_ids,
+            "robots_evidence": robots_evidence,
             "robots_sha256": hashlib.sha256(robots_raw).hexdigest(),
             "robots_bytes": len(robots_raw)}
 
