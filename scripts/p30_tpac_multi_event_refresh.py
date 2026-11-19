@@ -323,7 +323,13 @@ def _semantic_event_payload(event):
     # HOLD reasons are a set of stable safety decisions: order and duplicated
     # identical strings must not create false new activity.
     hold_semantics = ("quality_hold_reasons", tuple(sorted(set(holds))))
-    return tuple((key, event.get(key)) for key in keys) + role_values + (hold_semantics,)
+    # /event LIST and DETAIL periods are source-owned business evidence.
+    # A changed period must not be hidden by identical held-field labels or
+    # by unchanged next-showtime; exclude only receipt/observation metadata.
+    period_semantics = tuple((key, candidate.get(key))
+                             for key in ("list_period", "detail_period"))
+    return (tuple((key, event.get(key)) for key in keys)
+            + role_values + (hold_semantics,) + period_semantics)
 
 
 def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
