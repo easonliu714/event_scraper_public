@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import time
+import tempfile
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from urllib.parse import urljoin
@@ -108,8 +109,13 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
                 raise ValueError("DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD")
         observed_at = clock()
         # Store in isolated location only; never claim native HTTP attestation.
-        temporary = output_dir / ("incoming-" + role.lower() + ".tmp")
-        with temporary.open("xb") as stream:
+        # A fixed incoming-ROLE.tmp blocks recovery after an interrupted run.
+        # Use a unique private staging file and always remove it after ingestion.
+        if output_dir.is_symlink():
+            raise ValueError("OUTPUT_SYMLINK_HOLD")
+        with tempfile.NamedTemporaryFile(mode="wb", prefix="incoming-" + role.lower() + "-",
+                                         suffix=".tmp", dir=output_dir, delete=False) as stream:
+            temporary = Path(stream.name)
             stream.write(raw)
         try:
             receipt = ingest_response(raw_path=temporary, output_dir=output_dir,
