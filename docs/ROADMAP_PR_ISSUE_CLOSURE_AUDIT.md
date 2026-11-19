@@ -1,5 +1,14 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+### 2026-11-19｜TPAC C20 活動重現後重新排入 DETAIL（工程 Gate PASS，來源 GET HOLD）
+
+- Gate ID: `TPAC-C20-REAPPEARANCE-20261119`；Roadmap: SRC-V-TPAC (#250) / Capture C20；前置：雙入口歷史 LIST 20+18 IDs、封存 3 DETAIL、既有隔離 Inventory/CAS。
+- 真缺陷：`build_detail_inventory()` 在活動 ID 曾不見於 LIST 後保留 `NOT_IN_LATEST_LIST_REVIEW`；該 ID 再次出現未恢復為待抓狀態，`select_pending_details()` 因而可能永久漏排。修改後該 ID 重現會轉為 `PENDING_DETAIL_BUDGET`／`REAPPEARED_DETAIL_RECHECK_REQUIRED`，保留 attempts、last_attempt；其他解析成功活動維持原狀。
+- Engineering Draft [#243](https://github.com/easonliu714/event_scraper_public/pull/243) Source `1d916910a176c8d364ab2febdfc1bf540b53ade7`，Test / exact-head `f319ca8ac9e6092c435dd4f0a78c7854258450f7`；SOURCE blob `d3454615d229a4af5dcc183cad8706d96f6cedc2`、TEST blob `7ff37a7463a37f8c91353a5fad7308b9364529fe` 獨立讀回 PASS。
+- Exact-head [CI #44532308006](https://github.com/easonliu714/event_scraper_public/actions/runs/44532308006) SUCCESS，Job `135588540200` SUCCESS，Artifact `14533987047` SHA256 `befb6fee1f028529c7bb10468510a54da692f0951ab7954693c8ec53e69493fd`；正/反/回歸及無 GET/NO PUBLISH Gate。
+- 七層真新增：HTTP 0 / LIST 0 / DETAIL 0 / IDENTITY 0 / FIELD 0 / GOLDEN 0 / PUBLICATION 0。Gate `SOURCE_FIX_CI_PASS`，正式 Source GET 因真實跨主機 Claim 與獨立 Owner 授權 `HOLD`；`HARD_HOLD_NO_PUBLICATION` 不變。下一 Gate 優先真 TPAC C20 擷取可執行性、未取得的 35 DETAIL，禁止無授權 GET；Issue #250 comment `7010395305`。
+- UI/API/儲存/正式發佈影響：僅 isolated Source capture backlog 恢復策略，不改 UI/API、正式 JSON、Golden、Publisher、Pages、main、已驗收 Android PASS。
+
 ## 2026-10-29 23:55 — P30-VENUE-02A TMC source-first Gate / A-line exact-anchor diagnosis
 
 - **Fresh authority and dedup:** Source main `fbf4ca02b91159f2423caf3d79fb0ca4bb747069`; Preview main `03e515d65e827d5ed67fe341d079907a96bf784a`; ShowNews main `85fed3e85ff5deff479a85b8d692aa9e6d2bdcad`. Formal `docs/data.json` blob `7fc4fe32567a57fd504483eeb9a8b9e10b568ea4`, `docs/platform_status.json` blob `e19ca37c4c80c10b7278d0813b8ff1047535d124` unchanged. TMC official venue is **not** any of the formal 19 platform IDs; CKSMH #17, Songshan #14, Huashan #13, TWTC #16 remain REUSE; NTCH venue != OPENTIX #05.
