@@ -127,7 +127,7 @@ class Raw5ProviderTests(unittest.TestCase):
         api = FakeGitHub()
         p = self.provider(api)
         p.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
-        with self.assertRaisesRegex(ValueError, "FIRST_ATTEMPT_UNATTESTED_HOLD"):
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_CURRENT_LEASE_HOLD"):
             p.read_last_attempt(source_host=HOST)
         with self.assertRaisesRegex(ValueError, "RECEIPT_SCOPE_OR_FENCE_HOLD"):
             p.write_attempt(source_host=HOST, owner_run_id="runner-one-0001", fencing_token="wrong", attempted_at=NOW)
@@ -296,7 +296,7 @@ class ReceiptRoundTripTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
             reader.read_last_attempt(source_host=HOST)
         api, writer = self._written()
-        with self.assertRaisesRegex(ValueError, "FIRST_ATTEMPT_UNATTESTED_HOLD"):
+        with self.assertRaisesRegex(ValueError, "CURRENT_SLOT_RECEIPT_NOT_PREVIOUS_HOLD"):
             writer.read_last_attempt(source_host=HOST)
         with self.assertRaisesRegex(ValueError, "PROVIDER_ACQUIRED_LEASE_INVALID_HOLD"):
             reserve_durable_source_attempt(
@@ -357,7 +357,7 @@ class HostHistoryRecoveryTests(unittest.TestCase):
         api.server_time = NOW
         current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
         current.acquire_atomic(source_host=HOST, owner_run_id="new-run-0002")
-        with self.assertRaisesRegex(ValueError, "PREVIOUS_LEASE_WITHOUT_RECEIPT_HOLD"):
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_CRASH_GAP_HOLD"):
             current.read_last_attempt(source_host=HOST)
         self.assertEqual(len(api.refs), 2)
 
@@ -368,10 +368,46 @@ class HostHistoryRecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "FIRST_ATTEMPT_UNATTESTED_HOLD"):
             current.read_last_attempt(source_host=HOST)
 
+    def test_several_hour_old_receipt_recovered_via_host_wide_history(self):
+        # The old previous-hour-only reader incorrectly reported no history.
+        from scripts.p30_tpac_r4_source_policy import enforce_elapsed
+        prior = NOW - timedelta(hours=4, minutes=1)
+        api = SharedGitHubCommitAPI()
+        api.server_time = prior
+        older = GitHubRaw5AttemptProvider(api, ANCHOR, prior)
+        old_lease = older.acquire_atomic(
+            source_host=HOST, owner_run_id="older-run-0001")
+        older.write_attempt(
+            source_host=HOST, owner_run_id="older-run-0001",
+            fencing_token=old_lease["fencing_token"], attempted_at=prior)
+        api.server_time = NOW
+        current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        current.acquire_atomic(source_host=HOST, owner_run_id="current-run-0002")
+        recovered = current.read_last_attempt(source_host=HOST)
+        self.assertEqual(recovered["last_attempt_at"], prior)
+        self.assertEqual(recovered["history_receipt_ref"], older._receipt_ref)
+        self.assertTrue(recovered["host_wide_receipts_verified"])
+        self.assertFalse(recovered["history_complete_attested"])
+        self.assertFalse(recovered["native_get_allowed"])
+        with self.assertRaisesRegex(ValueError, "ENGINEERING_MIN_INTERVAL_HOLD"):
+            enforce_elapsed(NOW, recovered["last_attempt_at"])
+
+    def test_host_wide_restart_denies_older_orphan_without_receipt(self):
+        api = SharedGitHubCommitAPI()
+        prior = NOW - timedelta(hours=4, minutes=1)
+        api.server_time = prior
+        old = GitHubRaw5AttemptProvider(api, ANCHOR, prior)
+        old.acquire_atomic(source_host=HOST, owner_run_id="orphan-run-0001")
+        api.server_time = NOW
+        current = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        current.acquire_atomic(source_host=HOST, owner_run_id="current-run-0002")
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_CRASH_GAP_HOLD"):
+            current.read_last_attempt(source_host=HOST)
+
     def test_previous_receipt_ref_replacement_denied(self):
         api, writer, reader, _ = self._previous_and_current()
         api.refs[writer._receipt_ref] = ANCHOR
-        with self.assertRaisesRegex(ValueError, "HISTORY_COMMIT_INVALID_HOLD"):
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_COMMIT_HOLD"):
             reader.read_last_attempt(source_host=HOST)
 
     def test_previous_body_sha_tamper_denied(self):
@@ -396,7 +432,7 @@ class HostHistoryRecoveryTests(unittest.TestCase):
                     return 206, [], NOW
                 return original(method, path, payload)
         reader._request = BadStatusTransport()
-        with self.assertRaisesRegex(ValueError, "HISTORY_ENUMERATION_UNVERIFIED_HOLD"):
+        with self.assertRaisesRegex(ValueError, "HOST_WIDE_ENUMERATION_HOLD"):
             reader.read_last_attempt(source_host=HOST)
         with self.assertRaisesRegex(ValueError, "NO_LEASE_HOLD"):
             GitHubRaw5AttemptProvider(api, ANCHOR, NOW).read_last_attempt(source_host=HOST)
