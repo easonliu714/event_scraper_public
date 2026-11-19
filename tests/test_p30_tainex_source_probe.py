@@ -83,6 +83,23 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(delays, [probe.MIN_DELAY])
         self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
 
+    def test_stale_fixed_staging_file_does_not_block_capture(self):
+        # A prior crash can leave the old fixed staging filename behind.
+        self.out.mkdir(parents=True)
+        stale = self.out / "incoming-list.tmp"
+        stale.write_bytes(b"prior-run")
+        result = self.run_probe(execute=True)
+        self.assertEqual([r["role"] for r in result["receipts"]], ["LIST"])
+        self.assertEqual(stale.read_bytes(), b"prior-run")
+        self.assertEqual(list(self.out.glob("incoming-list-*.tmp")), [])
+
+    def test_unique_staging_files_are_removed_on_ingest_failure(self):
+        # Reject immutable digest collisions without leaving new staging bytes.
+        self.run_probe(execute=True)
+        with self.assertRaises(FileExistsError):
+            self.run_probe(execute=True)
+        self.assertEqual(list(self.out.glob("incoming-list-*.tmp")), [])
+
     def test_detail_must_be_in_current_list(self):
         self.opener.bodies[probe.LIST] = b"<html>no matching event</html>"
         with self.assertRaisesRegex(ValueError, "DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD"):
