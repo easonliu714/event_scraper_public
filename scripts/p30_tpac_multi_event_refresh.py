@@ -1051,18 +1051,17 @@ def archived_inventory_cli(manifest_path, repo_root):
                 status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
                 counts["detail_available"] += 1
             else:
-                # Partial archived manifests cannot revoke an earlier SHA-verified
-                # DETAIL for the identical immutable LIST snapshot.
+                # A previous inventory status is only historical metadata; it
+                # does NOT retain the DETAIL bytes or original receipt. A partial
+                # manifest cannot prove the old body is still replayable. Keep
+                # history in prior CAS versions, and requeue this ID until the
+                # caller supplies exact raw bytes + receipt for fresh validation.
+                # Never inflate C20 capture coverage from metadata alone.
                 if (old.get("status") == "ARCHIVED_DETAIL_VERIFIED_ONLY"
                         and old.get("list_sha") == _sha(raw)
                         and old.get("reason") == "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"):
-                    status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
-                    # Previously verified bytes remain available in this immutable
-                    # snapshot even when a later partial manifest omits the file.
-                    # Count retained evidence, not just files in this invocation.
-                    counts["detail_available"] += 1
-                else:
-                    counts["pending_detail_budget"] += 1
+                    reason = "PRIOR_ARCHIVED_DETAIL_BYTES_NOT_REPLAYED_HOLD"
+                counts["pending_detail_budget"] += 1
             rows[key] = {"source_namespace": catalog, "source_event_id": sid,
                          "list_url": card["list_url"], "detail_url": card["detail_url"],
                          "list_sha": _sha(raw), "last_observed": None,
