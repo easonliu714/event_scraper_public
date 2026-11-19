@@ -61,8 +61,8 @@ class ProbeTests(unittest.TestCase):
                          [probe.ROBOTS, probe.LIST, probe.ORIGIN + "/event/691"])
         self.assertEqual([r["role"] for r in result["receipts"]], ["LIST", "DETAIL"])
         self.assertFalse(result["native_http_attested"])
-        self.assertEqual(len(list(self.out.glob("*.bin"))), 2)
-        self.assertEqual(len(list(self.out.glob("*.json"))), 2)
+        self.assertEqual(len(list(self.out.glob("*.bin"))), 3)
+        self.assertEqual(len(list(self.out.glob("*.json"))), 3)
 
     def test_list_only_exposes_unique_safe_current_event_ids(self):
         self.opener.bodies[probe.LIST] = (
@@ -73,7 +73,7 @@ class ProbeTests(unittest.TestCase):
         result = self.run_probe(execute=True)
         self.assertEqual(result["current_list_event_ids"], ["22", "691"])
         self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
-        self.assertEqual(len(list(self.out.glob("*.bin"))), 1)
+        self.assertEqual(len(list(self.out.glob("*.bin"))), 2)
 
     def test_discovery_rejects_cross_origin_and_noncanonical_links(self):
         raw = (b'<a href="//evil.example/event/5">cross</a>'
@@ -125,9 +125,18 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(self.opener.calls, [probe.ROBOTS, probe.LIST])
         # The failed ID check must not erase the actual official LIST bytes.
         self.assertEqual(len(list(self.out.glob("*.bin"))), 1)
+        self.assertEqual(len(list(self.out.glob("*.json"))), 2)
+        self.assertIn(b"<html>no matching event</html>",
+                      [p.read_bytes() for p in self.out.glob("*.bin")])
+
+    def test_robots_raw_preserved_even_when_policy_denies_list(self):
+        self.opener.bodies[probe.ROBOTS] = b"User-agent: *\nDisallow: /event\n"
+        with self.assertRaisesRegex(ValueError, "ROBOTS_LIST_DENIED_HOLD"):
+            self.run_probe(execute=True)
+        self.assertEqual(self.opener.calls, [probe.ROBOTS])
+        self.assertEqual([p.read_bytes() for p in self.out.glob("*.bin")],
+                         [self.opener.bodies[probe.ROBOTS]])
         self.assertEqual(len(list(self.out.glob("*.json"))), 1)
-        self.assertEqual(next(self.out.glob("*.bin")).read_bytes(),
-                         b"<html>no matching event</html>")
 
     def test_html_robots_response_cannot_authorize_list(self):
         # A CDN HTML challenge with HTTP 200 is not a robots policy.
