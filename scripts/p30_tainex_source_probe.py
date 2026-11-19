@@ -85,7 +85,13 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
     # Robots must be fetched and parsed before any event request.
     robots_raw = fetch_bounded(ROBOTS, opener)
     robots = RobotFileParser()
-    robots.parse(robots_raw.decode("utf-8", "strict").splitlines())
+    # A malformed or non-robots HTML response must never authorize LIST.
+    # RobotFileParser defaults to permissive behavior without valid groups.
+    robots_text = robots_raw.decode("utf-8", "strict")
+    robots_lines = robots_text.splitlines()
+    if not any(line.strip().lower().startswith("user-agent:") for line in robots_lines):
+        raise ValueError("ROBOTS_INVALID_RESPONSE_HOLD")
+    robots.parse(robots_lines)
     if not robots.can_fetch(USER_AGENT, LIST):
         raise ValueError("ROBOTS_LIST_DENIED_HOLD")
     detail_url = ORIGIN + "/event/" + detail_id if detail_id else None
