@@ -791,6 +791,41 @@ class PersistentInventoryContractTests(unittest.TestCase):
             self.assertFalse((Path(root) / "docs" / "data.json").exists())
 
 
+    def test_list_reappearance_restores_pending_detail_without_losing_history(self):
+        # SOURCE backlog regression: disappearance must not permanently strand
+        # an ID when the same official catalog lists it again. No GET or publish.
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_detail_inventory, select_pending_details,
+        )
+        first_list = listing(("2111", "2112"))
+        first = build_detail_inventory("program", first_list,
+                                       receipt(ROOT, first_list), NOW)
+        pending = first["items"]["tpac:program:2111"]
+        pending["attempts"] = 2
+        pending["last_attempt"] = OBS
+        pending["reason"] = "PREVIOUS_DETAIL_TRANSIENT_HOLD"
+        verified = first["items"]["tpac:program:2112"]
+        verified["status"] = "REVIEW_DETAIL_PARSED"
+        verified["reason"] = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED"
+
+        missing_list = listing(("2112",))
+        missing = build_detail_inventory("program", missing_list,
+                                         receipt(ROOT, missing_list), NOW, first)
+        self.assertEqual(missing["items"]["tpac:program:2111"]["status"],
+                         "NOT_IN_LATEST_LIST_REVIEW")
+        self.assertNotIn("tpac:program:2111", select_pending_details(missing))
+
+        returned = build_detail_inventory("program", first_list,
+                                          receipt(ROOT, first_list), NOW, missing)
+        recovered = returned["items"]["tpac:program:2111"]
+        self.assertEqual(recovered["status"], "PENDING_DETAIL_BUDGET")
+        self.assertEqual(recovered["reason"], "REAPPEARED_DETAIL_RECHECK_REQUIRED")
+        self.assertEqual(recovered["attempts"], 2)
+        self.assertEqual(recovered["last_attempt"], OBS)
+        self.assertIn("tpac:program:2111", select_pending_details(returned))
+        self.assertEqual(returned["items"]["tpac:program:2112"]["status"],
+                         "REVIEW_DETAIL_PARSED")
+
     def test_real_cli_offline_two_catalog_inventory_restart_and_cas(self):
         import subprocess
         import sys
