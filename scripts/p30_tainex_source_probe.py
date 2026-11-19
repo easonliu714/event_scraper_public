@@ -93,11 +93,13 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     receipts = []
-    for index, (role, url) in enumerate((("LIST", LIST), ("DETAIL", detail_url))):
+    # robots.txt is itself a network request: enforce the source-wide delay
+    # before LIST as well as between LIST and DETAIL, not only for DETAIL.
+    delay = max(MIN_DELAY, float(robots.crawl_delay(USER_AGENT) or 0))
+    for role, url in (("LIST", LIST), ("DETAIL", detail_url)):
         if url is None:
             continue
-        if index:
-            sleeper(max(MIN_DELAY, float(robots.crawl_delay(USER_AGENT) or 0)))
+        sleeper(delay)
         raw = fetch_bounded(url, opener)
         if role == "LIST" and detail_url:
             links = ListLinks()
