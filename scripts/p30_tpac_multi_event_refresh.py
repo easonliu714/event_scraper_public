@@ -820,14 +820,21 @@ def build_detail_inventory(catalog, raw, receipt, now, previous=None):
                     or old.get("source_namespace") != catalog
                     or old.get("source_event_id") != sid):
             raise ValueError("TPAC_INVENTORY_IDENTITY_DRIFT_HOLD")
+        # A previously absent event may reappear in a later official LIST.
+        # The absence marker is not a terminal capture outcome: requeue only
+        # that identity for a fresh same-ID DETAIL, retaining attempt history.
+        # This changes isolated backlog state, never accepted REVIEW LKG.
+        reappeared = old.get("status") == "NOT_IN_LATEST_LIST_REVIEW"
         current[key] = {
             "source_namespace": catalog, "source_event_id": sid,
             "list_url": card["list_url"], "detail_url": card["detail_url"],
             "list_sha": list_sha, "last_observed": observed,
-            "status": old.get("status", "PENDING_DETAIL_BUDGET"),
+            "status": ("PENDING_DETAIL_BUDGET" if reappeared else
+                       old.get("status", "PENDING_DETAIL_BUDGET")),
             "attempts": old.get("attempts", 0),
             "last_attempt": old.get("last_attempt"),
-            "reason": old.get("reason", "DETAIL_BYTES_NOT_CAPTURED"),
+            "reason": ("REAPPEARED_DETAIL_RECHECK_REQUIRED" if reappeared else
+                       old.get("reason", "DETAIL_BYTES_NOT_CAPTURED")),
         }
     # Unobserved historical IDs are retained, but cannot be scheduled.
     for key in (set(prior_items) - {c["identity"] for c in cards.values()}):
