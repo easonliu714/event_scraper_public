@@ -39,6 +39,27 @@ class ListLinks(HTMLParser):
                 self.hrefs.append(href)
 
 
+def discover_current_list_ids(raw):
+    """Extract unique numeric event IDs from actual LIST anchors; no extra GET."""
+    links = ListLinks()
+    links.feed(raw.decode("utf-8", "strict"))
+    ids = set()
+    for href in links.hrefs:
+        absolute = urljoin(LIST, href)
+        parsed = urlsplit(absolute)
+        prefix = ORIGIN + "/event/"
+        if not absolute.startswith(prefix):
+            continue
+        event_id = absolute[len(prefix):]
+        if (parsed.scheme == "https" and parsed.netloc == "www.tainex.com.tw"
+                and not parsed.query and not parsed.fragment and not parsed.username
+                and not parsed.password and parsed.port is None
+                and event_id.isascii() and event_id.isdecimal()
+                and 1 <= len(event_id) <= 8):
+            ids.add(event_id)
+    return sorted(ids, key=lambda value: (int(value), value))
+
+
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, request, fp, code, msg, headers, newurl):
         return None
@@ -100,6 +121,7 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     receipts = []
+    list_ids = []
     # robots.txt is itself a network request: enforce the source-wide delay
     # before LIST as well as between LIST and DETAIL, not only for DETAIL.
     delay = max(MIN_DELAY, float(robots.crawl_delay(USER_AGENT) or 0))
@@ -128,13 +150,16 @@ def capture(*, output_dir, detail_id=None, execute=False, opener=None,
             temporary.unlink(missing_ok=True)
         receipt["role"] = role
         receipts.append(receipt)
-        if role == "LIST" and detail_url:
-            links = ListLinks()
-            links.feed(raw.decode("utf-8", "strict"))
-            if sum(urljoin(LIST, href) == detail_url for href in links.hrefs) != 1:
-                raise ValueError("DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD")
+        if role == "LIST":
+            list_ids = discover_current_list_ids(raw)
+            if detail_url:
+                links = ListLinks()
+                links.feed(raw.decode("utf-8", "strict"))
+                if sum(urljoin(LIST, href) == detail_url for href in links.hrefs) != 1:
+                    raise ValueError("DETAIL_ID_NOT_IN_CURRENT_LIST_HOLD")
     return {"decision": "ISOLATED_CAPTURE_NO_PUBLICATION",
             "native_http_attested": False, "receipts": receipts,
+            "current_list_event_ids": list_ids,
             "robots_sha256": hashlib.sha256(robots_raw).hexdigest(),
             "robots_bytes": len(robots_raw)}
 
