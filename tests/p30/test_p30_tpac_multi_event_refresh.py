@@ -903,9 +903,12 @@ class PersistentInventoryContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             program = listing(("2111",))
-            event = ('<a class="card-event" href="/event/2072" '
-                     'title="連結到北藝導覽"><div class="card-event__text-title">'
-                     '北藝導覽</div></a>').encode()
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
             (root / "program.html").write_bytes(program)
             (root / "event.html").write_bytes(event)
             first = build_detail_inventory("program", program,
