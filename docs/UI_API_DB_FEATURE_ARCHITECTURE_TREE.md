@@ -9597,3 +9597,6 @@ TPAC Source Adapter（既有 Draft PR #243，非 main）
 - **Exact-head CI：** [Run 44560472310](https://github.com/easonliu714/event_scraper_public/actions/runs/44560472310) SUCCESS，Job `135688036028` SUCCESS，Artifact `14548680231` GitHub digest `sha256:2b62458d9257fc4534f7c6653cb36a860d03129f4e0fd21317335909d1beb34d`。
 - **品質與發布隔離：** 僅 Archive Replay C20 Coverage 漏洞修補 PASS；新來源 HTTP/LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION 皆新增 0。既有封存 2 LIST 38 IDs、3 DETAILS 不變；正式 JSON/Golden/main/Pages/Android 無新部署驗收，`native_get_allowed=false`、`HARD_HOLD_NO_PUBLICATION` 不變。Source C20 仍待官方受控擷取與更多同 ID 原始 DETAIL；不以離線測試冒充產品發布。
 - **排程角色：** 原唯一 TPAC-FIRST Engineering Writer Task `6ae1e6147e548191881f20e730ab0f11` 每小時只選真實缺口修補，先 Fresh Read / exact-head CI / 第一真因；不新增第二 Writer 或自動觸發正式 Publisher。
+
+
+> **CAS_REPLAY_BOUNDARY_CLARIFICATION_20261119｜CAS 儲存範圍補充：** `write_detail_inventory()` 使用原子 CAS 覆寫目前隔離 Inventory JSON，**不會自行永久保存前一輪完整檔案或 DETAIL 原始 bytes**。先前 `ARCHIVED_DETAIL_VERIFIED_ONLY` 狀態及版本 SHA 是歷史 metadata，不代表新一輪可取得原始 bytes。故本次修補僅在當輪 Manifest 供給並重新驗證 raw DETAIL 與 receipt 後計入 `detail_available`；否則回復 `PENDING_DETAIL_BUDGET`。長期可重播證據仍依賴獨立保留的原始檔／Artifact／manifest；本機 CAS 不等於證據永久封存。正式 LKG 與正式資料發布不受影響。
