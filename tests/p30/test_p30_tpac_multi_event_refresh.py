@@ -1201,6 +1201,12 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             saved, _ = load_detail_inventory(root / "_isolated_archive_replay")
             self.assertEqual(saved["items"]["tpac:program:2040"]["status"], "ARCHIVED_DETAIL_VERIFIED_ONLY")
             self.assertEqual(second["counts"]["pending_detail_budget"], 1)
+            # The retained, SHA-verified /program DETAIL is still available;
+            # the partial manifest must not falsely report 0/2 coverage.
+            self.assertEqual(second["counts"]["detail_available"], 1)
+            self.assertEqual(second["counts"]["source_cards"], 2)
+            self.assertEqual(second["counts"]["detail_available"] +
+                             second["counts"]["pending_detail_budget"], 2)
             self.assertEqual(first["inventory"]["sha256"], second["inventory"]["sha256"])
             self.assertFalse((root / "docs" / "data.json").exists())
 
