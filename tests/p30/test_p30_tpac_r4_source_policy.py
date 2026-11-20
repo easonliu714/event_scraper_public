@@ -339,7 +339,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         class MissingCooldown(Provider):
             read_host_cooldown = None
         p = MissingCooldown()
-        with self.assertRaisesRegex(ValueError, "PROVIDER_OPERATION_FAILED_HOLD"):
+        with self.assertRaisesRegex(ValueError, "HOST_COOLDOWN_PROVIDER_MISSING_HOLD"):
             reserve_durable_source_attempt(provider=p, now=NOW,
                                            run_id="event-missing-provider")
         self.assertIsNone(p.written)
