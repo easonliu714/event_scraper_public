@@ -284,5 +284,63 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
             reserve_durable_source_attempt(provider=Provider(), now=NOW, run_id="../")
 
 
+
+class DurableCooldownPolicyTests(unittest.TestCase):
+    def state(self, **changes):
+        d = dict(source_host="tpac.org.taipei", source_identity="tpac:program:1423",
+                 durable_readback_verified=True, last_attempt_at=NOW,
+                 last_http_status=429, last_failure_class="RATE_LIMIT",
+                 consecutive_failures=1, cooldown_until=NOW+timedelta(hours=24))
+        d.update(changes)
+        return d
+
+    def test_429_expiry_is_review_only_never_live_get(self):
+        from scripts.p30_tpac_r4_source_policy import evaluate_source_cooldown
+        self.assertEqual(evaluate_source_cooldown(now=NOW+timedelta(hours=23),
+                                                  state=self.state())["decision"], "COOLDOWN_ACTIVE")
+        result = evaluate_source_cooldown(now=NOW+timedelta(hours=24), state=self.state())
+        self.assertEqual(result["decision"], "REVIEW_ONLY")
+        self.assertTrue(result["eligible_for_review"])
+        self.assertFalse(result["native_get_allowed"])
+        for count, hours in ((2, 48), (3, 96), (4, 168)):
+            with self.subTest(count=count):
+                with self.assertRaisesRegex(ValueError, "MINIMUM_VIOLATION"):
+                    evaluate_source_cooldown(now=NOW+timedelta(days=8),
+                        state=self.state(consecutive_failures=count,
+                                         cooldown_until=NOW+timedelta(hours=24)))
+                result = evaluate_source_cooldown(now=NOW+timedelta(days=8),
+                    state=self.state(consecutive_failures=count,
+                                     cooldown_until=NOW+timedelta(hours=hours)))
+                self.assertFalse(result["native_get_allowed"])
+
+    def test_403_requires_policy_review_even_after_expiry(self):
+        from scripts.p30_tpac_r4_source_policy import evaluate_source_cooldown
+        state = self.state(last_http_status=403, last_failure_class="ACCESS_DENIED",
+                           cooldown_until=NOW+timedelta(hours=72))
+        result = evaluate_source_cooldown(now=NOW+timedelta(days=4), state=state)
+        self.assertEqual(result["decision"], "SOURCE_ACCESS_HOLD_POLICY_REVIEW_REQUIRED")
+        self.assertFalse(result["native_get_allowed"])
+        with self.assertRaisesRegex(ValueError, "MINIMUM_VIOLATION"):
+            evaluate_source_cooldown(now=NOW+timedelta(days=4),
+                                    state=dict(state, cooldown_until=NOW+timedelta(hours=24)))
+
+    def test_unverified_readback_or_invalid_identity_never_eligible(self):
+        from scripts.p30_tpac_r4_source_policy import evaluate_source_cooldown
+        for change in ({"durable_readback_verified": False},
+                       {"source_identity": "tpac:other:1423"},
+                       {"last_attempt_at": NOW+timedelta(days=2)},
+                       {"cooldown_until": NOW+timedelta(hours=1)},
+                       {"consecutive_failures": True}):
+            with self.subTest(change=change):
+                with self.assertRaises(ValueError):
+                    evaluate_source_cooldown(now=NOW+timedelta(days=1),
+                                             state=self.state(**change))
+        result = evaluate_source_cooldown(now=NOW+timedelta(days=5),
+            state=self.state(last_http_status=404, last_failure_class="PERMANENT",
+                             cooldown_until=NOW+timedelta(days=1)))
+        self.assertEqual(result["decision"], "SOURCE_ACCESS_HOLD")
+        self.assertFalse(result["native_get_allowed"])
+
+
 if __name__ == "__main__":
     unittest.main()
