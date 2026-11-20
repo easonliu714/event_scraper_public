@@ -307,13 +307,16 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
                                            run_id="event-run-after-429")
         self.assertEqual(p.calls, ["acquire", "history", "cooldown"])
         self.assertIsNone(p.written)
-        # When elapsed, 429 permits REVIEW only; reservation never grants GET.
+        # Expired 429 permits offline policy review, but must not consume
+        # a new attempt without a separately verified probe authorization.
         p = Provider()
         p.last = NOW-timedelta(hours=25)
         p.cooldown_status = 429
-        expired = reserve_durable_source_attempt(provider=p, now=NOW,
-                                                 run_id="event-run-after-wait")
-        self.assertFalse(expired["native_get_allowed"])
+        with self.assertRaisesRegex(ValueError, "429_PROBE_AUTHORIZATION_REQUIRED_HOLD"):
+            reserve_durable_source_attempt(provider=p, now=NOW,
+                                           run_id="event-run-after-wait")
+        self.assertEqual(p.calls, ["acquire", "history", "cooldown"])
+        self.assertIsNone(p.written)
         # 403 is never an automatic retry merely because the 72h elapsed.
         p = Provider()
         p.last = NOW-timedelta(hours=80)
