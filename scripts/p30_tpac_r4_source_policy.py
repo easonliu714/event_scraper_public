@@ -300,3 +300,56 @@ def assert_no_untrusted_live_authority(result: dict) -> None:
     if result.get("immutable_cross_host_claim_verified") is not False:
         raise ValueError("TPAC_R4_UNVERIFIED_LIVE_AUTHORITY_HOLD")
     raise ValueError("TPAC_R4_IMMUTABLE_CLAIM_PROVIDER_MISSING_HOLD")
+
+def evaluate_source_cooldown(*, now: datetime, state: dict,
+                             source_host: str = SOURCE_HOST) -> dict:
+    """Pure, fail-closed durable cooldown decision; NEVER a GET authorization.
+
+    State is a provider-verified readback, not an in-memory scheduling hint.
+    A missing or malformed record is HOLD. Expiry only permits policy review.
+    """
+    current = _aware(now, "COOLDOWN_NOW")
+    if type(state) is not dict or state.get("source_host") != source_host or source_host != SOURCE_HOST:
+        raise ValueError("TPAC_R4_COOLDOWN_SOURCE_SCOPE_HOLD")
+    if state.get("durable_readback_verified") is not True:
+        raise ValueError("TPAC_R4_COOLDOWN_DURABLE_READBACK_HOLD")
+    identity = state.get("source_identity")
+    if type(identity) is not str or not re.fullmatch(r"tpac:(program|event):[0-9]+", identity):
+        raise ValueError("TPAC_R4_COOLDOWN_IDENTITY_HOLD")
+    last = state.get("last_attempt_at")
+    if type(last) is not datetime:
+        raise ValueError("TPAC_R4_COOLDOWN_ATTEMPT_MISSING_HOLD")
+    last = _aware(last, "COOLDOWN_ATTEMPT")
+    if last > current:
+        raise ValueError("TPAC_R4_COOLDOWN_CLOCK_ROLLBACK_HOLD")
+    status = state.get("last_http_status")
+    failure = state.get("last_failure_class")
+    count = state.get("consecutive_failures")
+    if type(count) is not int or count < 0 or type(status) is not int:
+        raise ValueError("TPAC_R4_COOLDOWN_SCHEMA_HOLD")
+    until = state.get("cooldown_until")
+    if type(until) is not datetime:
+        raise ValueError("TPAC_R4_COOLDOWN_DEADLINE_MISSING_HOLD")
+    until = _aware(until, "COOLDOWN_UNTIL")
+    if until < last:
+        raise ValueError("TPAC_R4_COOLDOWN_DEADLINE_INVALID_HOLD")
+    minimum = last + timedelta(seconds=MIN_INTERVAL_SECONDS)
+    if status == 429 and failure == "RATE_LIMIT":
+        minimum = last + timedelta(hours=min(24 * (2 ** min(max(count - 1, 0), 3)), 168))
+    elif status == 403 and failure == "ACCESS_DENIED":
+        minimum = last + timedelta(hours=72)
+    elif status >= 500 and status <= 599 and failure == "TRANSIENT":
+        minimum = last + timedelta(hours=12)
+    elif status == 200 and failure == "NONE" and count == 0:
+        pass
+    else:
+        return {"decision": "SOURCE_ACCESS_HOLD", "eligible_for_review": False,
+                "native_get_allowed": False}
+    if until < minimum:
+        raise ValueError("TPAC_R4_COOLDOWN_MINIMUM_VIOLATION_HOLD")
+    if status == 403:
+        return {"decision": "SOURCE_ACCESS_HOLD_POLICY_REVIEW_REQUIRED",
+                "eligible_for_review": current >= until, "native_get_allowed": False}
+    return {"decision": "COOLDOWN_ACTIVE" if current < until else "REVIEW_ONLY",
+            "eligible_for_review": current >= until, "native_get_allowed": False}
+
