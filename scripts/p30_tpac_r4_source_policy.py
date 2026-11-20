@@ -18,6 +18,7 @@ import hashlib
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from urllib import robotparser
 
 from scripts.p30_tpac_catalog_topology import CATALOGS, discover_catalog
@@ -345,6 +346,24 @@ def evaluate_source_cooldown(*, now: datetime, state: dict,
     else:
         return {"decision": "SOURCE_ACCESS_HOLD", "eligible_for_review": False,
                 "native_get_allowed": False}
+    # A trusted Retry-After must extend, never shorten, the host cooldown.
+    # Malformed headers fail closed rather than silently permitting an early probe.
+    retry_after = state.get("retry_after_header")
+    if retry_after is not None:
+        if type(retry_after) is not str or not retry_after or len(retry_after) > 128:
+            raise ValueError("TPAC_R4_RETRY_AFTER_INVALID_HOLD")
+        if re.fullmatch(r"[0-9]+", retry_after):
+            seconds = int(retry_after)
+            if seconds > 365 * 86400:
+                raise ValueError("TPAC_R4_RETRY_AFTER_INVALID_HOLD")
+            retry_deadline = last + timedelta(seconds=seconds)
+        else:
+            try:
+                parsed = parsedate_to_datetime(retry_after)
+                retry_deadline = _aware(parsed, "RETRY_AFTER")
+            except (ValueError, TypeError, OverflowError, IndexError) as exc:
+                raise ValueError("TPAC_R4_RETRY_AFTER_INVALID_HOLD") from exc
+        minimum = max(minimum, retry_deadline)
     if until < minimum:
         raise ValueError("TPAC_R4_COOLDOWN_MINIMUM_VIOLATION_HOLD")
     if status == 403:
