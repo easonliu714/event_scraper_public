@@ -212,7 +212,12 @@ def reserve_durable_source_attempt(*, provider, now: datetime,
         # state, missing provider support, and 403 policy HOLD fail closed.
         # This is only a review preflight; it never produces GET authority.
         if history.get("first_attempt") is not True:
-            host_state = provider.read_host_cooldown(source_host=source_host)
+            # Missing optional provider capability is a typed fail-closed HOLD,
+            # not a leaked TypeError or a reason to skip host cooldown.
+            read_host_cooldown = getattr(provider, "read_host_cooldown", None)
+            if not callable(read_host_cooldown):
+                raise ValueError("TPAC_R4_HOST_COOLDOWN_PROVIDER_MISSING_HOLD")
+            host_state = read_host_cooldown(source_host=source_host)
             if (type(host_state) is not dict
                     or host_state.get("scope") != "HOST_WIDE"
                     or type(host_state.get("last_attempt_at")) is not datetime
