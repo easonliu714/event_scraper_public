@@ -1,5 +1,15 @@
 # 活動暨售票雷達｜正式治理 Roadmap、PR、Issue 稽核
 
+### 2026-11-20 08:22｜TPAC C20 同 ID LIST 語意變更重新排入 DETAIL：隔離工程 PASS
+
+- **Gate ID：** `TPAC-C20-PER-ID-LIST-CARD-DRIFT-20261120`；SRC-V-TPAC Issue #250，既有 Engineering Draft PR #243（`feat/p30-tpac-multi-event-refresh-v1`）；前置依賴為兩入口 Inventory/CAS、逐 ID 真官方 LIST 來源身份與歷史 38 ID 快照。此 Gate 修復跨輪 Capture 待處理正確性，**不是**新 TPAC 來源 GET 或正式發布。
+- **首個實際缺陷：** `scripts/p30_tpac_multi_event_refresh.py::build_detail_inventory()` 舊邏輯只在活動 ID 消失又重現時恢復 `PENDING_DETAIL_BUDGET`；同一 ID 的來源 LIST 標題、活動期間或分類更改，卻會沿用 `REVIEW_DETAIL_PARSED`，造成過期 DETAIL 不再列入待擷取。整份 LIST SHA 改變也不應使無關 ID 全部重抓。
+- **修改前後：** 修改前沿用 `old.get("status")`；修改後對每個 ID 的來源擁有 `title/title_owned/period/category` 建立持久 `list_card_sha256` 指紋，僅指紋變更的身份回到 `PENDING_DETAIL_BUDGET / LIST_CARD_SEMANTIC_DRIFT_RECHECK_REQUIRED`；舊資料缺指紋時安全排回，保留 attempts/last_attempt、無關已解析 ID 不變，沒有對正式 REVIEW LKG 推進／覆蓋，未發來源 GET。
+- **GitHub Exact HEAD／測試：** Source commit `91bfa8a7f27526ed18b6c7277a7af62348ec99ee`（blob `657392c71b2b43d637fc4baa633479f37b63aef0`）；TEST commit/PR #243 HEAD `c58ff51e00e516c3e1de882fa9e81e9a366bf880`（blob `50554efa7dc910b90f465f8f2c99ed424debd1d9`）；新增 `test_per_event_list_semantic_change_requeues_only_affected_detail` 和 `test_event_list_category_period_drift_requeues_without_get`，正反／舊版資料／跨 Catalog 測試。GitHub 原始 SOURCE／TEST 讀回 PASS；exact-head CI [Run 44645740503](https://github.com/easonliu714/event_scraper_public/actions/runs/44645740503) SUCCESS，Job `135987718141` 22 steps SUCCESS，Artifact `14589140266`，GitHub digest `sha256:83bea724b6947cdfe34d056cbe0abc972a7a37a724f45349d92aee5127c4df29`。
+- **產品影響／Gate：** TPAC C20 每來源 ID 的 Capture backlog 安全度提高；HTTP/LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION **新官方增量皆 0**，歷史 38 LIST ID／3 DETAIL 與正式 `docs/data.json`／`docs/platform_status.json` 不變。UI/API/Pages/Android 新部署未驗證，不影響歷史 `USER_ATTESTED_PASS`；`HARD_HOLD_NO_PUBLICATION` 仍有效。
+- **下一 Gate／Owner：** 優先已有 PIN 官方 2 LIST + 3 DETAIL 原始 Artifact/Receipt 的 C20 backlog 獨立讀回，逐步解 35 筆缺 DETAILS；官方 TPAC 新 GET 仍待真實跨主機不可變 Claim/retention Provider 驗證和 Owner 獨立明示來源授權。唯一每小時 Writer Task `6ae1e6147e548191881f20e730ab0f11` 已保留並改為修首真因、每輪實際嘗試交付，兩輪停滯提出 Owner 決策；不能為追求每輪 commit 而虛構缺陷。Issue #250 記錄 `7026325201`；不 Merge／不發布。
+
+
 ### 2026-11-19｜TPAC C20 活動重現後重新排入 DETAIL（工程 Gate PASS，來源 GET HOLD）
 
 - Gate ID: `TPAC-C20-REAPPEARANCE-20261119`；Roadmap: SRC-V-TPAC (#250) / Capture C20；前置：雙入口歷史 LIST 20+18 IDs、封存 3 DETAIL、既有隔離 Inventory/CAS。
