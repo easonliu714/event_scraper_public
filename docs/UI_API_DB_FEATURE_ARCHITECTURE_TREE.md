@@ -9621,3 +9621,29 @@ TPAC Source Adapter（既有 Draft PR #243，非 main）
 
 
 > **CAS_REPLAY_BOUNDARY_CLARIFICATION_20261119｜CAS 儲存範圍補充：** `write_detail_inventory()` 使用原子 CAS 覆寫目前隔離 Inventory JSON，**不會自行永久保存前一輪完整檔案或 DETAIL 原始 bytes**。先前 `ARCHIVED_DETAIL_VERIFIED_ONLY` 狀態及版本 SHA 是歷史 metadata，不代表新一輪可取得原始 bytes。故本次修補僅在當輪 Manifest 供給並重新驗證 raw DETAIL 與 receipt 後計入 `detail_available`；否則回復 `PENDING_DETAIL_BUDGET`。長期可重播證據仍依賴獨立保留的原始檔／Artifact／manifest；本機 CAS 不等於證據永久封存。正式 LKG 與正式資料發布不受影響。
+
+
+## 2026-11-20｜TPAC-R4-HOST-WIDE-COOLDOWN-RESERVATION-20261120｜Host-wide response cooldown 在來源預留流程中的實際接線
+
+```text
+Owner-approved architecture decision (NOT source GET / Publisher activation)
+   |- Single network executor candidate: prove one writer / durable lease / crash recovery
+   |- Multi-host remains HOLD unless independently proven cross-host fencing
+   |- Per-source eligibility / per-host shared throttle:
+   |    historical last_attempt + host-wide last_http_status/Retry-After/cooldown_until
+   |    /program 429 --> /event same host blocked until cooldown; 403 --> policy review HOLD
+   |    next eligible source must be separately authorized, otherwise offline Adapter repair
+   v
+scripts/p30_tpac_r4_source_policy.py::reserve_durable_source_attempt()
+   existing atomic provider lease + 6h history check
+   NEW: read_host_cooldown(HOST_WIDE) + exact history-time binding
+        evaluate_source_cooldown() -> only REVIEW_ONLY can proceed to request reservation
+        missing method, stale/unverified/per-ID-only/403/429 active -> HOLD
+   existing write_attempt + readback + validate_durable_source_attempt
+   terminal native_get_allowed=False; no network; no Publisher
+```
+
+- **Engineering Source/Test:** TPAC existing Draft #243 SOURCE b677849a261067d2fb7824b3f63402b8048cb004, TEST 1142f0bccd002bd5f54923c9a988d29407bb4680。首次 CI #44727441847 FAIL（缺 Provider 方法導致 TypeError），在同 Draft 修成 Source `437c95aca5770ec707252e0efcceff33ef1b9886` 的明確 `TPAC_R4_HOST_COOLDOWN_PROVIDER_MISSING_HOLD`；最新 TEST/HEAD `f07ea3df7c17b94d3a4c6223719030fc7993b240`。
+- **Exact-head 驗收：** [CI #44727844945](https://github.com/easonliu714/event_scraper_public/actions/runs/44727844945) SUCCESS，Job 136259705615 22 steps SUCCESS，Artifact 14624567241 GitHub sha256 `1c56a7e40e3f6245c1018bd6caecd2084850dca9b707d8b539ff9b52a27026cc`。隔離正/反測試包含主機 429 → 異 Catalog 擋下、429 到期只 REVIEW、403 到期仍 policy HOLD、stale/per-ID/unknown Provider 拒絕，不能放寬 R4 原 6h / robots / GET budget。
+- **尚缺不可混淆：** 此 Source 預檢只是開始串接現有純冷卻判定，**沒有**真正的單執行者持久化健康狀態/回應原子寫入/可獨立驗證 crash/restart；現有 RAW5 Provider 尚不提供此 readback，正式 GET 權限仍為 false。不可把 flag `durable_readback_verified` 當跨主機安全已通過。TPAC C20 歷史 38/3/35 不變，未新增官方 HTTP、正式 Golden/JSON/Pages 發布，保留舊 Android PASS。
+- **後續 Source/Core:** 將共同 source_host cooldown 與 source-specific failure 分類加入實際受控單網路 Writer 之固定狀態儲存；需要 Provider 交易驗證／安全配置／Owner 來源 GET 個別授權。正式發布仍 `HARD_HOLD_NO_PUBLICATION`；不另立治理文件。
