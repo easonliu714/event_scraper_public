@@ -1,5 +1,26 @@
 # 活動暨售票雷達｜UI／API／資料儲存／CI 功能架構樹
 
+### 2026-11-20｜TPAC LIST 單一活動內容指紋與 DETAIL 待辦恢復（C20）
+
+- **Gate：** `TPAC-C20-PER-ID-LIST-CARD-DRIFT-20261120`，Engineering Draft #243 HEAD `c58ff51e00e516c3e1de882fa9e81e9a366bf880`，CI #44645740503 SUCCESS／Job 135987718141 PASS／Artifact 14589140266。既有 Writer `6ae1e6147e548191881f20e730ab0f11` 維持 TPAC-FIRST 每小時唯一工程修補者。
+- **功能樹／資料流：**
+  ```text
+  TPAC /program、/event 官方 LIST 原始 bytes + 同一次來源 receipt
+    → discover_catalog()：各 Catalog 獨立 ID/title/period/category
+    → build_detail_inventory()：每 ID list_card_sha256（來源欄位指紋）
+        ├─ 該 ID title／period／category／title_owner 變動
+        │    → PENDING_DETAIL_BUDGET；需合法、同 ID 的 DETAIL 重新驗證
+        ├─ 無關 LIST/card 改變 → 已解析其他 ID 保留原狀
+        └─ 舊 Inventory 無 per-card 指紋 → fail-closed 重新入列
+    → isolated Inventory CAS/backlog（不是 SOURCE GET 授權）
+    → 尚待真官方 GET/DETAIL/IDENTITY/FIELD 品質驗證
+    → 獨立 Review LKG／HARD_HOLD_NO_PUBLICATION／正式 Publisher HOLD
+  ```
+- **受影響函數：** `scripts/p30_tpac_multi_event_refresh.py::build_detail_inventory()`。修改前沿用舊 status、僅 ID 消失又重現才排隊；修改後儲存來源擁有 `title/title_owned/period/category` 的 canonical SHA256，變更時逐 ID 重排，保留 attempts 與 last_attempt。SOURCE blob `657392c71b2b43d637fc4baa633479f37b63aef0`，TEST blob `50554efa7dc910b90f465f8f2c99ed424debd1d9`，均 GitHub 獨立讀回 PASS。
+- **驗證／邊界：** 雙入口正反回歸／舊格式遷移／無關頁面變更與 CAS 安全；CI PASS。這是離線 Capture 行為工程 PASS，不是新原生官方 HTTP、LIST、DETAIL、IDENTITY、FIELD、Golden 或 Publication PASS；本輪七層新增皆 0，歷史 38 LIST ID／3 DETAIL 不變，正式 docs/data.json 與 platform_status.json、UI/Pages/Android 未動。
+- **未完成與 Owner：** TPAC C20 仍需補足合法同 ID DETAIL 原始 bytes。新的官方 GET 必須先經正式跨主機 Claim/保留驗證及 Owner 明示來源授權；6h 主機共用限速、403/429 STOP、`HARD_HOLD_NO_PUBLICATION` 保持。現有正式 Publisher、通知、Golden 與 main 不因此啟用或變更。
+
+
 ### 2026-11-19｜TPAC 雙 Catalog Capture Inventory 重現恢復契約
 
 - Gate `TPAC-C20-REAPPEARANCE-20261119`｜既有 Engineering Draft PR #243 exact-head `f319ca8ac9e6092c435dd4f0a78c7854258450f7`，Source `1d916910a176c8d364ab2febdfc1bf540b53ade7`，CI #44532308006 / Job 135588540200 SUCCESS，Artifact 14533987047；Source/Test Blob 獨立讀回 PASS。
