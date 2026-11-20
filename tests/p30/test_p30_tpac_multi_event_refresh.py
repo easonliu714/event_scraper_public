@@ -826,6 +826,87 @@ class PersistentInventoryContractTests(unittest.TestCase):
         self.assertEqual(returned["items"]["tpac:program:2112"]["status"],
                          "REVIEW_DETAIL_PARSED")
 
+    def test_per_event_list_semantic_change_requeues_only_affected_detail(self):
+        # Existing REVIEW detail cannot remain current when its *own* LIST
+        # title/period changes. An unrelated card or decoration is not drift.
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_detail_inventory, select_pending_details,
+        )
+        first_raw = listing(("2111", "2112"))
+        initial = build_detail_inventory("program", first_raw,
+                                         receipt(ROOT, first_raw), NOW)
+        for sid in ("2111", "2112"):
+            row = initial["items"]["tpac:program:" + sid]
+            row["status"] = "REVIEW_DETAIL_PARSED"
+            row["reason"] = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED"
+            row["attempts"] = 3
+            row["last_attempt"] = OBS
+        old_first_sha = initial["items"]["tpac:program:2111"]["list_card_sha256"]
+        old_other_sha = initial["items"]["tpac:program:2112"]["list_card_sha256"]
+
+        changed = first_raw.replace(b"2026-11-19 - 2026-11-28",
+                                    b"2026-11-20 - 2026-11-29", 1)
+        updated = build_detail_inventory("program", changed,
+                                         receipt(ROOT, changed), NOW, initial)
+        moved = updated["items"]["tpac:program:2111"]
+        other = updated["items"]["tpac:program:2112"]
+        self.assertEqual(moved["status"], "PENDING_DETAIL_BUDGET")
+        self.assertEqual(moved["reason"], "LIST_CARD_SEMANTIC_DRIFT_RECHECK_REQUIRED")
+        self.assertNotEqual(moved["list_card_sha256"], old_first_sha)
+        self.assertEqual((moved["attempts"], moved["last_attempt"]), (3, OBS))
+        self.assertEqual(other["status"], "REVIEW_DETAIL_PARSED")
+        self.assertEqual(other["list_card_sha256"], old_other_sha)
+        self.assertEqual(select_pending_details(updated), ["tpac:program:2111"])
+        # Idempotent after the new snapshot is committed; no repeated recapture.
+        replay = build_detail_inventory("program", changed,
+                                        receipt(ROOT, changed), NOW, updated)
+        self.assertEqual(replay, updated)
+
+        # Legacy inventories did not persist a per-card signature. Recheck
+        # rather than silently treating an unproven REVIEW as current.
+        legacy = {"kind": initial["kind"], "items": {
+            key: dict(value) for key, value in initial["items"].items()}}
+        legacy["items"]["tpac:program:2112"].pop("list_card_sha256")
+        migrated = build_detail_inventory("program", first_raw,
+                                           receipt(ROOT, first_raw), NOW, legacy)
+        self.assertEqual(migrated["items"]["tpac:program:2112"]["status"],
+                         "PENDING_DETAIL_BUDGET")
+        self.assertEqual(migrated["items"]["tpac:program:2112"]["reason"],
+                         "LIST_CARD_SEMANTIC_DRIFT_RECHECK_REQUIRED")
+
+    def test_event_list_category_period_drift_requeues_without_get(self):
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_detail_inventory, select_pending_details,
+        )
+        url = "https://tpac.org.taipei/event"
+        raw = ('<a class="card-event" title="連結到官方專題導覽" href="/event/2072">'
+               '<div class="card-event__text-title">官方專題導覽</div>'
+               '<div class="card-event__text-datecate">'
+               '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+               '</div></a>').encode("utf-8")
+        original = build_detail_inventory("event", raw, receipt(url, raw), NOW)
+        original["items"]["tpac:event:2072"]["status"] = "REVIEW_DETAIL_PARSED"
+        original["items"]["tpac:event:2072"]["reason"] = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED"
+
+        # A non-event navigation anchor changes LIST bytes but not owned data.
+        decorated = raw + b'<a href="/about">About</a>'
+        stable = build_detail_inventory("event", decorated,
+                                        receipt(url, decorated), NOW, original)
+        self.assertEqual(stable["items"]["tpac:event:2072"]["status"],
+                         "REVIEW_DETAIL_PARSED")
+        self.assertNotEqual(stable["items"]["tpac:event:2072"]["list_sha"],
+                            original["items"]["tpac:event:2072"]["list_sha"])
+
+        changed = decorated.replace("專題導覽</p>".encode("utf-8"),
+                                    "藝術工作坊</p>".encode("utf-8"))
+        newer = build_detail_inventory("event", changed,
+                                       receipt(url, changed), NOW, stable)
+        self.assertEqual(newer["items"]["tpac:event:2072"]["status"],
+                         "PENDING_DETAIL_BUDGET")
+        self.assertEqual(select_pending_details(newer), ["tpac:event:2072"])
+        self.assertEqual(newer["items"]["tpac:event:2072"]["reason"],
+                         "LIST_CARD_SEMANTIC_DRIFT_RECHECK_REQUIRED")
+
     def test_real_cli_offline_two_catalog_inventory_restart_and_cas(self):
         import subprocess
         import sys
