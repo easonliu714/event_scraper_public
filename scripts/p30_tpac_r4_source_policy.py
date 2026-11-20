@@ -205,6 +205,25 @@ def reserve_durable_source_attempt(*, provider, now: datetime,
             if type(history.get("last_attempt_at")) is not datetime:
                 raise ValueError("TPAC_R4_LAST_ATTEMPT_MISSING_HOLD")
             enforce_elapsed(current, history["last_attempt_at"])
+        # A six-hour request ledger is not a durable 403/429 host barrier.
+        # Read the *host-wide* response state after acquiring the same-source
+        # lease and before consuming a new attempt. Both /program and /event
+        # must observe the same most recent host attempt; stale/per-ID-only
+        # state, missing provider support, and 403 policy HOLD fail closed.
+        # This is only a review preflight; it never produces GET authority.
+        if history.get("first_attempt") is not True:
+            host_state = provider.read_host_cooldown(source_host=source_host)
+            if (type(host_state) is not dict
+                    or host_state.get("scope") != "HOST_WIDE"
+                    or type(host_state.get("last_attempt_at")) is not datetime
+                    or _aware(host_state["last_attempt_at"], "COOLDOWN_ATTEMPT")
+                       != _aware(history["last_attempt_at"], "PREVIOUS_CLAIM")):
+                raise ValueError("TPAC_R4_HOST_COOLDOWN_HISTORY_BINDING_HOLD")
+            eligibility = evaluate_source_cooldown(
+                now=current, state=host_state, source_host=source_host)
+            if (eligibility.get("decision") != "REVIEW_ONLY"
+                    or eligibility.get("eligible_for_review") is not True):
+                raise ValueError("TPAC_R4_HOST_COOLDOWN_ACTIVE_OR_POLICY_HOLD")
         # Persist before a single network request. Provider must implement
         # immutable fencing-bound write and independently verified readback.
         provider.write_attempt(source_host=source_host, owner_run_id=run_id,
