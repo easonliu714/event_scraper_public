@@ -4950,3 +4950,13 @@ Owner 2026-11-13 指令：每個 Source 固定一個 Roadmap Gate 和 GitHub Iss
 
 
 > **CAS_REPLAY_BOUNDARY_CLARIFICATION_20261119｜精確保存邊界補充：** `write_detail_inventory()` 採本機原子 CAS 覆寫當前 Inventory JSON，**不會自動為每次版本永久保存原始 DETAIL bytes／舊版 Inventory 檔**。先前的 CAS SHA／驗證狀態僅可作歷史紀錄或參照，不保證原始檔仍存在或可重播；本輪完整原始 bytes 與對應 receipt 的實際重驗，才可計入當輪 `detail_available`。若要追溯真正的舊資料內容，必須具備獨立保留的 Artifact／原始檔與可驗證 manifest。此說明優先於上方任何「歷史 CAS 版本可直接取回」的概括文字；不變更既有正式 LKG、Golden 或發布 Gate。
+
+
+## 2026-11-20｜TPAC-R4-HOST-WIDE-COOLDOWN-RESERVATION-20261120｜Owner Single-Executor / Source Cooldown 方案與 TPAC 實際修補（工程 PASS／正式來源 HOLD）
+
+- **Owner 決策（架構與隔離實作）：** 保留來源合規、主機層級防重與歷史證據；容許以經實測的**唯一網路擷取執行者＋持久化／原子互斥／崩潰重啟**替代複雜的 GitHub 不可變 Claim Ledger。各已授權 Source 按 host/來源獨立冷卻、拒絕當輪立即停、條件成立才於到期做有限復核，未受拒來源可繼續。這**不是**新官方 GET 或正式 Publisher 的授權；原 TPAC P0 不變，TaiNEX 仍只作 P1 備援。
+- **修正真缺口：** `scripts/p30_tpac_r4_source_policy.py::reserve_durable_source_attempt()` 原來只檢查主機近六小時 `last_attempt_at`，未實際執行已有 `evaluate_source_cooldown()`；可在 /program 收到 429 後第 6 小時對 /event 執行預留（即使尚不提供新 GET 權限）。更新後，先讀取 `provider.read_host_cooldown(source_host)`，要求 `scope=HOST_WIDE`、與 provider 最新 `last_attempt_at` 精確綁定、通過既有 429 Retry-After/24h 及 403 72h 政策判定；不足或無 Provider 方法時在下一次預留前 fail-closed。這是隔離預檢合同，不是正式跨主機 Provider 或網路擷取器驗收。
+- **Source/Test/Exact-head：** 既有 Engineering Draft PR #243，SOURCE commit `b677849a261067d2fb7824b3f63402b8048cb004`，TEST commit `1142f0bccd002bd5f54923c9a988d29407bb4680`；CI #44727441847 FAIL 真因為缺 Provider 方法時 TypeError 被直接冒泡，未轉成可稽核 HOLD。已立即修 Source `437c95aca5770ec707252e0efcceff33ef1b9886`、TEST/HEAD `f07ea3df7c17b94d3a4c6223719030fc7993b240`。Source Blob `70b8e38520785392365c78182f4b636d8a14ebb2`、TEST Blob `f26aa4fd32abbe0cc8832eabdcfb106cace4d875`。
+- **Exact-head CI/Artifact：** Run [#44727844945](https://github.com/easonliu714/event_scraper_public/actions/runs/44727844945) SUCCESS、Job `136259705615` SUCCESS（22 steps）；Artifact `14624567241` GitHub digest `sha256:1c56a7e40e3f6245c1018bd6caecd2084850dca9b707d8b539ff9b52a27026cc`；PR HEAD、GitHub Source/Test Blob 和 Artifact head_sha 各自讀回一致。**Gate 工程 PASS；來源 Claim/GET/HARD_HOLD_NO_PUBLICATION 不變**。
+- **產品增量界線：** 429 在 /program 會阻擋 /event 的預留，403 冷卻到期僅可政策復核；缺失、偽造、過期、Per-event 狀態拒絕預留。新增可重用行為但新官方 `HTTP/LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION=0/0/0/0/0/0/0`，歷史封存 `38 LIST / 3 DETAIL / 35 Pending` 不變，正式 JSON/status、main、Golden、Pages、Android PASS 均不動。
+- **下一 Gate 與 Owner：** TPAC 仍為 P0，實作**唯一受控網路擷取執行者**選項的證據：主機及來源持久化 health ledger 與 403/429/Retry-After 冷卻寫入交易、讀回、single-writer fencing、crash/restart；更新 Source Adapter 且可獨立驗證，再請 Owner 針對特定來源授權有限 GET，不要求逐輪審批。現有 GitHub RAW5 Provider 尚未實作 `read_host_cooldown()`，所以此 preflight 對其保持 HOLD，不能稱正式來源可擷取。正式 Publisher/排程啟用另受獨立授權。
