@@ -226,6 +226,10 @@ def reserve_durable_source_attempt(*, provider, now: datetime,
                 raise ValueError("TPAC_R4_HOST_COOLDOWN_HISTORY_BINDING_HOLD")
             eligibility = evaluate_source_cooldown(
                 now=current, state=host_state, source_host=source_host)
+            # Expired 429 permits policy REVIEW, not another attempt.
+            # An independently verified probe authorization is not implemented.
+            if host_state.get("last_http_status") == 429:
+                raise ValueError("TPAC_R4_429_PROBE_AUTHORIZATION_REQUIRED_HOLD")
             if (eligibility.get("decision") != "REVIEW_ONLY"
                     or eligibility.get("eligible_for_review") is not True):
                 raise ValueError("TPAC_R4_HOST_COOLDOWN_ACTIVE_OR_POLICY_HOLD")
