@@ -313,6 +313,24 @@ class DurableCooldownPolicyTests(unittest.TestCase):
                                      cooldown_until=NOW+timedelta(hours=hours)))
                 self.assertFalse(result["native_get_allowed"])
 
+    def test_retry_after_cannot_be_ignored_or_malformed(self):
+        from scripts.p30_tpac_r4_source_policy import evaluate_source_cooldown
+        for header in ("259200", "Fri, 27 Nov 2026 12:00:00 GMT"):
+            with self.subTest(header=header):
+                with self.assertRaisesRegex(ValueError, "MINIMUM_VIOLATION"):
+                    evaluate_source_cooldown(now=NOW+timedelta(days=8),
+                        state=self.state(retry_after_header=header))
+        for header in ("nonsense", "-1", "", True):
+            with self.subTest(header=header):
+                with self.assertRaisesRegex(ValueError, "RETRY_AFTER_INVALID"):
+                    evaluate_source_cooldown(now=NOW+timedelta(days=8),
+                        state=self.state(retry_after_header=header))
+        result = evaluate_source_cooldown(now=NOW+timedelta(days=8),
+            state=self.state(retry_after_header="259200",
+                             cooldown_until=NOW+timedelta(days=3)))
+        self.assertEqual(result["decision"], "REVIEW_ONLY")
+        self.assertFalse(result["native_get_allowed"])
+
     def test_403_requires_policy_review_even_after_expiry(self):
         from scripts.p30_tpac_r4_source_policy import evaluate_source_cooldown
         state = self.state(last_http_status=403, last_failure_class="ACCESS_DENIED",
