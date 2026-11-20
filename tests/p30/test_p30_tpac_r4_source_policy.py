@@ -234,6 +234,21 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
                 self.calls.append("history")
                 return dict(source_host=kw["source_host"], first_attempt=False,
                             last_attempt_at=self.last)
+            def read_host_cooldown(self, **kw):
+                self.calls.append("cooldown")
+                status = getattr(self, "cooldown_status", 200)
+                reason = ("NONE" if status == 200 else
+                          "RATE_LIMIT" if status == 429 else
+                          "ACCESS_DENIED" if status == 403 else "TRANSIENT")
+                minimum_hours = (24 if status == 429 else 72 if status == 403
+                                 else 12 if status >= 500 else 6)
+                return dict(scope="HOST_WIDE", source_host=kw["source_host"],
+                            source_identity="tpac:program:1423",
+                            durable_readback_verified=True,
+                            last_attempt_at=self.last, last_http_status=status,
+                            last_failure_class=reason,
+                            consecutive_failures=0 if status == 200 else 1,
+                            cooldown_until=self.last + timedelta(hours=minimum_hours))
             def write_attempt(self, **kw):
                 self.calls.append("write")
                 self.written = kw
@@ -245,7 +260,7 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
                             attempt_written_at=self.written["attempted_at"])
         p = Provider()
         result = reserve_durable_source_attempt(provider=p, now=NOW, run_id="source-run-001")
-        self.assertEqual(p.calls, ["acquire","history","write","readback"])
+        self.assertEqual(p.calls, ["acquire","history","cooldown","write","readback"])
         self.assertTrue(result["attempt_reserved"])
         self.assertFalse(result["native_get_allowed"])
         self.assertEqual(result["decision"], CLAIM_HOLD)
@@ -279,9 +294,56 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         p = Broken()
         with self.assertRaisesRegex(ValueError, "PROVIDER_OPERATION_FAILED_HOLD"):
             reserve_durable_source_attempt(provider=p, now=NOW, run_id="source-run-003")
-        self.assertEqual(p.calls, ["acquire","history","write","readback"])
+        self.assertEqual(p.calls, ["acquire","history","cooldown","write","readback"])
         with self.assertRaisesRegex(ValueError, "SOURCE_RUN_ID_HOLD"):
             reserve_durable_source_attempt(provider=Provider(), now=NOW, run_id="../")
+        # Reject a prior /program 429 for every /event attempt on this host,
+        # even though the Owner's six-hour minimum has already elapsed.
+        p = Provider()
+        p.last = NOW-timedelta(hours=7)
+        p.cooldown_status = 429
+        with self.assertRaisesRegex(ValueError, "HOST_COOLDOWN_ACTIVE_OR_POLICY_HOLD"):
+            reserve_durable_source_attempt(provider=p, now=NOW,
+                                           run_id="event-run-after-429")
+        self.assertEqual(p.calls, ["acquire", "history", "cooldown"])
+        self.assertIsNone(p.written)
+        # When elapsed, 429 permits REVIEW only; reservation never grants GET.
+        p = Provider()
+        p.last = NOW-timedelta(hours=25)
+        p.cooldown_status = 429
+        expired = reserve_durable_source_attempt(provider=p, now=NOW,
+                                                 run_id="event-run-after-wait")
+        self.assertFalse(expired["native_get_allowed"])
+        # 403 is never an automatic retry merely because the 72h elapsed.
+        p = Provider()
+        p.last = NOW-timedelta(hours=80)
+        p.cooldown_status = 403
+        with self.assertRaisesRegex(ValueError, "HOST_COOLDOWN_ACTIVE_OR_POLICY_HOLD"):
+            reserve_durable_source_attempt(provider=p, now=NOW,
+                                           run_id="event-run-after-403")
+        self.assertIsNone(p.written)
+        # Missing/stale/per-event state must fail *before* request reservation.
+        for mutation in ({"scope": "PER_EVENT"},
+                         {"last_attempt_at": NOW-timedelta(hours=7)},
+                         {"durable_readback_verified": False}):
+            class UntrustedCooldown(Provider):
+                def read_host_cooldown(self, **kw):
+                    result = super().read_host_cooldown(**kw)
+                    result.update(mutation)
+                    return result
+            p = UntrustedCooldown()
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                reserve_durable_source_attempt(provider=p, now=NOW,
+                                               run_id="event-untrusted-state")
+            self.assertIsNone(p.written)
+        class MissingCooldown(Provider):
+            read_host_cooldown = None
+        p = MissingCooldown()
+        with self.assertRaisesRegex(ValueError, "PROVIDER_OPERATION_FAILED_HOLD"):
+            reserve_durable_source_attempt(provider=p, now=NOW,
+                                           run_id="event-missing-provider")
+        self.assertIsNone(p.written)
+
 
 
 
