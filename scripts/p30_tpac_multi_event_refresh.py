@@ -887,7 +887,8 @@ def _validate_archived_review_row(row):
                 or "archive_field_hold_reason" in row):
             raise ValueError("TPAC_ARCHIVE_FIELD_CURRENTNESS_HOLD")
     elif (row.get("status") != "PENDING_DETAIL_BUDGET" or
-          row.get("archive_field_hold_reason") != "DETAIL_BYTES_NOT_REPLAYED_HOLD"):
+          row.get("archive_field_hold_reason") not in ("DETAIL_BYTES_NOT_REPLAYED_HOLD",
+              "DETAIL_VALIDATION_FAILED_HOLD")):
         raise ValueError("TPAC_ARCHIVE_FIELD_CURRENTNESS_HOLD")
     stamped = ev["observed_at"] or ev["capture_started_at"]
     if ((ev["observed_at"] is not None and ev["capture_started_at"] is not None)
