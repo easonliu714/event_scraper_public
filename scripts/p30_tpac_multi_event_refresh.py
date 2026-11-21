@@ -1038,18 +1038,31 @@ def write_detail_inventory(inventory, repo_root, expected_sha=None):
                 if archived.read_bytes() != prior:
                     raise ValueError("TPAC_INVENTORY_HISTORY_CORRUPT_HOLD")
             else:
+                # A killed writer must never expose a partially written SHA-named
+                # predecessor. Stage and fsync first, then publish by atomic
+                # no-clobber hard link. A restart may safely discard temp files.
+                staged = None
                 try:
-                    history_fd = os.open(archived, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-                except FileExistsError as error:
-                    raise ValueError("TPAC_INVENTORY_HISTORY_RACE_HOLD") from error
-                try:
-                    with os.fdopen(history_fd, "wb") as saved:
+                    with tempfile.NamedTemporaryFile(
+                            dir=history, prefix=".history-", delete=False) as saved:
+                        staged = Path(saved.name)
                         saved.write(prior)
                         saved.flush()
                         os.fsync(saved.fileno())
-                except BaseException:
-                    archived.unlink(missing_ok=True)
-                    raise
+                    try:
+                        os.link(staged, archived)
+                    except FileExistsError as error:
+                        raise ValueError("TPAC_INVENTORY_HISTORY_RACE_HOLD") from error
+                    # Persist the directory entry before replacing current CAS.
+                    if hasattr(os, "O_DIRECTORY"):
+                        dir_fd = os.open(history, os.O_RDONLY | os.O_DIRECTORY)
+                        try:
+                            os.fsync(dir_fd)
+                        finally:
+                            os.close(dir_fd)
+                finally:
+                    if staged is not None:
+                        staged.unlink(missing_ok=True)
         with tempfile.NamedTemporaryFile(dir=folder, prefix=".inventory-", delete=False) as tmp:
             temp_name = tmp.name
             tmp.write(payload)
