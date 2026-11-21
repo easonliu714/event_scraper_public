@@ -1946,6 +1946,37 @@ class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
                              second["sha256"])["sha256"], second["sha256"])
             self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
 
+    def test_history_link_failure_keeps_current_cas_and_no_partial_version(self):
+        # Simulate failure at the atomic history publication boundary.
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            initial = {"kind": INVENTORY_KIND, "items": {}}
+            first = write_detail_inventory(initial, root)
+            changed = {"kind": INVENTORY_KIND, "items": {
+                "tpac:event:1301": {
+                    "source_namespace": "event", "source_event_id": "1301",
+                    "detail_url": "https://tpac.org.taipei/event/1301",
+                    "status": "PENDING_DETAIL_BUDGET", "attempts": 0,
+                }
+            }}
+            with patch("scripts.p30_tpac_multi_event_refresh.os.link",
+                       side_effect=OSError("simulated crash before publication")):
+                with self.assertRaisesRegex(OSError, "simulated crash"):
+                    write_detail_inventory(changed, root, first["sha256"])
+            self.assertEqual(load_detail_inventory(root), (initial, first["sha256"]))
+            history = root / "_isolated_review" / "tpac" / "inventory_versions"
+            self.assertEqual(list(history.glob("*.json")), [])
+            self.assertEqual(list(history.glob(".history-*")), [])
+            second = write_detail_inventory(changed, root, first["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
+            self.assertTrue((history / (first["sha256"] + ".json")).is_file())
+
     def test_stale_cas_cannot_create_history_or_change_snapshot(self):
         import tempfile
         from pathlib import Path
