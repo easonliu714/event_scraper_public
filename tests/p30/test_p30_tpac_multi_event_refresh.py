@@ -1405,6 +1405,94 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                 archived_inventory_cli(manifest, root)
             self.assertEqual(load_detail_inventory(root / "_isolated_archive_replay")[1], before)
 
+
+    def test_persisted_archive_field_receipt_tamper_is_rejected_before_cas(self):
+        # JSON canonical form and its CAS hash alone do not establish that
+        # archived FIELD REVIEW has never been promoted to LIVE/accepted.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import (
+            _canonical, archived_inventory_cli, load_detail_inventory,
+            write_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive_root = root / "_isolated_archive_replay"
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                list_raw, list_rec, detail_raw, detail_rec = self.sources(catalog, sid)
+                list_file = root / (catalog + "_list.html")
+                detail_file = root / (catalog + "_detail.html")
+                list_file.write_bytes(list_raw)
+                detail_file.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(list_file), "list_receipt": list_rec,
+                    "details": {sid: {"detail_file": str(detail_file),
+                                       "receipt": detail_rec}},
+                }
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps(
+                {"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            initial = archived_inventory_cli(manifest, root)
+            stored, sha = load_detail_inventory(archive_root)
+            self.assertEqual(sha, initial["inventory"]["sha256"])
+            target = archive_root / "_isolated_review/tpac/tpac_detail_inventory.json"
+            original = target.read_bytes()
+            row_key = "tpac:program:2040"
+
+            def mutate(doc, name):
+                row = doc["items"][row_key]
+                evidence = row.get("archive_field_evidence", {})
+                if name == "accepted":
+                    evidence["accepted_fields"] = 1
+                elif name == "published":
+                    evidence["published"] = True
+                elif name == "wrong_url":
+                    evidence["field_roles"]["title"]["source_url"] = (
+                        "https://tpac.org.taipei/program/777")
+                elif name == "accepted_role":
+                    evidence["field_roles"]["title"]["decision"] = "FIELD_ACCEPTED"
+                elif name == "price_value":
+                    evidence["field_holds"]["price"]["value"] = "NT$500"
+                elif name == "title_empty":
+                    evidence["field_roles"]["title"]["value"] = ""
+                elif name == "body_sha":
+                    evidence["detail_body_sha256"] = "0" * 64
+                elif name == "stale_claim_current":
+                    row["status"] = "PENDING_DETAIL_BUDGET"
+                elif name == "bad_flag":
+                    row["archive_field_evidence_current"] = "true"
+                elif name == "orphan_flag":
+                    row.pop("archive_field_evidence")
+                elif name == "bad_timestamp":
+                    evidence["capture_started_at"] = "not-a-date"
+                else:
+                    raise AssertionError(name)
+
+            for bad in ("accepted", "published", "wrong_url", "accepted_role",
+                        "price_value", "title_empty", "body_sha",
+                        "stale_claim_current", "bad_flag", "orphan_flag",
+                        "bad_timestamp"):
+                with self.subTest(tamper=bad):
+                    forged = deepcopy(stored)
+                    mutate(forged, bad)
+                    forged_bytes = _canonical(forged)
+                    target.write_bytes(forged_bytes)
+                    # Reading this perfectly canonical JSON must FAIL.
+                    with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_FIELD_"):
+                        load_detail_inventory(archive_root)
+                    # Replaying fresh manifest must not overwrite the tampered
+                    # LKG silently; the operator must reconcile the corruption.
+                    with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_FIELD_"):
+                        archived_inventory_cli(manifest, root)
+                    self.assertEqual(target.read_bytes(), forged_bytes)
+                    target.write_bytes(original)
+            self.assertEqual(load_detail_inventory(archive_root)[1], sha)
+            # The normal, unchanged re-run is idempotent.
+            self.assertEqual(archived_inventory_cli(
+                manifest, root)["inventory"]["sha256"], sha)
+            self.assertFalse((root / "docs/data.json").exists())
+
+
     def test_archived_cli_cannot_downgrade_existing_live_inventory(self):
         import subprocess
         import sys
