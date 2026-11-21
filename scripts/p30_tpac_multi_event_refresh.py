@@ -1012,6 +1012,79 @@ def _archived_cards(catalog, raw, receipt):
 
 
 
+
+def _archived_detail_date_roles(catalog, article, soup, detail_url, body_sha, stamped):
+    """Parse source-owned date semantics without fabricating LIVE field acceptance.
+
+    Exact detail DOM scopes only. A listing/activity date range is never a
+    performance start or ticket-sale time. Invalid/ambiguous nodes remain HOLD.
+    """
+    roles = {}
+    def evidence(role, value):
+        return {"role": role, "value": value, "source_url": detail_url,
+                "source_body_sha256": body_sha, "observed_at": stamped,
+                "decision": "ARCHIVED_SEMANTIC_REVIEW_NOT_FIELD_ACCEPTED"}
+    try:
+        if catalog == "program":
+            nodes = [x for x in article.select(".page-program__article-top") if _visible(x)]
+            if len(nodes) != 1:
+                return roles
+            dates = _period(_text(nodes[0]))
+            # Performance dates are evidence only when sourced from an exact
+            # owned showtime block; the programme period alone is not a show.
+            blocks = [x for x in soup.select(".page-program__aside-place-showtimes")
+                      if _visible(x) and len(x.select("h3")) == 1
+                      and _text(x.select_one("h3")) == "場次"]
+        else:
+            nodes = [x for x in article.select(".page-event__article-top-text")
+                     if _visible(x)]
+            if len(nodes) != 1:
+                return roles
+            children = nodes[0].find_all("div", recursive=False)
+            if len(children) != 2:
+                return roles
+            category = _text(children[0])
+            dates = _period(_text(children[1]))
+            if not category:
+                return roles
+            period_role = ("EXHIBITION_PERIOD" if category == "展覽"
+                           else "ACTIVITY_PERIOD")
+            roles["activity_period"] = evidence(period_role,
+                [dates[0].isoformat(), dates[1].isoformat()])
+            if category == "展覽":
+                # Exhibition range must NOT become show start or opening hours.
+                return roles
+            blocks = [x for x in soup.select(".page-event__aside-place-showtimes")
+                      if _visible(x) and len(x.select("h3")) == 1
+                      and _text(x.select_one("h3")) == "場次"]
+        if len(blocks) != 1:
+            return roles
+        labels = blocks[0].select("ul > li > p")
+        if not 1 <= len(labels) <= 40 or any(not _visible(x) for x in labels):
+            return roles
+        times = []
+        for node in labels:
+            match = SHOW.fullmatch(_text(node))
+            if match is None:
+                return roles
+            moment = datetime.fromisoformat(
+                match[1] + "T" + match[3] + ":00+08:00")
+            if (DAY[moment.weekday()] != match[2]
+                    or not dates[0] <= moment.date() <= dates[1]):
+                return roles
+            times.append(moment)
+        if times != sorted(set(times)):
+            return roles
+        # The date may now be historical; never filter it by current time or
+        # claim a future event, price or availability.
+        roles["show_start"] = evidence("EVENT_SHOW_START", times[0].isoformat())
+        roles["show_count"] = evidence("SOURCE_SHOW_COUNT", len(times))
+    except (ValueError, TypeError, KeyError, IndexError, OverflowError):
+        # Bad dates or unexpected DOM can only remove REVIEW candidates.
+        return {}
+    return roles
+
+
 def bind_archived_detail_identity(catalog, list_raw, list_receipt,
                                   event_id, detail_raw, detail_receipt):
     """Compare sealed LIST and same-ID DETAIL bytes/identity (OFFLINE only).
@@ -1040,6 +1113,11 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
     name = _text(titles[0])
     if name != card["title_candidate"]:
         raise ValueError("TPAC_ARCHIVE_LIST_DETAIL_TITLE_PARITY_HOLD")
+    stamped = (detail_receipt.get("observed_at")
+               or detail_receipt.get("capture_started_at"))
+    date_roles = _archived_detail_date_roles(
+        catalog, articles[0], soup, card["detail_url"],
+        detail_receipt["body_sha256"], stamped)
     return {
         "kind": "TPAC_ARCHIVED_SAME_ID_DETAIL_REVIEW_V1",
         "identity": card["identity"], "source_namespace": catalog,
@@ -1053,14 +1131,17 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
             "title": {"role": "EVENT_TITLE", "value": name,
                       "source_url": card["detail_url"],
                       "source_body_sha256": detail_receipt["body_sha256"],
-                      "decision": "ARCHIVED_IDENTITY_PARITY_REVIEW_ONLY"}
+                      "decision": "ARCHIVED_IDENTITY_PARITY_REVIEW_ONLY"},
+            **date_roles
         },
         # The archived H1 proves identity only. These field roles are explicit
         # UNKNOWNs, not values inferred from the card, surrounding text, or
         # unverified historical HTML. This makes partial replay safe for LKG.
         "field_holds": {
             role: {"decision": "HOLD", "value": None,
-                   "hold_reason": "ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED",
+                   "hold_reason": ("ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
+                                    if role == "date" and date_roles else
+                                    "ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED"),
                    "source_url": card["detail_url"],
                    "source_body_sha256": detail_receipt["body_sha256"]}
             for role in ("date", "price", "venue", "description", "image")
