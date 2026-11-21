@@ -1977,6 +1977,75 @@ class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
             self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
             self.assertTrue((history / (first["sha256"] + ".json")).is_file())
 
+    def test_recover_one_historical_review_row_preserves_other_events(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+            restore_detail_inventory_row,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            def row(sid, reason):
+                return {"source_namespace": "event", "source_event_id": sid,
+                        "detail_url": "https://tpac.org.taipei/event/" + sid,
+                        "status": "PENDING_DETAIL_BUDGET", "attempts": 0,
+                        "reason": reason}
+            identity = "tpac:event:1301"
+            other = "tpac:event:2072"
+            first_doc = {"kind": INVENTORY_KIND, "items": {
+                identity: row("1301", "OLD_REVIEW"),
+                other: row("2072", "OTHER_VALID")}}
+            first = write_detail_inventory(first_doc, root)
+            second_doc = {"kind": INVENTORY_KIND, "items": {
+                identity: row("1301", "NEW_UNWANTED_REVIEW"),
+                other: row("2072", "OTHER_VALID")}}
+            second = write_detail_inventory(second_doc, root, first["sha256"])
+            restored = restore_detail_inventory_row(root, first["sha256"],
+                                                    identity, second["sha256"])
+            actual, actual_sha = load_detail_inventory(root)
+            self.assertEqual(actual_sha, restored["sha256"])
+            self.assertEqual(actual["items"][identity], first_doc["items"][identity])
+            self.assertEqual(actual["items"][other], second_doc["items"][other])
+            self.assertEqual(restored["decision"],
+                             "ISOLATED_HISTORICAL_ROW_REVIEW_HOLD_NO_PUBLICATION")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_RECOVERY_CAS_HOLD"):
+                restore_detail_inventory_row(root, first["sha256"], identity,
+                                             second["sha256"])
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_RECOVERY_IDENTITY_HOLD"):
+                restore_detail_inventory_row(root, first["sha256"], "../1301",
+                                             actual_sha)
+            self.assertEqual(load_detail_inventory(root)[1], actual_sha)
+
+    def test_recovery_rejects_source_drift_and_corrupted_version(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+            restore_detail_inventory_row,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            identity = "tpac:event:1301"
+            original = {"source_namespace": "event", "source_event_id": "1301",
+                        "detail_url": "https://tpac.org.taipei/event/1301",
+                        "status": "PENDING_DETAIL_BUDGET", "attempts": 0}
+            first = write_detail_inventory(
+                {"kind": INVENTORY_KIND, "items": {identity: original}}, root)
+            drift = dict(original, detail_url="https://tpac.org.taipei/event/9999")
+            second = write_detail_inventory(
+                {"kind": INVENTORY_KIND, "items": {identity: drift}},
+                root, first["sha256"])
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_RECOVERY_SOURCE_DRIFT_HOLD"):
+                restore_detail_inventory_row(root, first["sha256"], identity,
+                                             second["sha256"])
+            history = root / "_isolated_review" / "tpac" / "inventory_versions"
+            (history / (first["sha256"] + ".json")).write_bytes(b"corrupt")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_HISTORY_CORRUPT_HOLD"):
+                restore_detail_inventory_row(root, first["sha256"], identity,
+                                             second["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
+
     def test_stale_cas_cannot_create_history_or_change_snapshot(self):
         import tempfile
         from pathlib import Path
