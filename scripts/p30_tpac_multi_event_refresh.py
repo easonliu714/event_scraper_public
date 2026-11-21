@@ -1202,9 +1202,19 @@ def archived_inventory_cli(manifest_path, repo_root):
                 body = Path(record["detail_file"]).read_bytes()
                 # Require the source-owned article H1 to match the exact LIST card
                 # before counting this archived DETAIL as identity-verified.
-                bind_archived_detail_identity(catalog, raw, receipt, sid,
-                                              body, record["receipt"])
-                # Archived parity is REVIEW only; semantic fields remain unaccepted.
+                bound = bind_archived_detail_identity(catalog, raw, receipt, sid,
+                                                     body, record["receipt"])
+                # Persist exact body-bound FIELD REVIEW evidence in archive-only
+                # CAS inventory. Never promote archived fields to LIVE/accepted.
+                archive_evidence = {
+                    "detail_body_sha256": bound["detail_body_sha256"],
+                    "field_roles": bound["field_roles"],
+                    "field_holds": bound["field_holds"],
+                    "observed_at": bound["observed_at"],
+                    "capture_started_at": bound["capture_started_at"],
+                    "decision": bound["decision"],
+                    "accepted_fields": 0, "published": False,
+                }
                 status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
                 counts["detail_available"] += 1
             else:
@@ -1224,6 +1234,12 @@ def archived_inventory_cli(manifest_path, repo_root):
                          "list_sha": _sha(raw), "last_observed": None,
                          "status": status, "attempts": old.get("attempts", 0),
                          "last_attempt": old.get("last_attempt"), "reason": reason}
+            if sid in details:
+                rows[key]["archive_field_evidence"] = archive_evidence
+            elif "archive_field_evidence" in old:
+                # Missing replay cannot revalidate old bytes. Keep prior LKG
+                # evidence intact but explicitly mark it historical and held.
+                rows[key]["archive_field_evidence"] = old["archive_field_evidence"]
             diagnostics[key] = {"status": status, "reason": reason}
     # Do not erase rows from other snapshots; archive replay is not LIVE reconciliation.
     inventory = {"kind": INVENTORY_KIND, "items": rows}
