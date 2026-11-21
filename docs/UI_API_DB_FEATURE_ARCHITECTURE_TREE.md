@@ -9736,3 +9736,21 @@ Next: official sealed DETAIL bytes field_roles → isolated LKG/CAS
 - **原始固定程式交付：** `scripts/p30_tpac_multi_event_refresh.py::_archived_cards,bind_archived_detail_identity`（Commit `db4b072aa0e2425d8f129852a95d08c58a35cc6a`，Blob `9401060cdea1e23ebba6f867f21a61e82fe34c9b`）；Test `tests/p30/test_p30_tpac_multi_event_refresh.py::ArchivedDetailIdentityBindingTests`（Commit `62f37f2d206d41c7cab335f8cd7790aec62fbe44`，Blob `df36cb133b84befd2ec90b41cddcb1d2f752dc50`）。
 - **Workflow 固定重播：** `.github/workflows/eventradar_tpac_multi_event_refresh.yml`（Commit/HEAD `103da073e5394c79c752aa5324369f3a5af1e97b`，Blob `01861ba8d19be0dd1737d232cbcf811dd339aa6a`），使用先前已 PIN 官方 2 LIST/3 DETAIL 做 3-ID 同活動 H1 parity；Run `44869933304`、Job `136741958345` SUCCESS；Artifact `14693033568` SHA256 `df4b1936e5d78f4146abc04d88a0010fd7436504c91c54471721e5230b80d491`。
 - **邊界：** GitHub archived 原始 bytes 的重新核對不是新 Live Source HTTP/DETAIL；TITLE 僅 REVIEW 所屬身分，其他活動期間／SHOW／入場／開賣／價格／場館欄位仍須獨立 Parser/Quality 驗收。正式資料 JSON、Golden、main/Pages、Android 歷史 PASS 皆不改；Source C20 仍缺 35 DETAIL；Owner 已接受 Termux 做單執行者隔離驗證（先前 6/6 PASS），不代表正式 GET/自動 Publisher 可啟用。
+
+### TPAC-P0-C20-20261121-1559-EXACT-CI-FIX｜Source LIST→DETAIL archive identity CI 與真正發布界線
+
+```text
+歷史 TPAC 官方 LIST /program + /event [2 archive bodies, NOT LIVE]
+    ↓ _archived_cards() [原始 SHA/URL/可信來源活動 title]
+歷史 DETAIL /program/2040 + /event/1301,/event/2072 [3 archive bodies]
+    ↓ bind_archived_detail_identity() [source_namespace/event_id/detail_url/H1/title/SHA]
+    ↓ archived_inventory_cli() 僅同活動驗證成功才增加 detail_available
+    ↓ CAS inventory [38 LIST IDs: 3 archived DETAIL identity, 35 PENDING]
+    ↓ FIELD role parser / LKG integration [NEXT: not yet finished]
+    ↓ Formal Publisher / docs/data.json / Android PWA [HARD_HOLD_NO_PUBLICATION]
+```
+
+- **原 CI 首真因：** exact-head `44882500915` FAIL／Job `136780633823`，步驟 5：舊回歸 Fixture 缺乏來源文章與 H1，被已驗證身份合約正確拒絕。不是新 Source 本身應降低標準。
+- **實際修補：** `tests/p30/test_p30_tpac_multi_event_refresh.py::ArchivedProvenanceCliTests.test_partial_archived_manifest_requires_raw_detail_replay` 將舊任意 HTML 替換為與 LIST 標題吻合的 `article.page-program__article > h1` 合規 synthetic Detail，保留原缺少／歸還 Detail／CAS Restart／竄改負測。Test `63708e85b193d550d6d84d3a993c0d3f71a16b5d`，Blob `1a266e0d921946814aede97e832da67622e9dc54`。Source 原嚴格同活動驗證邏輯不變。
+- **驗收：** 新 exact-head Run `44882863221` SUCCESS／Job `136781744094` SUCCESS／Artifact `14699035840` sha256 `0263bb2f41f6ab497e6498f0fe873452c27e7c95992f2b6e493f110a4430c87d`；原封存 LIST/DETAIL 3-ID identity replay 已可於固定 CI 走完。**Archive identity PASS 不可等同 Fresh HTTP/Parser FIELD/GOLDEN/正式發布 PASS。**
+- **API／DB／UI／發布：** 此次只有 TEST fixture，未改正式 API、SQLite schema、正式 docs/data.json、docs/platform_status.json、Frontend 或 Android；不啟用 TPAC GET、Termux 正式 Scheduler/Publisher。保留前次 Termux isolated native 6/6 PASS 與原 Android UI PASS，下一 Gate 在隔離 Draft 接 FIXED Adapter/Detail FIELD roles→LKG Snapshot。
