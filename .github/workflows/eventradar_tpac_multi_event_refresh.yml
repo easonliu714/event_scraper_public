@@ -390,6 +390,24 @@ jobs:
                       assert candidate['decision']=='ARCHIVED_SEMANTIC_REVIEW_NOT_FIELD_ACCEPTED'
                       reviewed_date_roles+=1
           assert reviewed_date_roles>=1, 'HOLD_NO_REAL_ARCHIVED_DATE_ROLE_PARSED'
+          # Verify the ACTUAL archived CAS on disk contains only the same
+          # body-bound parsed roles; a transient parser return is insufficient.
+          from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+          archive_store,archive_sha=load_detail_inventory(root/'_isolated_archive_replay')
+          assert archive_sha==first['inventory']['sha256']
+          persisted={}
+          for event_identity,source_row in matches.items():
+              archived_row=archive_store['items'][event_identity]
+              ev=archived_row['archive_field_evidence']
+              assert archived_row['archive_field_evidence_current'] is True
+              assert archived_row['status']=='ARCHIVED_DETAIL_VERIFIED_ONLY'
+              assert ev['detail_body_sha256']==source_row['detail_body_sha256']
+              assert ev['field_roles']==source_row['field_roles']
+              assert ev['field_holds']==source_row['field_holds']
+              assert ev['accepted_fields']==0 and ev['published'] is False
+              persisted[event_identity]=ev['detail_body_sha256']
+          assert set(persisted)==expected_ids
+          print('PASS_REAL_ARCHIVED_FIELD_CAS_SHA_ID_ROLE_RESTART_NO_PUBLISH')
           Path('evidence/tpac_archived_three_detail_identity_review.json').write_text(
               json.dumps({'kind':'TPAC_ARCHIVED_3_IDENTITY_PARITY_REVIEW_V1',
                           'historical_only':True,
