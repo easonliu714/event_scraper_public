@@ -1419,8 +1419,28 @@ def archived_inventory_cli(manifest_path, repo_root):
                 body = Path(record["detail_file"]).read_bytes()
                 # Require the source-owned article H1 to match the exact LIST card
                 # before counting this archived DETAIL as identity-verified.
-                bound = bind_archived_detail_identity(catalog, raw, receipt, sid,
-                                                     body, record["receipt"])
+                # An invalid individual DETAIL must not erase unrelated, already
+                # validated archived rows. Keep the failed identity in backlog;
+                # never accept its stale evidence as current.
+                try:
+                    bound = bind_archived_detail_identity(catalog, raw, receipt, sid,
+                                                         body, record["receipt"])
+                except ValueError as error:
+                    status, reason = "PENDING_DETAIL_BUDGET", "ARCHIVED_DETAIL_VALIDATION_HOLD"
+                    counts["archive_identity_hold"] += 1
+                    counts["pending_detail_budget"] += 1
+                    rows[key] = {"source_namespace": catalog, "source_event_id": sid,
+                                 "list_url": card["list_url"], "detail_url": card["detail_url"],
+                                 "list_sha": _sha(raw), "last_observed": None,
+                                 "status": status, "attempts": old.get("attempts", 0),
+                                 "last_attempt": old.get("last_attempt"), "reason": reason}
+                    if "archive_field_evidence" in old:
+                        rows[key]["archive_field_evidence"] = old["archive_field_evidence"]
+                        rows[key]["archive_field_evidence_current"] = False
+                        rows[key]["archive_field_hold_reason"] = "DETAIL_VALIDATION_FAILED_HOLD"
+                    diagnostics[key] = {"status": status, "reason": reason,
+                                        "detail_error": str(error)}
+                    continue
                 # Persist exact body-bound FIELD REVIEW evidence in archive-only
                 # CAS inventory. Never promote archived fields to LIVE/accepted.
                 archive_evidence = {
