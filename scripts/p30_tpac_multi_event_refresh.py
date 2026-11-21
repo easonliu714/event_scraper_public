@@ -1236,10 +1236,13 @@ def archived_inventory_cli(manifest_path, repo_root):
                          "last_attempt": old.get("last_attempt"), "reason": reason}
             if sid in details:
                 rows[key]["archive_field_evidence"] = archive_evidence
+                rows[key]["archive_field_evidence_current"] = True
             elif "archive_field_evidence" in old:
                 # Missing replay cannot revalidate old bytes. Keep prior LKG
                 # evidence intact but explicitly mark it historical and held.
                 rows[key]["archive_field_evidence"] = old["archive_field_evidence"]
+                rows[key]["archive_field_evidence_current"] = False
+                rows[key]["archive_field_hold_reason"] = "DETAIL_BYTES_NOT_REPLAYED_HOLD"
             diagnostics[key] = {"status": status, "reason": reason}
     # Do not erase rows from other snapshots; archive replay is not LIVE reconciliation.
     inventory = {"kind": INVENTORY_KIND, "items": rows}
