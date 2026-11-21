@@ -1101,6 +1101,44 @@ def read_detail_inventory_version(repo_root, version_sha):
     return document, version_sha
 
 
+
+def restore_detail_inventory_row(repo_root, version_sha, identity, expected_current_sha):
+    """Recover one archived REVIEW row by CAS; never restore an entire stale snapshot.
+
+    The current document and immutable predecessor must both validate. Other
+    identities remain byte-for-byte equivalent at the canonical row level.
+    This is isolated inventory recovery, never LIVE field acceptance or publish.
+    """
+    if type(identity) is not str or re.fullmatch(r"tpac:(program|event):[0-9]+", identity) is None:
+        raise ValueError("TPAC_INVENTORY_RECOVERY_IDENTITY_HOLD")
+    archived, _ = read_detail_inventory_version(repo_root, version_sha)
+    old_row = archived["items"].get(identity)
+    if old_row is None:
+        raise ValueError("TPAC_INVENTORY_RECOVERY_ROW_MISSING_HOLD")
+    current, current_sha = load_detail_inventory(repo_root)
+    if current_sha != expected_current_sha:
+        raise ValueError("TPAC_INVENTORY_RECOVERY_CAS_HOLD")
+    current_row = current["items"].get(identity)
+    if current_row is None:
+        raise ValueError("TPAC_INVENTORY_RECOVERY_CURRENT_ROW_MISSING_HOLD")
+    # A row recovery cannot silently change an event's source identity or URL.
+    for field in ("source_namespace", "source_event_id", "detail_url", "list_url", "list_sha"):
+        if old_row.get(field) != current_row.get(field):
+            raise ValueError("TPAC_INVENTORY_RECOVERY_SOURCE_DRIFT_HOLD")
+    # Do not silently promote archived evidence to currentness on rollback.
+    recovered = dict(old_row)
+    if "archive_field_evidence" in recovered:
+        recovered["archive_field_evidence_current"] = False
+        recovered["archive_field_hold_reason"] = "RESTORED_HISTORICAL_REVIEW_HOLD"
+    updated = {"kind": INVENTORY_KIND, "items": dict(current["items"])}
+    updated["items"][identity] = recovered
+    # Validate the entire merged document before committing.
+    select_pending_details(updated, 0)
+    result = write_detail_inventory(updated, repo_root, current_sha)
+    return {"sha256": result["sha256"], "recovered_identity": identity,
+            "decision": "ISOLATED_HISTORICAL_ROW_REVIEW_HOLD_NO_PUBLICATION"}
+
+
 def load_detail_inventory(repo_root):
     """Read canonical persisted inventory and its CAS version."""
     target = Path(repo_root).resolve() / "_isolated_review" / "tpac" / "tpac_detail_inventory.json"
