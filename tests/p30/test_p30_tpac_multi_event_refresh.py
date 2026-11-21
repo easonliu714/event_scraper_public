@@ -1114,6 +1114,88 @@ class ArchivedDetailIdentityBindingTests(unittest.TestCase):
 
 
 
+
+    def test_archive_date_roles_real_dom_value_not_only_source_string(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        scenarios = (
+            ("program", "2040",
+             '<div class="page-program__article-top">2026-11-20 - 2026-11-30</div>',
+             '<div class="page-program__aside-place-showtimes"><h3>場次</h3>'
+             '<ul><li><p>2026-11-21 (六) 19:30</p></li></ul></div>',
+             "EVENT_SHOW_START"),
+            ("event", "1301",
+             '<div class="page-event__article-top-text"><div>展覽</div>'
+             '<div>2026-11-20 - 2026-11-30</div></div>',
+             '', "EXHIBITION_PERIOD"),
+            ("event", "2072",
+             '<div class="page-event__article-top-text"><div>導覽</div>'
+             '<div>2026-11-20 - 2026-11-30</div></div>',
+             '<div class="page-event__aside-place-showtimes"><h3>場次</h3>'
+             '<ul><li><p>2026-11-21 (六) 19:30</p></li></ul></div>',
+             "EVENT_SHOW_START"))
+        for catalog, sid, period, showtimes, expected_role in scenarios:
+            with self.subTest(catalog=catalog, sid=sid):
+                list_raw, list_rec, _, _ = self.sources(catalog, sid)
+                title = "封存測試同一活動"
+                detail_raw = (
+                    f'<main><article class="page-{catalog}__article">'
+                    f'<h1>{title}</h1>{period}</article>{showtimes}</main>'
+                ).encode()
+                receipt = self.archived_receipt(
+                    f"https://tpac.org.taipei/{catalog}/{sid}", detail_raw)
+                row = bind_archived_detail_identity(
+                    catalog, list_raw, list_rec, sid, detail_raw, receipt)
+                roles = row["field_roles"]
+                self.assertTrue(
+                    any(r["role"] == expected_role for r in roles.values()), roles)
+                self.assertEqual(row["accepted_fields"], 0)
+                self.assertFalse(row["formal_field_pass"])
+                self.assertFalse(row["published"])
+                self.assertEqual(row["field_holds"]["date"]["decision"], "HOLD")
+                self.assertEqual(row["field_holds"]["price"]["value"], None)
+                self.assertEqual(row["field_holds"]["venue"]["value"], None)
+                self.assertEqual(row["field_holds"]["date"]["hold_reason"],
+                                 "ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")
+                for candidate in roles.values():
+                    self.assertEqual(candidate["source_url"], row["detail_url"])
+                    self.assertEqual(candidate["source_body_sha256"],
+                                     hashlib.sha256(detail_raw).hexdigest())
+                    self.assertNotEqual(candidate["decision"], "FIELD_ACCEPTED")
+                if expected_role == "EXHIBITION_PERIOD":
+                    self.assertNotIn("show_start", roles)
+                    self.assertEqual(roles["activity_period"]["value"],
+                                     ["2026-11-20", "2026-11-30"])
+                else:
+                    self.assertEqual(roles["show_start"]["value"],
+                                     "2026-11-21T19:30:00+08:00")
+
+    def test_archived_malformed_show_or_period_never_promotes_date(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        list_raw, list_rec, _, _ = self.sources("program", "2040")
+        for period, show, expected in (
+            ("2026-11-30 - 2026-11-20", "2026-11-21 (六) 19:30", False),
+            ("2026-11-20 - 2026-11-30", "2026-11-21 (日) 19:30", False),
+            ("2026-11-20 - 2026-11-30", "2026-11-21 (六) 25:30", False),
+            ("2026-11-20 - 2026-11-30", "2026-12-21 (一) 19:30", False)):
+            with self.subTest(period=period, show=show):
+                raw = (
+                    '<main><article class="page-program__article">'
+                    '<h1>封存測試同一活動</h1>'
+                    f'<div class="page-program__article-top">{period}</div>'
+                    '</article><div class="page-program__aside-place-showtimes">'
+                    f'<h3>場次</h3><ul><li><p>{show}</p></li></ul></div></main>'
+                ).encode()
+                rec = self.archived_receipt(
+                    "https://tpac.org.taipei/program/2040", raw)
+                row = bind_archived_detail_identity(
+                    "program", list_raw, list_rec, "2040", raw, rec)
+                self.assertNotIn("show_start", row["field_roles"])
+                self.assertEqual(row["field_holds"]["date"]["value"], None)
+                self.assertEqual(row["field_holds"]["date"]["decision"], "HOLD")
+                self.assertEqual(row["accepted_fields"], 0)
+                self.assertEqual(row["field_roles"]["title"]["value"],
+                                 "封存測試同一活動")
+
     def test_archived_identity_never_promotes_unverified_field_roles(self):
         # Historical identity parity is not a date/price/venue/description receipt.
         import inspect
