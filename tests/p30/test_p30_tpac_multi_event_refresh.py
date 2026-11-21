@@ -1387,8 +1387,10 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                                 "robots_allowed": None}}
                 save()
                 if expected:
-                    with self.assertRaisesRegex(ValueError, expected):
-                        archived_inventory_cli(manifest, root)
+                    result = archived_inventory_cli(manifest, root)
+                    self.assertEqual(result["counts"]["archive_identity_hold"], 1)
+                    self.assertEqual(result["counts"]["detail_available"], 0)
+                    self.assertEqual(result["diagnostics"]["tpac:program:2040"]["detail_error"], expected)
                 else:
                     result = archived_inventory_cli(manifest, root)
                     self.assertEqual(result["counts"]["detail_available"], 1)
@@ -1772,10 +1774,16 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertEqual(third["inventory"]["sha256"], first["inventory"]["sha256"])
             # A tampered body may not promote a forged archive status or mutate CAS.
             detail_path.write_bytes(b"<html>tampered archive body</html>")
-            with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_BYTES_SHA_HOLD"):
-                archived_inventory_cli(manifest, root)
-            _, after_tamper_sha = load_detail_inventory(root / "_isolated_archive_replay")
-            self.assertEqual(after_tamper_sha, third["inventory"]["sha256"])
+            tampered = archived_inventory_cli(manifest, root)
+            self.assertEqual(tampered["counts"]["archive_identity_hold"], 1)
+            self.assertEqual(tampered["counts"]["detail_available"], 0)
+            self.assertEqual(tampered["diagnostics"]["tpac:program:2040"]["detail_error"],
+                             "TPAC_ARCHIVE_BYTES_SHA_HOLD")
+            stored_tampered, after_tamper_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertNotEqual(after_tamper_sha, third["inventory"]["sha256"])
+            self.assertFalse(stored_tampered["items"]["tpac:program:2040"]["archive_field_evidence_current"])
+            self.assertEqual(stored_tampered["items"]["tpac:program:2040"]["archive_field_hold_reason"],
+                             "DETAIL_VALIDATION_FAILED_HOLD")
             self.assertFalse((root / "docs" / "data.json").exists())
 
 class PersistedHoldSchemaRegressionTests(unittest.TestCase):
