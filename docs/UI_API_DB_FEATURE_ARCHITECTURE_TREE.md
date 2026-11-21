@@ -9754,3 +9754,27 @@ Next: official sealed DETAIL bytes field_roles → isolated LKG/CAS
 - **實際修補：** `tests/p30/test_p30_tpac_multi_event_refresh.py::ArchivedProvenanceCliTests.test_partial_archived_manifest_requires_raw_detail_replay` 將舊任意 HTML 替換為與 LIST 標題吻合的 `article.page-program__article > h1` 合規 synthetic Detail，保留原缺少／歸還 Detail／CAS Restart／竄改負測。Test `63708e85b193d550d6d84d3a993c0d3f71a16b5d`，Blob `1a266e0d921946814aede97e832da67622e9dc54`。Source 原嚴格同活動驗證邏輯不變。
 - **驗收：** 新 exact-head Run `44882863221` SUCCESS／Job `136781744094` SUCCESS／Artifact `14699035840` sha256 `0263bb2f41f6ab497e6498f0fe873452c27e7c95992f2b6e493f110a4430c87d`；原封存 LIST/DETAIL 3-ID identity replay 已可於固定 CI 走完。**Archive identity PASS 不可等同 Fresh HTTP/Parser FIELD/GOLDEN/正式發布 PASS。**
 - **API／DB／UI／發布：** 此次只有 TEST fixture，未改正式 API、SQLite schema、正式 docs/data.json、docs/platform_status.json、Frontend 或 Android；不啟用 TPAC GET、Termux 正式 Scheduler/Publisher。保留前次 Termux isolated native 6/6 PASS 與原 Android UI PASS，下一 Gate 在隔離 Draft 接 FIXED Adapter/Detail FIELD roles→LKG Snapshot。
+
+### 2026-11-21｜TPAC-P0-20261121-1816-REAL-ARCHIVED-DATE-ROLE-PARSER｜封存來源的 FIELD Candidate 角色（隔離 CI PASS，非發布）
+
+```text
+官方原始歷史 /program LIST + /event LIST [封存 2，無新 HTTP]
+  ↓ _archived_cards 來源權威 URL/ID/名稱 + SHA
+同 ID DETAIL [封存 3，歷史/不可升格 LIVE]
+  ↓ bind_archived_detail_identity:
+    同 Host+Catalog+URL+Event ID+H1+LIST title+SHA
+  ↓ 新 _archived_detail_date_roles(DETAIL article, showtime block)
+    ├─ program show label + 範圍 + 星期核對 → EVENT_SHOW_START REVIEW
+    ├─ event 活動期間 → ACTIVITY_PERIOD REVIEW
+    ├─ event 展覽期間 → EXHIBITION_PERIOD REVIEW（不是演出開始）
+    └─ 時間異常/缺少：不產出日期候選，欄位 HOLD
+  ↓ field_roles: role/value/source_url/body_sha256/observed_at/REVIEW ONLY
+  ↓ field_holds: date仍未正式驗收，price/venue/description/image UNKNOWN
+  ↓ 已封存 3 筆真實 BODY 在 CI 產生 >=1 個日期候選，無 GET
+  ↓ 隔離 LKG field-role CAS/rollback [NEXT 尚未完成]
+  ↓ 正式 Publisher/data.json/Pages/Android [HARD_HOLD_NO_PUBLICATION]
+```
+
+- **Source：** `scripts/p30_tpac_multi_event_refresh.py::_archived_detail_date_roles`、`bind_archived_detail_identity`，SOURCE `b9f114e9ee1bbb55fd227028badf508400f4d072`，blob `e43b27317ab881858758c4b9d999d33fbd4f79cd`。分清日期語意，不能以活動範圍、票務時間或未解析節點冒充演出開始。
+- **正反測試：** `tests/p30/test_p30_tpac_multi_event_refresh.py::ArchivedDetailIdentityBindingTests`，TEST `be6521e0153a8bc9ef203859df69dee15d5649c7`，blob `bc98aa82cd0835916800208e903a918f19aea211`；Workflow `96b1f1521224457ca97081c49cafb0efb9d0a967`，blob `d6bf771e4cae23aa5d352aeb85c945144a587de8`；exact-head CI `44893871551` SUCCESS、Job `136815249714` SUCCESS、Artifact `14702418812` SHA256 `1643a6a8df3e43b1f5e97539bac7b329fc4bc120665d25009c4da5d0b76cc8fe`。CI 直接要求已封存原始 3 DETAIL 產生至少 1 可追溯日角色並驗全部欄位仍不正式接受。
+- **UI/API/DB/Storage/Publication：** Source Parser 增量不改正式 UI／正式活動 JSON／Golden／Status 或 SQLite 舊 Gate；隔離 artifact 僅供 REVIEW。真正新 HTTP/LIST/DETAIL/IDENTITY/FIELD_ACCEPTED/GOLDEN/PUBLISHED=0，Termux isolated 6/6 舊版實機 PASS 與 Android PASS 保留，正式單機 Source GET/Publisher/Scheduler 仍 HOLD，未解除發布禁令。下一工程實作：來源候選 date roles → 可重跑不破壞 LKG CAS + failure rollback + 原始 SHA/ID 持續綁定。
