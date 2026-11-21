@@ -302,7 +302,9 @@ class TPACR4OwnerPolicyTests(unittest.TestCase):
         p = Provider()
         p.last = NOW-timedelta(hours=7)
         p.cooldown_status = 429
-        with self.assertRaisesRegex(ValueError, "HOST_COOLDOWN_ACTIVE_OR_POLICY_HOLD"):
+        # Active 429 must report the cooldown fence, not the expired-only
+        # probe authorization fence; both reject before write_attempt.
+        with self.assertRaisesRegex(ValueError, "TPAC_R4_HOST_COOLDOWN_ACTIVE_OR_POLICY_HOLD"):
             reserve_durable_source_attempt(provider=p, now=NOW,
                                            run_id="event-run-after-429")
         self.assertEqual(p.calls, ["acquire", "history", "cooldown"])
