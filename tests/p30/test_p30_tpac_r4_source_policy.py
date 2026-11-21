@@ -523,22 +523,106 @@ class IsolatedSingleExecutorLedgerTests(unittest.TestCase):
                     source_host="tpac.org.taipei", source_identity="tpac:program:list",
                     owner_run_id="runner-program-0003", now=NOW)
                 raw = program()
-                response = store.commit_response(
+                observed = NOW+timedelta(minutes=1)
+                bound_receipt = receipt(P_URL, raw)
+                bound_receipt.update(
+                    observed_at=observed.isoformat(),
+                    ledger_evidence_class="ISOLATED_OFFLINE_SOURCE_RECEIPT",
+                    ledger_owner_run_id="runner-program-0003",
+                    ledger_fencing_token=lease["fencing_token"],
+                    ledger_source_host="tpac.org.taipei",
+                    ledger_source_identity="tpac:program:list",
+                    ledger_source_url=P_URL,
+                    ledger_observed_at=observed.isoformat())
+                args = dict(
                     source_host="tpac.org.taipei", owner_run_id="runner-program-0003",
                     fencing_token=lease["fencing_token"], status=200,
-                    observed_at=NOW+timedelta(minutes=1),
-                    raw_body=raw, source_receipt=receipt(P_URL, raw))
+                    observed_at=observed, raw_body=raw)
+                # One changed attribute cannot silently commit a different
+                # event, host, owner, time or fencing token.
+                with self.assertRaisesRegex(ValueError, "PARSER_RECEIPT_BINDING_HOLD"):
+                    store.commit_response(**args, source_receipt=receipt(P_URL, raw))
+                tampered = (
+                    ("ledger_owner_run_id", "wrong-owner"),
+                    ("ledger_fencing_token", "wrong-fence"),
+                    ("ledger_source_identity", "tpac:event:list"),
+                    ("ledger_source_host", "other.example"),
+                    ("ledger_source_url", E_URL),
+                    ("ledger_observed_at", NOW.isoformat()),
+                    ("observed_at", NOW.isoformat()),
+                    ("final_url", E_URL),
+                    ("ledger_evidence_class", "LIVE_AUTHORIZED"))
+                for key, value in tampered:
+                    with self.subTest(field=key):
+                        forged = {**bound_receipt, key: value}
+                        with self.assertRaisesRegex(
+                                ValueError, "PARSER_RECEIPT_BINDING_HOLD"):
+                            store.commit_response(**args, source_receipt=forged)
+                with self.assertRaisesRegex(ValueError, "RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD"):
+                    store.commit_response(**{**args, "raw_body": raw+b" "},
+                                          source_receipt=bound_receipt)
+                with self.assertRaisesRegex(ValueError, "MISSING_OR_PENDING_RESPONSE_HOLD"):
+                    store.read_host_cooldown(source_host="tpac.org.taipei")
+                response = store.commit_response(**args, source_receipt=bound_receipt)
                 self.assertFalse(response["native_get_allowed"])
+                evidence = store.read_last_bound_source(source_host="tpac.org.taipei")
+                self.assertEqual(evidence["source_identity"], "tpac:program:list")
+                self.assertEqual(evidence["source_url"], P_URL)
+                self.assertEqual(evidence["source_observed_at"], observed)
+                self.assertEqual(evidence["body_sha256"], hashlib.sha256(raw).hexdigest())
+                self.assertFalse(evidence["native_get_allowed"])
                 with self.assertRaisesRegex(ValueError, "SIX_HOUR_HOST_HOLD"):
                     store.begin_attempt(
                         source_host="tpac.org.taipei", source_identity="tpac:event:list",
                         owner_run_id="runner-event-too-soon", now=NOW+timedelta(hours=2))
             with IsolatedSingleExecutorLedger(db) as store:
+                evidence = store.read_last_bound_source(source_host="tpac.org.taipei")
+                self.assertEqual(evidence["source_url"], P_URL)
+                self.assertFalse(evidence["native_get_allowed"])
                 other = store.begin_attempt(
                     source_host="tpac.org.taipei", source_identity="tpac:event:list",
                     owner_run_id="runner-event-six-hour-later",
                     now=NOW+timedelta(hours=7))
                 self.assertFalse(other["native_get_allowed"])
+
+    def test_legacy_success_without_fenced_source_receipt_stays_hold(self):
+        import sqlite3
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_r4_source_policy import IsolatedSingleExecutorLedger
+        # Existing durable DBs may contain an old 200 without audited
+        # source-url and attempt-bound parser receipt. Schema migration must
+        # NEVER allow it to become a new source authorization.
+        with tempfile.TemporaryDirectory() as directory:
+            db = Path(directory) / "legacy.sqlite"
+            with sqlite3.connect(str(db)) as conn:
+                conn.execute("""CREATE TABLE source_attempts (
+                    id INTEGER PRIMARY KEY, source_host TEXT NOT NULL,
+                    source_identity TEXT NOT NULL,
+                    owner_run_id TEXT NOT NULL UNIQUE, fencing_token TEXT NOT NULL,
+                    attempted_at TEXT NOT NULL, response_at TEXT,
+                    outcome TEXT NOT NULL, last_http_status INTEGER,
+                    failure_class TEXT, consecutive_failures INTEGER DEFAULT 0,
+                    retry_after_header TEXT, cooldown_until TEXT,
+                    body_sha256 TEXT)""")
+                conn.execute("""INSERT INTO source_attempts
+                    (source_host,source_identity,owner_run_id,fencing_token,
+                    attempted_at,response_at,outcome,last_http_status,
+                    failure_class,cooldown_until,body_sha256)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?)""", (
+                    "tpac.org.taipei", "tpac:program:list", "legacy-run-0001",
+                    "old-fence", NOW.isoformat(), NOW.isoformat(),
+                    "COMMITTED", 200, "NONE",
+                    (NOW+timedelta(hours=6)).isoformat(),
+                    "0"*64))
+            with IsolatedSingleExecutorLedger(db) as store:
+                with self.assertRaisesRegex(ValueError, "LEGACY_UNBOUND_200_HOLD"):
+                    store.begin_attempt(
+                        source_host="tpac.org.taipei", source_identity="tpac:event:list",
+                        owner_run_id="post-migration-run",
+                        now=NOW+timedelta(days=1))
+                with self.assertRaisesRegex(ValueError, "BOUND_SOURCE_NOT_AVAILABLE_HOLD"):
+                    store.read_last_bound_source(source_host="tpac.org.taipei")
 
     def test_actual_os_process_lock_and_crash_pending_recovery(self):
         import tempfile
