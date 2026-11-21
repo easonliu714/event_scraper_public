@@ -855,6 +855,113 @@ def build_detail_inventory(catalog, raw, receipt, now, previous=None):
     return {"kind": INVENTORY_KIND, "items": current}
 
 
+
+def _validate_archived_review_row(row):
+    """Fail closed on corrupted archived FIELD evidence before CAS/readback.
+
+    This is a local integrity/authority schema, not independent HTTP proof.
+    Legacy inventory rows without this optional archive extension are kept.
+    """
+    evidence_keys = ("archive_field_evidence", "archive_field_evidence_current",
+                     "archive_field_hold_reason")
+    if "archive_field_evidence" not in row:
+        if any(key in row for key in evidence_keys[1:]):
+            raise ValueError("TPAC_ARCHIVE_FIELD_ORPHAN_FLAG_HOLD")
+        return
+    ev = row["archive_field_evidence"]
+    if (type(ev) is not dict or
+            set(ev) != {"detail_body_sha256", "field_roles", "field_holds",
+                        "observed_at", "capture_started_at", "decision",
+                        "accepted_fields", "published"} or
+            ev["decision"] != "ARCHIVED_LIST_DETAIL_IDENTITY_REVIEW_ONLY" or
+            type(ev["accepted_fields"]) is not int or ev["accepted_fields"] != 0 or
+            ev["published"] is not False or
+            type(ev["detail_body_sha256"]) is not str or
+            re.fullmatch(r"[0-9a-f]{64}", ev["detail_body_sha256"]) is None or
+            type(row.get("archive_field_evidence_current")) is not bool):
+        raise ValueError("TPAC_ARCHIVE_FIELD_AUTHORITY_SCHEMA_HOLD")
+    current = row["archive_field_evidence_current"]
+    if current:
+        if (row.get("status") != "ARCHIVED_DETAIL_VERIFIED_ONLY"
+                or row.get("reason") != "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
+                or "archive_field_hold_reason" in row):
+            raise ValueError("TPAC_ARCHIVE_FIELD_CURRENTNESS_HOLD")
+    elif (row.get("status") != "PENDING_DETAIL_BUDGET" or
+          row.get("archive_field_hold_reason") != "DETAIL_BYTES_NOT_REPLAYED_HOLD"):
+        raise ValueError("TPAC_ARCHIVE_FIELD_CURRENTNESS_HOLD")
+    stamped = ev["observed_at"] or ev["capture_started_at"]
+    if ((ev["observed_at"] is not None and ev["capture_started_at"] is not None)
+            or type(stamped) is not str or not stamped):
+        raise ValueError("TPAC_ARCHIVE_FIELD_TIMESTAMP_HOLD")
+    try:
+        _time(stamped)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("TPAC_ARCHIVE_FIELD_TIMESTAMP_HOLD") from exc
+    roles = ev["field_roles"]
+    holds = ev["field_holds"]
+    allowed = {"title": ("EVENT_TITLE",),
+               "show_start": ("EVENT_SHOW_START",),
+               "show_count": ("SOURCE_SHOW_COUNT",),
+               "activity_period": ("ACTIVITY_PERIOD", "EXHIBITION_PERIOD")}
+    if (type(roles) is not dict or "title" not in roles
+            or set(roles) - set(allowed) or type(holds) is not dict
+            or set(holds) != {"date", "price", "venue", "description", "image"}):
+        raise ValueError("TPAC_ARCHIVE_FIELD_ROLES_SCHEMA_HOLD")
+    sha = ev["detail_body_sha256"]
+    url = row["detail_url"]
+    for key, candidate in roles.items():
+        if (type(candidate) is not dict or
+                candidate.get("role") not in allowed[key] or
+                candidate.get("source_url") != url or
+                candidate.get("source_body_sha256") != sha):
+            raise ValueError("TPAC_ARCHIVE_FIELD_ROLE_SOURCE_HOLD")
+        if key == "title":
+            if (set(candidate) != {"role", "value", "source_url",
+                                  "source_body_sha256", "decision"} or
+                    candidate.get("decision") != "ARCHIVED_IDENTITY_PARITY_REVIEW_ONLY" or
+                    type(candidate.get("value")) is not str or
+                    not candidate["value"].strip()):
+                raise ValueError("TPAC_ARCHIVE_FIELD_TITLE_HOLD")
+            continue
+        if (set(candidate) != {"role", "value", "source_url",
+                              "source_body_sha256", "observed_at", "decision"} or
+                candidate.get("decision") != "ARCHIVED_SEMANTIC_REVIEW_NOT_FIELD_ACCEPTED" or
+                candidate.get("observed_at") != stamped):
+            raise ValueError("TPAC_ARCHIVE_FIELD_ROLE_AUTHORITY_HOLD")
+        value = candidate["value"]
+        if key == "show_count":
+            if type(value) is not int or not 1 <= value <= 40:
+                raise ValueError("TPAC_ARCHIVE_FIELD_SHOW_COUNT_HOLD")
+        elif key == "show_start":
+            if type(value) is not str:
+                raise ValueError("TPAC_ARCHIVE_FIELD_SHOW_START_HOLD")
+            try:
+                parsed = datetime.fromisoformat(value)
+            except ValueError as exc:
+                raise ValueError("TPAC_ARCHIVE_FIELD_SHOW_START_HOLD") from exc
+            if parsed.utcoffset() != timedelta(hours=8):
+                raise ValueError("TPAC_ARCHIVE_FIELD_SHOW_START_HOLD")
+        elif (type(value) is not list or len(value) != 2
+              or any(type(item) is not str for item in value)
+              or not re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}", value[0])
+              or not re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}", value[1])
+              or value[0] > value[1]):
+            raise ValueError("TPAC_ARCHIVE_FIELD_PERIOD_HOLD")
+    expected_reason = ("ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
+                       if len(roles) > 1 else
+                       "ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED")
+    for key, field in holds.items():
+        if (type(field) is not dict or
+                set(field) != {"decision", "value", "hold_reason",
+                               "source_url", "source_body_sha256"} or
+                field["decision"] != "HOLD" or field["value"] is not None or
+                field["source_url"] != url or
+                field["source_body_sha256"] != sha or
+                field["hold_reason"] != (expected_reason if key == "date" else
+                                         "ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED")):
+            raise ValueError("TPAC_ARCHIVE_FIELD_HOLD_AUTHORITY_HOLD")
+
+
 def select_pending_details(inventory, limit=2):
     """Fair, deterministic per-catalog round-robin; selection is not GET authority."""
     if (not isinstance(inventory, dict) or inventory.get("kind") != INVENTORY_KIND
@@ -870,6 +977,9 @@ def select_pending_details(inventory, limit=2):
                 or row.get("detail_url") != "https://tpac.org.taipei/" +
                    row["source_namespace"] + "/" + str(row["source_event_id"])):
             raise ValueError("TPAC_INVENTORY_ROW_IDENTITY_HOLD")
+        # Persisted archive-only field receipts must not claim LIVE authority,
+        # override a source URL/SHA, or masquerade as a current replay.
+        _validate_archived_review_row(row)
         if row.get("status") == "PENDING_DETAIL_BUDGET":
             buckets.setdefault(row["source_namespace"], []).append((key, row))
     for entries in buckets.values():
