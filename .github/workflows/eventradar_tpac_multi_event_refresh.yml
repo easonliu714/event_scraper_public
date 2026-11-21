@@ -372,10 +372,29 @@ jobs:
                      not row['native_get_allowed'] and
                      row['release_state']=='HARD_HOLD_NO_PUBLICATION'
                      for row in matches.values())
+          # Actual archived originals must pass the date-role DOM parser.
+          # Unknown values remain HOLD and are never formal FIELD_ACCEPTED.
+          reviewed_date_roles=0
+          for row in matches.values():
+              sha=row['detail_body_sha256']
+              roles=row['field_roles']
+              assert roles['title']['value'] and roles['title']['source_body_sha256']==sha
+              assert row['field_holds']['price']['value'] is None
+              assert row['field_holds']['venue']['value'] is None
+              assert row['field_holds']['date']['decision']=='HOLD'
+              for role_name,candidate in roles.items():
+                  assert candidate['source_body_sha256']==sha
+                  assert candidate['source_url']==row['detail_url']
+                  assert candidate['decision'] not in ('ACCEPTED','FIELD_ACCEPTED')
+                  if role_name in ('show_start','activity_period'):
+                      assert candidate['decision']=='ARCHIVED_SEMANTIC_REVIEW_NOT_FIELD_ACCEPTED'
+                      reviewed_date_roles+=1
+          assert reviewed_date_roles>=1, 'HOLD_NO_REAL_ARCHIVED_DATE_ROLE_PARSED'
           Path('evidence/tpac_archived_three_detail_identity_review.json').write_text(
               json.dumps({'kind':'TPAC_ARCHIVED_3_IDENTITY_PARITY_REVIEW_V1',
                           'historical_only':True,
                           'detail_identities_reviewed':3,
+                          'archived_date_role_candidates':reviewed_date_roles,
                           'new_official_get':0,'accepted_fields':0,'published':0,
                           'records':matches},ensure_ascii=False,indent=2,
                           sort_keys=True)+'\n',encoding='utf-8')
