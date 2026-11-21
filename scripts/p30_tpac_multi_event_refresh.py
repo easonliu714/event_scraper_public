@@ -1109,8 +1109,11 @@ def archived_inventory_cli(manifest_path, repo_root):
                 if not isinstance(record, dict) or set(record) != {"detail_file", "receipt"}:
                     raise ValueError("TPAC_ARCHIVE_DETAIL_SCHEMA_HOLD")
                 body = Path(record["detail_file"]).read_bytes()
-                _archived_body(body, record["receipt"], card["detail_url"], catalog, sid)
-                # Only source-body identity is verified; semantic fields remain unaccepted.
+                # Require the source-owned article H1 to match the exact LIST card
+                # before counting this archived DETAIL as identity-verified.
+                bind_archived_detail_identity(catalog, raw, receipt, sid,
+                                              body, record["receipt"])
+                # Archived parity is REVIEW only; semantic fields remain unaccepted.
                 status, reason = "ARCHIVED_DETAIL_VERIFIED_ONLY", "PARSER_NOT_ACCEPTED_ARCHIVE_ONLY"
                 counts["detail_available"] += 1
             else:
