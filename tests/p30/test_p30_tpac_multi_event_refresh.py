@@ -1215,6 +1215,52 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
     archived_receipt = ArchivedDetailIdentityBindingTests.archived_receipt
     sources = ArchivedDetailIdentityBindingTests.sources
 
+    def test_bad_one_detail_preserves_other_valid_archive_and_prior_evidence(self):
+        # Real disk CAS: a tampered DETAIL receipt holds only that ID; valid
+        # sibling still reaches REVIEW, and no formal field is accepted.
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                list_raw, list_receipt, detail_raw, detail_receipt = self.sources(catalog, sid)
+                list_path = root / (catalog + "-list.html")
+                detail_path = root / (catalog + "-detail.html")
+                list_path.write_bytes(list_raw)
+                detail_path.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(list_path), "list_receipt": list_receipt,
+                    "details": {sid: {"detail_file": str(detail_path),
+                                      "receipt": detail_receipt}},
+                }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                     encoding="utf-8")
+            first = archived_inventory_cli(manifest_path, root)
+            self.assertEqual(first["counts"]["detail_available"], 2)
+            self.assertEqual(first["accepted_fields"], 0)
+            # Tamper only the event receipt, leaving its bytes unchanged.
+            catalogs["event"]["details"]["1301"]["receipt"]["body_sha256"] = "0" * 64
+            manifest_path.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                     encoding="utf-8")
+            second = archived_inventory_cli(manifest_path, root)
+            self.assertEqual(second["counts"]["detail_available"], 1)
+            self.assertEqual(second["counts"]["archive_identity_hold"], 1)
+            self.assertEqual(second["counts"]["pending_detail_budget"], 1)
+            stored, sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(sha, second["inventory"]["sha256"])
+            valid = stored["items"]["tpac:program:2040"]
+            bad = stored["items"]["tpac:event:1301"]
+            self.assertTrue(valid["archive_field_evidence_current"])
+            self.assertFalse(bad["archive_field_evidence_current"])
+            self.assertEqual(bad["archive_field_hold_reason"],
+                             "DETAIL_VALIDATION_FAILED_HOLD")
+            self.assertEqual(bad["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(bad["archive_field_evidence"]["accepted_fields"], 0)
+            self.assertEqual(second["published"], 0)
+
     def test_archived_real_event_link_prefix_preserves_source_owned_title(self):
         # Official /event title attrs begin with a navigation prefix, but the
         # event-owned visible title itself does not contain that prefix.
