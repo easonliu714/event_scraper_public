@@ -1439,7 +1439,11 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                         "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
                         "body_bytes": len(raw), "capture_started_at": OBS,
                         "observed_at": None, "http_status": None, "robots_allowed": None}}
-            body = b"<html>archived detail</html>"
+            # Archived DETAIL coverage now requires same-ID, source-owned H1,
+            # not merely a caller-consistent SHA for arbitrary HTML.
+            body = (b'<article class="page-program__article">'
+                    + " <h1>封存活動</h1>".encode("utf-8")
+                    + b"</article>")
             detail_path = root / "detail.html"
             detail_path.write_bytes(body)
             detail_url = "https://tpac.org.taipei/program/2040"
