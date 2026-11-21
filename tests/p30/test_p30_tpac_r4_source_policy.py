@@ -427,5 +427,158 @@ class DurableCooldownPolicyTests(unittest.TestCase):
         self.assertFalse(result["native_get_allowed"])
 
 
+
+class IsolatedSingleExecutorLedgerTests(unittest.TestCase):
+    """Real local SQLite/POSIX lock/restart IO; NO official HTTP or publication."""
+
+    def test_host_429_shares_fence_but_independent_sources_are_not_blocked(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_r4_source_policy import IsolatedSingleExecutorLedger
+        with tempfile.TemporaryDirectory() as directory:
+            db = Path(directory) / "source-ledger.sqlite"
+            with IsolatedSingleExecutorLedger(db) as store:
+                lease = store.begin_attempt(
+                    source_host="tpac.org.taipei", source_identity="tpac:program:list",
+                    owner_run_id="runner-program-0001", now=NOW)
+                self.assertFalse(lease["native_get_allowed"])
+                result = store.commit_response(
+                    source_host="tpac.org.taipei", owner_run_id="runner-program-0001",
+                    fencing_token=lease["fencing_token"], status=429,
+                    observed_at=NOW+timedelta(minutes=1),
+                    retry_after_header="259200")
+                self.assertFalse(result["native_get_allowed"])
+                self.assertEqual(result["cooldown_until"],
+                                 NOW+timedelta(days=3, minutes=1))
+                # The second LIST namespace cannot bypass the first 429.
+                with self.assertRaisesRegex(ValueError, "POLICY_OR_PROBE_REVIEW_HOLD"):
+                    store.begin_attempt(
+                        source_host="tpac.org.taipei", source_identity="tpac:event:list",
+                        owner_run_id="runner-event-0001",
+                        now=NOW+timedelta(days=4))
+                # Another explicitly isolated source host is independent.
+                other = store.begin_attempt(
+                    source_host="tainex.example", source_identity="tainex:event:701",
+                    owner_run_id="runner-tainex-0001",
+                    now=NOW+timedelta(hours=1))
+                self.assertFalse(other["native_get_allowed"])
+            with IsolatedSingleExecutorLedger(db) as reopened:
+                saved = reopened.read_host_cooldown(source_host="tpac.org.taipei")
+                self.assertEqual(saved["last_http_status"], 429)
+                self.assertEqual(saved["retry_after_header"], "259200")
+                self.assertEqual(saved["evidence_class"], "ISOLATED_LOCAL_PROCESS_ONLY")
+                self.assertFalse(saved["native_get_allowed"])
+                with self.assertRaisesRegex(ValueError, "POLICY_OR_PROBE_REVIEW_HOLD"):
+                    reopened.begin_attempt(
+                        source_host="tpac.org.taipei", source_identity="tpac:event:list",
+                        owner_run_id="runner-event-after-restart", now=NOW+timedelta(days=6))
+                with self.assertRaisesRegex(ValueError, "PENDING_RESPONSE_HOLD"):
+                    reopened.read_host_cooldown(source_host="tainex.example")
+
+    def test_stale_fence_untrusted_200_and_bad_retry_after_preserve_pending(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_r4_source_policy import IsolatedSingleExecutorLedger
+        with tempfile.TemporaryDirectory() as directory:
+            db = Path(directory) / "test.sqlite"
+            with IsolatedSingleExecutorLedger(db) as store:
+                lease = store.begin_attempt(
+                    source_host="tpac.org.taipei", source_identity="tpac:program:list",
+                    owner_run_id="runner-program-0002", now=NOW)
+                def submit(**changes):
+                    args = dict(source_host="tpac.org.taipei",
+                                owner_run_id="runner-program-0002",
+                                fencing_token=lease["fencing_token"], status=429,
+                                observed_at=NOW+timedelta(minutes=1))
+                    args.update(changes)
+                    return store.commit_response(**args)
+                with self.assertRaisesRegex(ValueError, "FENCING_OR_PENDING_HOLD"):
+                    submit(fencing_token="stale-generation")
+                with self.assertRaisesRegex(ValueError, "RESPONSE_BEFORE_ATTEMPT_HOLD"):
+                    submit(observed_at=NOW-timedelta(seconds=1))
+                for bad in ("garbled", "-1", "", True):
+                    with self.subTest(bad=bad):
+                        with self.assertRaisesRegex(ValueError, "RETRY_AFTER"):
+                            submit(retry_after_header=bad)
+                with self.assertRaisesRegex(ValueError, "200_TRUSTED_PARSER_RECEIPT_HOLD"):
+                    submit(status=200)
+                with self.assertRaisesRegex(ValueError, "MISSING_OR_PENDING_RESPONSE_HOLD"):
+                    store.read_host_cooldown(source_host="tpac.org.taipei")
+                committed = submit()
+                self.assertEqual(committed["last_http_status"], 429)
+                with self.assertRaisesRegex(ValueError, "FENCING_OR_PENDING_HOLD"):
+                    submit()
+            with IsolatedSingleExecutorLedger(db) as reopened:
+                self.assertEqual(reopened.read_host_cooldown(
+                    source_host="tpac.org.taipei")["consecutive_failures"], 1)
+
+    def test_verified_offline_list_200_requires_real_bytes_and_allows_next_cycle(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_r4_source_policy import IsolatedSingleExecutorLedger
+        with tempfile.TemporaryDirectory() as directory:
+            db = Path(directory) / "test.sqlite"
+            with IsolatedSingleExecutorLedger(db) as store:
+                lease = store.begin_attempt(
+                    source_host="tpac.org.taipei", source_identity="tpac:program:list",
+                    owner_run_id="runner-program-0003", now=NOW)
+                raw = program()
+                response = store.commit_response(
+                    source_host="tpac.org.taipei", owner_run_id="runner-program-0003",
+                    fencing_token=lease["fencing_token"], status=200,
+                    observed_at=NOW+timedelta(minutes=1),
+                    raw_body=raw, source_receipt=receipt(P_URL, raw))
+                self.assertFalse(response["native_get_allowed"])
+                with self.assertRaisesRegex(ValueError, "SIX_HOUR_HOST_HOLD"):
+                    store.begin_attempt(
+                        source_host="tpac.org.taipei", source_identity="tpac:event:list",
+                        owner_run_id="runner-event-too-soon", now=NOW+timedelta(hours=2))
+            with IsolatedSingleExecutorLedger(db) as store:
+                other = store.begin_attempt(
+                    source_host="tpac.org.taipei", source_identity="tpac:event:list",
+                    owner_run_id="runner-event-six-hour-later",
+                    now=NOW+timedelta(hours=7))
+                self.assertFalse(other["native_get_allowed"])
+
+    def test_actual_os_process_lock_and_crash_pending_recovery(self):
+        import tempfile
+        import subprocess
+        import sys
+        from pathlib import Path
+        from scripts.p30_tpac_r4_source_policy import IsolatedSingleExecutorLedger
+        with tempfile.TemporaryDirectory() as directory:
+            db = Path(directory) / "exclusive.sqlite"
+            with IsolatedSingleExecutorLedger(db):
+                # A separate Python interpreter must not take over the same DB.
+                child = subprocess.run([sys.executable, "-c",
+                    "import sys;from scripts.p30_tpac_r4_source_policy import "
+                    "IsolatedSingleExecutorLedger as L;"
+                    "db=sys.argv[1];"
+                    "\ntry:\n L(db)\nexcept ValueError:\n sys.exit(0)"
+                    "\nelse:\n sys.exit(5)", str(db)],
+                    capture_output=True, text=True)
+                self.assertEqual(child.returncode, 0, child.stderr)
+            # Abrupt process exit releases OS lock but leaves pending attempt.
+            child = subprocess.run([sys.executable, "-c",
+                "import os,sys;from datetime import datetime,timezone;"
+                "from scripts.p30_tpac_r4_source_policy import "
+                "IsolatedSingleExecutorLedger as L;"
+                "db=sys.argv[1];x=L(db);"
+                "x.begin_attempt(source_host='tpac.org.taipei',"
+                "source_identity='tpac:program:list',"
+                "owner_run_id='runner-crash-0001',"
+                "now=datetime(2026,11,9,9,35,tzinfo=timezone.utc));"
+                "os._exit(7)", str(db)], capture_output=True, text=True)
+            self.assertEqual(child.returncode, 7, child.stderr)
+            with IsolatedSingleExecutorLedger(db) as reopened:
+                with self.assertRaisesRegex(ValueError, "UNCERTAIN_CRASH_OUTCOME_HOLD"):
+                    reopened.begin_attempt(
+                        source_host="tpac.org.taipei", source_identity="tpac:event:list",
+                        owner_run_id="runner-retry-after-crash",
+                        now=NOW+timedelta(days=10))
+                with self.assertRaisesRegex(ValueError, "MISSING_OR_PENDING_RESPONSE_HOLD"):
+                    reopened.read_host_cooldown(source_host="tpac.org.taipei")
+
+
 if __name__ == "__main__":
     unittest.main()
