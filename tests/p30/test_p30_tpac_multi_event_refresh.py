@@ -1897,3 +1897,65 @@ class EventPeriodSemanticDriftRegressionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
+    def test_real_disk_cas_versions_restart_and_corruption_hold(self):
+        # The previous complete inventory survives restart, while a corrupt
+        # version cannot be loaded or silently replace the current CAS.
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+            read_detail_inventory_version,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            initial = {"kind": INVENTORY_KIND, "items": {}}
+            first = write_detail_inventory(initial, root)
+            row = {"source_namespace": "program", "source_event_id": "2040",
+                   "detail_url": "https://tpac.org.taipei/program/2040",
+                   "status": "PENDING_DETAIL_BUDGET", "attempts": 0}
+            second_document = {"kind": INVENTORY_KIND,
+                               "items": {"tpac:program:2040": row}}
+            second = write_detail_inventory(second_document, root, first["sha256"])
+            saved, saved_sha = read_detail_inventory_version(root, first["sha256"])
+            self.assertEqual(saved, initial)
+            self.assertEqual(saved_sha, first["sha256"])
+            current, current_sha = load_detail_inventory(root)
+            self.assertEqual(current, second_document)
+            self.assertEqual(current_sha, second["sha256"])
+            # A second unchanged replay is idempotent.
+            repeat = write_detail_inventory(second_document, root, second["sha256"])
+            self.assertEqual(repeat["sha256"], second["sha256"])
+            history = root / "_isolated_review" / "tpac" / "inventory_versions"
+            self.assertEqual(len(list(history.glob("*.json"))), 1)
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_VERSION_SHA_HOLD"):
+                read_detail_inventory_version(root, "../escape")
+            predecessor = history / (first["sha256"] + ".json")
+            predecessor.write_bytes(b"corrupted")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_HISTORY_CORRUPT_HOLD"):
+                read_detail_inventory_version(root, first["sha256"])
+            # Bad historical evidence cannot contaminate the current snapshot.
+            current_again, current_again_sha = load_detail_inventory(root)
+            self.assertEqual(current_again, second_document)
+            self.assertEqual(current_again_sha, second["sha256"])
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_HISTORY_CORRUPT_HOLD"):
+                write_detail_inventory(initial, root, second["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
+
+    def test_stale_cas_cannot_create_history_or_change_snapshot(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            document = {"kind": INVENTORY_KIND, "items": {}}
+            first = write_detail_inventory(document, root)
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_CAS_HOLD"):
+                write_detail_inventory(document, root, "0" * 64)
+            self.assertEqual(load_detail_inventory(root)[1], first["sha256"])
+            self.assertFalse((root / "_isolated_review" / "tpac" /
+                              "inventory_versions").exists())
