@@ -1443,15 +1443,32 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertEqual(row["archive_field_evidence"]["detail_body_sha256"],
                              inventory["items"]["tpac:event:1301"]["archive_field_evidence"]["detail_body_sha256"])
             self.assertEqual(row["archive_field_evidence"]["accepted_fields"], 0)
-            # Corrupt original bytes fail before CAS commit.
+            # A corrupt individual DETAIL must be quarantined, not abort the
+            # entire batch or erase the other catalog's verified evidence.
             catalogs["event"]["details"] = {
                 "1301": {"detail_file": catalogs["event"]["list_file"],
                          "receipt": catalogs["program"]["details"]["2040"]["receipt"]}}
             save()
-            before = load_detail_inventory(root / "_isolated_archive_replay")[1]
-            with self.assertRaises(ValueError):
-                archived_inventory_cli(manifest, root)
-            self.assertEqual(load_detail_inventory(root / "_isolated_archive_replay")[1], before)
+            before, before_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            failed = archived_inventory_cli(manifest, root)
+            after, after_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(failed["counts"]["archive_identity_hold"], 1)
+            self.assertEqual(failed["counts"]["detail_available"], 1)
+            self.assertNotEqual(after_sha, before_sha)
+            self.assertEqual(after["items"]["tpac:program:2040"],
+                             before["items"]["tpac:program:2040"])
+            bad = after["items"]["tpac:event:1301"]
+            self.assertEqual(bad["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(bad["reason"], "ARCHIVED_DETAIL_VALIDATION_HOLD")
+            self.assertFalse(bad["archive_field_evidence_current"])
+            self.assertEqual(bad["archive_field_hold_reason"],
+                             "DETAIL_VALIDATION_FAILED_HOLD")
+            self.assertEqual(bad["archive_field_evidence"],
+                             before["items"]["tpac:event:1301"]["archive_field_evidence"])
+            self.assertEqual(failed["accepted_fields"], 0)
+            self.assertEqual(failed["published"], 0)
+            self.assertEqual(archived_inventory_cli(manifest, root)["inventory"]["sha256"],
+                             after_sha)
 
 
     def test_persisted_archive_field_receipt_tamper_is_rejected_before_cas(self):
