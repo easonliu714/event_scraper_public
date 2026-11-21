@@ -1055,6 +1055,16 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
                       "source_body_sha256": detail_receipt["body_sha256"],
                       "decision": "ARCHIVED_IDENTITY_PARITY_REVIEW_ONLY"}
         },
+        # The archived H1 proves identity only. These field roles are explicit
+        # UNKNOWNs, not values inferred from the card, surrounding text, or
+        # unverified historical HTML. This makes partial replay safe for LKG.
+        "field_holds": {
+            role: {"decision": "HOLD", "value": None,
+                   "hold_reason": "ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED",
+                   "source_url": card["detail_url"],
+                   "source_body_sha256": detail_receipt["body_sha256"]}
+            for role in ("date", "price", "venue", "description", "image")
+        },
         "decision": "ARCHIVED_LIST_DETAIL_IDENTITY_REVIEW_ONLY",
         "historical_replay_only": True, "native_get_allowed": False,
         "source_requests_performed": 0, "accepted_fields": 0,
