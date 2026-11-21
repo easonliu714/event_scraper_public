@@ -1619,6 +1619,9 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                              "PENDING_DETAIL_BUDGET")
             self.assertEqual(saved["items"]["tpac:program:2040"]["reason"],
                              "PRIOR_ARCHIVED_DETAIL_BYTES_NOT_REPLAYED_HOLD")
+            self.assertFalse(saved["items"]["tpac:program:2040"]["archive_field_evidence_current"])
+            self.assertEqual(saved["items"]["tpac:program:2040"]["archive_field_hold_reason"],
+                             "DETAIL_BYTES_NOT_REPLAYED_HOLD")
             self.assertEqual(second["counts"]["detail_available"], 0)
             self.assertEqual(second["counts"]["pending_detail_budget"], 2)
             self.assertEqual(second["counts"]["source_cards"], 2)
