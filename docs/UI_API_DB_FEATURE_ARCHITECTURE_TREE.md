@@ -9778,3 +9778,28 @@ Next: official sealed DETAIL bytes field_roles → isolated LKG/CAS
 - **Source：** `scripts/p30_tpac_multi_event_refresh.py::_archived_detail_date_roles`、`bind_archived_detail_identity`，SOURCE `b9f114e9ee1bbb55fd227028badf508400f4d072`，blob `e43b27317ab881858758c4b9d999d33fbd4f79cd`。分清日期語意，不能以活動範圍、票務時間或未解析節點冒充演出開始。
 - **正反測試：** `tests/p30/test_p30_tpac_multi_event_refresh.py::ArchivedDetailIdentityBindingTests`，TEST `be6521e0153a8bc9ef203859df69dee15d5649c7`，blob `bc98aa82cd0835916800208e903a918f19aea211`；Workflow `96b1f1521224457ca97081c49cafb0efb9d0a967`，blob `d6bf771e4cae23aa5d352aeb85c945144a587de8`；exact-head CI `44893871551` SUCCESS、Job `136815249714` SUCCESS、Artifact `14702418812` SHA256 `1643a6a8df3e43b1f5e97539bac7b329fc4bc120665d25009c4da5d0b76cc8fe`。CI 直接要求已封存原始 3 DETAIL 產生至少 1 可追溯日角色並驗全部欄位仍不正式接受。
 - **UI/API/DB/Storage/Publication：** Source Parser 增量不改正式 UI／正式活動 JSON／Golden／Status 或 SQLite 舊 Gate；隔離 artifact 僅供 REVIEW。真正新 HTTP/LIST/DETAIL/IDENTITY/FIELD_ACCEPTED/GOLDEN/PUBLISHED=0，Termux isolated 6/6 舊版實機 PASS 與 Android PASS 保留，正式單機 Source GET/Publisher/Scheduler 仍 HOLD，未解除發布禁令。下一工程實作：來源候選 date roles → 可重跑不破壞 LKG CAS + failure rollback + 原始 SHA/ID 持續綁定。
+
+### 2026-11-21｜TPAC-20261121-2105-ARCHIVE-FIELD-AUTHORITY-CAS-VALIDATION｜隔離 archived FIELD Candidate DB／CAS 來源契約實際落地
+
+```text
+TPAC 官方歷史 2 LIST + 3 DETAIL 原始 bytes（PIN SHA，無新 HTTP）
+ ↓ 同 Host + Catalog + Event ID + Detail URL + H1 + SHA 
+bind_archived_detail_identity() → title/date role REVIEW 候選
+ ↓ archived_inventory_cli()
+隔離 _isolated_archive_replay/_isolated_review/tpac/tpac_detail_inventory.json
+ ↓ 〔本輪新增〕_validate_archived_review_row() 於 select_pending_details()
+ ├─ 嚴格 accepted_fields=0、published=False、decision=REVIEW_ONLY
+ ├─ 來源 detail_url + body_sha256 + captured/observed time 綁定
+ ├─ title/show_start/show_count/activity_period 允許的 role/value/decision
+ ├─ date/price/venue/description/image field_holds=HOLD，無偽造正式價格
+ ├─ archive_field_evidence_current 真值與 STATUS/HOLD 原因相符
+ └─ 任何 canonical JSON 格式但已惡意改值：拒絕 load / write / 重播
+ ↓ load_detail_inventory() / write_detail_inventory() 共同受護
+ ↓ Exact-head CI：封存真實 bytes Parser+磁碟 CAS SHA/role/value 重新讀回
+ ↓ 下一步：LKG 差異、回滾、Source Adapter 到正式資料服務（未啟用）
+ ↓ 正式 docs/data.json / Pages / Android：HARD_HOLD_NO_PUBLICATION
+```
+
+- **受影響實作：** `scripts/p30_tpac_multi_event_refresh.py::_validate_archived_review_row`（新增）、`select_pending_details`（先比對原始 source 身分，後強制 nested archive FIELD evidence 驗證）。`load_detail_inventory`／`write_detail_inventory` 已共用 select_pending_details，無須繞開現有 CAS storage。Source SHA `8832bcec7b2ac9e87afd0c813adb6dc941ba9645`，blob `c97e1db45e18bc034701f0860e5d529dff5f28e5`。**修改前**只驗外層 canonical/row ID；**修改後**拒絕嵌套的偽造發布、錯來源與過期字段。
+- **驗證與安全：** `tests/p30/test_p30_tpac_multi_event_refresh.py` 11 組 canonical persisted 蓄意篡改，`load_detail_inventory`/archive replay 皆 fail-closed、不覆寫，正常資料 CAS restart/idempotence 保留。Test commit `2f977949528ab10f83a593568f8e46101fa48067`，blob `4fb36d85314751a5d6422966bee6597a1c05007f`。Workflow/exact HEAD `2a22498a70184688bf958a1b3bf148c9b7ce4f77`，blob `ba8f8cd95f2d4913cb7c3c9cfabf79345d9eed69`，CI Run `44907589230` SUCCESS Job `136856364923` SUCCESS Artifact `14708771411` sha256 `12bfa4cb411c7224f3f200f91cf0f9e156858255bc1473f5db77a4754159da47`；已封存 3 原始 DETAIL 的 CAS role+SHA 真讀回成功。
+- **UI／API／DB／Storage／發佈：** 只增量工程 Draft 的封存 FIELD 子契約/驗收，沿用 Python local JSON CAS；不需新 DB 表、不改正式 Frontend／API／`docs/data.json`／狀態檔／Golden。新官方 HTTP/LIST/DETAIL/IDENTITY/FIELD_ACCEPTED/GOLDEN/PUBLISHED 仍 0；Termux isolated native 6/6 舊版 PASS 與 Android 歷史 PASS 保留；新版本正式 Termux/Android 發布驗收 UNKNOWN。正式 Scheduler、Publisher、Notifier 以及 Source 官方 GET 均未啟用。下一優先 LKG 可重複差異/修復流程，而不是重做已完成的 validator Gate。
