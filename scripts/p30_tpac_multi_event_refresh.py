@@ -1005,10 +1005,62 @@ def _archived_cards(catalog, raw, receipt):
         results[sid] = {"identity": "tpac:" + catalog + ":" + sid,
                         "source_event_id": sid, "source_namespace": catalog,
                         "list_url": "https://tpac.org.taipei/" + catalog,
-                        "detail_url": url}
+                        "detail_url": url, "title_candidate": title}
     if not results:
         raise ValueError("TPAC_ARCHIVE_NO_VISIBLE_CARDS_HOLD")
     return results
+
+
+
+def bind_archived_detail_identity(catalog, list_raw, list_receipt,
+                                  event_id, detail_raw, detail_receipt):
+    """Compare sealed LIST and same-ID DETAIL bytes/identity (OFFLINE only).
+
+    Archive receipt provenance does not prove fresh HTTP, robots or live access.
+    Only the source-owned DETAIL article H1 is reviewed, never published.
+    """
+    if (catalog not in ("program", "event")
+            or type(event_id) is not str
+            or re.fullmatch(r"[1-9][0-9]{0,9}", event_id) is None):
+        raise ValueError("TPAC_ARCHIVE_DETAIL_ID_SCOPE_HOLD")
+    cards = _archived_cards(catalog, list_raw, list_receipt)
+    card = cards.get(event_id)
+    if card is None or card["identity"] != "tpac:" + catalog + ":" + event_id:
+        raise ValueError("TPAC_ARCHIVE_DETAIL_NOT_IN_SAME_LIST_HOLD")
+    soup = _archived_body(detail_raw, detail_receipt, card["detail_url"],
+                          catalog, event_id)
+    selector = ("article.page-program__article" if catalog == "program"
+                else "article.page-event__article")
+    articles = [node for node in soup.select(selector) if _visible(node)]
+    if len(articles) != 1:
+        raise ValueError("TPAC_ARCHIVE_DETAIL_OWNED_ARTICLE_HOLD")
+    titles = [node for node in articles[0].select("h1") if _visible(node)]
+    if len(titles) != 1:
+        raise ValueError("TPAC_ARCHIVE_DETAIL_OWNED_H1_HOLD")
+    name = _text(titles[0])
+    if name != card["title_candidate"]:
+        raise ValueError("TPAC_ARCHIVE_LIST_DETAIL_TITLE_PARITY_HOLD")
+    return {
+        "kind": "TPAC_ARCHIVED_SAME_ID_DETAIL_REVIEW_V1",
+        "identity": card["identity"], "source_namespace": catalog,
+        "source_event_id": event_id,
+        "list_url": card["list_url"], "detail_url": card["detail_url"],
+        "list_body_sha256": list_receipt["body_sha256"],
+        "detail_body_sha256": detail_receipt["body_sha256"],
+        "capture_started_at": detail_receipt.get("capture_started_at"),
+        "observed_at": detail_receipt.get("observed_at"),
+        "field_roles": {
+            "title": {"role": "EVENT_TITLE", "value": name,
+                      "source_url": card["detail_url"],
+                      "source_body_sha256": detail_receipt["body_sha256"],
+                      "decision": "ARCHIVED_IDENTITY_PARITY_REVIEW_ONLY"}
+        },
+        "decision": "ARCHIVED_LIST_DETAIL_IDENTITY_REVIEW_ONLY",
+        "historical_replay_only": True, "native_get_allowed": False,
+        "source_requests_performed": 0, "accepted_fields": 0,
+        "formal_field_pass": False, "published": False,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
 
 
 def archived_inventory_cli(manifest_path, repo_root):
