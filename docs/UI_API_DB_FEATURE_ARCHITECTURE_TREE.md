@@ -9647,3 +9647,34 @@ scripts/p30_tpac_r4_source_policy.py::reserve_durable_source_attempt()
 - **Exact-head 驗收：** [CI #44727844945](https://github.com/easonliu714/event_scraper_public/actions/runs/44727844945) SUCCESS，Job 136259705615 22 steps SUCCESS，Artifact 14624567241 GitHub sha256 `1c56a7e40e3f6245c1018bd6caecd2084850dca9b707d8b539ff9b52a27026cc`。隔離正/反測試包含主機 429 → 異 Catalog 擋下、429 到期只 REVIEW、403 到期仍 policy HOLD、stale/per-ID/unknown Provider 拒絕，不能放寬 R4 原 6h / robots / GET budget。
 - **尚缺不可混淆：** 此 Source 預檢只是開始串接現有純冷卻判定，**沒有**真正的單執行者持久化健康狀態/回應原子寫入/可獨立驗證 crash/restart；現有 RAW5 Provider 尚不提供此 readback，正式 GET 權限仍為 false。不可把 flag `durable_readback_verified` 當跨主機安全已通過。TPAC C20 歷史 38/3/35 不變，未新增官方 HTTP、正式 Golden/JSON/Pages 發布，保留舊 Android PASS。
 - **後續 Source/Core:** 將共同 source_host cooldown 與 source-specific failure 分類加入實際受控單網路 Writer 之固定狀態儲存；需要 Provider 交易驗證／安全配置／Owner 來源 GET 個別授權。正式發布仍 `HARD_HOLD_NO_PUBLICATION`；不另立治理文件。
+
+### 2026-11-21｜TPAC-C20-SINGLE-ACTOR-SQLITE-LEDGER-20261121｜Source 請求防重與 Host 健康資料流（隔離工程，非發布）
+
+```text
+Source TPAC /program + /event（共用 tpac.org.taipei Host）
+  ↓ 實際 LIVE GET：HOLD，未授權
+隔離 Source/Host 健康候選（固定 SOURCE，非正式寫入）
+  scripts/p30_tpac_r4_source_policy.py
+    IsolatedSingleExecutorLedger(db_path) [ISOLATED_CI_PASS]
+      POSIX kernel flock（單機 process lock）
+      SQLite WAL + synchronous FULL + BEGIN IMMEDIATE
+      begin_attempt(host, identity, owner_run_id, UTC)
+        ├─ 同 Host 6h/429/403 fence、未知 PENDING → FAIL CLOSED
+        ├─ 跨 Host 各自狀態，來源輪轉不共享不相關的冷卻
+        └─ durable PENDING + fencing_token，native_get_allowed=False
+      commit_response(host, run, fence, status, observed_at)
+        ├─ fencing 與時間順序驗證
+        ├─ 429 Retry-After、24h 起冷卻／403 72h policy HOLD
+        ├─ 200 需原始 LIST body/來源 receipt 及現有 discover_catalog 解析
+        └─ COMMITTED 原子更新；崩潰留下 PENDING
+      read_host_cooldown(host) → local durability only, never GET authority
+      close() → release kernel lock
+  ↓
+正式 Native Source Executor/持久部署權威 [HOLD/NOT CONNECTED]
+  ↓（Publisher 安全 Gate 與 Owner 獨立授權）
+正式 docs/data.json / Pages / Android [UNCHANGED]
+```
+
+- **實作與驗收：** Source Commit `649aeeeb14e29f2d60de71a87098d2ac88146599`（Blob `03c45a38562c454109eb044520ec36e2e6a27708`）；Test/exact HEAD `b241a2bd33bcdc12e047991a8b8d12bad0477691`（Blob `3c78134495aa62dcc013f04216f2610fa1d80cad`）；CI `44858618605`、Job `136706564417` SUCCESS、Artifact `14687914416` SHA256 `d8b5c98141d2cdffe3f14e0885b0a81ee4b0376fc4962a30a44c9793330b2bd3`。
+- **通過界線：** 本地 SQLite 交易、獨立真子行程拒絕第二擷取者、異常終止持久 PENDING、跨 Host 狀態隔離、受控 Retry-After、安全收據拒絕 Boolean-only 假成功均為隔離 CI PASS；此元件為隔離候選，不假定 Docker/Windows/多台主機共用鎖或雲端 runner 的儲存永續。不具有正式 GET 權限，與 RAW5 GitHub Claim Provider 的不可變來源 Gate 不可混淆。
+- **未完成／下一接口：** 尚未具備 Owner 指定的持久化單執行者執行主機與真實跨行程讀回；尚未整合官方 Response Parser 生成可信驗證收據；正式 Source Scheduler/Publisher/Notifier 仍未授權。TPAC 真實新資料 0、歷史 38 LIST /3 DETAIL、正式 Source GET／Golden／Publication HOLD；既有 Android PASS 與正式 JSON 不變。
