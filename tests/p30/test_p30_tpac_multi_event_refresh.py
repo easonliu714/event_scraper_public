@@ -2032,13 +2032,21 @@ class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
                         "status": "PENDING_DETAIL_BUDGET", "attempts": 0}
             first = write_detail_inventory(
                 {"kind": INVENTORY_KIND, "items": {identity: original}}, root)
+            # Source identity is guarded on every CAS write, before recovery.
+            # Exercise the real rejection instead of attempting to persist an
+            # invalid source URL that the existing validator correctly blocks.
             drift = dict(original, detail_url="https://tpac.org.taipei/event/9999")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_ROW_IDENTITY_HOLD"):
+                write_detail_inventory(
+                    {"kind": INVENTORY_KIND, "items": {identity: drift}},
+                    root, first["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], first["sha256"])
+            # Advance to a valid second version so the corrupted historical
+            # version is tested against an actual recoverable CAS transition.
             second = write_detail_inventory(
-                {"kind": INVENTORY_KIND, "items": {identity: drift}},
+                {"kind": INVENTORY_KIND, "items": {
+                    identity: dict(original, reason="NEW_REVIEW")}},
                 root, first["sha256"])
-            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_RECOVERY_SOURCE_DRIFT_HOLD"):
-                restore_detail_inventory_row(root, first["sha256"], identity,
-                                             second["sha256"])
             history = root / "_isolated_review" / "tpac" / "inventory_versions"
             (history / (first["sha256"] + ".json")).write_bytes(b"corrupt")
             with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_HISTORY_CORRUPT_HOLD"):
