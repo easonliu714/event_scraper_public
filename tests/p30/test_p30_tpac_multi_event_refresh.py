@@ -1114,6 +1114,17 @@ class ArchivedDetailIdentityBindingTests(unittest.TestCase):
 
 
 
+    def test_archived_identity_never_promotes_unverified_field_roles(self):
+        # Historical identity parity is not a date/price/venue/description receipt.
+        import inspect
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        source = inspect.getsource(bind_archived_detail_identity)
+        self.assertIn("ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED", source)
+        self.assertIn('"field_holds"', source)
+        self.assertIn('"source_body_sha256"', source)
+        self.assertIn('"accepted_fields": 0', source)
+
+
 class ArchivedProvenanceCliTests(unittest.TestCase):
     """Archive-only CLI is an evidence inventory, never a LIVE attestation."""
 
