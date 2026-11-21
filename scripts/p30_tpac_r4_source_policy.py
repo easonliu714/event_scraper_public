@@ -20,6 +20,11 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from urllib import robotparser
+import fcntl
+import os
+import secrets
+import sqlite3
+from pathlib import Path
 
 from scripts.p30_tpac_catalog_topology import CATALOGS, discover_catalog
 
@@ -401,3 +406,228 @@ def evaluate_source_cooldown(*, now: datetime, state: dict,
     return {"decision": "COOLDOWN_ACTIVE" if current < until else "REVIEW_ONLY",
             "eligible_for_review": current >= until, "native_get_allowed": False}
 
+
+
+class IsolatedSingleExecutorLedger:
+    """Local POSIX single-actor, crash-durable SOURCE health prototype.
+
+    This is an OFFLINE candidate, not a cross-host provider or HTTP executor.
+    A held kernel file lock is mandatory in addition to SQLite transactions.
+    PENDING survives process death and is never inferred to mean HTTP success.
+    No method issues requests or returns live/source-publication authorization.
+    """
+
+    def __init__(self, database_path):
+        path = Path(database_path).absolute()
+        if (os.name != "posix" or path.parent.is_symlink()
+                or path.is_symlink() or Path(str(path) + ".lock").is_symlink()
+                or not path.parent.is_dir()):
+            raise ValueError("TPAC_LEDGER_UNSAFE_LOCAL_PATH_HOLD")
+        self._lock_fd = None
+        self._conn = None
+        try:
+            self._lock_fd = os.open(str(path) + ".lock",
+                                    os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+            try:
+                fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise ValueError("TPAC_LEDGER_SECOND_EXECUTOR_HOLD") from exc
+            self._conn = sqlite3.connect(str(path), timeout=0,
+                                         isolation_level=None)
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=FULL")
+            self._conn.execute("PRAGMA busy_timeout=0")
+            self._conn.execute("""CREATE TABLE IF NOT EXISTS source_attempts (
+                id INTEGER PRIMARY KEY,
+                source_host TEXT NOT NULL,
+                source_identity TEXT NOT NULL,
+                owner_run_id TEXT NOT NULL UNIQUE,
+                fencing_token TEXT NOT NULL,
+                attempted_at TEXT NOT NULL,
+                response_at TEXT,
+                outcome TEXT NOT NULL CHECK(outcome IN ('PENDING','COMMITTED')),
+                last_http_status INTEGER,
+                failure_class TEXT,
+                consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                retry_after_header TEXT,
+                cooldown_until TEXT,
+                body_sha256 TEXT
+            )""")
+            if self._conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+                raise ValueError("TPAC_LEDGER_SQLITE_INTEGRITY_HOLD")
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self):
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
+        if self._lock_fd is not None:
+            fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+            os.close(self._lock_fd)
+            self._lock_fd = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def _latest(self, source_host):
+        return self._conn.execute(
+            """SELECT owner_run_id,fencing_token,attempted_at,outcome,
+                      last_http_status,failure_class,consecutive_failures,
+                      retry_after_header,cooldown_until,source_identity
+               FROM source_attempts WHERE source_host=?
+               ORDER BY id DESC LIMIT 1""", (source_host,)).fetchone()
+
+    @staticmethod
+    def _identity(source_host, source_identity):
+        if (type(source_host) is not str
+                or re.fullmatch(r"[a-z0-9][a-z0-9.-]{2,120}", source_host) is None
+                or type(source_identity) is not str
+                or re.fullmatch(r"[a-z][a-z0-9_-]{1,30}:(?:program|event):(?:list|[1-9][0-9]{0,9})",
+                                source_identity) is None):
+            raise ValueError("TPAC_LEDGER_IDENTITY_SCHEMA_HOLD")
+        if (source_host == SOURCE_HOST) != source_identity.startswith("tpac:"):
+            raise ValueError("TPAC_LEDGER_IDENTITY_HOST_MISMATCH_HOLD")
+
+    def begin_attempt(self, *, source_host, source_identity, owner_run_id, now):
+        """Atomically reserve OFFLINE attempt; never grants native GET."""
+        self._identity(source_host, source_identity)
+        if (type(owner_run_id) is not str
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,127}",
+                                owner_run_id) is None):
+            raise ValueError("TPAC_LEDGER_RUN_ID_HOLD")
+        current = _aware(now, "LEDGER_BEGIN")
+        try:
+            self._conn.execute("BEGIN IMMEDIATE")
+            last = self._latest(source_host)
+            if last is not None:
+                previous = _aware(datetime.fromisoformat(last[2]), "LEDGER_PREVIOUS")
+                if current < previous:
+                    raise ValueError("TPAC_LEDGER_CLOCK_ROLLBACK_HOLD")
+                if last[3] == "PENDING":
+                    raise ValueError("TPAC_LEDGER_UNCERTAIN_CRASH_OUTCOME_HOLD")
+                if current - previous < timedelta(seconds=MIN_INTERVAL_SECONDS):
+                    raise ValueError("TPAC_LEDGER_SIX_HOUR_HOST_HOLD")
+                if last[4] in (403, 429):
+                    raise ValueError("TPAC_LEDGER_POLICY_OR_PROBE_REVIEW_HOLD")
+                until = _aware(datetime.fromisoformat(last[8]), "LEDGER_COOLDOWN")
+                if current < until:
+                    raise ValueError("TPAC_LEDGER_HOST_COOLDOWN_ACTIVE_HOLD")
+            fence = secrets.token_hex(32)
+            self._conn.execute(
+                """INSERT INTO source_attempts
+                   (source_host,source_identity,owner_run_id,fencing_token,
+                    attempted_at,outcome)
+                   VALUES(?,?,?,?,?,'PENDING')""",
+                (source_host, source_identity, owner_run_id, fence,
+                 current.isoformat()))
+            self._conn.commit()
+        except BaseException:
+            self._conn.rollback()
+            raise
+        return {"owner_run_id": owner_run_id, "fencing_token": fence,
+                "source_host": source_host, "decision": "ISOLATED_PENDING_ONLY",
+                "native_get_allowed": False}
+
+    def commit_response(self, *, source_host, owner_run_id, fencing_token,
+                        status, observed_at, retry_after_header=None,
+                        raw_body=None, source_receipt=None):
+        """Fenced response write; a bare HTTP-200/boolean cannot mark success."""
+        observed = _aware(observed_at, "LEDGER_RESPONSE")
+        if type(status) is not int or not 100 <= status <= 599:
+            raise ValueError("TPAC_LEDGER_HTTP_STATUS_HOLD")
+        if retry_after_header is not None:
+            if (type(retry_after_header) is not str
+                    or not 1 <= len(retry_after_header) <= 128):
+                raise ValueError("TPAC_LEDGER_RETRY_AFTER_HOLD")
+            if re.fullmatch(r"[0-9]+", retry_after_header):
+                delta = int(retry_after_header)
+                if delta > 365 * 86400:
+                    raise ValueError("TPAC_LEDGER_RETRY_AFTER_HOLD")
+                retry_deadline = observed + timedelta(seconds=delta)
+            else:
+                try:
+                    retry_deadline = _aware(parsedate_to_datetime(retry_after_header),
+                                            "LEDGER_RETRY_AFTER")
+                except (ValueError, TypeError, OverflowError, IndexError) as exc:
+                    raise ValueError("TPAC_LEDGER_RETRY_AFTER_HOLD") from exc
+        else:
+            retry_deadline = observed
+        try:
+            self._conn.execute("BEGIN IMMEDIATE")
+            last = self._latest(source_host)
+            if (last is None or last[0] != owner_run_id
+                    or type(fencing_token) is not str
+                    or last[1] != fencing_token or last[3] != "PENDING"):
+                raise ValueError("TPAC_LEDGER_FENCING_OR_PENDING_HOLD")
+            begun = _aware(datetime.fromisoformat(last[2]), "LEDGER_BEGIN")
+            if observed < begun:
+                raise ValueError("TPAC_LEDGER_RESPONSE_BEFORE_ATTEMPT_HOLD")
+            count = 0
+            digest = None
+            if status == 200:
+                if (source_host != SOURCE_HOST or raw_body is None
+                        or type(source_receipt) is not dict
+                        or last[9] not in ("tpac:program:list", "tpac:event:list")):
+                    raise ValueError("TPAC_LEDGER_200_TRUSTED_PARSER_RECEIPT_HOLD")
+                # No generic Boolean-success bypass; only an exact owned LIST
+                # parser pass with original body/receipt. Still OFFLINE only.
+                kind = last[9].split(":")[1]
+                from scripts.p30_tpac_catalog_topology import discover_catalog
+                discover_catalog(kind, raw_body, source_receipt, observed)
+                digest = hashlib.sha256(raw_body).hexdigest()
+                minimum = observed + timedelta(seconds=MIN_INTERVAL_SECONDS)
+                failure = "NONE"
+            elif status == 429:
+                earlier = self._conn.execute(
+                    """SELECT last_http_status,consecutive_failures
+                       FROM source_attempts WHERE source_host=? AND outcome='COMMITTED'
+                       ORDER BY id DESC LIMIT 1""", (source_host,)).fetchone()
+                count = (earlier[1] + 1) if earlier and earlier[0] == 429 else 1
+                minimum = observed + timedelta(hours=min(24 * (2 ** min(count-1, 3)), 168))
+                failure = "RATE_LIMIT"
+            elif status == 403:
+                minimum = observed + timedelta(hours=72)
+                failure = "ACCESS_DENIED"
+            elif 500 <= status <= 599:
+                minimum = observed + timedelta(hours=12)
+                failure = "TRANSIENT"
+            else:
+                minimum = observed + timedelta(days=7)
+                failure = "PERMANENT"
+            deadline = max(minimum, retry_deadline)
+            self._conn.execute(
+                """UPDATE source_attempts SET outcome='COMMITTED',
+                   response_at=?,last_http_status=?,failure_class=?,
+                   consecutive_failures=?,retry_after_header=?,
+                   cooldown_until=?,body_sha256=?
+                   WHERE owner_run_id=? AND fencing_token=? AND outcome='PENDING'""",
+                (observed.isoformat(), status, failure, count,
+                 retry_after_header, deadline.isoformat(), digest,
+                 owner_run_id, fencing_token))
+            self._conn.commit()
+        except BaseException:
+            self._conn.rollback()
+            raise
+        return {"source_host": source_host, "decision": "ISOLATED_RESPONSE_COMMITTED",
+                "last_http_status": status, "cooldown_until": deadline,
+                "native_get_allowed": False}
+
+    def read_host_cooldown(self, *, source_host):
+        """Durable readback; PENDING is an irreversible unknown-outcome HOLD."""
+        last = self._latest(source_host)
+        if last is None or last[3] == "PENDING":
+            raise ValueError("TPAC_LEDGER_MISSING_OR_PENDING_RESPONSE_HOLD")
+        return {"scope": "HOST_WIDE", "source_host": source_host,
+                "source_identity": last[9],
+                "durable_readback_verified": True,
+                "evidence_class": "ISOLATED_LOCAL_PROCESS_ONLY",
+                "last_attempt_at": datetime.fromisoformat(last[2]),
+                "last_http_status": last[4], "last_failure_class": last[5],
+                "consecutive_failures": last[6], "retry_after_header": last[7],
+                "cooldown_until": datetime.fromisoformat(last[8]),
+                "native_get_allowed": False}
