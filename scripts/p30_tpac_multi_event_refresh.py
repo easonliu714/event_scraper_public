@@ -1017,6 +1017,39 @@ def write_detail_inventory(inventory, repo_root, expected_sha=None):
         if (None if prior is None else _sha(prior)) != expected_sha:
             raise ValueError("TPAC_INVENTORY_CAS_HOLD")
         payload = _canonical(inventory)
+        # Preserve the last complete, validated CAS version before replacement.
+        # This is an isolated local recovery journal, never a LIVE/Publisher LKG.
+        # A failed archive write must leave the current inventory untouched.
+        if prior is not None and prior != payload:
+            if not 0 < len(prior) <= 16 * 1024 * 1024:
+                raise ValueError("TPAC_INVENTORY_PRIOR_SIZE_HOLD")
+            previous_document = json.loads(prior)
+            if _canonical(previous_document) != prior:
+                raise ValueError("TPAC_INVENTORY_PRIOR_NONCANONICAL_HOLD")
+            select_pending_details(previous_document, 0)
+            history = folder / "inventory_versions"
+            if history.is_symlink():
+                raise ValueError("TPAC_INVENTORY_HISTORY_SYMLINK_HOLD")
+            history.mkdir(exist_ok=True)
+            archived = history / (_sha(prior) + ".json")
+            if archived.is_symlink():
+                raise ValueError("TPAC_INVENTORY_HISTORY_SYMLINK_HOLD")
+            if archived.exists():
+                if archived.read_bytes() != prior:
+                    raise ValueError("TPAC_INVENTORY_HISTORY_CORRUPT_HOLD")
+            else:
+                try:
+                    history_fd = os.open(archived, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                except FileExistsError as error:
+                    raise ValueError("TPAC_INVENTORY_HISTORY_RACE_HOLD") from error
+                try:
+                    with os.fdopen(history_fd, "wb") as saved:
+                        saved.write(prior)
+                        saved.flush()
+                        os.fsync(saved.fileno())
+                except BaseException:
+                    archived.unlink(missing_ok=True)
+                    raise
         with tempfile.NamedTemporaryFile(dir=folder, prefix=".inventory-", delete=False) as tmp:
             temp_name = tmp.name
             tmp.write(payload)
@@ -1030,6 +1063,29 @@ def write_detail_inventory(inventory, repo_root, expected_sha=None):
         return {"sha256": _sha(payload), "items": len(inventory["items"])}
     finally:
         os.unlink(lock)
+
+
+def read_detail_inventory_version(repo_root, version_sha):
+    """Read a validated immutable local CAS predecessor, never publish/auto-restore."""
+    if type(version_sha) is not str or re.fullmatch(r"[0-9a-f]{64}", version_sha) is None:
+        raise ValueError("TPAC_INVENTORY_VERSION_SHA_HOLD")
+    root = Path(repo_root).resolve()
+    folder = root / "_isolated_review" / "tpac"
+    history = folder / "inventory_versions"
+    archived = history / (version_sha + ".json")
+    if any(path.is_symlink() for path in
+           (root / "_isolated_review", folder, history, archived)):
+        raise ValueError("TPAC_INVENTORY_HISTORY_SYMLINK_HOLD")
+    if not archived.is_file():
+        raise ValueError("TPAC_INVENTORY_VERSION_MISSING_HOLD")
+    raw = archived.read_bytes()
+    if not 0 < len(raw) <= 16 * 1024 * 1024 or _sha(raw) != version_sha:
+        raise ValueError("TPAC_INVENTORY_HISTORY_CORRUPT_HOLD")
+    document = json.loads(raw)
+    if _canonical(document) != raw:
+        raise ValueError("TPAC_INVENTORY_HISTORY_NONCANONICAL_HOLD")
+    select_pending_details(document, 0)
+    return document, version_sha
 
 
 def load_detail_inventory(repo_root):
