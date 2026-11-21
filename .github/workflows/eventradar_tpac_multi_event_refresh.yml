@@ -350,6 +350,36 @@ jobs:
           target=root/'_isolated_archive_replay/_isolated_review/tpac/tpac_detail_inventory.json'
           assert hashlib.sha256(target.read_bytes()).hexdigest()==first['inventory']['sha256']
           print('PASS_ORIGINAL_ARCHIVED_38_ID_CLI_E2E_CAS_RESTART_3_DETAIL_35_PENDING_NO_PUBLICATION')
+
+          # The already sealed 2 LIST + 3 DETAIL are real archived source
+          # bytes. Prove each DETAIL is the SAME event as its LIST card.
+          # Neither this replay nor its role report grants LIVE GET authority.
+          from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+          manifest=json.loads(Path('evidence/tpac_archived_38_id_manifest.json').read_text(encoding='utf-8'))
+          matches={}
+          for catalog in ('program','event'):
+              entry=manifest['catalogs'][catalog]
+              list_raw=Path(entry['list_file']).read_bytes()
+              for sid,detail in sorted(entry['details'].items()):
+                  row=bind_archived_detail_identity(
+                      catalog,list_raw,entry['list_receipt'],sid,
+                      Path(detail['detail_file']).read_bytes(),detail['receipt'])
+                  matches[row['identity']]=row
+          expected_ids={'tpac:program:2040','tpac:event:1301','tpac:event:2072'}
+          assert set(matches)==expected_ids, matches
+          assert all(row['source_requests_performed']==0 and
+                     row['accepted_fields']==0 and not row['published'] and
+                     not row['native_get_allowed'] and
+                     row['release_state']=='HARD_HOLD_NO_PUBLICATION'
+                     for row in matches.values())
+          Path('evidence/tpac_archived_three_detail_identity_review.json').write_text(
+              json.dumps({'kind':'TPAC_ARCHIVED_3_IDENTITY_PARITY_REVIEW_V1',
+                          'historical_only':True,
+                          'detail_identities_reviewed':3,
+                          'new_official_get':0,'accepted_fields':0,'published':0,
+                          'records':matches},ensure_ascii=False,indent=2,
+                          sort_keys=True)+'\n',encoding='utf-8')
+          print('PASS_REAL_ARCHIVED_3_LIST_DETAIL_TITLE_ID_PARITY_REVIEW_NO_GET_NO_PUBLISH')
           PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
