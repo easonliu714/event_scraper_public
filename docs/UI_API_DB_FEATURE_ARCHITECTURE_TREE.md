@@ -9678,3 +9678,31 @@ Source TPAC /program + /event（共用 tpac.org.taipei Host）
 - **實作與驗收：** Source Commit `649aeeeb14e29f2d60de71a87098d2ac88146599`（Blob `03c45a38562c454109eb044520ec36e2e6a27708`）；Test/exact HEAD `b241a2bd33bcdc12e047991a8b8d12bad0477691`（Blob `3c78134495aa62dcc013f04216f2610fa1d80cad`）；CI `44858618605`、Job `136706564417` SUCCESS、Artifact `14687914416` SHA256 `d8b5c98141d2cdffe3f14e0885b0a81ee4b0376fc4962a30a44c9793330b2bd3`。
 - **通過界線：** 本地 SQLite 交易、獨立真子行程拒絕第二擷取者、異常終止持久 PENDING、跨 Host 狀態隔離、受控 Retry-After、安全收據拒絕 Boolean-only 假成功均為隔離 CI PASS；此元件為隔離候選，不假定 Docker/Windows/多台主機共用鎖或雲端 runner 的儲存永續。不具有正式 GET 權限，與 RAW5 GitHub Claim Provider 的不可變來源 Gate 不可混淆。
 - **未完成／下一接口：** 尚未具備 Owner 指定的持久化單執行者執行主機與真實跨行程讀回；尚未整合官方 Response Parser 生成可信驗證收據；正式 Source Scheduler/Publisher/Notifier 仍未授權。TPAC 真實新資料 0、歷史 38 LIST /3 DETAIL、正式 Source GET／Golden／Publication HOLD；既有 Android PASS 與正式 JSON 不變。
+
+### 2026-11-21｜TPAC-P30-TERMUX-NATIVE-6OF6-PARSER-RECEIPT-20261121｜Termux 隔離單執行者/native Source Receipt 新介面
+
+```text
+既有 Android Termux / POSIX aarch64 / Python 3.13.13
+  └─ IsolatedSingleExecutorLedger [TERMUX_NATIVE_PASS 6/6]
+      ├─ SQLite WAL/FULL + OS flock/process exclusive
+      ├─ begin_attempt(host, namespace, owner_run_id, UTC) → durable PENDING + fencing
+      ├─ 崩潰重啟仍 PENDING；他程序鎖衝突 HOLD
+      ├─ /program & /event 共用 host 429/403 cooldown / Retry-After；其他 host 隔離
+      └─ commit_response(200) [ISOLATED_PARSER_RECEIPT_CI_PASS]
+          ├─ 檢查 run_id／fence／source_host／source_identity／source_URL／UTC／evidence_class
+          ├─ 官方 LIST 原始 bytes＋receipt＋body SHA／解析器 discover_catalog 通過
+          ├─ SQLite 持久 source URL／receipt SHA／observed UTC／body SHA
+          └─ read_last_bound_source(host) → 獨立本地證據／無 LIVE GET 授權
+      ├─ legacy 未綁定 COMMITTED 200 → HOLD（不能憑空放行）
+      └─ native_get_allowed=False；不發官方 TPAC GET、不寫正式 JSON／Publisher
+
+既有 Source Adapter [LIST/DETAIL integration pending]
+    ↓ 合法來源一次性授權/官方 HTTP 合規與限額（HOLD）
+同 ID Detail 身分＋欄位語意可信回應收據/固定 Parser [NEXT GATE]
+    ↓ 受控隔離 Quality/LKG／Diff／Rollback [待 Gate]
+    ↓ 正式 Publisher／docs/data.json／Pages／Android [HARD_HOLD_NO_PUBLICATION]
+```
+
+- **真機證據與版本：** Owner 檔案 `tpac_termux_isolated_result.json` 原始 SHA256 `7124cb6284def5bf9511cd8142b11a34f90e8b4cd2a649062a31c7c38b2fabb5`，observed 2026-11-21T03:11:57.502826+00:00，6 case PASS：pin Git source+blob、真實第二程序排他、強制退出後 PENDING、Host 429 Retry-After + 多 Host 隔離、403 人工政策、fence+原始離線 bytes 竄改。固定 Source PR #243 `b241a2bd33bcdc12e047991a8b8d12bad0477691`，Owner 未做任何 Source GET／Github 寫入。
+- **下一代隔離 Core/Source API：** `scripts/p30_tpac_r4_source_policy.py::IsolatedSingleExecutorLedger.__init__/_latest/begin_attempt/commit_response/read_last_bound_source`；Source commit `2e431d5bff525a3ace5be6f2daefe4c4bfd8bd7e`，TEST HEAD `bbcde575464b752dc03de17fc9c763df402e7c13`，Blob `08b3610cd1db98846b174da945fcfb8e77a4b8c2`／`601ad512eccbc3ee8efc4a5764f5bba9e10acf2c`；Exact-head CI `44860672725` SUCCESS、Job `136713066664` SUCCESS、Artifact `14689209299` sha256 `91084e3d7f29df5118e51437c8bb6e2eeab4b02e0c4a2a9c3f3733a1d20e888d`。所有 Source/Parser 收據附加屬性為**隔離內部一致性約束，非數位簽章／獨立 HTTP 時間戳**，不能當正式網站擷取證據。
+- **資料／發布不變界線：** GitHub main、`docs/data.json`、`docs/platform_status.json`、Golden、正式 Pages 及既有 Android PASS 不變。實際新 HTTP/LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION 0；歷史封存 LIST 38 / DETAIL 3 / pending 35。仍禁止未授權 GET、合併、正式 Publisher/Scheduler/Notifier；下一 Gate 是接合既有 TPAC Adapter＋同 ID 原始 DETAIL Source 角色，而不是重做 Termux 六項 PASS。
