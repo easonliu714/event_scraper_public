@@ -1200,6 +1200,57 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertIn("TPAC_ARCHIVE_BYTES_SHA_HOLD", denied.stderr)
 
 
+    def test_archived_cli_requires_list_detail_article_title_parity(self):
+        # Same URL and caller-consistent digest must not inflate archive coverage
+        # when the source-owned article H1 disagrees with the sealed LIST card.
+        from scripts.p30_tpac_multi_event_refresh import archived_inventory_cli
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                title = "封存活動"
+                cls = "card-program" if catalog == "program" else "card-event"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<span class="{cls}__text-title">{title}</span></a>').encode()
+                path = root / (catalog + "_list.html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                           "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                           "body_bytes": len(raw), "capture_started_at": OBS,
+                           "observed_at": None, "http_status": None, "robots_allowed": None}
+                catalogs[catalog] = {"list_file": str(path), "list_receipt": receipt,
+                                     "details": {}}
+            manifest = root / "manifest.json"
+            def save():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+            save()
+            self.assertEqual(archived_inventory_cli(manifest, root)["counts"]["detail_available"], 0)
+            for title, expected in (("不同文章", "TPAC_ARCHIVE_LIST_DETAIL_TITLE_PARITY_HOLD"),
+                                    ("封存活動", None)):
+                raw = (f'<article class="page-program__article"><h1>{title}</h1>'
+                       '</article>').encode()
+                detail_path = root / "program_detail.html"
+                detail_path.write_bytes(raw)
+                catalogs["program"]["details"]["2040"] = {
+                    "detail_file": str(detail_path),
+                    "receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                                "source_url": "https://tpac.org.taipei/program/2040",
+                                "body_sha256": hashlib.sha256(raw).hexdigest(),
+                                "body_bytes": len(raw), "capture_started_at": OBS,
+                                "observed_at": None, "http_status": None,
+                                "robots_allowed": None}}
+                save()
+                if expected:
+                    with self.assertRaisesRegex(ValueError, expected):
+                        archived_inventory_cli(manifest, root)
+                else:
+                    result = archived_inventory_cli(manifest, root)
+                    self.assertEqual(result["counts"]["detail_available"], 1)
+                    self.assertEqual(result["accepted_fields"], 0)
+                    self.assertEqual(result["published"], 0)
+
     def test_archived_cli_cannot_downgrade_existing_live_inventory(self):
         import subprocess
         import sys
