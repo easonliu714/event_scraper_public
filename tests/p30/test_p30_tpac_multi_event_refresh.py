@@ -1210,6 +1210,11 @@ class ArchivedDetailIdentityBindingTests(unittest.TestCase):
 class ArchivedProvenanceCliTests(unittest.TestCase):
     """Archive-only CLI is an evidence inventory, never a LIVE attestation."""
 
+    # Reuse the source-byte fixtures for the real archived CLI→CAS regression.
+    # Previously this class called self.sources() without owning that helper.
+    archived_receipt = ArchivedDetailIdentityBindingTests.archived_receipt
+    sources = ArchivedDetailIdentityBindingTests.sources
+
     def test_archived_real_event_link_prefix_preserves_source_owned_title(self):
         # Official /event title attrs begin with a navigation prefix, but the
         # event-owned visible title itself does not contain that prefix.
