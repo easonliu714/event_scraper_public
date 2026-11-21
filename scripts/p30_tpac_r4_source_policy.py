@@ -15,6 +15,7 @@ local tombstones and CI fixtures are not authority for source GET.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
@@ -451,8 +452,17 @@ class IsolatedSingleExecutorLedger:
                 consecutive_failures INTEGER NOT NULL DEFAULT 0,
                 retry_after_header TEXT,
                 cooldown_until TEXT,
-                body_sha256 TEXT
+                body_sha256 TEXT,
+                source_url TEXT,
+                source_receipt_sha256 TEXT,
+                source_observed_at TEXT
             )""")
+            # Migrate isolated local ledgers; preexisting unbound 200s HOLD.
+            columns = {entry[1] for entry in self._conn.execute(
+                "PRAGMA table_info(source_attempts)")}
+            for column in ("source_url", "source_receipt_sha256", "source_observed_at"):
+                if column not in columns:
+                    self._conn.execute("ALTER TABLE source_attempts ADD COLUMN " + column + " TEXT")
             if self._conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                 raise ValueError("TPAC_LEDGER_SQLITE_INTEGRITY_HOLD")
         except BaseException:
@@ -478,7 +488,8 @@ class IsolatedSingleExecutorLedger:
         return self._conn.execute(
             """SELECT owner_run_id,fencing_token,attempted_at,outcome,
                       last_http_status,failure_class,consecutive_failures,
-                      retry_after_header,cooldown_until,source_identity
+                      retry_after_header,cooldown_until,source_identity,
+                       source_url,source_receipt_sha256,source_observed_at,body_sha256
                FROM source_attempts WHERE source_host=?
                ORDER BY id DESC LIMIT 1""", (source_host,)).fetchone()
 
@@ -510,6 +521,8 @@ class IsolatedSingleExecutorLedger:
                     raise ValueError("TPAC_LEDGER_CLOCK_ROLLBACK_HOLD")
                 if last[3] == "PENDING":
                     raise ValueError("TPAC_LEDGER_UNCERTAIN_CRASH_OUTCOME_HOLD")
+                if last[4] == 200 and not all(last[i] for i in (10, 11, 12, 13)):
+                    raise ValueError("TPAC_LEDGER_LEGACY_UNBOUND_200_HOLD")
                 if current - previous < timedelta(seconds=MIN_INTERVAL_SECONDS):
                     raise ValueError("TPAC_LEDGER_SIX_HOUR_HOST_HOLD")
                 if last[4] in (403, 429):
@@ -569,17 +582,41 @@ class IsolatedSingleExecutorLedger:
                 raise ValueError("TPAC_LEDGER_RESPONSE_BEFORE_ATTEMPT_HOLD")
             count = 0
             digest = None
+            source_url = None
+            source_receipt_sha256 = None
+            source_observed_at = None
             if status == 200:
                 if (source_host != SOURCE_HOST or raw_body is None
                         or type(source_receipt) is not dict
                         or last[9] not in ("tpac:program:list", "tpac:event:list")):
                     raise ValueError("TPAC_LEDGER_200_TRUSTED_PARSER_RECEIPT_HOLD")
-                # No generic Boolean-success bypass; only an exact owned LIST
-                # parser pass with original body/receipt. Still OFFLINE only.
+                # Bind parser evidence to this exact attempt/host/namespace,
+                # URL, response time and fencing generation. These fields
+                # are local provenance only, never LIVE GET authorization.
                 kind = last[9].split(":")[1]
-                from scripts.p30_tpac_catalog_topology import discover_catalog
+                from scripts.p30_tpac_catalog_topology import CATALOGS, discover_catalog
+                expected_url = CATALOGS[kind]["list_url"]
+                evidence_fields = {
+                    "ledger_evidence_class": "ISOLATED_OFFLINE_SOURCE_RECEIPT",
+                    "ledger_owner_run_id": owner_run_id,
+                    "ledger_fencing_token": fencing_token,
+                    "ledger_source_host": source_host,
+                    "ledger_source_identity": last[9],
+                    "ledger_source_url": expected_url,
+                    "ledger_observed_at": observed.isoformat(),
+                }
+                if (type(raw_body) is not bytes
+                        or any(source_receipt.get(k) != v for k, v in evidence_fields.items())
+                        or source_receipt.get("final_url") != expected_url
+                        or source_receipt.get("observed_at") != observed.isoformat()):
+                    raise ValueError("TPAC_LEDGER_PARSER_RECEIPT_BINDING_HOLD")
                 discover_catalog(kind, raw_body, source_receipt, observed)
                 digest = hashlib.sha256(raw_body).hexdigest()
+                source_url = expected_url
+                source_receipt_sha256 = hashlib.sha256(json.dumps(
+                    source_receipt, sort_keys=True, ensure_ascii=False,
+                    separators=(",", ":")).encode("utf-8")).hexdigest()
+                source_observed_at = observed.isoformat()
                 minimum = observed + timedelta(seconds=MIN_INTERVAL_SECONDS)
                 failure = "NONE"
             elif status == 429:
@@ -604,10 +641,12 @@ class IsolatedSingleExecutorLedger:
                 """UPDATE source_attempts SET outcome='COMMITTED',
                    response_at=?,last_http_status=?,failure_class=?,
                    consecutive_failures=?,retry_after_header=?,
-                   cooldown_until=?,body_sha256=?
+                   cooldown_until=?,body_sha256=?,source_url=?,
+                   source_receipt_sha256=?,source_observed_at=?
                    WHERE owner_run_id=? AND fencing_token=? AND outcome='PENDING'""",
                 (observed.isoformat(), status, failure, count,
                  retry_after_header, deadline.isoformat(), digest,
+                 source_url, source_receipt_sha256, source_observed_at,
                  owner_run_id, fencing_token))
             self._conn.commit()
         except BaseException:
@@ -630,4 +669,17 @@ class IsolatedSingleExecutorLedger:
                 "last_http_status": last[4], "last_failure_class": last[5],
                 "consecutive_failures": last[6], "retry_after_header": last[7],
                 "cooldown_until": datetime.fromisoformat(last[8]),
+                "native_get_allowed": False}
+
+    def read_last_bound_source(self, *, source_host):
+        """Independent local SQLite provenance readback; never GET authority."""
+        last = self._latest(source_host)
+        if (last is None or last[3] != "COMMITTED" or last[4] != 200
+                or not all(last[i] for i in (10, 11, 12, 13))):
+            raise ValueError("TPAC_LEDGER_BOUND_SOURCE_NOT_AVAILABLE_HOLD")
+        return {"source_host": source_host, "source_identity": last[9],
+                "source_url": last[10], "source_receipt_sha256": last[11],
+                "source_observed_at": datetime.fromisoformat(last[12]),
+                "body_sha256": last[13],
+                "evidence_class": "ISOLATED_LOCAL_PROVENANCE_ONLY",
                 "native_get_allowed": False}
