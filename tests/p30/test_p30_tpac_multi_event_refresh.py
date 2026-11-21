@@ -1344,6 +1344,62 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
                     self.assertEqual(result["accepted_fields"], 0)
                     self.assertEqual(result["published"], 0)
 
+    def test_archived_field_evidence_survives_cas_restart_and_missing_replay(self):
+        # The real source-owned archive binding must flow into persisted CAS,
+        # not just return from an isolated parser helper.
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                raw, rr, detail_raw, dr = self.sources(catalog, sid)
+                list_file = root / (catalog + "_list.html")
+                detail_file = root / (catalog + "_detail.html")
+                list_file.write_bytes(raw)
+                detail_file.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(list_file), "list_receipt": rr,
+                    "details": {sid: {"detail_file": str(detail_file), "receipt": dr}},
+                }
+            manifest = root / "archive_manifest.json"
+            def save():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+            save()
+            first = archived_inventory_cli(manifest, root)
+            inventory, sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(first["inventory"]["sha256"], sha)
+            self.assertEqual(first["counts"]["detail_available"], 2)
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                evidence = inventory["items"][f"tpac:{catalog}:{sid}"]["archive_field_evidence"]
+                self.assertEqual(evidence["field_roles"]["title"]["role"], "EVENT_TITLE")
+                self.assertEqual(evidence["accepted_fields"], 0)
+                self.assertFalse(evidence["published"])
+                self.assertEqual(evidence["detail_body_sha256"],
+                                 catalogs[catalog]["details"][sid]["receipt"]["body_sha256"])
+            self.assertEqual(archived_inventory_cli(manifest, root)["inventory"]["sha256"], sha)
+            # Missing DETAIL on restart never erases last body-bound review evidence.
+            catalogs["event"]["details"] = {}
+            save()
+            archived_inventory_cli(manifest, root)
+            retained, _ = load_detail_inventory(root / "_isolated_archive_replay")
+            row = retained["items"]["tpac:event:1301"]
+            self.assertEqual(row["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(row["archive_field_evidence"]["detail_body_sha256"],
+                             inventory["items"]["tpac:event:1301"]["archive_field_evidence"]["detail_body_sha256"])
+            self.assertEqual(row["archive_field_evidence"]["accepted_fields"], 0)
+            # Corrupt original bytes fail before CAS commit.
+            catalogs["event"]["details"] = {
+                "1301": {"detail_file": catalogs["event"]["list_file"],
+                         "receipt": catalogs["program"]["details"]["2040"]["receipt"]}}
+            save()
+            before = load_detail_inventory(root / "_isolated_archive_replay")[1]
+            with self.assertRaises(ValueError):
+                archived_inventory_cli(manifest, root)
+            self.assertEqual(load_detail_inventory(root / "_isolated_archive_replay")[1], before)
+
     def test_archived_cli_cannot_downgrade_existing_live_inventory(self):
         import subprocess
         import sys
