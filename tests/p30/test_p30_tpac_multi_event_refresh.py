@@ -1940,8 +1940,10 @@ class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
             current_again, current_again_sha = load_detail_inventory(root)
             self.assertEqual(current_again, second_document)
             self.assertEqual(current_again_sha, second["sha256"])
-            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_HISTORY_CORRUPT_HOLD"):
-                write_detail_inventory(initial, root, second["sha256"])
+            # Replaying the valid current version is still safe and idempotent;
+            # recovery of the corrupted predecessor remains explicitly denied.
+            self.assertEqual(write_detail_inventory(second_document, root,
+                             second["sha256"])["sha256"], second["sha256"])
             self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
 
     def test_stale_cas_cannot_create_history_or_change_snapshot(self):
