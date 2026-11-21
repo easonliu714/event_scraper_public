@@ -9706,3 +9706,33 @@ Source TPAC /program + /event（共用 tpac.org.taipei Host）
 - **真機證據與版本：** Owner 檔案 `tpac_termux_isolated_result.json` 原始 SHA256 `7124cb6284def5bf9511cd8142b11a34f90e8b4cd2a649062a31c7c38b2fabb5`，observed 2026-11-21T03:11:57.502826+00:00，6 case PASS：pin Git source+blob、真實第二程序排他、強制退出後 PENDING、Host 429 Retry-After + 多 Host 隔離、403 人工政策、fence+原始離線 bytes 竄改。固定 Source PR #243 `b241a2bd33bcdc12e047991a8b8d12bad0477691`，Owner 未做任何 Source GET／Github 寫入。
 - **下一代隔離 Core/Source API：** `scripts/p30_tpac_r4_source_policy.py::IsolatedSingleExecutorLedger.__init__/_latest/begin_attempt/commit_response/read_last_bound_source`；Source commit `2e431d5bff525a3ace5be6f2daefe4c4bfd8bd7e`，TEST HEAD `bbcde575464b752dc03de17fc9c763df402e7c13`，Blob `08b3610cd1db98846b174da945fcfb8e77a4b8c2`／`601ad512eccbc3ee8efc4a5764f5bba9e10acf2c`；Exact-head CI `44860672725` SUCCESS、Job `136713066664` SUCCESS、Artifact `14689209299` sha256 `91084e3d7f29df5118e51437c8bb6e2eeab4b02e0c4a2a9c3f3733a1d20e888d`。所有 Source/Parser 收據附加屬性為**隔離內部一致性約束，非數位簽章／獨立 HTTP 時間戳**，不能當正式網站擷取證據。
 - **資料／發布不變界線：** GitHub main、`docs/data.json`、`docs/platform_status.json`、Golden、正式 Pages 及既有 Android PASS 不變。實際新 HTTP/LIST/DETAIL/IDENTITY/FIELD/GOLDEN/PUBLICATION 0；歷史封存 LIST 38 / DETAIL 3 / pending 35。仍禁止未授權 GET、合併、正式 Publisher/Scheduler/Notifier；下一 Gate 是接合既有 TPAC Adapter＋同 ID 原始 DETAIL Source 角色，而不是重做 Termux 六項 PASS。
+
+### TPAC-P0-ARCHIVED-3-ID-LIST-DETAIL-IDENTITY-CLOSURE-20261121｜Source / Parser / Storage 增量架構（隔離）
+
+```text
+官方 TPAC 過往 2 LIST + 3 DETAIL 封存 bytes [ARCHIVED_ONLY; NO NEW GET]
+  │ Archive URL+body_SHA+original capture timestamp (缺失=UNKNOWN)
+  ↓
+scripts/p30_tpac_multi_event_refresh.py
+  _archived_body() [PASS: 原始 bytes SHA、URL、evidence class]
+  _archived_cards() [PASS: LIST card 自有 Title、Catalog/Event ID]
+  bind_archived_detail_identity() [NEW EXACT-HEAD CI PASS]
+    ├─ LIST card identity = same Catalog + same Event ID
+    ├─ DETAIL URL == 官方 exact ID URL
+    ├─ DETAIL 自有 article H1 == LIST card 自有 Title
+    └─ EVENT_TITLE/source_url/body_SHA → ARCHIVED_ONLY_REVIEW
+  ↓
+evidence/tpac_archived_three_detail_identity_review.json
+  ├─ tpac:program:2040 / tpac:event:1301 / tpac:event:2072
+  ├─ 3/3 ARCHIVED IDENTITY PARITY REVIEW, no new Source GET
+  ├─ accepted_fields=0, native_get_allowed=False, published=False
+  └─ HARD_HOLD_NO_PUBLICATION
+  ↓
+Next: official sealed DETAIL bytes field_roles → isolated LKG/CAS
+  ↓ (獨立 Owner GET+Quality+正式 Publisher 授權，目前 HOLD)
+正式 docs/data.json / Pages / Android [UNCHANGED]
+```
+
+- **原始固定程式交付：** `scripts/p30_tpac_multi_event_refresh.py::_archived_cards,bind_archived_detail_identity`（Commit `db4b072aa0e2425d8f129852a95d08c58a35cc6a`，Blob `9401060cdea1e23ebba6f867f21a61e82fe34c9b`）；Test `tests/p30/test_p30_tpac_multi_event_refresh.py::ArchivedDetailIdentityBindingTests`（Commit `62f37f2d206d41c7cab335f8cd7790aec62fbe44`，Blob `df36cb133b84befd2ec90b41cddcb1d2f752dc50`）。
+- **Workflow 固定重播：** `.github/workflows/eventradar_tpac_multi_event_refresh.yml`（Commit/HEAD `103da073e5394c79c752aa5324369f3a5af1e97b`，Blob `01861ba8d19be0dd1737d232cbcf811dd339aa6a`），使用先前已 PIN 官方 2 LIST/3 DETAIL 做 3-ID 同活動 H1 parity；Run `44869933304`、Job `136741958345` SUCCESS；Artifact `14693033568` SHA256 `df4b1936e5d78f4146abc04d88a0010fd7436504c91c54471721e5230b80d491`。
+- **邊界：** GitHub archived 原始 bytes 的重新核對不是新 Live Source HTTP/DETAIL；TITLE 僅 REVIEW 所屬身分，其他活動期間／SHOW／入場／開賣／價格／場館欄位仍須獨立 Parser/Quality 驗收。正式資料 JSON、Golden、main/Pages、Android 歷史 PASS 皆不改；Source C20 仍缺 35 DETAIL；Owner 已接受 Termux 做單執行者隔離驗證（先前 6/6 PASS），不代表正式 GET/自動 Publisher 可啟用。
