@@ -1038,6 +1038,82 @@ class PersistentInventoryContractTests(unittest.TestCase):
             select_pending_details(bad)
 
 
+
+class ArchivedDetailIdentityBindingTests(unittest.TestCase):
+    """OFFLINE same-ID LIST→DETAIL contract; positive/negative and no GET."""
+
+    def archived_receipt(self, url, raw):
+        return {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                "source_url": url,
+                "body_sha256": hashlib.sha256(raw).hexdigest(),
+                "body_bytes": len(raw), "capture_started_at": OBS,
+                "observed_at": None, "http_status": None, "robots_allowed": None}
+
+    def sources(self, catalog, sid):
+        title = "封存測試同一活動"
+        attr = ("連結到" + title) if catalog == "event" else title
+        cls = "card-" + catalog
+        list_raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{attr}">'
+                    f'<div class="{cls}__text-title">{title}</div></a>').encode()
+        detail_raw = (f'<article class="page-{catalog}__article">'
+                      f'<h1>{title}</h1></article>').encode()
+        root = "https://tpac.org.taipei/" + catalog
+        return (list_raw, self.archived_receipt(root, list_raw),
+                detail_raw, self.archived_receipt(root + "/" + sid, detail_raw))
+
+    def test_both_catalog_namespaces_bind_real_html_title_without_publication(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        for catalog, sid in (("program", "2040"), ("event", "1301")):
+            with self.subTest(catalog=catalog):
+                args = self.sources(catalog, sid)
+                result = bind_archived_detail_identity(
+                    catalog, args[0], args[1], sid, args[2], args[3])
+                self.assertEqual(result["identity"], f"tpac:{catalog}:{sid}")
+                self.assertEqual(result["field_roles"]["title"]["role"], "EVENT_TITLE")
+                self.assertEqual(result["detail_body_sha256"], hashlib.sha256(args[2]).hexdigest())
+                self.assertEqual(result["decision"], "ARCHIVED_LIST_DETAIL_IDENTITY_REVIEW_ONLY")
+                self.assertIsNone(result["observed_at"])
+                self.assertEqual(result["accepted_fields"], 0)
+                self.assertEqual(result["source_requests_performed"], 0)
+                self.assertFalse(result["native_get_allowed"])
+                self.assertFalse(result["published"])
+                self.assertEqual(result["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_detail_swaps_title_host_id_or_role_fail_without_acceptance(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        args = self.sources("event", "1301")
+        with self.assertRaisesRegex(ValueError, "NOT_IN_SAME_LIST_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "2072", args[2], args[3])
+        with self.assertRaisesRegex(ValueError, "DETAIL_ID_SCOPE_HOLD"):
+            bind_archived_detail_identity("other", args[0], args[1],
+                                          "1301", args[2], args[3])
+        swapped = args[2].replace("封存測試同一活動".encode(),
+                                  "不同的活動標題".encode())
+        with self.assertRaisesRegex(ValueError, "ARCHIVE_BYTES_SHA_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", swapped, args[3])
+        new_receipt = self.archived_receipt("https://tpac.org.taipei/event/1301", swapped)
+        with self.assertRaisesRegex(ValueError, "TITLE_PARITY_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", swapped, new_receipt)
+        wrong_article = args[2].replace(b"page-event__article", b"page-program__article")
+        wrong_receipt = self.archived_receipt(
+            "https://tpac.org.taipei/event/1301", wrong_article)
+        with self.assertRaisesRegex(ValueError, "OWNED_ARTICLE_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", wrong_article, wrong_receipt)
+        copied_receipt = dict(args[3], source_url="https://tpac.org.taipei/event/2072")
+        with self.assertRaisesRegex(ValueError, "ARCHIVE_IDENTITY_URL_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", args[2], copied_receipt)
+        escalated = dict(args[3], http_status=200)
+        with self.assertRaisesRegex(ValueError, "ARCHIVE_AUTHORITY_ESCALATION_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", args[2], escalated)
+
+
+
 class ArchivedProvenanceCliTests(unittest.TestCase):
     """Archive-only CLI is an evidence inventory, never a LIVE attestation."""
 
