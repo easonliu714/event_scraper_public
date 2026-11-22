@@ -2777,3 +2777,42 @@ class ArchivedFieldCandidateCliIntegrationTests(unittest.TestCase):
                           "--commit-archive-field-candidates"])
                 with self.assertRaisesRegex(ValueError, "MODE_HOLD"):
                     main(["--repo-root", str(root), "--candidate-expected-sha", prior_sha])
+
+
+class ArchivedCandidateRestartReadTests(unittest.TestCase):
+    def test_restart_cli_read_exact_snapshot_and_stale_cas(self):
+        import io
+        from contextlib import redirect_stdout
+        from scripts.p30_tpac_multi_event_refresh import (
+            main, write_archived_field_candidate_snapshot)
+        with tempfile.TemporaryDirectory() as td:
+            identity = "tpac:program:2040"
+            delta = {
+                "kind": "TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1",
+                "current_inventory_sha256": "a" * 64,
+                "changed": {identity: {"title": {"transition": "HOLD_TO_REVIEW"}}},
+                "candidates": {identity: {
+                    "identity": identity, "source_namespace": "program",
+                    "event_id": "2040", "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY",
+                    "fields": {"title": {"value": "Original", "role": "TITLE",
+                                         "decision": "REVIEW_ONLY_NOT_ACCEPTED"}}}},
+                "accepted_fields": 0, "published": 0,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+            committed = write_archived_field_candidate_snapshot(delta, td)
+            args = ["--repo-root", td, "--read-archive-field-candidates",
+                    "--expected-sha", committed["sha256"]]
+            out = io.StringIO()
+            with redirect_stdout(out):
+                self.assertEqual(main(args), 0)
+            recovered = json.loads(out.getvalue())
+            self.assertEqual(recovered["candidates"][identity]["fields"]["title"]["value"], "Original")
+            self.assertEqual((recovered["accepted_fields"], recovered["published"]), (0, 0))
+            delta["candidates"][identity]["fields"]["title"]["value"] = "Updated"
+            next_commit = write_archived_field_candidate_snapshot(delta, td, committed["sha256"])
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                main(args)
+            args[-1] = next_commit["sha256"]
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(args), 0)
+            with self.assertRaisesRegex(ValueError, "MODE_HOLD"):
+                main(args + ["--export-archive-fields"])
