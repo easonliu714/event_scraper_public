@@ -1065,6 +1065,46 @@ class PersistentInventoryContractTests(unittest.TestCase):
             self.assertFalse((root / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json").exists())
             self.assertFalse((root / "docs/data.json").exists())
 
+    def test_offline_unreadable_detail_isolated_and_restart_recovery(self):
+        # A missing DETAIL must not abort the other catalog or erase prior rows.
+        from scripts.p30_tpac_multi_event_refresh import offline_inventory_cli, load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            program = listing(("2111", "2112"))
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
+            (root / "program.html").write_bytes(program)
+            (root / "event.html").write_bytes(event)
+            missing = root / "missing.html"
+            manifest = {"now": NOW.isoformat(), "catalogs": {
+                "program": {"list_file": str(root / "program.html"),
+                            "list_receipt": receipt(ROOT, program),
+                            "details": {"2111": {"detail_file": str(missing),
+                                                  "receipt": receipt(ROOT + "/2111", b"unused")}}},
+                "event": {"list_file": str(root / "event.html"),
+                          "list_receipt": receipt("https://tpac.org.taipei/event", event),
+                          "details": {}}}}
+            path = root / "manifest.json"
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            first = offline_inventory_cli(path, root)
+            self.assertEqual(first["diagnostics"]["tpac:program:2111"]["reason"], "DETAIL_IO_HOLD")
+            self.assertEqual(first["counts"]["pending_detail_budget"], 3)
+            self.assertEqual(first["counts"]["source_cards"], 3)
+            self.assertEqual(first["published"], 0)
+            self.assertEqual(load_detail_inventory(root)[1], first["inventory"]["sha256"])
+            again = offline_inventory_cli(path, root)
+            self.assertEqual(again["inventory"]["sha256"], first["inventory"]["sha256"])
+            missing.write_bytes(b"<html>invalid detail</html>")
+            recovered = offline_inventory_cli(path, root)
+            self.assertEqual(recovered["counts"]["parse_hold"], 1)
+            self.assertEqual(recovered["diagnostics"]["tpac:program:2111"]["status"], "PARSE_HOLD")
+            self.assertEqual(recovered["counts"]["pending_detail_budget"], 2)
+            self.assertFalse((root / "docs/data.json").exists())
+
     def test_cross_namespace_url_conflict_fails_closed(self):
         from scripts.p30_tpac_multi_event_refresh import (
             INVENTORY_KIND, select_pending_details,
