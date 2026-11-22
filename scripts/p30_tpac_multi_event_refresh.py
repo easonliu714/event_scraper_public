@@ -837,6 +837,7 @@ def main(argv=None):
     ap.add_argument("--input", type=Path)
     ap.add_argument("--inventory-input", type=Path,
                     help="Offline two-catalog LIST/DETAIL receipt manifest; no network")
+    ap.add_argument("--diff-prior-archive-sha", help="Read-only previous inventory version for candidate field delta")
     ap.add_argument("--export-archive-fields", action="store_true",
                     help="Read-only normalized FIELD REVIEW ledger from isolated archive CAS")
     ap.add_argument("--repo-root", type=Path, required=True)
@@ -847,6 +848,8 @@ def main(argv=None):
                     help="CAS-load the current isolated LKG instead of a manifest prior")
     args = ap.parse_args(argv)
     if args.export_archive_fields:
+        if args.diff_prior_archive_sha is not None and (type(args.diff_prior_archive_sha) is not str or re.fullmatch(r"[0-9a-f]{64}", args.diff_prior_archive_sha) is None):
+            raise ValueError("TPAC_FIELD_DELTA_PRIOR_SHA_HOLD")
         # A strict, read-only output mode, never a publication or GET path.
         if (args.input is not None or args.inventory_input is not None
                 or args.restore_archive_version is not None
@@ -861,8 +864,14 @@ def main(argv=None):
         if actual_sha is None or actual_sha != args.expected_sha:
             raise ValueError("TPAC_ARCHIVE_FIELD_EXPORT_CAS_HOLD")
         report = build_archived_field_review_export(inventory, actual_sha)
+        if args.diff_prior_archive_sha is not None:
+            prior_inventory, prior_sha = read_detail_inventory_version(archive_root, args.diff_prior_archive_sha)
+            prior_ledger = build_archived_field_review_export(prior_inventory, prior_sha)
+            report = build_archived_field_candidate_delta(prior_ledger, report)
         print(json.dumps(report, ensure_ascii=False, sort_keys=True))
         return 0
+    if args.diff_prior_archive_sha is not None:
+        raise ValueError("TPAC_FIELD_DELTA_MODE_HOLD")
     if args.restore_archive_version is not None or args.restore_identity is not None:
         # Archive recovery is a separate mode; never touch LIVE inventory/LKG.
         if (args.input is not None or args.inventory_input is not None
@@ -1688,6 +1697,85 @@ def build_archived_field_review_export(inventory, inventory_sha):
         "new_official_get": 0, "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
+
+
+
+def build_archived_field_candidate_delta(previous, current):
+    """Diff two validated isolated FIELD ledgers; never promote REVIEW to accepted.
+
+    Candidate rows are scoped to current REVIEW evidence. HOLD transitions
+    explicitly invalidate the affected field, not the unaffected siblings.
+    Receipt-only observations do not change semantic candidate values.
+    """
+    if (not isinstance(previous, dict) or not isinstance(current, dict)
+            or previous.get("kind") != "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1"
+            or current.get("kind") != "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1"
+            or previous.get("source_scope") != "ARCHIVED_OFFLINE_REVIEW_ONLY"
+            or current.get("source_scope") != "ARCHIVED_OFFLINE_REVIEW_ONLY"
+            or previous.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+            or current.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+            or any(doc.get("accepted_fields") != 0 or doc.get("published") != 0
+                   for doc in (previous, current))):
+        raise ValueError("TPAC_FIELD_DELTA_AUTHORITY_HOLD")
+    before, after = previous.get("records"), current.get("records")
+    if not isinstance(before, dict) or not isinstance(after, dict) or not after:
+        raise ValueError("TPAC_FIELD_DELTA_EMPTY_OR_SCHEMA_HOLD")
+    if set(before) - set(after):
+        raise ValueError("TPAC_FIELD_DELTA_DESTRUCTIVE_REMOVAL_HOLD")
+    changed, candidates = {}, {}
+    for identity, row in sorted(after.items()):
+        if not isinstance(row, dict) or row.get("identity") != identity:
+            raise ValueError("TPAC_FIELD_DELTA_IDENTITY_HOLD")
+        old = before.get(identity)
+        if old is not None and (not isinstance(old, dict)
+                                or old.get("identity") != identity
+                                or any(old.get(key) != row.get(key) for key in
+                                       ("source_namespace", "event_id", "detail_source_url"))):
+            raise ValueError("TPAC_FIELD_DELTA_SOURCE_IDENTITY_HOLD")
+        fields = row.get("fields")
+        old_fields = old.get("fields", {}) if old is not None else {}
+        if not isinstance(fields, dict) or not fields or not isinstance(old_fields, dict):
+            raise ValueError("TPAC_FIELD_DELTA_FIELDS_HOLD")
+        event_changes, candidate_fields = {}, {}
+        for name, field in sorted(fields.items()):
+            if not isinstance(field, dict) or field.get("decision") not in ("REVIEW", "HOLD"):
+                raise ValueError("TPAC_FIELD_DELTA_FIELD_AUTHORITY_HOLD")
+            if field.get("event_id") != row["event_id"] or field.get("source_url") != row["detail_source_url"]:
+                raise ValueError("TPAC_FIELD_DELTA_PROVENANCE_HOLD")
+            if field["decision"] == "REVIEW":
+                if not row.get("archive_evidence_current") or field.get("value") is None:
+                    raise ValueError("TPAC_FIELD_DELTA_STALE_REVIEW_HOLD")
+                candidate_fields[name] = {"value": field["value"], "role": field["role"],
+                                          "decision": "REVIEW_ONLY_NOT_ACCEPTED"}
+            elif field.get("value") is not None:
+                raise ValueError("TPAC_FIELD_DELTA_HELD_VALUE_HOLD")
+            prior = old_fields.get(name)
+            if prior is not None and not isinstance(prior, dict):
+                raise ValueError("TPAC_FIELD_DELTA_PRIOR_FIELD_HOLD")
+            semantic = lambda item: None if item is None else (
+                item.get("decision"), item.get("role"), item.get("value"),
+                item.get("hold_reason"))
+            if semantic(field) != semantic(prior):
+                event_changes[name] = {
+                    "transition": ((prior.get("decision") if prior else "ABSENT")
+                                   + "_TO_" + field["decision"]),
+                    "current_decision": field["decision"],
+                    "current_role": field["role"],
+                    "current_value": field["value"] if field["decision"] == "REVIEW" else None,
+                    "hold_reason": field.get("hold_reason"),
+                }
+        candidates[identity] = {"identity": identity, "source_namespace": row["source_namespace"],
+                                "event_id": row["event_id"], "fields": candidate_fields,
+                                "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY"}
+        if event_changes:
+            changed[identity] = event_changes
+    return {"kind": "TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1",
+            "previous_inventory_sha256": previous.get("inventory_sha256"),
+            "current_inventory_sha256": current.get("inventory_sha256"),
+            "changed": changed, "candidates": candidates,
+            "counts": {"events": len(after), "changed_events": len(changed)},
+            "accepted_fields": 0, "published": 0,
+            "release_state": "HARD_HOLD_NO_PUBLICATION"}
 
 
 def offline_inventory_cli(manifest_path, repo_root):
