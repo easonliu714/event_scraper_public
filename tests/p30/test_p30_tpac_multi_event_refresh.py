@@ -2395,6 +2395,40 @@ class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
                               "inventory_versions").exists())
 
 
+
+class CrossCatalogIdentitySemanticRegressionTests(unittest.TestCase):
+    def test_same_display_values_but_identity_or_review_authority_changes(self):
+        # Cross-source identity/authority drift must update LKG even when
+        # public display fields remain unchanged; receipts alone must not.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+
+        baseline = {
+            "source_event_id": "1301", "url": "https://tpac.org.taipei/event/1301",
+            "title": "Source-owned event", "source_namespace": "event",
+            "identity": "tpac:event:1301",
+            "_candidate": {"scope": "ARCHIVED_SOURCE_REPLAY_REVIEW_ONLY",
+                           "decision": "REVIEW", "identity": "tpac:event:1301",
+                           "field_roles": {}, "hold_reasons": []},
+        }
+        original = _semantic_event_payload(baseline)
+        for field, value in (("identity", "tpac:1301"),
+                             ("source_namespace", "program")):
+            changed = deepcopy(baseline)
+            changed[field] = value
+            self.assertNotEqual(original, _semantic_event_payload(changed))
+        for field, value in (("scope", "SOURCE_REVIEW_ONLY"),
+                             ("decision", "HOLD"),
+                             ("identity", "tpac:1301")):
+            changed = deepcopy(baseline)
+            changed["_candidate"][field] = value
+            self.assertNotEqual(original, _semantic_event_payload(changed))
+        unchanged = deepcopy(baseline)
+        unchanged["_candidate"]["observed_at"] = "2026-11-22T12:00:00Z"
+        unchanged["_candidate"]["source_detail_sha256"] = "a" * 64
+        self.assertEqual(original, _semantic_event_payload(unchanged))
+
+
 class TestCrashSafeLockUnavailable(unittest.TestCase):
     def test_missing_fcntl_fails_closed_without_creating_lock(self):
         import builtins
