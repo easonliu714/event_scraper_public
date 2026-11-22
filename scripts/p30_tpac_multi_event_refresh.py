@@ -843,6 +843,8 @@ def main(argv=None):
                     help="Commit archived FIELD candidate delta to isolated LKG, never formal data")
     ap.add_argument("--candidate-expected-sha",
                     help="Expected current isolated candidate snapshot SHA for compare-and-swap")
+    ap.add_argument("--read-archive-field-candidates", action="store_true",
+                    help="Read exact isolated candidate LKG after restart; never publish")
     ap.add_argument("--export-archive-fields", action="store_true",
                     help="Read-only normalized FIELD REVIEW ledger from isolated archive CAS")
     ap.add_argument("--repo-root", type=Path, required=True)
@@ -852,6 +854,17 @@ def main(argv=None):
     ap.add_argument("--prior-from-lkg", action="store_true",
                     help="CAS-load the current isolated LKG instead of a manifest prior")
     args = ap.parse_args(argv)
+    if args.read_archive_field_candidates:
+        if (args.export_archive_fields or args.commit_archive_field_candidates
+                or args.diff_prior_archive_sha is not None
+                or args.candidate_expected_sha is not None
+                or args.input is not None or args.inventory_input is not None
+                or args.restore_archive_version is not None
+                or args.restore_identity is not None or args.prior_from_lkg):
+            raise ValueError("TPAC_CANDIDATE_READ_MODE_HOLD")
+        snapshot = load_archived_field_candidate_snapshot(args.repo_root, args.expected_sha)
+        print(json.dumps(snapshot, ensure_ascii=False, sort_keys=True))
+        return 0
     if args.export_archive_fields:
         if args.diff_prior_archive_sha is not None and (type(args.diff_prior_archive_sha) is not str or re.fullmatch(r"[0-9a-f]{64}", args.diff_prior_archive_sha) is None):
             raise ValueError("TPAC_FIELD_DELTA_PRIOR_SHA_HOLD")
@@ -1892,6 +1905,40 @@ def write_archived_field_candidate_snapshot(delta, repo_root, expected_sha=None)
                 "sha256": _sha(payload), "events": len(snapshot["candidates"]),
                 "accepted_fields": 0, "published": 0}
 
+
+
+def load_archived_field_candidate_snapshot(repo_root, expected_sha):
+    """Read back the exact isolated candidate LKG after restart; no GET or publication."""
+    if not isinstance(expected_sha, str) or re.fullmatch(r"[0-9a-f]{64}", expected_sha) is None:
+        raise ValueError("TPAC_CANDIDATE_READ_EXPECTED_SHA_HOLD")
+    root = Path(repo_root).resolve() / "_isolated_archive_replay"
+    target = root / "field_candidate_lkg.json"
+    if root.is_symlink() or target.is_symlink() or not target.is_file():
+        raise ValueError("TPAC_CANDIDATE_READ_MISSING_OR_SYMLINK_HOLD")
+    raw = target.read_bytes()
+    if _sha(raw) != expected_sha:
+        raise ValueError("TPAC_CANDIDATE_READ_CAS_HOLD")
+    try:
+        snapshot = json.loads(raw)
+    except (ValueError, UnicodeError) as exc:
+        raise ValueError("TPAC_CANDIDATE_READ_SCHEMA_HOLD") from exc
+    if (not isinstance(snapshot, dict) or _canonical(snapshot) != raw
+            or set(snapshot) != {"kind", "inventory_sha256", "candidates",
+                                 "release_state", "accepted_fields", "published"}
+            or snapshot["kind"] != "TPAC_ISOLATED_FIELD_CANDIDATE_SNAPSHOT_V1"
+            or snapshot["release_state"] != "HARD_HOLD_NO_PUBLICATION"
+            or snapshot["accepted_fields"] != 0 or snapshot["published"] != 0
+            or not isinstance(snapshot["candidates"], dict) or not snapshot["candidates"]):
+        raise ValueError("TPAC_CANDIDATE_READ_SCHEMA_HOLD")
+    for identity, row in snapshot["candidates"].items():
+        if (not isinstance(row, dict) or row.get("identity") != identity
+                or row.get("decision") != "ISOLATED_REVIEW_CANDIDATE_ONLY"
+                or not isinstance(row.get("fields"), dict)):
+            raise ValueError("TPAC_CANDIDATE_READ_IDENTITY_HOLD")
+        for field in row["fields"].values():
+            if not isinstance(field, dict) or field.get("decision") != "REVIEW_ONLY_NOT_ACCEPTED":
+                raise ValueError("TPAC_CANDIDATE_READ_FIELD_HOLD")
+    return snapshot
 
 
 def offline_inventory_cli(manifest_path, repo_root):
