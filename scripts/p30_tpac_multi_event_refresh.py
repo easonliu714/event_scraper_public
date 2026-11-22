@@ -647,6 +647,9 @@ def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollb
                 old_doc = json.loads(prior)
                 if old_doc.get("kind") != KIND or not isinstance(old_doc.get("events"), dict):
                     raise ValueError("TPAC_PRIOR_SCHEMA_HOLD")
+                # Reject malformed prior bytes before archiving them during recovery.
+                if set(old_doc) != {"kind", "events"} or _canonical(old_doc) != prior:
+                    raise ValueError("TPAC_PRIOR_SCHEMA_HOLD")
                 old_rows = old_doc["events"]
             except (TypeError, json.JSONDecodeError) as error:
                 raise ValueError("TPAC_PRIOR_SCHEMA_HOLD") from error
