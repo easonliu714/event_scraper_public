@@ -66,6 +66,48 @@ def empty_prior():
 
 
 class MultiEventRefreshTests(unittest.TestCase):
+    def test_posix_writer_crash_releases_lock_without_removing_legacy_sentinel(self):
+        import os
+        import subprocess
+        import sys
+        if os.name != "posix":
+            self.skipTest("POSIX flock recovery")
+        from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as temp:
+            initial = write_isolated_plan(plan, temp)
+            folder = Path(temp) / "_isolated_review" / "tpac"
+            lock = folder / ".write.lock"
+            child_code = (
+                "import sys; from pathlib import Path; "
+                "from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock; "
+                "guard = _isolated_writer_lock(Path(sys.argv[1]), 'HOLD'); "
+                "guard.__enter__(); print('LOCKED', flush=True); sys.stdin.read()"
+            )
+            child = subprocess.Popen(
+                [sys.executable, "-c", child_code, str(lock)],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True)
+            try:
+                self.assertEqual(child.stdout.readline().strip(), "LOCKED")
+                with self.assertRaisesRegex(ValueError, "TPAC_CONCURRENT_WRITER_HOLD"):
+                    write_isolated_plan(plan, temp, initial["sha256"])
+            finally:
+                child.kill()
+                child.communicate(timeout=10)
+            self.assertTrue(lock.is_file())
+            resumed = write_isolated_plan(plan, temp, initial["sha256"])
+            self.assertEqual(resumed["sha256"], initial["sha256"])
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                write_isolated_plan(plan, temp, None)
+            legacy = folder / ".inventory.lock"
+            legacy.write_bytes(b"")
+            with self.assertRaisesRegex(ValueError, "LEGACY_HOLD"):
+                with _isolated_writer_lock(legacy, "LEGACY_HOLD"):
+                    self.fail("legacy sentinel must not be adopted")
+            self.assertEqual(legacy.read_bytes(), b"")
+
     def test_two_distinct_event_ids_generate_repeatable_review_snapshot(self):
         body, rr, details = inputs()
         plan = refresh_plan(body, rr, details, empty_prior(), NOW)
