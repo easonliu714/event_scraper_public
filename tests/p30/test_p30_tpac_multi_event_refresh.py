@@ -2571,3 +2571,64 @@ class TestCrashSafeLockUnavailable(unittest.TestCase):
                     with _isolated_writer_lock(lock, "TPAC_CONCURRENT_WRITER_HOLD"):
                         self.fail("unsafe legacy lock acquired")
             self.assertEqual(lock.read_bytes(), b"LEGACY_SENTINEL")
+
+
+class ArchivedFieldCandidateDeltaTests(unittest.TestCase):
+    """Fixed isolated candidate path: semantic transitions, no publication."""
+
+    def _ledger(self, decision="HOLD", value=None, sha="a" * 64,
+                current=False, receipt="b" * 64):
+        identity = "tpac:program:2040"
+        field = {"value": value, "role": "SHOW_START" if decision == "REVIEW" else "UNKNOWN",
+                 "event_id": "2040", "source_url": "https://tpac.org.taipei/program/2040",
+                 "observed_at": "2026-11-22T00:00:00Z", "source_body_sha256": receipt,
+                 "decision": decision,
+                 "hold_reason": ("ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
+                                 if decision == "REVIEW" else "ARCHIVED_FIELD_ROLE_NOT_VERIFIED_HOLD")}
+        return {"kind": "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1",
+                "source_scope": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+                "release_state": "HARD_HOLD_NO_PUBLICATION",
+                "inventory_sha256": sha, "accepted_fields": 0, "published": 0,
+                "records": {identity: {"identity": identity, "source_namespace": "program",
+                                      "event_id": "2040", "detail_source_url": field["source_url"],
+                                      "archive_evidence_current": current,
+                                      "fields": {"show_start": field}}}}
+
+    def test_hold_to_review_and_review_to_hold_without_sibling_loss(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        old = self._ledger()
+        new = self._ledger("REVIEW", "2026-11-28 19:30", "c" * 64, True)
+        result = build_archived_field_candidate_delta(old, new)
+        key = "tpac:program:2040"
+        self.assertEqual(result["changed"][key]["show_start"]["transition"], "HOLD_TO_REVIEW")
+        self.assertEqual(result["candidates"][key]["fields"]["show_start"]["decision"],
+                         "REVIEW_ONLY_NOT_ACCEPTED")
+        self.assertEqual((result["accepted_fields"], result["published"]), (0, 0))
+        reverse = build_archived_field_candidate_delta(new, self._ledger(sha="d" * 64))
+        self.assertEqual(reverse["changed"][key]["show_start"]["transition"], "REVIEW_TO_HOLD")
+        self.assertEqual(reverse["candidates"][key]["fields"], {})
+
+    def test_receipt_only_does_not_churn_but_semantic_value_does(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        old = self._ledger("REVIEW", "A", current=True)
+        receipt_only = self._ledger("REVIEW", "A", "c" * 64, True, "d" * 64)
+        self.assertEqual(build_archived_field_candidate_delta(old, receipt_only)["changed"], {})
+        updated = self._ledger("REVIEW", "B", "e" * 64, True)
+        self.assertEqual(build_archived_field_candidate_delta(old, updated)["counts"]["changed_events"], 1)
+
+    def test_empty_and_stale_review_fail_closed(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        prior = self._ledger()
+        current = self._ledger("REVIEW", "A", current=False)
+        with self.assertRaisesRegex(ValueError, "STALE_REVIEW"):
+            build_archived_field_candidate_delta(prior, current)
+        empty = self._ledger()
+        empty["records"] = {}
+        with self.assertRaisesRegex(ValueError, "EMPTY_OR_SCHEMA"):
+            build_archived_field_candidate_delta(prior, empty)
+        with self.assertRaisesRegex(ValueError, "DESTRUCTIVE_REMOVAL"):
+            build_archived_field_candidate_delta(prior, {"kind": prior["kind"],
+                "source_scope": prior["source_scope"], "release_state": prior["release_state"],
+                "accepted_fields": 0, "published": 0,
+                "records": {"tpac:event:999": {"identity": "tpac:event:999"}}})
+
