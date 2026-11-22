@@ -535,6 +535,136 @@ jobs:
           Path('evidence/tpac_real_archived_detail_io.json').write_text(json.dumps(report,sort_keys=True),encoding='utf-8')
           print('PASS_REAL_ARCHIVED_DETAIL_IO_ISOLATION_NO_GET_NO_PUBLISH')
           PY
+      - name: Recover real two-catalog archive after process kill and mid-CAS crash (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import copy, json, os, select, subprocess, sys
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import (
+              load_detail_inventory, read_detail_inventory_version, write_detail_inventory,
+          )
+          manifest = Path('evidence/tpac_archived_38_id_manifest.json')
+          original = json.loads(manifest.read_text(encoding='utf-8'))
+          root = Path('evidence/tpac_native_crash_recovery')
+          archive = root / '_isolated_archive_replay'
+          cmd = [sys.executable, '-m', 'scripts.p30_tpac_multi_event_refresh',
+                 '--repo-root', str(root)]
+          def replay(path):
+              return json.loads(subprocess.check_output(
+                  cmd + ['--inventory-input', str(path)], text=True, timeout=30))
+          first = replay(manifest)
+          original_doc, initial_sha = load_detail_inventory(archive)
+          assert first['counts']['source_cards'] == 38
+          assert first['counts']['detail_available'] == 3
+          assert len(original_doc['items']) == 38
+          assert initial_sha == first['inventory']['sha256']
+          lock = archive / '_isolated_review' / 'tpac' / '.inventory.lock'
+          initial_inode = lock.stat().st_ino
+          # Prove actual cross-process exclusion, not an in-process mock.
+          child_code = (
+              "import sys\\nfrom pathlib import Path\\n"
+              "from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock\\n"
+              "with _isolated_writer_lock(Path(sys.argv[1]), 'HOLD'):\\n"
+              "    print('LOCKED', flush=True)\\n    sys.stdin.read()\\n"
+          )
+          child = subprocess.Popen(
+              [sys.executable, '-u', '-c', child_code, str(lock)],
+              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+              text=True)
+          try:
+              ready, _, _ = select.select([child.stdout], [], [], 8)
+              assert ready and child.stdout.readline().strip() == 'LOCKED', (
+                  'HOLD_CHILD_LOCK_NOT_ACQUIRED')
+              blocked = subprocess.run(cmd + ['--inventory-input', str(manifest)],
+                                       capture_output=True, text=True, timeout=25)
+              assert blocked.returncode != 0
+              assert 'TPAC_INVENTORY_CONCURRENT_WRITER_HOLD' in blocked.stderr
+              assert load_detail_inventory(archive)[1] == initial_sha
+          finally:
+              child.kill()
+              child.communicate(timeout=10)
+          assert lock.stat().st_ino == initial_inode
+          # The same fixed Adapter CLI must replay after SIGKILL without
+          # deleting or stealing the persistent lock inode.
+          resumed = replay(manifest)
+          assert resumed['inventory']['sha256'] == initial_sha
+          assert lock.stat().st_ino == initial_inode
+          partial = copy.deepcopy(original)
+          del partial['catalogs']['event']['details']['1301']
+          partial_path = root / 'partial_manifest.json'
+          partial_path.write_text(json.dumps(partial, ensure_ascii=False),
+                                  encoding='utf-8')
+          # A real process exits between staging the new JSON and atomic
+          # replacement. The last-known-good CAS must survive unchanged.
+          crash_code = (
+              "import os,sys\\nfrom pathlib import Path\\n"
+              "import scripts.p30_tpac_multi_event_refresh as source\\n"
+              "prior=os.replace\\n"
+              "def crash(src,dst):\\n"
+              "    if Path(dst).name == 'tpac_detail_inventory.json':\\n"
+              "        os._exit(77)\\n"
+              "    return prior(src,dst)\\n"
+              "os.replace=crash\\n"
+              "source.archived_inventory_cli(sys.argv[1],sys.argv[2])\\n"
+          )
+          crashed = subprocess.run([sys.executable, '-c', crash_code,
+                                   str(partial_path), str(root)],
+                                   capture_output=True, text=True, timeout=25)
+          assert crashed.returncode == 77, ('HOLD_CRASH_POINT_NOT_REACHED',
+                                            crashed.stderr[-400:])
+          assert load_detail_inventory(archive)[1] == initial_sha
+          assert lock.stat().st_ino == initial_inode
+          # A crash may leave only a complete, SHA-pinned archived predecessor.
+          prior_version, version_sha = read_detail_inventory_version(archive, initial_sha)
+          assert version_sha == initial_sha and prior_version == original_doc
+          second = replay(partial_path)
+          held_doc, held_sha = load_detail_inventory(archive)
+          assert held_sha == second['inventory']['sha256'] != initial_sha
+          assert second['counts']['detail_available'] == 2
+          assert second['counts']['pending_detail_budget'] == 36
+          identity = 'tpac:event:1301'
+          assert not held_doc['items'][identity]['archive_field_evidence_current']
+          assert held_doc['items'][identity]['archive_field_evidence'] == (
+              original_doc['items'][identity]['archive_field_evidence'])
+          assert all(held_doc['items'][k] == v for k,v in original_doc['items'].items()
+                     if k != identity)
+          assert lock.stat().st_ino == initial_inode
+          # A separate fresh process replays the entire sealed input and
+          # regains exactly the old original canonical snapshot.
+          third = replay(manifest)
+          final_doc, final_sha = load_detail_inventory(archive)
+          assert third['counts']['detail_available'] == 3
+          assert final_doc == original_doc and final_sha == initial_sha
+          archived_held, archived_held_sha = read_detail_inventory_version(archive, held_sha)
+          assert archived_held_sha == held_sha and archived_held == held_doc
+          assert lock.stat().st_ino == initial_inode
+          try:
+              write_detail_inventory(final_doc, archive, expected_sha=held_sha)
+          except ValueError as error:
+              assert str(error) == 'TPAC_INVENTORY_CAS_HOLD'
+          else:
+              raise AssertionError('HOLD_STALE_CAS_ACCEPTED')
+          assert load_detail_inventory(archive)[1] == initial_sha
+          assert not (root/'docs/data.json').exists()
+          assert not (root/'_isolated_review').exists()
+          report = {
+              'kind':'TPAC_NATIVE_ARCHIVE_PROCESS_KILL_CAS_CRASH_RECOVERY_V1',
+              'original_official_list_bodies':2,'original_official_detail_bodies':3,
+              'source_card_count':38,'unaffected_siblings':37,
+              'process_lock_exclusion':True,'process_killed':True,
+              'same_persistent_lock_inode':True,'pre_replace_crash_exit_code':77,
+              'lkg_unchanged_at_crash':True,'sealed_history_readback':True,
+              'recovery_replayed_in_new_process':True,'stale_cas_rejected':True,
+              'original_sha256':initial_sha,'partial_sha256':held_sha,
+              'recovered_sha256':final_sha,
+              'new_official_http':0,'accepted_fields':0,'published':0,
+              'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          Path('evidence/tpac_native_archive_process_crash_recovery.json').write_text(
+              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\\n',
+              encoding='utf-8')
+          print('PASS_ORIGINAL_ARCHIVE_CROSS_PROCESS_KILL_CAS_CRASH_RESTART_38_IDS_NO_GET_NO_PUBLISH')
+          PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
           set -euo pipefail
