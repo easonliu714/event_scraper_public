@@ -2708,3 +2708,72 @@ class ArchivedFieldCandidateSnapshotPersistenceTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "AUTHORITY_HOLD"):
                 write_archived_field_candidate_snapshot(empty, td)
             self.assertFalse((Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json").exists())
+
+
+class ArchivedFieldCandidateCliIntegrationTests(unittest.TestCase):
+    def test_explicit_archive_diff_commits_only_isolated_candidate_snapshot(self):
+        # Exercise the actual CLI route, not an isolated writer unit test.
+        from unittest.mock import patch
+        from scripts.p30_tpac_multi_event_refresh import main
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_archived_field_candidate_delta, build_archived_field_review_export)
+        import io
+        from contextlib import redirect_stdout
+
+        prior_sha, current_sha = "a" * 64, "b" * 64
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            archive = root / "_isolated_archive_replay"
+            archive.mkdir()
+            old_inventory = {"kind": "TPAC_DUAL_CATALOG_PENDING_DETAIL_V1", "items": {}}
+            current_inventory = {"kind": "TPAC_DUAL_CATALOG_PENDING_DETAIL_V1", "items": {}}
+            identity = "tpac:program:2040"
+            row = {"identity": identity, "source_namespace": "program",
+                   "event_id": "2040", "detail_source_url": "https://tpac.org.taipei/program/2040",
+                   "archive_evidence_current": True,
+                   "fields": {"title": {"value": "Archived title", "role": "TITLE",
+                                        "decision": "REVIEW", "event_id": "2040",
+                                        "source_url": "https://tpac.org.taipei/program/2040",
+                                        "hold_reason": "ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"}}}
+            old_ledger = {"kind": "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1",
+                          "source_scope": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+                          "release_state": "HARD_HOLD_NO_PUBLICATION",
+                          "inventory_sha256": prior_sha, "accepted_fields": 0, "published": 0,
+                          "records": {identity: {**row, "fields": {
+                              "title": {**row["fields"]["title"], "value": None,
+                                        "role": "UNKNOWN", "decision": "HOLD"}}}}}
+            new_ledger = {**old_ledger, "inventory_sha256": current_sha,
+                          "records": {identity: row}}
+            def export(_inventory, sha):
+                return old_ledger if sha == prior_sha else new_ledger
+            with (patch("scripts.p30_tpac_multi_event_refresh.load_detail_inventory",
+                        return_value=(current_inventory, current_sha)),
+                  patch("scripts.p30_tpac_multi_event_refresh.read_detail_inventory_version",
+                        return_value=(old_inventory, prior_sha)),
+                  patch("scripts.p30_tpac_multi_event_refresh.build_archived_field_review_export",
+                        side_effect=export)):
+                args = ["--repo-root", str(root), "--export-archive-fields",
+                        "--expected-sha", current_sha,
+                        "--diff-prior-archive-sha", prior_sha,
+                        "--commit-archive-field-candidates"]
+                out = io.StringIO()
+                with redirect_stdout(out):
+                    self.assertEqual(main(args), 0)
+                result = json.loads(out.getvalue())
+                target = archive / "field_candidate_lkg.json"
+                saved = json.loads(target.read_bytes())
+                self.assertEqual(saved["candidates"][identity]["fields"]["title"]["value"],
+                                 "Archived title")
+                self.assertEqual(result["result"]["sha256"],
+                                 hashlib.sha256(target.read_bytes()).hexdigest())
+                self.assertEqual((saved["accepted_fields"], saved["published"]), (0, 0))
+                with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                    main(args)
+                self.assertEqual(result["result"]["sha256"],
+                                 hashlib.sha256(target.read_bytes()).hexdigest())
+                with self.assertRaisesRegex(ValueError, "REQUIRES_PRIOR_VERSION"):
+                    main(["--repo-root", str(root), "--export-archive-fields",
+                          "--expected-sha", current_sha,
+                          "--commit-archive-field-candidates"])
+                with self.assertRaisesRegex(ValueError, "MODE_HOLD"):
+                    main(["--repo-root", str(root), "--candidate-expected-sha", prior_sha])
