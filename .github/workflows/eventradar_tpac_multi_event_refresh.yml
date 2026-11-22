@@ -665,6 +665,56 @@ jobs:
               encoding='utf-8')
           print('PASS_ORIGINAL_ARCHIVE_CROSS_PROCESS_KILL_CAS_CRASH_RESTART_38_IDS_NO_GET_NO_PUBLISH')
           PY
+      - name: Export real sealed archive as normalized field provenance ledger (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, subprocess, sys
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+          root=Path('evidence/tpac_archived_38_id')
+          inventory,sha=load_detail_inventory(root/'_isolated_archive_replay')
+          assert sha and len(inventory['items'])==38
+          cmd=[sys.executable,'-m','scripts.p30_tpac_multi_event_refresh',
+               '--repo-root',str(root),'--export-archive-fields','--expected-sha',sha]
+          exported=subprocess.check_output(cmd,text=True)
+          ledger=json.loads(exported)
+          assert ledger['kind']=='TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1'
+          assert ledger['inventory_sha256']==sha
+          assert ledger['counts']=={
+              'events':38,'archived_detail_current':3,'pending_or_held':35}
+          assert (ledger['new_official_get'],ledger['accepted_fields'],ledger['published'])==(0,0,0)
+          assert ledger['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          expected={'tpac:program:2040','tpac:event:1301','tpac:event:2072'}
+          assert set(ledger['records'])==set(inventory['items'])
+          for identity,row in ledger['records'].items():
+              fields=row['fields']
+              assert all(set(f)=={'value','role','event_id','source_url','observed_at',
+                                'source_body_sha256','decision','hold_reason'} for f in fields.values())
+              assert all(f['event_id']==row['event_id'] and
+                         f['source_url']==row['detail_source_url'] and
+                         f['decision'] in ('REVIEW','HOLD')
+                         for f in fields.values())
+              assert fields['price']['value'] is None and fields['price']['decision']=='HOLD'
+              assert fields['date']['value'] is None and fields['date']['decision']=='HOLD'
+              if identity in expected:
+                  assert row['archive_evidence_current'] is True
+                  assert fields['title']['role']=='EVENT_TITLE' and fields['title']['value']
+                  assert fields['title']['decision']=='REVIEW'
+                  assert len(row['historical_detail_body_sha256'])==64
+              else:
+                  assert row['archive_evidence_current'] is False
+                  assert all(f['value'] is None and f['decision']=='HOLD' for f in fields.values())
+          assert ledger['records']['tpac:event:1301']['fields']['activity_period']['role']=='EXHIBITION_PERIOD'
+          assert ledger['records']['tpac:event:1301']['fields']['show_start']['value'] is None
+          assert ledger['records']['tpac:event:2072']['fields']['show_start']['role']=='EVENT_SHOW_START'
+          assert ledger['records']['tpac:program:2040']['fields']['show_start']['role']=='EVENT_SHOW_START'
+          assert load_detail_inventory(root/'_isolated_archive_replay')[1]==sha
+          assert not (root/'docs/data.json').exists()
+          Path('evidence/tpac_archived_field_provenance_38_id.json').write_text(
+              exported,encoding='utf-8')
+          print('PASS_38_ID_ARCHIVED_FIELD_LEDGER_3_REVIEW_35_HOLD_NO_GET_NO_PUBLISH')
+          PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
           set -euo pipefail
