@@ -722,7 +722,9 @@ jobs:
           # Product E2E: sealed native archive -> versioned field delta -> durable candidate LKG -> fresh process.
           import hashlib, json, subprocess, sys
           from pathlib import Path
-          root=Path('evidence/tpac_archived_38_id')
+          # The crash-recovery predecessor is immutable under this exact archive root;
+          # the separate 38-ID ledger fixture does not own that version history.
+          root=Path('evidence/tpac_native_crash_recovery')
           archive=root/'_isolated_archive_replay'
           report=json.loads(Path('evidence/tpac_native_archive_process_crash_recovery.json').read_text())
           previous=report['partial_sha256']
