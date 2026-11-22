@@ -330,8 +330,29 @@ def _semantic_event_payload(event):
     # by unchanged next-showtime; exclude only receipt/observation metadata.
     period_semantics = tuple((key, candidate.get(key))
                              for key in ("list_period", "detail_period"))
+    # Price REVIEW is not a displayed price, but its tier range and direct
+    # ticket identity are business semantics. Receipt-only SHA/time changes
+    # must not churn LKG; changed range or ticket event must not retain stale
+    # field evidence just because the public price stays blank.
+    price_review = candidate.get("price_review")
+    if price_review is None:
+        price_semantics = ("price_review", None)
+    else:
+        if not isinstance(price_review, dict):
+            raise ValueError("TPAC_SEMANTIC_PRICE_REVIEW_SCHEMA_HOLD")
+        linked = price_review.get("linked_ticket")
+        if not isinstance(linked, dict):
+            raise ValueError("TPAC_SEMANTIC_TICKET_IDENTITY_SCHEMA_HOLD")
+        price_semantics = ("price_review", tuple(
+            (name, price_review.get(name)) for name in
+            ("decision", "role", "event_id", "min_price_ntd",
+             "max_price_ntd", "raw_price_label")),
+            tuple((name, linked.get(name)) for name in
+                  ("platform", "ticket_event_id", "ticket_event_url",
+                   "relation", "same_event_relation")))
     return (tuple((key, event.get(key)) for key in keys)
-            + role_values + (hold_semantics,) + period_semantics)
+            + role_values + (hold_semantics,) + period_semantics
+            + (price_semantics,))
 
 
 def refresh_plan(list_body, list_receipt, detail_pairs, prior, now):
