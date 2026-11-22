@@ -1347,6 +1347,92 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
     archived_receipt = ArchivedDetailIdentityBindingTests.archived_receipt
     sources = ArchivedDetailIdentityBindingTests.sources
 
+    def test_readonly_archive_field_ledger_cli_and_stale_hold(self):
+        # Product Core path: persisted two-catalog CAS -> typed field evidence
+        # without another GET, field acceptance or file publication.
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                list_raw, list_receipt, detail_raw, detail_receipt = self.sources(catalog, sid)
+                lp, dp = root / (catalog + "-list.html"), root / (catalog + "-detail.html")
+                lp.write_bytes(list_raw)
+                dp.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(lp), "list_receipt": list_receipt,
+                    "details": {sid: {"detail_file": str(dp), "receipt": detail_receipt}},
+                }
+            manifest = root / "manifest.json"
+            def replay():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+                return archived_inventory_cli(manifest, root)
+            first = replay()
+            archive = root / "_isolated_archive_replay"
+            _, sha = load_detail_inventory(archive)
+            self.assertEqual(sha, first["inventory"]["sha256"])
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--repo-root", str(root), "--export-archive-fields",
+                       "--expected-sha", sha]
+            result = json.loads(subprocess.check_output(command, text=True))
+            self.assertEqual(result["kind"], "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1")
+            self.assertEqual(result["counts"], {
+                "events": 2, "archived_detail_current": 2, "pending_or_held": 0})
+            self.assertEqual((result["new_official_get"], result["accepted_fields"],
+                              result["published"]), (0, 0, 0))
+            rows = result["records"]
+            for identity, sid in (("tpac:program:2040", "2040"), ("tpac:event:1301", "1301")):
+                title = rows[identity]["fields"]["title"]
+                self.assertEqual(title["event_id"], sid)
+                self.assertEqual(title["role"], "EVENT_TITLE")
+                self.assertEqual(title["decision"], "REVIEW")
+                self.assertEqual(title["value"], "封存測試同一活動")
+                self.assertEqual(title["source_url"],
+                                 "https://tpac.org.taipei/" + rows[identity]["source_namespace"] + "/" + sid)
+                self.assertEqual(title["source_body_sha256"],
+                                 rows[identity]["historical_detail_body_sha256"])
+                self.assertEqual(rows[identity]["fields"]["date"]["decision"], "HOLD")
+                self.assertIsNone(rows[identity]["fields"]["date"]["value"])
+                self.assertEqual(rows[identity]["fields"]["price"]["role"], "UNKNOWN")
+                self.assertEqual(rows[identity]["fields"]["show_start"]["decision"], "HOLD")
+            self.assertEqual(load_detail_inventory(archive)[1], sha)
+            # A missing replay cannot turn old H1/show roles into current values.
+            catalogs["event"]["details"] = {}
+            second = replay()
+            _, new_sha = load_detail_inventory(archive)
+            self.assertNotEqual(new_sha, sha)
+            denied = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_FIELD_EXPORT_CAS_HOLD", denied.stderr)
+            command[-1] = new_sha
+            stale = json.loads(subprocess.check_output(command, text=True))
+            self.assertEqual(stale["counts"], {
+                "events": 2, "archived_detail_current": 1, "pending_or_held": 1})
+            held = stale["records"]["tpac:event:1301"]
+            self.assertFalse(held["archive_evidence_current"])
+            self.assertIsNone(held["fields"]["title"]["value"])
+            self.assertEqual(held["fields"]["title"]["decision"], "HOLD")
+            self.assertEqual(held["fields"]["title"]["role"], "UNKNOWN")
+            self.assertEqual(held["fields"]["title"]["hold_reason"],
+                             "DETAIL_BYTES_NOT_REPLAYED_HOLD")
+            self.assertEqual(held["fields"]["title"]["source_body_sha256"],
+                             rows["tpac:event:1301"]["historical_detail_body_sha256"])
+            self.assertEqual(stale["records"]["tpac:program:2040"],
+                             rows["tpac:program:2040"])
+            conflict = subprocess.run(command + ["--inventory-input", str(manifest)],
+                                      capture_output=True, text=True)
+            self.assertNotEqual(conflict.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_FIELD_EXPORT_MODE_HOLD", conflict.stderr)
+            self.assertEqual(load_detail_inventory(archive)[1], new_sha)
+            self.assertEqual(second["published"], 0)
+            self.assertFalse((root / "docs/data.json").exists())
+            self.assertFalse((root / "_isolated_review").exists())
+
     def test_bad_one_detail_preserves_other_valid_archive_and_prior_evidence(self):
         # Real disk CAS: a tampered DETAIL receipt holds only that ID; valid
         # sibling still reaches REVIEW, and no formal field is accepted.
