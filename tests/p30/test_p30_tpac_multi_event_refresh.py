@@ -2429,6 +2429,34 @@ class CrossCatalogIdentitySemanticRegressionTests(unittest.TestCase):
         self.assertEqual(original, _semantic_event_payload(unchanged))
 
 
+class CrossCatalogLkgAdmissionTests(unittest.TestCase):
+    def test_program_alias_cannot_poison_isolated_lkg(self):
+        # Keep legacy programme rows without optional namespace metadata valid,
+        # but reject forged cross-catalog identities before any CAS file write.
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        key = next(iter(plan["events"]))
+        with tempfile.TemporaryDirectory() as temp:
+            for field, value in (("source_namespace", "other"),
+                                 ("source_namespace", "event"),
+                                 ("identity", "tpac:event:2111")):
+                import copy
+                changed = copy.deepcopy(plan)
+                changed["events"][key][field] = value
+                with self.assertRaisesRegex(ValueError, "TPAC_REVIEW_ROW_AUTHORITY_HOLD"):
+                    write_isolated_plan(changed, temp)
+                self.assertFalse((Path(temp) / "_isolated_review" / "tpac" /
+                                  "tpac_multi_event_lkg.json").exists())
+            import copy
+            changed = copy.deepcopy(plan)
+            changed["events"][key]["_candidate"]["identity"] = "tpac:event:2111"
+            with self.assertRaisesRegex(ValueError, "TPAC_REVIEW_ROW_AUTHORITY_HOLD"):
+                write_isolated_plan(changed, temp)
+            accepted = write_isolated_plan(plan, temp)
+            self.assertRegex(accepted["sha256"], r"^[0-9a-f]{64}$")
+
+
 class TestCrashSafeLockUnavailable(unittest.TestCase):
     def test_missing_fcntl_fails_closed_without_creating_lock(self):
         import builtins
