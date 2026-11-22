@@ -2616,6 +2616,24 @@ class ArchivedFieldCandidateDeltaTests(unittest.TestCase):
         updated = self._ledger("REVIEW", "B", "e" * 64, True)
         self.assertEqual(build_archived_field_candidate_delta(old, updated)["counts"]["changed_events"], 1)
 
+    def test_source_currentness_transition_is_semantic_but_sha_only_is_not(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        old = self._ledger("HOLD", current=False)
+        current = self._ledger("HOLD", sha="c" * 64, current=True,
+                               receipt="d" * 64)
+        key = "tpac:program:2040"
+        delta = build_archived_field_candidate_delta(old, current)
+        self.assertEqual(delta["changed"][key]["__source_currentness__"]["transition"],
+                         "STALE_TO_CURRENT")
+        self.assertEqual(delta["candidates"][key]["fields"], {})
+        reverse = build_archived_field_candidate_delta(current, self._ledger(
+            "HOLD", sha="e" * 64, current=False))
+        self.assertEqual(reverse["changed"][key]["__source_currentness__"]["transition"],
+                         "CURRENT_TO_STALE")
+        same = self._ledger("HOLD", sha="f" * 64, current=True, receipt="a" * 64)
+        self.assertEqual(build_archived_field_candidate_delta(current, same)["changed"], {})
+        self.assertEqual((delta["accepted_fields"], delta["published"]), (0, 0))
+
     def test_missing_review_field_withdraws_candidate_without_sibling_loss(self):
         from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
         import copy
