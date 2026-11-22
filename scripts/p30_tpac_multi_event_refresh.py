@@ -757,9 +757,27 @@ def main(argv=None):
                     help="Offline two-catalog LIST/DETAIL receipt manifest; no network")
     ap.add_argument("--repo-root", type=Path, required=True)
     ap.add_argument("--expected-sha")
+    ap.add_argument("--restore-archive-version", help="SHA256 of a prior isolated archive inventory")
+    ap.add_argument("--restore-identity", help="One exact tpac:program/event:ID to recover as historical REVIEW")
     ap.add_argument("--prior-from-lkg", action="store_true",
                     help="CAS-load the current isolated LKG instead of a manifest prior")
     args = ap.parse_args(argv)
+    if args.restore_archive_version is not None or args.restore_identity is not None:
+        # Archive recovery is a separate mode; never touch LIVE inventory/LKG.
+        if (args.input is not None or args.inventory_input is not None
+                or args.prior_from_lkg or args.restore_archive_version is None
+                or args.restore_identity is None or args.expected_sha is None
+                or re.fullmatch(r"[0-9a-f]{64}", args.expected_sha) is None):
+            raise ValueError("TPAC_ARCHIVE_RECOVERY_CLI_MODE_HOLD")
+        archive_root = Path(args.repo_root).resolve() / "_isolated_archive_replay"
+        if archive_root.is_symlink():
+            raise ValueError("TPAC_ARCHIVE_ROOT_SYMLINK_HOLD")
+        result = restore_detail_inventory_row(
+            archive_root, args.restore_archive_version, args.restore_identity,
+            args.expected_sha)
+        print(json.dumps({**result, "accepted_fields": 0, "published": 0},
+                         ensure_ascii=False, sort_keys=True))
+        return 0
     if args.inventory_input is not None:
         if args.input is not None or args.prior_from_lkg or args.expected_sha is not None:
             raise ValueError("TPAC_INVENTORY_CLI_MODE_CONFLICT_HOLD")
@@ -888,7 +906,7 @@ def _validate_archived_review_row(row):
             raise ValueError("TPAC_ARCHIVE_FIELD_CURRENTNESS_HOLD")
     elif (row.get("status") != "PENDING_DETAIL_BUDGET" or
           row.get("archive_field_hold_reason") not in ("DETAIL_BYTES_NOT_REPLAYED_HOLD",
-              "DETAIL_VALIDATION_FAILED_HOLD")):
+              "DETAIL_VALIDATION_FAILED_HOLD", "RESTORED_HISTORICAL_REVIEW_HOLD")):
         raise ValueError("TPAC_ARCHIVE_FIELD_CURRENTNESS_HOLD")
     stamped = ev["observed_at"] or ev["capture_started_at"]
     if ((ev["observed_at"] is not None and ev["capture_started_at"] is not None)
@@ -1129,6 +1147,10 @@ def restore_detail_inventory_row(repo_root, version_sha, identity, expected_curr
     # Do not silently promote archived evidence to currentness on rollback.
     recovered = dict(old_row)
     if "archive_field_evidence" in recovered:
+        # Historical bytes are not a current replay. Requeue the restored ID
+        # explicitly, preserving the evidence but not its previous authority.
+        recovered["status"] = "PENDING_DETAIL_BUDGET"
+        recovered["reason"] = "RESTORED_HISTORICAL_REVIEW_HOLD"
         recovered["archive_field_evidence_current"] = False
         recovered["archive_field_hold_reason"] = "RESTORED_HISTORICAL_REVIEW_HOLD"
     updated = {"kind": INVENTORY_KIND, "items": dict(current["items"])}
