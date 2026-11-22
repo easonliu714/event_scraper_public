@@ -472,6 +472,69 @@ jobs:
           Path('evidence/tpac_real_archived_row_recovery.json').write_text(json.dumps(report,sort_keys=True),encoding='utf-8')
           print('PASS_REAL_ARCHIVED_SINGLE_ROW_RECOVERY_CLI_NO_GET_NO_PUBLISH')
           PY
+      - name: Isolate unreadable real archived DETAIL without losing other rows (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import copy,json,subprocess,sys
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+          original=Path('evidence/tpac_archived_38_id_manifest.json')
+          data=json.loads(original.read_text(encoding='utf-8'))
+          root=Path('evidence/tpac_archived_detail_io')
+          archive=root/'_isolated_archive_replay'
+          command=[sys.executable,'-m','scripts.p30_tpac_multi_event_refresh','--repo-root',str(root)]
+          def replay(path):
+              return json.loads(subprocess.check_output(command+['--inventory-input',str(path)],text=True))
+          first=replay(original)
+          before,first_sha=load_detail_inventory(archive)
+          assert first['counts']['detail_available']==3 and len(before['items'])==38
+          identity='tpac:event:1301'
+          missing=root/'missing-detail.html'
+          folder=root/'not-a-detail-file'
+          folder.mkdir()
+          versions=[]
+          for path in (missing,folder):
+              bad=copy.deepcopy(data)
+              bad['catalogs']['event']['details']['1301']['detail_file']=str(path)
+              changed=root/'bad-manifest.json'
+              changed.write_text(json.dumps(bad,ensure_ascii=False),encoding='utf-8')
+              result=replay(changed)
+              saved,sha=load_detail_inventory(archive)
+              assert sha==result['inventory']['sha256'] and sha!=first_sha
+              assert result['counts']['detail_available']==2
+              assert result['counts']['pending_detail_budget']==36
+              assert result['counts']['archive_identity_hold']==1
+              assert result['diagnostics'][identity]['reason']=='ARCHIVED_DETAIL_IO_HOLD'
+              assert result['diagnostics'][identity]['detail_error']=='DETAIL_FILE_UNREADABLE'
+              assert len(saved['items'])==38
+              assert all(saved['items'][k]==v for k,v in before['items'].items() if k!=identity)
+              row=saved['items'][identity]
+              assert row['archive_field_evidence']==before['items'][identity]['archive_field_evidence']
+              assert row['status']=='PENDING_DETAIL_BUDGET' and not row['archive_field_evidence_current']
+              assert result['published']==result['accepted_fields']==0
+              versions.append(sha)
+          assert versions[0]==versions[1]
+          invalid=copy.deepcopy(data)
+          invalid['catalogs']['event']['list_file']=str(missing)
+          bad_list=root/'bad-list.json'
+          bad_list.write_text(json.dumps(invalid,ensure_ascii=False),encoding='utf-8')
+          denied=subprocess.run(command+['--inventory-input',str(bad_list)],capture_output=True,text=True)
+          assert denied.returncode!=0 and load_detail_inventory(archive)[1]==versions[-1]
+          recovered=replay(original)
+          final,final_sha=load_detail_inventory(archive)
+          assert final==before and final_sha==first_sha
+          assert recovered['counts']['detail_available']==3
+          assert not (root/'docs/data.json').exists() and not (root/'_isolated_review').exists()
+          report={'kind':'TPAC_REAL_ARCHIVED_DETAIL_IO_ISOLATION_V1','historical_source_only':True,
+                  'source_list_count':38,'archived_details':3,'held_identity':identity,
+                  'unaffected_rows':37,'missing_file_and_directory_held':True,
+                  'missing_list_rejected_without_cas_change':True,
+                  'original_sha256':first_sha,'held_sha256':versions[0],'recovered_sha256':final_sha,
+                  'new_official_get':0,'accepted_fields':0,'published':0}
+          Path('evidence/tpac_real_archived_detail_io.json').write_text(json.dumps(report,sort_keys=True),encoding='utf-8')
+          print('PASS_REAL_ARCHIVED_DETAIL_IO_ISOLATION_NO_GET_NO_PUBLISH')
+          PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
           set -euo pipefail
