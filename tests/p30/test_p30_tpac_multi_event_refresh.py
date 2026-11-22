@@ -2797,6 +2797,40 @@ class ArchivedFieldCandidateCliIntegrationTests(unittest.TestCase):
                     main(["--repo-root", str(root), "--candidate-expected-sha", prior_sha])
 
 
+class ArchivedCandidateCurrentnessPersistenceTests(unittest.TestCase):
+    def test_stale_candidate_currentness_survives_snapshot_restart(self):
+        # A stale source must remain explicitly stale after persistence;
+        # receipt-only SHA changes cannot make the candidate current.
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_archived_field_candidate_delta,
+            write_archived_field_candidate_snapshot,
+            load_archived_field_candidate_snapshot)
+        identity = "tpac:program:2040"
+        row = {"identity": identity, "source_namespace": "program",
+               "event_id": "2040", "detail_source_url": "https://tpac.org.taipei/program/2040",
+               "archive_evidence_current": False,
+               "fields": {"title": {"decision": "HOLD", "value": None,
+                                    "role": "UNKNOWN", "hold_reason": "SOURCE_STALE",
+                                    "event_id": "2040",
+                                    "source_url": "https://tpac.org.taipei/program/2040"}}}
+        ledger = {"kind": "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1",
+                  "source_scope": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+                  "release_state": "HARD_HOLD_NO_PUBLICATION",
+                  "inventory_sha256": "a" * 64, "accepted_fields": 0,
+                  "published": 0, "records": {identity: row}}
+        delta = build_archived_field_candidate_delta(
+            {**ledger, "records": {}}, ledger)
+        self.assertIs(delta["candidates"][identity]["source_current"], False)
+        self.assertEqual(delta["candidates"][identity]["fields"], {})
+        with tempfile.TemporaryDirectory() as td:
+            committed = write_archived_field_candidate_snapshot(delta, td)
+            saved = json.loads((Path(td) / "_isolated_archive_replay" /
+                                "field_candidate_lkg.json").read_text())
+            self.assertIs(saved["candidates"][identity]["source_current"], False)
+            self.assertEqual(saved["accepted_fields"], 0)
+            self.assertEqual(saved["published"], 0)
+
+
 class ArchivedCandidateRestartReadTests(unittest.TestCase):
     def test_restart_cli_read_exact_snapshot_and_stale_cas(self):
         import io
