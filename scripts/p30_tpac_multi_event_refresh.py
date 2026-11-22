@@ -536,18 +536,11 @@ def _isolated_writer_lock(lock, hold):
     """
     try:
         import fcntl
-    except ImportError:
-        # Preserve the legacy contract on platforms without flock.
-        try:
-            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        except FileExistsError as error:
-            raise ValueError(hold) from error
-        try:
-            yield
-        finally:
-            os.close(fd)
-            lock.unlink()
-        return
+    except ImportError as error:
+        # No crash-safe ownership proof is available without an OS-backed lock.
+        # Never create/unlink a sentinel that could be stolen after a crash or
+        # unlink another writer's inode. Fail closed without touching the LKG.
+        raise ValueError(hold) from error
 
     marker = b"TPAC_ISOLATED_FLOCK_V1\n"
     if not lock.exists() and not lock.is_symlink():
