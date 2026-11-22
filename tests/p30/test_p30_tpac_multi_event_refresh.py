@@ -1261,6 +1261,69 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertEqual(bad["archive_field_evidence"]["accepted_fields"], 0)
             self.assertEqual(second["published"], 0)
 
+    def test_missing_or_unreadable_detail_preserves_sibling_and_recovers(self):
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "_isolated_archive_replay"
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                raw, receipt, detail, detail_receipt = self.sources(catalog, sid)
+                lp, dp = root / (catalog + "-list.html"), root / (catalog + "-detail.html")
+                lp.write_bytes(raw)
+                dp.write_bytes(detail)
+                catalogs[catalog] = {"list_file": str(lp), "list_receipt": receipt,
+                    "details": {sid: {"detail_file": str(dp), "receipt": detail_receipt}}}
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            first = archived_inventory_cli(manifest, root)
+            prior, first_sha = load_detail_inventory(archive)
+            self.assertEqual(first["counts"]["detail_available"], 2)
+            self.assertEqual(first["inventory"]["sha256"], first_sha)
+            identity, sibling = "tpac:event:1301", "tpac:program:2040"
+            target = root / "event-detail.html"
+            original = target.read_bytes()
+            target.unlink()
+            for mode in ("missing", "directory"):
+                if mode == "directory":
+                    target.mkdir()
+                result = archived_inventory_cli(manifest, root)
+                current, sha = load_detail_inventory(archive)
+                self.assertEqual(sha, result["inventory"]["sha256"])
+                self.assertEqual(result["counts"]["detail_available"], 1)
+                self.assertEqual(result["counts"]["archive_identity_hold"], 1)
+                self.assertEqual(result["counts"]["pending_detail_budget"], 1)
+                self.assertEqual(result["diagnostics"][identity]["reason"], "ARCHIVED_DETAIL_IO_HOLD")
+                self.assertEqual(result["diagnostics"][identity]["detail_error"], "DETAIL_FILE_UNREADABLE")
+                self.assertEqual(current["items"][sibling], prior["items"][sibling])
+                row = current["items"][identity]
+                self.assertEqual(row["archive_field_evidence"], prior["items"][identity]["archive_field_evidence"])
+                self.assertFalse(row["archive_field_evidence_current"])
+                self.assertEqual(row["status"], "PENDING_DETAIL_BUDGET")
+                self.assertEqual(result["accepted_fields"], 0)
+                self.assertEqual(result["published"], 0)
+                self.assertNotEqual(sha, first_sha)
+            # A LIST I/O failure still blocks the whole transaction.
+            list_path = root / "event-list.html"
+            list_bytes = list_path.read_bytes()
+            list_path.unlink()
+            with self.assertRaises(OSError):
+                archived_inventory_cli(manifest, root)
+            self.assertEqual(load_detail_inventory(archive)[1], sha)
+            list_path.write_bytes(list_bytes)
+            target.rmdir()
+            target.write_bytes(original)
+            restored = archived_inventory_cli(manifest, root)
+            final, final_sha = load_detail_inventory(archive)
+            self.assertEqual(restored["counts"]["detail_available"], 2)
+            self.assertEqual(final_sha, first_sha)
+            self.assertEqual(final, prior)
+            self.assertFalse((root / "docs/data.json").exists())
+            self.assertFalse((root / "_isolated_review").exists())
+
     def test_archived_cli_recovers_actual_field_row_as_historical_pending(self):
         import subprocess
         import sys
