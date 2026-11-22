@@ -1829,8 +1829,14 @@ def build_archived_field_candidate_delta(previous, current):
                 "current_value": None,
                 "hold_reason": "FIELD_REMOVED_FROM_CURRENT_EVIDENCE_HOLD",
             }
+        # Persist source-currentness with the candidate, not only the transient
+        # delta. Consumers must not infer freshness from a previous REVIEW value.
+        source_current = row.get("archive_evidence_current")
+        if not isinstance(source_current, bool):
+            raise ValueError("TPAC_FIELD_DELTA_CURRENTNESS_SCHEMA_HOLD")
         candidates[identity] = {"identity": identity, "source_namespace": row["source_namespace"],
                                 "event_id": row["event_id"], "fields": candidate_fields,
+                                "source_current": source_current,
                                 "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY"}
         if event_changes:
             changed[identity] = event_changes
