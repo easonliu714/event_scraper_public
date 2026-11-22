@@ -837,6 +837,8 @@ def main(argv=None):
     ap.add_argument("--input", type=Path)
     ap.add_argument("--inventory-input", type=Path,
                     help="Offline two-catalog LIST/DETAIL receipt manifest; no network")
+    ap.add_argument("--export-archive-fields", action="store_true",
+                    help="Read-only normalized FIELD REVIEW ledger from isolated archive CAS")
     ap.add_argument("--repo-root", type=Path, required=True)
     ap.add_argument("--expected-sha")
     ap.add_argument("--restore-archive-version", help="SHA256 of a prior isolated archive inventory")
@@ -844,6 +846,23 @@ def main(argv=None):
     ap.add_argument("--prior-from-lkg", action="store_true",
                     help="CAS-load the current isolated LKG instead of a manifest prior")
     args = ap.parse_args(argv)
+    if args.export_archive_fields:
+        # A strict, read-only output mode, never a publication or GET path.
+        if (args.input is not None or args.inventory_input is not None
+                or args.restore_archive_version is not None
+                or args.restore_identity is not None or args.prior_from_lkg
+                or type(args.expected_sha) is not str
+                or re.fullmatch(r"[0-9a-f]{64}", args.expected_sha) is None):
+            raise ValueError("TPAC_ARCHIVE_FIELD_EXPORT_MODE_HOLD")
+        archive_root = Path(args.repo_root).resolve() / "_isolated_archive_replay"
+        if archive_root.is_symlink():
+            raise ValueError("TPAC_ARCHIVE_ROOT_SYMLINK_HOLD")
+        inventory, actual_sha = load_detail_inventory(archive_root)
+        if actual_sha is None or actual_sha != args.expected_sha:
+            raise ValueError("TPAC_ARCHIVE_FIELD_EXPORT_CAS_HOLD")
+        report = build_archived_field_review_export(inventory, actual_sha)
+        print(json.dumps(report, ensure_ascii=False, sort_keys=True))
+        return 0
     if args.restore_archive_version is not None or args.restore_identity is not None:
         # Archive recovery is a separate mode; never touch LIVE inventory/LKG.
         if (args.input is not None or args.inventory_input is not None
@@ -1597,6 +1616,79 @@ def archived_inventory_cli(manifest_path, repo_root):
             "inventory": result, "counts": counts, "diagnostics": diagnostics,
             "next_detail_ids": select_pending_details(inventory),
             "published": 0, "accepted_fields": 0}
+
+
+def build_archived_field_review_export(inventory, inventory_sha):
+    """Normalize archived LIST->DETAIL->FIELD evidence into a read-only ledger.
+
+    A complete current archived replay supplies REVIEW candidates, never an
+    accepted field. Missing, stale or quarantined DETAIL rows supply HOLD/UNKNOWN
+    without leaking historical values as current. Neither reads native HTTP nor
+    mutates the isolated CAS, Golden or formal PWA data.
+    """
+    if (type(inventory_sha) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", inventory_sha) is None):
+        raise ValueError("TPAC_ARCHIVE_FIELD_EXPORT_SHA_HOLD")
+    select_pending_details(inventory, 0)  # Reuse persistent evidence authority validation.
+    field_names = ("title", "date", "show_start", "show_count", "activity_period",
+                   "price", "venue", "description", "image")
+    items = {}
+    current_count = 0
+    for identity, row in sorted(inventory["items"].items()):
+        evidence = row.get("archive_field_evidence")
+        current = row.get("archive_field_evidence_current") is True
+        if current:
+            current_count += 1
+        observed = ((evidence.get("observed_at") or evidence.get("capture_started_at"))
+                    if evidence is not None else None)
+        historical_sha = (evidence["detail_body_sha256"]
+                          if evidence is not None else None)
+        roles = evidence["field_roles"] if evidence is not None and current else {}
+        holds = evidence["field_holds"] if evidence is not None and current else {}
+        fields = {}
+        for name in field_names:
+            role = roles.get(name)
+            held = holds.get(name)
+            if role is not None:
+                # A source-owned role is only REVIEW, including verified H1.
+                value, field_role, decision = role["value"], role["role"], "REVIEW"
+                hold_reason = "ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
+            else:
+                value, field_role, decision = None, "UNKNOWN", "HOLD"
+                hold_reason = (
+                    row.get("archive_field_hold_reason")
+                    if evidence is not None and not current else
+                    (held["hold_reason"] if held is not None else
+                     "ARCHIVED_FIELD_ROLE_NOT_VERIFIED_HOLD"))
+            fields[name] = {
+                "value": value, "role": field_role,
+                "event_id": row["source_event_id"],
+                "source_url": row["detail_url"], "observed_at": observed,
+                "source_body_sha256": historical_sha,
+                "decision": decision, "hold_reason": hold_reason,
+            }
+        items[identity] = {
+            "identity": identity, "source_namespace": row["source_namespace"],
+            "event_id": row["source_event_id"],
+            "list_source_url": row.get("list_url"),
+            "list_body_sha256": row.get("list_sha"),
+            "detail_source_url": row["detail_url"],
+            "historical_detail_body_sha256": historical_sha,
+            "archive_evidence_current": current,
+            "status": row.get("status"),
+            "fields": fields,
+        }
+    return {
+        "kind": "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1",
+        "source_scope": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+        "inventory_sha256": inventory_sha,
+        "records": items,
+        "counts": {"events": len(items), "archived_detail_current": current_count,
+                   "pending_or_held": len(items) - current_count},
+        "new_official_get": 0, "accepted_fields": 0, "published": 0,
+        "release_state": "HARD_HOLD_NO_PUBLICATION",
+    }
+
 
 def offline_inventory_cli(manifest_path, repo_root):
     """Replay sealed two-catalog LIST bytes, persist backlog CAS; never GET/publish."""
