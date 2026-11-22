@@ -133,6 +133,39 @@ class MultiEventRefreshTests(unittest.TestCase):
         self.assertEqual(again["changed"], 0)
         self.assertEqual(again["unchanged"], 2)
 
+    def test_price_review_tier_and_ticket_identity_changes_update_lkg(self):
+        # An unchanged public price (blank pending formal acceptance) cannot
+        # hide changed source-owned REVIEW price/ticket semantics.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_event_id": "2111", "title": "Sample", "url": ROOT + "/2111",
+                "price": "", "published": False, "_candidate": {
+                    "hold_reasons": ["PRICE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE"],
+                    "field_roles": {}, "price_review": {
+                        "decision": "SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL",
+                        "role": "EVENT_GENERAL_ADMISSION_PRICE_RANGE",
+                        "event_id": "2111", "min_price_ntd": 1500,
+                        "max_price_ntd": 3500, "raw_price_label": "3500-1500 元",
+                        "source_body_sha256": "a" * 64,
+                        "linked_ticket": {"platform": "OPENTIX", "ticket_event_id": "100",
+                                          "ticket_event_url": "https://www.opentix.life/event/100",
+                                          "relation": "DIRECT_OFFICIAL_TPAC_DETAIL_LINK",
+                                          "same_event_relation": "SOURCE_LINKED_NOT_TICKET_DETAIL_ATTESTED"}}}}
+        original = _semantic_event_payload(base)
+        receipt_only = deepcopy(base)
+        receipt_only["_candidate"]["price_review"]["source_body_sha256"] = "b" * 64
+        self.assertEqual(original, _semantic_event_payload(receipt_only))
+        new_tier = deepcopy(base)
+        new_tier["_candidate"]["price_review"]["min_price_ntd"] = 2000
+        self.assertNotEqual(original, _semantic_event_payload(new_tier))
+        new_ticket = deepcopy(base)
+        new_ticket["_candidate"]["price_review"]["linked_ticket"]["ticket_event_id"] = "200"
+        self.assertNotEqual(original, _semantic_event_payload(new_ticket))
+        invalid = deepcopy(base)
+        invalid["_candidate"]["price_review"]["linked_ticket"] = None
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_TICKET_IDENTITY_SCHEMA_HOLD"):
+            _semantic_event_payload(invalid)
+
     def test_corrupt_prior_event_semantics_isolated_without_batch_abort(self):
         # A damaged persisted REVIEW record cannot overwrite itself or
         # prevent an independent valid event from entering isolated LKG.
