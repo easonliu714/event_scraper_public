@@ -350,7 +350,14 @@ def _semantic_event_payload(event):
             tuple((name, linked.get(name)) for name in
                   ("platform", "ticket_event_id", "ticket_event_url",
                    "relation", "same_event_relation")))
+    # Preserve cross-catalog identity and REVIEW authority transitions even
+    # when display fields and source URLs happen to remain unchanged.
+    identity_semantics = tuple((key, event.get(key)) for key in
+                               ("source_namespace", "identity"))
+    authority_semantics = tuple((key, candidate.get(key)) for key in
+                                ("scope", "decision", "identity"))
     return (tuple((key, event.get(key)) for key in keys)
+            + identity_semantics + authority_semantics
             + role_values + (hold_semantics,) + period_semantics
             + (price_semantics,))
 
