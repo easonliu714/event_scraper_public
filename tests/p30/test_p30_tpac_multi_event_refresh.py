@@ -644,7 +644,7 @@ class MultiEventRefreshTests(unittest.TestCase):
     def test_noncanonical_prior_cannot_be_archived_or_replaced(self):
         import pathlib
         with tempfile.TemporaryDirectory() as root:
-            plan = refresh_plan(*inputs(), empty_prior(), OBS)
+            plan = refresh_plan(*inputs(), empty_prior(), NOW)
             first = write_isolated_plan(plan, root)
             target = pathlib.Path(root) / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
             versions = target.parent / "versions"
