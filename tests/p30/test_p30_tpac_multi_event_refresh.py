@@ -2360,3 +2360,33 @@ class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
             self.assertEqual(load_detail_inventory(root)[1], first["sha256"])
             self.assertFalse((root / "_isolated_review" / "tpac" /
                               "inventory_versions").exists())
+
+
+class TestCrashSafeLockUnavailable(unittest.TestCase):
+    def test_missing_fcntl_fails_closed_without_creating_lock(self):
+        import builtins
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock
+
+        real_import = builtins.__import__
+
+        def deny_fcntl(name, *args, **kwargs):
+            if name == "fcntl":
+                raise ImportError("simulated unsupported platform")
+            return real_import(name, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as directory:
+            lock = Path(directory) / ".write.lock"
+            with patch("builtins.__import__", side_effect=deny_fcntl):
+                with self.assertRaisesRegex(ValueError, "TPAC_CONCURRENT_WRITER_HOLD"):
+                    with _isolated_writer_lock(lock, "TPAC_CONCURRENT_WRITER_HOLD"):
+                        self.fail("unsafe lock acquired")
+            self.assertFalse(lock.exists())
+            lock.write_bytes(b"LEGACY_SENTINEL")
+            with patch("builtins.__import__", side_effect=deny_fcntl):
+                with self.assertRaisesRegex(ValueError, "TPAC_CONCURRENT_WRITER_HOLD"):
+                    with _isolated_writer_lock(lock, "TPAC_CONCURRENT_WRITER_HOLD"):
+                        self.fail("unsafe legacy lock acquired")
+            self.assertEqual(lock.read_bytes(), b"LEGACY_SENTINEL")
