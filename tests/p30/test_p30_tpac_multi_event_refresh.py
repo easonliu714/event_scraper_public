@@ -2616,6 +2616,26 @@ class ArchivedFieldCandidateDeltaTests(unittest.TestCase):
         updated = self._ledger("REVIEW", "B", "e" * 64, True)
         self.assertEqual(build_archived_field_candidate_delta(old, updated)["counts"]["changed_events"], 1)
 
+    def test_missing_review_field_withdraws_candidate_without_sibling_loss(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        import copy
+        prior = self._ledger("REVIEW", "2026-11-28 19:30", current=True)
+        key = "tpac:program:2040"
+        prior["records"][key]["fields"]["title"] = copy.deepcopy(
+            prior["records"][key]["fields"]["show_start"])
+        prior["records"][key]["fields"]["title"]["value"] = "Still present"
+        current = copy.deepcopy(prior)
+        current["inventory_sha256"] = "c" * 64
+        del current["records"][key]["fields"]["show_start"]
+        result = build_archived_field_candidate_delta(prior, current)
+        self.assertEqual(result["changed"][key]["show_start"]["transition"],
+                         "REVIEW_TO_ABSENT")
+        self.assertEqual(result["changed"][key]["show_start"]["current_decision"], "HOLD")
+        self.assertNotIn("show_start", result["candidates"][key]["fields"])
+        self.assertEqual(result["candidates"][key]["fields"]["title"]["value"],
+                         "Still present")
+        self.assertEqual((result["accepted_fields"], result["published"]), (0, 0))
+
     def test_empty_and_stale_review_fail_closed(self):
         from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
         prior = self._ledger()
