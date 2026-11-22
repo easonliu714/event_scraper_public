@@ -12,6 +12,8 @@ import json
 import os
 import re
 import tempfile
+import stat
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -524,6 +526,67 @@ def _canonical(obj):
     return (json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
 
 
+@contextmanager
+def _isolated_writer_lock(lock, hold):
+    """Persistent POSIX lock inode; legacy/unknown sentinels remain HOLD.
+
+    Publish the protocol marker atomically before locking. Never unlink a
+    protocol inode: another process may already have opened it. Old writers
+    using O_EXCL will also fail closed against this persistent sentinel.
+    """
+    try:
+        import fcntl
+    except ImportError:
+        # Preserve the legacy contract on platforms without flock.
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as error:
+            raise ValueError(hold) from error
+        try:
+            yield
+        finally:
+            os.close(fd)
+            lock.unlink()
+        return
+
+    marker = b"TPAC_ISOLATED_FLOCK_V1\n"
+    if not lock.exists() and not lock.is_symlink():
+        staged = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=lock.parent, prefix=".lock-stage-",
+                                             delete=False) as stream:
+                staged = Path(stream.name)
+                stream.write(marker)
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                os.link(staged, lock)
+            except FileExistsError:
+                pass
+        finally:
+            if staged is not None:
+                staged.unlink(missing_ok=True)
+    if not hasattr(os, "O_NOFOLLOW"):
+        raise ValueError(hold)
+    try:
+        fd = os.open(lock, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError as error:
+        raise ValueError(hold) from error
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or os.read(fd, len(marker) + 1) != marker:
+            raise ValueError(hold)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            raise ValueError(hold) from error
+        if not os.path.samestat(info, os.stat(lock, follow_symlinks=False)):
+            raise ValueError(hold)
+        yield
+    finally:
+        os.close(fd)
+
+
 def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollback=False,
                         rollback_archive_sha=None):
     """Atomic/CAS isolated REVIEW snapshot; archived rollback is byte-bound.
@@ -573,12 +636,7 @@ def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollb
     if target.is_symlink():
         raise ValueError("TPAC_LKG_SYMLINK_HOLD")
     lock = dest_dir / ".write.lock"
-    try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError as e:
-        raise ValueError("TPAC_CONCURRENT_WRITER_HOLD") from e
-    try:
-        os.close(fd)
+    with _isolated_writer_lock(lock, "TPAC_CONCURRENT_WRITER_HOLD"):
         prior = target.read_bytes() if target.exists() else None
         actual = _sha(prior) if prior is not None else None
         if actual != expected_sha:
@@ -669,8 +727,6 @@ def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollb
         finally:
             if tmp is not None:
                 tmp.unlink(missing_ok=True)
-    finally:
-        lock.unlink(missing_ok=True)
 
 
 def restore_isolated_version(repo_root, archived_sha, expected_current_sha):
@@ -1026,12 +1082,7 @@ def write_detail_inventory(inventory, repo_root, expected_sha=None):
     lock = folder / ".inventory.lock"
     if target.is_symlink() or lock.is_symlink():
         raise ValueError("TPAC_INVENTORY_SYMLINK_HOLD")
-    try:
-        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError as error:
-        raise ValueError("TPAC_INVENTORY_CONCURRENT_WRITER_HOLD") from error
-    try:
-        os.close(fd)
+    with _isolated_writer_lock(lock, "TPAC_INVENTORY_CONCURRENT_WRITER_HOLD"):
         prior = target.read_bytes() if target.exists() else None
         if (None if prior is None else _sha(prior)) != expected_sha:
             raise ValueError("TPAC_INVENTORY_CAS_HOLD")
@@ -1093,8 +1144,7 @@ def write_detail_inventory(inventory, repo_root, expected_sha=None):
             if os.path.exists(temp_name):
                 os.unlink(temp_name)
         return {"sha256": _sha(payload), "items": len(inventory["items"])}
-    finally:
-        os.unlink(lock)
+
 
 
 def read_detail_inventory_version(repo_root, version_sha):
