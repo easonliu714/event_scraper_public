@@ -563,10 +563,10 @@ jobs:
           initial_inode = lock.stat().st_ino
           # Prove actual cross-process exclusion, not an in-process mock.
           child_code = (
-              "import sys\\nfrom pathlib import Path\\n"
-              "from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock\\n"
-              "with _isolated_writer_lock(Path(sys.argv[1]), 'HOLD'):\\n"
-              "    print('LOCKED', flush=True)\\n    sys.stdin.read()\\n"
+              "import sys\nfrom pathlib import Path\n"
+              "from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock\n"
+              "with _isolated_writer_lock(Path(sys.argv[1]), 'HOLD'):\n"
+              "    print('LOCKED', flush=True)\n    sys.stdin.read()\n"
           )
           child = subprocess.Popen(
               [sys.executable, '-u', '-c', child_code, str(lock)],
@@ -598,15 +598,15 @@ jobs:
           # A real process exits between staging the new JSON and atomic
           # replacement. The last-known-good CAS must survive unchanged.
           crash_code = (
-              "import os,sys\\nfrom pathlib import Path\\n"
-              "import scripts.p30_tpac_multi_event_refresh as source\\n"
-              "prior=os.replace\\n"
-              "def crash(src,dst):\\n"
-              "    if Path(dst).name == 'tpac_detail_inventory.json':\\n"
-              "        os._exit(77)\\n"
-              "    return prior(src,dst)\\n"
-              "os.replace=crash\\n"
-              "source.archived_inventory_cli(sys.argv[1],sys.argv[2])\\n"
+              "import os,sys\nfrom pathlib import Path\n"
+              "import scripts.p30_tpac_multi_event_refresh as source\n"
+              "prior=os.replace\n"
+              "def crash(src,dst):\n"
+              "    if Path(dst).name == 'tpac_detail_inventory.json':\n"
+              "        os._exit(77)\n"
+              "    return prior(src,dst)\n"
+              "os.replace=crash\n"
+              "source.archived_inventory_cli(sys.argv[1],sys.argv[2])\n"
           )
           crashed = subprocess.run([sys.executable, '-c', crash_code,
                                    str(partial_path), str(root)],
@@ -661,7 +661,7 @@ jobs:
               'new_official_http':0,'accepted_fields':0,'published':0,
               'release_state':'HARD_HOLD_NO_PUBLICATION'}
           Path('evidence/tpac_native_archive_process_crash_recovery.json').write_text(
-              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\\n',
+              json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
               encoding='utf-8')
           print('PASS_ORIGINAL_ARCHIVE_CROSS_PROCESS_KILL_CAS_CRASH_RESTART_38_IDS_NO_GET_NO_PUBLISH')
           PY
