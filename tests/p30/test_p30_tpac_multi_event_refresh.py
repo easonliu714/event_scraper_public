@@ -641,6 +641,23 @@ class MultiEventRefreshTests(unittest.TestCase):
 
 
 
+    def test_noncanonical_prior_cannot_be_archived_or_replaced(self):
+        import pathlib
+        with tempfile.TemporaryDirectory() as root:
+            plan = refresh_plan(*inputs(), empty_prior(), OBS)
+            first = write_isolated_plan(plan, root)
+            target = pathlib.Path(root) / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
+            versions = target.parent / "versions"
+            original = target.read_bytes()
+            malformed = original.replace(b'{"events":', b'{  "events":', 1)
+            self.assertNotEqual(malformed, original)
+            target.write_bytes(malformed)
+            before = target.read_bytes()
+            with self.assertRaisesRegex(ValueError, "TPAC_PRIOR_SCHEMA_HOLD"):
+                write_isolated_plan(plan, root, hashlib.sha256(before).hexdigest())
+            self.assertEqual(target.read_bytes(), before)
+            self.assertFalse((versions / (hashlib.sha256(before).hexdigest() + ".json")).exists())
+
 class ReviewRoleDeltaRegressionTests(unittest.TestCase):
     """REVIEW source role changes are meaningful even when formal fields are blank."""
 
