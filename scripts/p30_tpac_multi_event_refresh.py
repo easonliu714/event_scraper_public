@@ -1791,6 +1791,87 @@ def build_archived_field_candidate_delta(previous, current):
             "release_state": "HARD_HOLD_NO_PUBLICATION"}
 
 
+
+def write_archived_field_candidate_snapshot(delta, repo_root, expected_sha=None):
+    """Persist a REVIEW-only candidate snapshot with CAS and sibling preservation.
+
+    The snapshot is deliberately separate from the event LKG and formal data.
+    A failed compare-and-swap cannot replace another process's candidate state.
+    """
+    if (not isinstance(delta, dict)
+            or delta.get("kind") != "TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1"
+            or delta.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+            or delta.get("accepted_fields") != 0 or delta.get("published") != 0
+            or not isinstance(delta.get("candidates"), dict)
+            or not delta["candidates"]
+            or not isinstance(delta.get("changed"), dict)):
+        raise ValueError("TPAC_CANDIDATE_SNAPSHOT_AUTHORITY_HOLD")
+    for identity, row in delta["candidates"].items():
+        if (not isinstance(row, dict) or row.get("identity") != identity
+                or row.get("decision") != "ISOLATED_REVIEW_CANDIDATE_ONLY"
+                or not isinstance(row.get("fields"), dict)):
+            raise ValueError("TPAC_CANDIDATE_SNAPSHOT_IDENTITY_HOLD")
+        for field in row["fields"].values():
+            if not isinstance(field, dict) or field.get("decision") != "REVIEW_ONLY_NOT_ACCEPTED":
+                raise ValueError("TPAC_CANDIDATE_SNAPSHOT_FIELD_HOLD")
+    if expected_sha is not None and (not isinstance(expected_sha, str)
+                                     or re.fullmatch(r"[0-9a-f]{64}", expected_sha) is None):
+        raise ValueError("TPAC_CANDIDATE_SNAPSHOT_EXPECTED_SHA_HOLD")
+    root = Path(repo_root).resolve() / "_isolated_archive_replay"
+    if root.is_symlink():
+        raise ValueError("TPAC_CANDIDATE_SNAPSHOT_SYMLINK_HOLD")
+    root.mkdir(parents=True, exist_ok=True)
+    target = root / "field_candidate_lkg.json"
+    if target.is_symlink():
+        raise ValueError("TPAC_CANDIDATE_SNAPSHOT_SYMLINK_HOLD")
+    with _isolated_writer_lock(root / ".field_candidate.lock", "TPAC_CANDIDATE_CONCURRENT_WRITER_HOLD"):
+        prior = target.read_bytes() if target.exists() else None
+        actual = _sha(prior) if prior is not None else None
+        if actual != expected_sha:
+            raise ValueError("TPAC_CANDIDATE_SNAPSHOT_CAS_HOLD")
+        if prior is not None:
+            try:
+                old = json.loads(prior)
+                if (_canonical(old) != prior
+                        or old.get("kind") != "TPAC_ISOLATED_FIELD_CANDIDATE_SNAPSHOT_V1"
+                        or old.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+                        or old.get("accepted_fields") != 0 or old.get("published") != 0
+                        or not isinstance(old.get("candidates"), dict)
+                        or set(old["candidates"]) - set(delta["candidates"])):
+                    raise ValueError("TPAC_CANDIDATE_PRIOR_CORRUPT_OR_REMOVAL_HOLD")
+            except (TypeError, json.JSONDecodeError) as exc:
+                raise ValueError("TPAC_CANDIDATE_PRIOR_CORRUPT_OR_REMOVAL_HOLD") from exc
+        snapshot = {"kind": "TPAC_ISOLATED_FIELD_CANDIDATE_SNAPSHOT_V1",
+                    "inventory_sha256": delta.get("current_inventory_sha256"),
+                    "candidates": delta["candidates"],
+                    "release_state": "HARD_HOLD_NO_PUBLICATION",
+                    "accepted_fields": 0, "published": 0}
+        payload = _canonical(snapshot)
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="wb", dir=root, prefix=".candidate-",
+                                             delete=False) as out:
+                temp_path = Path(out.name)
+                out.write(payload)
+                out.flush()
+                os.fsync(out.fileno())
+            os.replace(temp_path, target)
+            temp_path = None
+            if hasattr(os, "O_DIRECTORY"):
+                fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+        return {"decision": "ISOLATED_FIELD_CANDIDATE_SNAPSHOT_COMMITTED_NOT_FORMAL",
+                "sha256": _sha(payload), "events": len(snapshot["candidates"]),
+                "accepted_fields": 0, "published": 0}
+
+
+
 def offline_inventory_cli(manifest_path, repo_root):
     """Replay sealed two-catalog LIST bytes, persist backlog CAS; never GET/publish."""
     data = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
