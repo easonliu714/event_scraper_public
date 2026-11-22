@@ -1439,17 +1439,25 @@ def archived_inventory_cli(manifest_path, repo_root):
                 record = details[sid]
                 if not isinstance(record, dict) or set(record) != {"detail_file", "receipt"}:
                     raise ValueError("TPAC_ARCHIVE_DETAIL_SCHEMA_HOLD")
-                body = Path(record["detail_file"]).read_bytes()
                 # Require the source-owned article H1 to match the exact LIST card
                 # before counting this archived DETAIL as identity-verified.
                 # An invalid individual DETAIL must not erase unrelated, already
                 # validated archived rows. Keep the failed identity in backlog;
                 # never accept its stale evidence as current.
                 try:
+                    # Missing/unreadable bytes are per-event failures, not LIST
+                    # authority failures. Reject non-regular files before reading.
+                    detail_path = Path(record["detail_file"])
+                    if not detail_path.is_file():
+                        raise OSError("DETAIL_NOT_REGULAR_FILE")
+                    body = detail_path.read_bytes()
                     bound = bind_archived_detail_identity(catalog, raw, receipt, sid,
                                                          body, record["receipt"])
-                except ValueError as error:
-                    status, reason = "PENDING_DETAIL_BUDGET", "ARCHIVED_DETAIL_VALIDATION_HOLD"
+                except (OSError, ValueError) as error:
+                    is_io = isinstance(error, OSError)
+                    status = "PENDING_DETAIL_BUDGET"
+                    reason = ("ARCHIVED_DETAIL_IO_HOLD" if is_io
+                              else "ARCHIVED_DETAIL_VALIDATION_HOLD")
                     counts["archive_identity_hold"] += 1
                     counts["pending_detail_budget"] += 1
                     rows[key] = {"source_namespace": catalog, "source_event_id": sid,
@@ -1462,7 +1470,9 @@ def archived_inventory_cli(manifest_path, repo_root):
                         rows[key]["archive_field_evidence_current"] = False
                         rows[key]["archive_field_hold_reason"] = "DETAIL_VALIDATION_FAILED_HOLD"
                     diagnostics[key] = {"status": status, "reason": reason,
-                                        "detail_error": str(error)}
+                                        # Avoid exposing the caller's local filesystem path.
+                                        "detail_error": ("DETAIL_FILE_UNREADABLE" if is_io
+                                                         else str(error))}
                     continue
                 # Persist exact body-bound FIELD REVIEW evidence in archive-only
                 # CAS inventory. Never promote archived fields to LIVE/accepted.
