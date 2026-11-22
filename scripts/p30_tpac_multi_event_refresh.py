@@ -1764,6 +1764,19 @@ def build_archived_field_candidate_delta(previous, current):
                     "current_value": field["value"] if field["decision"] == "REVIEW" else None,
                     "hold_reason": field.get("hold_reason"),
                 }
+        # A disappeared field is an explicit candidate withdrawal, not an
+        # unchanged value. Preserve siblings while preventing stale REVIEW reuse.
+        for name in sorted(set(old_fields) - set(fields)):
+            prior = old_fields[name]
+            if not isinstance(prior, dict) or prior.get("decision") not in ("REVIEW", "HOLD"):
+                raise ValueError("TPAC_FIELD_DELTA_PRIOR_FIELD_HOLD")
+            event_changes[name] = {
+                "transition": prior["decision"] + "_TO_ABSENT",
+                "current_decision": "HOLD",
+                "current_role": "UNKNOWN",
+                "current_value": None,
+                "hold_reason": "FIELD_REMOVED_FROM_CURRENT_EVIDENCE_HOLD",
+            }
         candidates[identity] = {"identity": identity, "source_namespace": row["source_namespace"],
                                 "event_id": row["event_id"], "fields": candidate_fields,
                                 "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY"}
