@@ -715,6 +715,67 @@ jobs:
               exported,encoding='utf-8')
           print('PASS_38_ID_ARCHIVED_FIELD_LEDGER_3_REVIEW_35_HOLD_NO_GET_NO_PUBLISH')
           PY
+      - name: Replay real 38-ID archived FIELD delta through isolated candidate CAS and fresh CLI restart (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          # Product E2E: sealed native archive -> versioned field delta -> durable candidate LKG -> fresh process.
+          import hashlib, json, subprocess, sys
+          from pathlib import Path
+          root=Path('evidence/tpac_archived_38_id')
+          archive=root/'_isolated_archive_replay'
+          report=json.loads(Path('evidence/tpac_native_archive_process_crash_recovery.json').read_text())
+          previous=report['partial_sha256']
+          current=report['recovered_sha256']
+          assert previous!=current
+          cli=[sys.executable,'-m','scripts.p30_tpac_multi_event_refresh','--repo-root',str(root)]
+          def invoke(*args):
+              return json.loads(subprocess.check_output(cli+list(args),text=True))
+          delta=invoke('--export-archive-fields','--expected-sha',current,
+                       '--diff-prior-archive-sha',previous)
+          assert delta['kind']=='TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1'
+          assert delta['counts']['events']==38
+          assert set(delta['candidates'])==set(json.loads(
+              Path('evidence/tpac_archived_field_provenance_38_id.json').read_text())['records'])
+          assert delta['changed'].get('tpac:event:1301')
+          committed=invoke('--export-archive-fields','--expected-sha',current,
+                           '--diff-prior-archive-sha',previous,
+                           '--commit-archive-field-candidates')
+          sha=committed['result']['sha256']
+          target=archive/'field_candidate_lkg.json'
+          assert hashlib.sha256(target.read_bytes()).hexdigest()==sha
+          restored=invoke('--read-archive-field-candidates','--expected-sha',sha)
+          assert len(restored['candidates'])==38
+          assert restored['inventory_sha256']==current
+          assert (restored['accepted_fields'],restored['published'])==(0,0)
+          for identity,row in restored['candidates'].items():
+              assert row['decision']=='ISOLATED_REVIEW_CANDIDATE_ONLY'
+              assert all(field['decision']=='REVIEW_ONLY_NOT_ACCEPTED'
+                         for field in row['fields'].values())
+          assert restored['candidates']['tpac:event:1301']['fields']['title']['value']
+          assert restored['candidates']['tpac:program:2040']['fields']['title']['value']
+          assert restored['candidates']['tpac:event:2072']['fields']['title']['value']
+          # Replaying without a current candidate SHA must fail closed and retain all 38 siblings.
+          rejected=subprocess.run(cli+['--export-archive-fields','--expected-sha',current,
+                                     '--diff-prior-archive-sha',previous,
+                                     '--commit-archive-field-candidates'],
+                                  capture_output=True,text=True)
+          assert rejected.returncode!=0 and 'CAS_HOLD' in rejected.stderr
+          assert hashlib.sha256(target.read_bytes()).hexdigest()==sha
+          assert invoke('--read-archive-field-candidates','--expected-sha',sha)==restored
+          assert not (root/'docs/data.json').exists()
+          assert not (root/'docs/platform_status.json').exists()
+          evidence={'kind':'TPAC_REAL_ARCHIVED_CANDIDATE_CLI_CAS_RESTART_E2E_V1',
+                    'sealed_list_bodies':2,'sealed_detail_bodies':3,'identities':38,
+                    'prior_inventory_sha256':previous,'current_inventory_sha256':current,
+                    'candidate_snapshot_sha256':sha,'fresh_process_readback':True,
+                    'stale_cas_rejected':True,'sibling_count':38,
+                    'new_official_http':0,'accepted_fields':0,'published':0,
+                    'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          Path('evidence/tpac_archived_candidate_38_id_cas_restart.json').write_text(
+              json.dumps(evidence,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('PASS_REAL_38_ID_FIELD_DELTA_CANDIDATE_CAS_FRESH_RESTART_NO_GET_NO_PUBLISH')
+          PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
           set -euo pipefail
