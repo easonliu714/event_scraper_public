@@ -637,7 +637,9 @@ def write_isolated_plan(plan, repo_root, expected_sha=None, allow_archived_rollb
                 or event.get("url") != url
                 or (event_match and (event.get("source_namespace") != "event"
                                      or event.get("identity") != key))
-                or (program_match and event.get("source_namespace") == "event")
+                or (program_match and (event.get("source_namespace") not in (None, "program")
+                                       or event.get("identity") not in (None, key)))
+                or (event["_candidate"].get("identity") not in (None, key))
                 or event.get("published") is not False
                 or event.get("golden_accepted") is not False
                 or event.get("formal_field_pass") is not False
