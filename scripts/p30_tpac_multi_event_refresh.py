@@ -1772,6 +1772,23 @@ def build_archived_field_candidate_delta(previous, current):
         if not isinstance(fields, dict) or not fields or not isinstance(old_fields, dict):
             raise ValueError("TPAC_FIELD_DELTA_FIELDS_HOLD")
         event_changes, candidate_fields = {}, {}
+        # Source currentness is a semantic authority transition, unlike a
+        # receipt/body SHA-only observation. Keep it separate from FIELD names.
+        if old is not None:
+            old_current = old.get("archive_evidence_current")
+            new_current = row.get("archive_evidence_current")
+            if not isinstance(old_current, bool) or not isinstance(new_current, bool):
+                raise ValueError("TPAC_FIELD_DELTA_CURRENTNESS_SCHEMA_HOLD")
+            if old_current != new_current:
+                event_changes["__source_currentness__"] = {
+                    "transition": ("CURRENT_TO_STALE" if old_current
+                                   else "STALE_TO_CURRENT"),
+                    "current_decision": "REVIEW" if new_current else "HOLD",
+                    "current_role": "SOURCE_CURRENTNESS",
+                    "current_value": new_current,
+                    "hold_reason": (None if new_current
+                                    else "ARCHIVED_SOURCE_NOT_CURRENT_HOLD"),
+                }
         for name, field in sorted(fields.items()):
             if not isinstance(field, dict) or field.get("decision") not in ("REVIEW", "HOLD"):
                 raise ValueError("TPAC_FIELD_DELTA_FIELD_AUTHORITY_HOLD")
