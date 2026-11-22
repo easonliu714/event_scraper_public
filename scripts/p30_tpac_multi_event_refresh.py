@@ -838,6 +838,11 @@ def main(argv=None):
     ap.add_argument("--inventory-input", type=Path,
                     help="Offline two-catalog LIST/DETAIL receipt manifest; no network")
     ap.add_argument("--diff-prior-archive-sha", help="Read-only previous inventory version for candidate field delta")
+    # Explicit opt-in: persist REVIEW-only field candidates under isolated CAS.
+    ap.add_argument("--commit-archive-field-candidates", action="store_true",
+                    help="Commit archived FIELD candidate delta to isolated LKG, never formal data")
+    ap.add_argument("--candidate-expected-sha",
+                    help="Expected current isolated candidate snapshot SHA for compare-and-swap")
     ap.add_argument("--export-archive-fields", action="store_true",
                     help="Read-only normalized FIELD REVIEW ledger from isolated archive CAS")
     ap.add_argument("--repo-root", type=Path, required=True)
@@ -850,7 +855,16 @@ def main(argv=None):
     if args.export_archive_fields:
         if args.diff_prior_archive_sha is not None and (type(args.diff_prior_archive_sha) is not str or re.fullmatch(r"[0-9a-f]{64}", args.diff_prior_archive_sha) is None):
             raise ValueError("TPAC_FIELD_DELTA_PRIOR_SHA_HOLD")
-        # A strict, read-only output mode, never a publication or GET path.
+        # Export stays read-only unless explicitly opted into isolated candidate CAS.
+        if args.commit_archive_field_candidates:
+            if args.diff_prior_archive_sha is None:
+                raise ValueError("TPAC_CANDIDATE_COMMIT_REQUIRES_PRIOR_VERSION_HOLD")
+            if (args.candidate_expected_sha is not None and
+                    re.fullmatch(r"[0-9a-f]{64}", args.candidate_expected_sha) is None):
+                raise ValueError("TPAC_CANDIDATE_COMMIT_EXPECTED_SHA_HOLD")
+        elif args.candidate_expected_sha is not None:
+            raise ValueError("TPAC_CANDIDATE_COMMIT_MODE_HOLD")
+        # A strict, archive-only output mode, never a publication or GET path.
         if (args.input is not None or args.inventory_input is not None
                 or args.restore_archive_version is not None
                 or args.restore_identity is not None or args.prior_from_lkg
@@ -868,9 +882,17 @@ def main(argv=None):
             prior_inventory, prior_sha = read_detail_inventory_version(archive_root, args.diff_prior_archive_sha)
             prior_ledger = build_archived_field_review_export(prior_inventory, prior_sha)
             report = build_archived_field_candidate_delta(prior_ledger, report)
+        if args.commit_archive_field_candidates:
+            # The existing isolated writer lock and CAS are the sole writer path.
+            committed = write_archived_field_candidate_snapshot(
+                report, args.repo_root, args.candidate_expected_sha)
+            print(json.dumps({"result": committed, "delta": report},
+                             ensure_ascii=False, sort_keys=True))
+            return 0
         print(json.dumps(report, ensure_ascii=False, sort_keys=True))
         return 0
-    if args.diff_prior_archive_sha is not None:
+    if (args.diff_prior_archive_sha is not None or args.commit_archive_field_candidates
+            or args.candidate_expected_sha is not None):
         raise ValueError("TPAC_FIELD_DELTA_MODE_HOLD")
     if args.restore_archive_version is not None or args.restore_identity is not None:
         # Archive recovery is a separate mode; never touch LIVE inventory/LKG.
