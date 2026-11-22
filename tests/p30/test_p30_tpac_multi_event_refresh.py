@@ -2652,3 +2652,59 @@ class ArchivedFieldCandidateDeltaTests(unittest.TestCase):
                 "accepted_fields": 0, "published": 0,
                 "records": {"tpac:event:999": {"identity": "tpac:event:999"}}})
 
+
+
+class ArchivedFieldCandidateSnapshotPersistenceTests(unittest.TestCase):
+    def _delta(self, title="Current"):
+        return {"kind": "TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1",
+                "release_state": "HARD_HOLD_NO_PUBLICATION",
+                "accepted_fields": 0, "published": 0,
+                "current_inventory_sha256": "a" * 64, "changed": {},
+                "candidates": {
+                    "tpac:program:2040": {
+                        "identity": "tpac:program:2040",
+                        "source_namespace": "program", "event_id": "2040",
+                        "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY",
+                        "fields": {"title": {"value": title, "role": "TITLE",
+                                             "decision": "REVIEW_ONLY_NOT_ACCEPTED"}}},
+                    "tpac:event:2072": {
+                        "identity": "tpac:event:2072",
+                        "source_namespace": "event", "event_id": "2072",
+                        "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY",
+                        "fields": {"show_start": {"value": "2026-11-28 19:30",
+                                                  "role": "SHOW_START",
+                                                  "decision": "REVIEW_ONLY_NOT_ACCEPTED"}}}}}
+
+    def test_candidate_snapshot_cas_restart_and_sibling_preservation(self):
+        from scripts.p30_tpac_multi_event_refresh import write_archived_field_candidate_snapshot
+        with tempfile.TemporaryDirectory() as td:
+            first = write_archived_field_candidate_snapshot(self._delta(), td)
+            target = Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json"
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), first["sha256"])
+            updated = self._delta("Updated")
+            updated["candidates"]["tpac:event:2072"]["fields"] = {}
+            second = write_archived_field_candidate_snapshot(updated, td, first["sha256"])
+            saved = json.loads(target.read_bytes())
+            self.assertEqual(saved["candidates"]["tpac:program:2040"]["fields"]["title"]["value"], "Updated")
+            self.assertEqual(saved["candidates"]["tpac:event:2072"]["fields"], {})
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                write_archived_field_candidate_snapshot(self._delta("Stale"), td, first["sha256"])
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), second["sha256"])
+            with self.assertRaisesRegex(ValueError, "REMOVAL_HOLD"):
+                reduced = self._delta()
+                del reduced["candidates"]["tpac:event:2072"]
+                write_archived_field_candidate_snapshot(reduced, td, second["sha256"])
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), second["sha256"])
+
+    def test_candidate_snapshot_rejects_published_and_empty_without_write(self):
+        from scripts.p30_tpac_multi_event_refresh import write_archived_field_candidate_snapshot
+        with tempfile.TemporaryDirectory() as td:
+            bad = self._delta()
+            bad["published"] = 1
+            with self.assertRaisesRegex(ValueError, "AUTHORITY_HOLD"):
+                write_archived_field_candidate_snapshot(bad, td)
+            empty = self._delta()
+            empty["candidates"] = {}
+            with self.assertRaisesRegex(ValueError, "AUTHORITY_HOLD"):
+                write_archived_field_candidate_snapshot(empty, td)
+            self.assertFalse((Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json").exists())
