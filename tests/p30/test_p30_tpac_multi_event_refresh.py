@@ -1261,6 +1261,64 @@ class ArchivedProvenanceCliTests(unittest.TestCase):
             self.assertEqual(bad["archive_field_evidence"]["accepted_fields"], 0)
             self.assertEqual(second["published"], 0)
 
+    def test_archived_cli_recovers_actual_field_row_as_historical_pending(self):
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "_isolated_archive_replay"
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                raw, receipt, detail, detail_receipt = self.sources(catalog, sid)
+                lp, dp = root / (catalog + "-list.html"), root / (catalog + "-detail.html")
+                lp.write_bytes(raw)
+                dp.write_bytes(detail)
+                catalogs[catalog] = {"list_file": str(lp), "list_receipt": receipt,
+                    "details": {sid: {"detail_file": str(dp), "receipt": detail_receipt}}}
+            manifest = root / "manifest.json"
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--repo-root", str(root)]
+            def replay():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+                return json.loads(subprocess.check_output(
+                    command + ["--inventory-input", str(manifest)], text=True))
+            first = replay()
+            old, old_sha = load_detail_inventory(archive)
+            identity, sibling = "tpac:event:1301", "tpac:program:2040"
+            self.assertEqual(old_sha, first["inventory"]["sha256"])
+            self.assertTrue(old["items"][identity]["archive_field_evidence_current"])
+            catalogs["event"]["details"] = {}
+            second = replay()
+            before, before_sha = load_detail_inventory(archive)
+            self.assertEqual(before_sha, second["inventory"]["sha256"])
+            restore = command + ["--restore-archive-version", old_sha,
+                                 "--restore-identity", identity, "--expected-sha", before_sha]
+            result = json.loads(subprocess.check_output(restore, text=True))
+            after, after_sha = load_detail_inventory(archive)
+            self.assertEqual(result["sha256"], after_sha)
+            self.assertNotEqual(after_sha, before_sha)
+            row = after["items"][identity]
+            self.assertEqual(row["archive_field_evidence"],
+                             old["items"][identity]["archive_field_evidence"])
+            self.assertFalse(row["archive_field_evidence_current"])
+            self.assertEqual(row["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(row["archive_field_hold_reason"], "RESTORED_HISTORICAL_REVIEW_HOLD")
+            self.assertEqual(after["items"][sibling], before["items"][sibling])
+            self.assertEqual(result["accepted_fields"], 0)
+            self.assertEqual(result["published"], 0)
+            denied = subprocess.run(restore, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_INVENTORY_RECOVERY_CAS_HOLD", denied.stderr)
+            conflict = subprocess.run(restore + ["--inventory-input", str(manifest)],
+                                      capture_output=True, text=True)
+            self.assertNotEqual(conflict.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_RECOVERY_CLI_MODE_HOLD", conflict.stderr)
+            self.assertEqual(load_detail_inventory(archive)[1], after_sha)
+            self.assertFalse((root / "_isolated_review").exists())
+            self.assertFalse((root / "docs/data.json").exists())
+
     def test_archived_real_event_link_prefix_preserves_source_owned_title(self):
         # Official /event title attrs begin with a navigation prefix, but the
         # event-owned visible title itself does not contain that prefix.
