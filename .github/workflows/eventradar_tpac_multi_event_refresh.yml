@@ -418,6 +418,60 @@ jobs:
                           sort_keys=True)+'\n',encoding='utf-8')
           print('PASS_REAL_ARCHIVED_3_LIST_DETAIL_TITLE_ID_PARITY_REVIEW_NO_GET_NO_PUBLISH')
           PY
+      - name: Recover one real archived FIELD row via isolated CLI (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, subprocess, sys
+          from pathlib import Path
+          from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+          manifest=Path('evidence/tpac_archived_38_id_manifest.json')
+          data=json.loads(manifest.read_text(encoding='utf-8'))
+          root=Path('evidence/tpac_archived_row_recovery')
+          archive=root/'_isolated_archive_replay'
+          command=[sys.executable,'-m','scripts.p30_tpac_multi_event_refresh','--repo-root',str(root)]
+          def replay(path):
+              return json.loads(subprocess.check_output(command+['--inventory-input',str(path)],text=True))
+          first=replay(manifest)
+          original,first_sha=load_detail_inventory(archive)
+          assert first['counts']['detail_available']==3
+          assert first_sha==first['inventory']['sha256']
+          del data['catalogs']['event']['details']['1301']
+          partial=Path('evidence/tpac_archived_recovery_partial_manifest.json')
+          partial.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
+          second=replay(partial)
+          before,before_sha=load_detail_inventory(archive)
+          assert second['counts']['detail_available']==2 and before_sha!=first_sha
+          assert not before['items']['tpac:event:1301']['archive_field_evidence_current']
+          identity='tpac:event:1301'
+          restore=command+['--restore-archive-version',first_sha,'--restore-identity',identity,'--expected-sha',before_sha]
+          result=json.loads(subprocess.check_output(restore,text=True))
+          after,after_sha=load_detail_inventory(archive)
+          assert after_sha==result['sha256'] and after_sha!=before_sha
+          assert len(after['items'])==len(before['items'])==38
+          assert all(after['items'][key]==row for key,row in before['items'].items() if key!=identity)
+          row=after['items'][identity]
+          assert row['archive_field_evidence']==original['items'][identity]['archive_field_evidence']
+          assert row['status']=='PENDING_DETAIL_BUDGET' and not row['archive_field_evidence_current']
+          assert row['archive_field_hold_reason']=='RESTORED_HISTORICAL_REVIEW_HOLD'
+          assert result['accepted_fields']==result['published']==0
+          stale=subprocess.run(restore,capture_output=True,text=True)
+          assert stale.returncode!=0 and 'TPAC_INVENTORY_RECOVERY_CAS_HOLD' in stale.stderr
+          assert load_detail_inventory(archive)[1]==after_sha
+          current=replay(manifest)
+          final,final_sha=load_detail_inventory(archive)
+          assert current['counts']['detail_available']==3
+          assert final['items'][identity]['archive_field_evidence_current'] is True
+          assert final_sha==first_sha
+          assert not (root/'docs/data.json').exists() and not (root/'_isolated_review').exists()
+          report={'kind':'TPAC_REAL_ARCHIVED_SINGLE_ROW_RECOVERY_V1',
+                  'historical_source_only':True,'source_list_count':38,'archived_details':3,
+                  'recovered_identity':identity,'unaffected_rows':37,'stale_cas_rejected':True,
+                  'original_sha256':first_sha,'partial_sha256':before_sha,'recovered_sha256':after_sha,
+                  'replayed_sha256':final_sha,'new_official_get':0,'accepted_fields':0,'published':0}
+          Path('evidence/tpac_real_archived_row_recovery.json').write_text(json.dumps(report,sort_keys=True),encoding='utf-8')
+          print('PASS_REAL_ARCHIVED_SINGLE_ROW_RECOVERY_CLI_NO_GET_NO_PUBLISH')
+          PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
           set -euo pipefail
