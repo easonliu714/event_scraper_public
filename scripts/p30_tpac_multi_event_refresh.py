@@ -1604,11 +1604,20 @@ def offline_inventory_cli(manifest_path, repo_root):
             raise ValueError("TPAC_INVENTORY_CLI_DETAIL_ID_HOLD")
         counts["source_cards"] += len(cards)
         pairs = {}
+        unreadable = set()
         for sid, record in details.items():
             if not isinstance(record, dict) or set(record) != {"detail_file", "receipt"}:
                 raise ValueError("TPAC_INVENTORY_CLI_DETAIL_SCHEMA_HOLD")
-            pairs[sid] = {"body": Path(record["detail_file"]).read_bytes(),
-                          "receipt": record["receipt"]}
+            # Isolate an unavailable DETAIL to its identity; LIST failures remain fatal.
+            try:
+                detail_path = Path(record["detail_file"])
+                if not detail_path.is_file():
+                    raise OSError("DETAIL_NOT_REGULAR_FILE")
+                body = detail_path.read_bytes()
+            except (OSError, TypeError, ValueError):
+                unreadable.add(sid)
+                continue
+            pairs[sid] = {"body": body, "receipt": record["receipt"]}
         plan = None
         if pairs:
             planner = refresh_event_plan if catalog == "event" else refresh_plan
@@ -1618,6 +1627,12 @@ def offline_inventory_cli(manifest_path, repo_root):
             key = card["identity"]
             row = staged["items"][key]
             if sid not in pairs:
+                if sid in unreadable:
+                    row["status"] = "PENDING_DETAIL_BUDGET"
+                    row["reason"] = "DETAIL_IO_HOLD"
+                    counts["pending_detail_budget"] += 1
+                    diagnostics[key] = {"status": row["status"], "reason": row["reason"]}
+                    continue
                 # A prior REVIEW status is not proof of replayable DETAIL bytes
                 # in this manifest. Preserve the separate REVIEW LKG, but
                 # restore this identity to the capture backlog (no LIVE GET).
