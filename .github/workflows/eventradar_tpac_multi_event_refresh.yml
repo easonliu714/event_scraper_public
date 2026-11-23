@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - scripts/p30_tpac_multi_event_refresh.py
+      - scripts/p30_offline_source_adapters.py
       - scripts/p30_tpac_catalog_topology.py
       - scripts/p30_tpac_event_catalog_once.py
       - scripts/p30_tpac_event_detail_review.py
@@ -20,6 +21,7 @@ on:
       - tests/p30/test_p30_tpac_event_catalog_once.py
       - tests/p30/test_p30_tpac_catalog_topology.py
       - tests/p30/test_p30_tpac_multi_event_refresh.py
+      - tests/p30/test_p30_offline_source_adapters.py
       - .github/workflows/eventradar_tpac_multi_event_refresh.yml
 permissions:
   contents: read
@@ -48,7 +50,7 @@ jobs:
           test "$(git rev-parse HEAD:docs/index.html)" = 18c14a92288f7bc2aa1ed8bc57b62107957b851d
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'scripts/p30_tpac_r4_source_policy.py' 'scripts/p30_tpac_raw5_github_attempt_provider.py' 'scripts/p30_tpac_raw5_native_response.py' 'scripts/p30_raw5_non_source_claim_probe.py' 'tests/p30/test_p30_raw5_non_source_claim_probe.py' 'tests/p30/test_p30_tpac_raw5_github_attempt_provider.py' 'tests/p30/test_p30_tpac_raw5_native_response.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
+          expected="$(printf '%s\n' 'scripts/p30_tpac_multi_event_refresh.py' 'scripts/p30_offline_source_adapters.py' 'scripts/p30_tpac_catalog_topology.py' 'scripts/p30_tpac_event_catalog_once.py' 'scripts/p30_tpac_event_detail_review.py' 'scripts/p30_tpac_price_reconcile.py' 'scripts/p30_tpac_r4_source_policy.py' 'scripts/p30_tpac_raw5_github_attempt_provider.py' 'scripts/p30_tpac_raw5_native_response.py' 'scripts/p30_raw5_non_source_claim_probe.py' 'tests/p30/test_p30_raw5_non_source_claim_probe.py' 'tests/p30/test_p30_tpac_raw5_github_attempt_provider.py' 'tests/p30/test_p30_tpac_raw5_native_response.py' 'tests/p30/test_p30_tpac_multi_event_refresh.py' 'tests/p30/test_p30_offline_source_adapters.py' 'tests/p30/test_p30_tpac_r4_source_policy.py' 'tests/p30/test_p30_tpac_price_reconcile.py' 'tests/p30/test_p30_tpac_event_detail_review.py' 'tests/p30/test_p30_tpac_event_catalog_once.py' 'tests/p30/test_p30_tpac_catalog_topology.py' '.github/workflows/eventradar_tpac_multi_event_refresh.yml' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAUTHORIZED_FORMAL_SCOPE; exit 1; }
           echo PASS_EXACT_HEAD_TPAC_SINGLE_SOURCE_REVIEW_ONLY
       - uses: actions/setup-python@v5
@@ -59,6 +61,7 @@ jobs:
           set -euo pipefail
           python -m pip install 'beautifulsoup4==4.15.0'
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_multi_event_refresh.py' -v
+          python -m unittest discover -s tests/p30 -p 'test_p30_offline_source_adapters.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_catalog_topology.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_catalog_once.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_event_detail_review.py' -v
@@ -68,7 +71,68 @@ jobs:
           python -m unittest discover -s tests/p30 -p 'test_p30_tpac_raw5_native_response.py' -v
           python -m unittest discover -s tests/p30 -p 'test_p30_raw5_non_source_claim_probe.py' -v
           python -m py_compile scripts/p30_tpac_multi_event_refresh.py scripts/p30_tpac_catalog_topology.py scripts/p30_tpac_event_catalog_once.py scripts/p30_tpac_event_detail_review.py scripts/p30_tpac_price_reconcile.py scripts/p30_tpac_r4_source_policy.py scripts/p30_tpac_raw5_github_attempt_provider.py scripts/p30_tpac_raw5_native_response.py scripts/p30_raw5_non_source_claim_probe.py
+          python -m py_compile scripts/p30_offline_source_adapters.py
           echo PASS_TPAC_MULTI_EVENT_PARSER_AND_LKG_FAIL_CLOSED_TESTS
+      - name: Cross-source KKTIX ACCUPASS offline LIST same-ID DETAIL FIELD contract (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          # Independent external-provider synthetic fixtures: parser/Core
+          # executable integration, NOT newly captured official HTML.
+          import hashlib, json, subprocess, sys
+          from pathlib import Path
+          root=Path('evidence/two_provider_offline')
+          root.mkdir(parents=True,exist_ok=True)
+          manifest={'mode':'SEALED_OFFLINE_REPLAY_ONLY','sources':{}}
+          for provider,host,prefix in (
+              ('kktix','kktix.com','events'),
+              ('accupass','www.accupass.com','event')):
+              url='https://'+host+'/'+prefix+'/abc123'
+              title='隔離來源事件標題_'+provider
+              if provider=='kktix':
+                  listing=('<a href="/events/abc123" title="'+title+
+                           '"><span class="name">'+title+'</span></a>').encode()
+              else:
+                  listing=('<a href="/event/abc123"><h3>'+title+'</h3></a>').encode()
+              detail=('<article><h1>'+title+'</h1></article>').encode()
+              lp,dp=provider+'_list.html',provider+'_detail.html'
+              (root/lp).write_bytes(listing)
+              (root/dp).write_bytes(detail)
+              def proof(raw,url):
+                  return {'evidence_class':'SEALED_OFFLINE_FIXTURE_ONLY',
+                          'source_url':url,
+                          'body_sha256':hashlib.sha256(raw).hexdigest(),
+                          'observed_at':'2026-11-23T10:00:00+08:00'}
+              manifest['sources'][provider]={
+                  'list_file':lp,'list_receipt':proof(listing,'https://'+host+'/'),
+                  'details':{'abc123':{'detail_file':dp,'receipt':proof(detail,url)}}}
+          manifest_file=root/'manifest.json'
+          manifest_file.write_text(json.dumps(manifest,ensure_ascii=False),encoding='utf-8')
+          cmd=[sys.executable,'-m','scripts.p30_offline_source_adapters',
+               '--manifest',str(manifest_file),'--fixture-root',str(root)]
+          first=json.loads(subprocess.check_output(cmd,text=True))
+          assert set(first['records'])=={'kktix:abc123','accupass:abc123'}
+          assert first['counts']['review_identities']==2
+          assert (first['new_official_get'],first['accepted_fields'],first['published'])==(0,0,0)
+          assert first['release_state']=='HARD_HOLD_NO_PUBLICATION'
+          for identity,row in first['records'].items():
+              assert row['fields']['title']['decision']=='REVIEW'
+              assert row['fields']['title']['source_url']==row['detail_source_url']
+              assert len(row['fields']['title']['source_body_sha256'])==64
+              assert all(row['fields'][n]['decision']=='HOLD' and
+                         row['fields'][n]['value'] is None
+                         for n in ('date','show_start','price','venue','image'))
+          # Per-provider LIST failure cannot erase a healthy sibling.
+          (root/'accupass_list.html').unlink()
+          held=json.loads(subprocess.check_output(cmd,text=True))
+          assert held['source_states']['accupass']=='HOLD_LIST'
+          assert set(held['records'])=={'kktix:abc123'}
+          assert held['published']==0
+          (root/'two_provider_review.json').write_text(
+              json.dumps(first,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
+              encoding='utf-8')
+          print('PASS_KKTIX_ACCUPASS_OFFLINE_SAME_ID_DETAIL_FIELD_REVIEW_CORE_NO_GET')
+          PY
       - name: Preserve consumed TPAC /event source one-shot (NO NETWORK)
         run: |
           set -euo pipefail
