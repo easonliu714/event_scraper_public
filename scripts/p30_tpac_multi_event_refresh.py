@@ -2142,6 +2142,16 @@ def write_archived_field_candidate_snapshot(delta, repo_root, expected_sha=None)
                         or not isinstance(old.get("candidates"), dict)
                         or set(old["candidates"]) - set(delta["candidates"])):
                     raise ValueError("TPAC_CANDIDATE_PRIOR_CORRUPT_OR_REMOVAL_HOLD")
+                # Validate every persisted sibling before admitting a new CAS.
+                # Canonical JSON alone does not establish field provenance or
+                # source identity, and an update must not silently launder it.
+                for identity, previous_row in old["candidates"].items():
+                    _validate_archived_candidate_snapshot_row(
+                        identity, previous_row, "TPAC_CANDIDATE_PRIOR_CORRUPT_OR_REMOVAL_HOLD")
+                    next_row = delta["candidates"][identity]
+                    for key in ("source_namespace", "event_id", "detail_source_url"):
+                        if previous_row.get(key) != next_row.get(key):
+                            raise ValueError("TPAC_CANDIDATE_PRIOR_SOURCE_IDENTITY_HOLD")
             except (TypeError, json.JSONDecodeError) as exc:
                 raise ValueError("TPAC_CANDIDATE_PRIOR_CORRUPT_OR_REMOVAL_HOLD") from exc
         snapshot = {"kind": "TPAC_ISOLATED_FIELD_CANDIDATE_SNAPSHOT_V1",
