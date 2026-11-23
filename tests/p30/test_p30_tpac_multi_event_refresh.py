@@ -1215,6 +1215,55 @@ class PersistentInventoryContractTests(unittest.TestCase):
             self.assertFalse((root / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json").exists())
             self.assertFalse((root / "docs/data.json").exists())
 
+    def test_offline_unreadable_list_preserves_sibling_and_prior_inventory(self):
+        # Real disk replay: one missing catalog LIST must not erase its prior
+        # inventory, nor prevent a readable sibling LIST from being admitted.
+        from scripts.p30_tpac_multi_event_refresh import (
+            offline_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            program = listing(("2111", "2112"))
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
+            program_path, event_path = root / "program.html", root / "event.html"
+            program_path.write_bytes(program)
+            event_path.write_bytes(event)
+            manifest = {"now": NOW.isoformat(), "catalogs": {
+                "program": {"list_file": str(program_path),
+                            "list_receipt": receipt(ROOT, program), "details": {}},
+                "event": {"list_file": str(event_path),
+                          "list_receipt": receipt("https://tpac.org.taipei/event", event),
+                          "details": {}}}}
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            first = offline_inventory_cli(manifest_path, root)
+            prior, prior_sha = load_detail_inventory(root)
+            self.assertIn("tpac:program:2111", prior["items"])
+            program_path.unlink()
+            second = offline_inventory_cli(manifest_path, root)
+            current, current_sha = load_detail_inventory(root)
+            self.assertEqual(second["diagnostics"]["tpac:program:__list__"]["reason"],
+                             "LIST_IO_HOLD")
+            self.assertEqual(current["items"]["tpac:program:2111"],
+                             prior["items"]["tpac:program:2111"])
+            self.assertIn("tpac:event:2072", current["items"])
+            self.assertEqual(second["published"], 0)
+            event_path.unlink()
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_CLI_ALL_LIST_UNAVAILABLE_HOLD"):
+                offline_inventory_cli(manifest_path, root)
+            self.assertEqual(load_detail_inventory(root)[1], current_sha)
+            program_path.write_bytes(program)
+            restored = offline_inventory_cli(manifest_path, root)
+            self.assertEqual(restored["counts"]["source_cards"], 2)
+            self.assertNotIn("tpac:program:__list__", restored["diagnostics"])
+            self.assertEqual(load_detail_inventory(root)[1], restored["inventory"]["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+
     def test_offline_unreadable_detail_isolated_and_restart_recovery(self):
         # A missing DETAIL must not abort the other catalog or erase prior rows.
         from scripts.p30_tpac_multi_event_refresh import offline_inventory_cli, load_detail_inventory
