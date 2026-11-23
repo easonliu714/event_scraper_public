@@ -186,6 +186,233 @@ def replay_offline_sources(manifest, fixture_root):
     }
 
 
+# Shared Candidate/Core integration: the existing provenance validator is reused
+# rather than introducing a second, weaker field admission contract.
+def _candidate_rows(report):
+    from scripts.p30_tpac_multi_event_refresh import _validate_archived_candidate_snapshot_row
+    if (not isinstance(report, dict)
+            or report.get("kind") != "MULTI_SOURCE_OFFLINE_FIELD_EVIDENCE_V1"
+            or report.get("scope") != "SEALED_OFFLINE_REPLAY_ONLY"
+            or report.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+            or report.get("new_official_get") != 0
+            or report.get("accepted_fields") != 0 or report.get("published") != 0
+            or not isinstance(report.get("records"), dict)
+            or not isinstance(report.get("source_states"), dict)
+            or set(report["source_states"]) != set(SOURCES)):
+        raise ValueError("SOURCE_CANDIDATE_AUTHORITY_HOLD")
+    rows = {}
+    for identity, record in sorted(report["records"].items()):
+        if (not isinstance(record, dict)
+                or identity != record.get("identity")
+                or record.get("source_namespace") not in SOURCES
+                or identity != record["source_namespace"] + ":" + str(record.get("event_id"))
+                or record.get("archive_evidence_current") is not False
+                or record.get("decision") != "REVIEW_ONLY_NO_FIELD_ACCEPTANCE"
+                or not isinstance(record.get("fields"), dict)):
+            raise ValueError("SOURCE_CANDIDATE_IDENTITY_HOLD")
+        url = _canonical_event_url(record["source_namespace"], record.get("detail_source_url"))
+        if url is None or url[0] != record["event_id"] or url[1] != record["detail_source_url"]:
+            raise ValueError("SOURCE_CANDIDATE_SOURCE_URL_HOLD")
+        accepted, held = {}, {}
+        for name, field in sorted(record["fields"].items()):
+            if (not isinstance(field, dict) or field.get("event_id") != record["event_id"]
+                    or field.get("source_url") != url[1]
+                    or not isinstance(field.get("observed_at"), str)
+                    or not isinstance(field.get("source_body_sha256"), str)
+                    or re.fullmatch(r"[0-9a-f]{64}", field["source_body_sha256"]) is None
+                    or not isinstance(field.get("hold_reason"), str)
+                    or not field["hold_reason"]):
+                raise ValueError("SOURCE_CANDIDATE_FIELD_PROVENANCE_HOLD")
+            if field.get("decision") == "REVIEW" and field.get("value") is not None:
+                accepted[name] = dict(field, decision="REVIEW_ONLY_NOT_ACCEPTED")
+            elif field.get("decision") == "HOLD" and field.get("value") is None:
+                held[name] = dict(field)
+            else:
+                raise ValueError("SOURCE_CANDIDATE_FIELD_AUTHORITY_HOLD")
+        row = {"identity": identity, "source_namespace": record["source_namespace"],
+               "event_id": record["event_id"], "detail_source_url": url[1],
+               "fields": accepted, "held_fields": held, "source_current": False,
+               "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY"}
+        _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_CORE_HOLD")
+        rows[identity] = row
+    return rows
+
+
+def _candidate_canonical(obj):
+    return (json.dumps(obj, ensure_ascii=False, sort_keys=True,
+                       separators=(",", ":")) + "\n").encode("utf-8")
+
+
+def commit_offline_candidate_lkg(report, root, expected_sha=None):
+    """Non-destructive, locked CAS of two provider-namespaced Candidate ledgers.
+
+    Failed source replays retain their prior candidate, never replace it with
+    an empty source result. Historical versions remain available for rollback.
+    """
+    import os
+    import tempfile
+    from scripts.p30_tpac_multi_event_refresh import (
+        _isolated_writer_lock, _validate_archived_candidate_snapshot_row)
+    rows = _candidate_rows(report)
+    if expected_sha is not None and not re.fullmatch(r"[0-9a-f]{64}", expected_sha):
+        raise ValueError("SOURCE_CANDIDATE_EXPECTED_SHA_HOLD")
+    root = Path(root).resolve()
+    directory = root / "_isolated_multi_source_candidates"
+    if directory.is_symlink():
+        raise ValueError("SOURCE_CANDIDATE_SYMLINK_HOLD")
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / "candidate_lkg.json"
+    if target.is_symlink():
+        raise ValueError("SOURCE_CANDIDATE_SYMLINK_HOLD")
+    with _isolated_writer_lock(directory / ".candidate.lock", "SOURCE_CANDIDATE_WRITER_HOLD"):
+        prior = target.read_bytes() if target.exists() else None
+        actual = hashlib.sha256(prior).hexdigest() if prior is not None else None
+        if actual != expected_sha:
+            raise ValueError("SOURCE_CANDIDATE_CAS_HOLD")
+        if prior is not None:
+            try:
+                old = json.loads(prior)
+                if (_candidate_canonical(old) != prior
+                        or old.get("kind") != "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1"
+                        or old.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+                        or old.get("accepted_fields") != 0 or old.get("published") != 0
+                        or not isinstance(old.get("candidates"), dict)):
+                    raise ValueError("SOURCE_CANDIDATE_PRIOR_CORRUPT_HOLD")
+                for identity, row in old["candidates"].items():
+                    _validate_archived_candidate_snapshot_row(
+                        identity, row, "SOURCE_CANDIDATE_PRIOR_FIELD_HOLD")
+                    provider = row["source_namespace"]
+                    if identity in rows:
+                        if any(row.get(k) != rows[identity].get(k) for k in
+                               ("source_namespace", "event_id", "detail_source_url")):
+                            raise ValueError("SOURCE_CANDIDATE_IDENTITY_SWAP_HOLD")
+                    elif report["source_states"][provider] == "REVIEW_IDENTITY_ONLY":
+                        raise ValueError("SOURCE_CANDIDATE_DESTRUCTIVE_REMOVAL_HOLD")
+                    else:
+                        rows[identity] = row
+            except (TypeError, UnicodeError, json.JSONDecodeError) as exc:
+                raise ValueError("SOURCE_CANDIDATE_PRIOR_CORRUPT_HOLD") from exc
+        if not rows:
+            raise ValueError("SOURCE_CANDIDATE_EMPTY_HOLD")
+        snapshot = {"kind": "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1",
+                    "candidates": rows, "release_state": "HARD_HOLD_NO_PUBLICATION",
+                    "accepted_fields": 0, "published": 0}
+        payload = _candidate_canonical(snapshot)
+        digest = hashlib.sha256(payload).hexdigest()
+        versions = directory / "versions"
+        if versions.is_symlink():
+            raise ValueError("SOURCE_CANDIDATE_SYMLINK_HOLD")
+        versions.mkdir(exist_ok=True)
+        # Keep immutable version files for an explicit CAS-controlled rollback.
+        version = versions / (digest + ".json")
+        if version.is_symlink():
+            raise ValueError("SOURCE_CANDIDATE_SYMLINK_HOLD")
+        if version.exists():
+            if version.read_bytes() != payload:
+                raise ValueError("SOURCE_CANDIDATE_VERSION_COLLISION_HOLD")
+        else:
+            with version.open("xb") as out:
+                out.write(payload)
+                out.flush()
+                os.fsync(out.fileno())
+        temp = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=directory, prefix=".candidate-",
+                                             delete=False) as out:
+                temp = Path(out.name)
+                out.write(payload)
+                out.flush()
+                os.fsync(out.fileno())
+            os.replace(temp, target)
+            temp = None
+        finally:
+            if temp is not None:
+                temp.unlink(missing_ok=True)
+        return {"sha256": digest, "events": len(rows),
+                "decision": "ISOLATED_MULTI_SOURCE_CANDIDATE_COMMITTED_NOT_FORMAL",
+                "accepted_fields": 0, "published": 0}
+
+
+def load_offline_candidate_lkg(root, expected_sha):
+    """Restart readback validates both canonical bytes and shared Core fields."""
+    from scripts.p30_tpac_multi_event_refresh import _validate_archived_candidate_snapshot_row
+    if not isinstance(expected_sha, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_sha):
+        raise ValueError("SOURCE_CANDIDATE_READ_SHA_HOLD")
+    directory = Path(root).resolve() / "_isolated_multi_source_candidates"
+    target = directory / "candidate_lkg.json"
+    if directory.is_symlink() or target.is_symlink() or not target.is_file():
+        raise ValueError("SOURCE_CANDIDATE_READ_PATH_HOLD")
+    raw = target.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != expected_sha:
+        raise ValueError("SOURCE_CANDIDATE_READ_CAS_HOLD")
+    try:
+        snapshot = json.loads(raw)
+    except (UnicodeError, ValueError) as exc:
+        raise ValueError("SOURCE_CANDIDATE_READ_SCHEMA_HOLD") from exc
+    if (_candidate_canonical(snapshot) != raw
+            or set(snapshot) != {"kind", "candidates", "release_state",
+                                 "accepted_fields", "published"}
+            or snapshot["kind"] != "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1"
+            or snapshot["release_state"] != "HARD_HOLD_NO_PUBLICATION"
+            or snapshot["accepted_fields"] != 0 or snapshot["published"] != 0
+            or not isinstance(snapshot["candidates"], dict)):
+        raise ValueError("SOURCE_CANDIDATE_READ_SCHEMA_HOLD")
+    for identity, row in snapshot["candidates"].items():
+        _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_READ_FIELD_HOLD")
+    return snapshot
+
+
+def rollback_offline_candidate_lkg(root, archived_sha, expected_current_sha):
+    """Restore an archived version only after exact current-state CAS."""
+    directory = Path(root).resolve() / "_isolated_multi_source_candidates"
+    version = directory / "versions" / (archived_sha + ".json")
+    if (not isinstance(archived_sha, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", archived_sha)
+            or directory.is_symlink() or version.is_symlink() or not version.is_file()):
+        raise ValueError("SOURCE_CANDIDATE_ROLLBACK_VERSION_HOLD")
+    raw = version.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != archived_sha:
+        raise ValueError("SOURCE_CANDIDATE_ROLLBACK_HASH_HOLD")
+    historical = json.loads(raw)
+    # Reuse the normal admission path, without trusting historical filenames.
+    report = {"kind": "MULTI_SOURCE_OFFLINE_FIELD_EVIDENCE_V1",
+              "scope": "SEALED_OFFLINE_REPLAY_ONLY",
+              "records": {}, "source_states": {p: "HOLD_LIST" for p in SOURCES},
+              "new_official_get": 0, "accepted_fields": 0, "published": 0,
+              "release_state": "HARD_HOLD_NO_PUBLICATION"}
+    from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock
+    import os
+    import tempfile
+    with _isolated_writer_lock(directory / ".candidate.lock", "SOURCE_CANDIDATE_WRITER_HOLD"):
+        target = directory / "candidate_lkg.json"
+        if target.is_symlink() or not target.is_file():
+            raise ValueError("SOURCE_CANDIDATE_ROLLBACK_PATH_HOLD")
+        current = target.read_bytes()
+        if hashlib.sha256(current).hexdigest() != expected_current_sha:
+            raise ValueError("SOURCE_CANDIDATE_ROLLBACK_CAS_HOLD")
+        load_offline_candidate_lkg(root, expected_current_sha)
+        if (_candidate_canonical(historical) != raw
+                or historical.get("kind") != "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1"
+                or historical.get("release_state") != "HARD_HOLD_NO_PUBLICATION"
+                or historical.get("accepted_fields") != 0 or historical.get("published") != 0):
+            raise ValueError("SOURCE_CANDIDATE_ROLLBACK_SCHEMA_HOLD")
+        from scripts.p30_tpac_multi_event_refresh import _validate_archived_candidate_snapshot_row
+        for identity, row in historical["candidates"].items():
+            _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_ROLLBACK_FIELD_HOLD")
+        temp = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=directory, prefix=".rollback-", delete=False) as out:
+                temp = Path(out.name)
+                out.write(raw)
+                out.flush()
+                os.fsync(out.fileno())
+            os.replace(temp, target)
+            temp = None
+        finally:
+            if temp is not None:
+                temp.unlink(missing_ok=True)
+    return {"sha256": archived_sha, "decision": "ISOLATED_ROLLBACK_NOT_FORMAL"}
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Offline two-source LIST+DETAIL; no GET/publish")
     parser.add_argument("--manifest", required=True, type=Path)
