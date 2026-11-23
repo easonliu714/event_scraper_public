@@ -86,10 +86,18 @@ def _owned_list(provider, body):
             name_node = link.select_one(".name")
         else:
             name_node = link.select_one("h3")
-        name = (link.get("title") or
-                (name_node.get_text(" ", strip=True) if name_node else "") or
-                link.get_text(" ", strip=True)).strip()
-        name = " ".join(name.split())
+        # LIST card identity must not silently prefer a stale title
+        # attribute over a conflicting rendered event heading. Both are
+        # source-owned assertions and disagreement makes the ID untrusted.
+        attribute_title = link.get("title")
+        visible_title = (name_node.get_text(" ", strip=True)
+                         if name_node else link.get_text(" ", strip=True))
+        attribute_title = (" ".join(attribute_title.split())
+                           if isinstance(attribute_title, str) else "")
+        visible_title = " ".join(visible_title.split())
+        if attribute_title and visible_title and attribute_title != visible_title:
+            raise ValueError("SOURCE_LIST_CARD_TITLE_CONFLICT_HOLD")
+        name = attribute_title or visible_title
         if not name or len(name) > 300:
             continue
         # Duplicate event IDs with conflicting titles must not override the
