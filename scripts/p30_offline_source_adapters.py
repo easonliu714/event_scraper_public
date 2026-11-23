@@ -181,7 +181,12 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
             location = places[0]
         else:
             location = None
-    if isinstance(location, dict) and location.get("@type") == "Place":
+    # A graph-local Place may advertise multiple schema.org types; apply
+    # the same exact Place predicate used when resolving its @id.
+    location_kinds = location.get("@type") if isinstance(location, dict) else None
+    if isinstance(location, dict) and (
+            location_kinds == "Place" or
+            isinstance(location_kinds, list) and location_kinds.count("Place") == 1):
         name = location.get("name")
         if isinstance(name, str) and 0 < len(name.strip()) <= 200:
             fields["venue"] = _field(
