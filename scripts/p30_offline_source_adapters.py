@@ -114,6 +114,8 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
     JSON-LD is untrusted archived HTML: no cross-event, timezone-naive,
     multiple Event, or incomplete venue inference is allowed.
     """
+    # Keep each Event bound to its own JSON-LD document. An @id from a
+    # different script is not evidence that the Event owns that Place.
     matches = []
     for node in article.select('script[type="application/ld+json"]'):
         try:
@@ -141,10 +143,10 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
             if (parsed != (sid, detail_url)
                     or " ".join(str(obj.get("name", "")).split()) != title):
                 continue
-            matches.append(obj)
+            matches.append((obj, objects))
     if len(matches) != 1:
         return {}
-    obj = matches[0]
+    obj, same_document_objects = matches[0]
     # A structurally invalid Event startDate invalidates this JSON-LD event
     # as a field-evidence source; do not retain a venue REVIEW from the same
     # malformed event while show_start is HOLD.
@@ -168,23 +170,13 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
         reference = location.get("@id")
         places = []
         if isinstance(reference, str) and reference:
-            for node in article.select('script[type="application/ld+json"]'):
-                try:
-                    document = json.loads(node.string or node.get_text())
-                except (ValueError, TypeError):
-                    continue
-                roots = document if isinstance(document, list) else [document]
-                for root in roots:
-                    if not isinstance(root, dict):
-                        continue
-                    graph = root.get("@graph")
-                    if not isinstance(graph, list):
-                        continue
-                    for candidate in graph:
-                        if (isinstance(candidate, dict)
-                                and candidate.get("@id") == reference
-                                and candidate.get("@type") == "Place"):
-                            places.append(candidate)
+            for candidate in same_document_objects:
+                kinds = candidate.get("@type")
+                is_place = (kinds == "Place" or
+                            isinstance(kinds, list) and kinds.count("Place") == 1)
+                if (candidate is not obj and candidate.get("@id") == reference
+                        and is_place):
+                    places.append(candidate)
         if len(places) == 1:
             location = places[0]
         else:
