@@ -841,9 +841,20 @@ def refresh_dual_catalog_plan(program_inputs, event_inputs, prior, now):
     required = {"list_body", "list_receipt", "detail_pairs"}
     if set(program_inputs) != required or set(event_inputs) != required:
         raise ValueError("TPAC_DUAL_CATALOG_INPUT_HOLD")
-    program = refresh_plan(**program_inputs, prior=prior, now=now)
+    # Missing LIST bytes have no source authority. HOLD just that catalog,
+    # preserve all prior identities, and let the healthy catalog advance.
+    # Never fabricate an empty official LIST or invoke its parser as if valid.
+    if program_inputs["list_body"] is None:
+        program = {"events": dict(prior["events"]), "qualified": 0,
+                   "rejected": {}, "decision": "HOLD_PROGRAM_LIST_IO"}
+    else:
+        program = refresh_plan(**program_inputs, prior=prior, now=now)
     intermediate = {"kind": KIND, "events": program["events"]}
-    event = refresh_event_plan(**event_inputs, prior=intermediate, now=now)
+    if event_inputs["list_body"] is None:
+        event = {"events": dict(intermediate["events"]), "qualified": 0,
+                 "rejected": {}, "decision": "HOLD_EVENT_LIST_IO"}
+    else:
+        event = refresh_event_plan(**event_inputs, prior=intermediate, now=now)
     qualified = program["qualified"] + event["qualified"]
     rejected = {"program:" + key: value for key, value in program["rejected"].items()}
     rejected.update({"event:" + key: value for key, value in event["rejected"].items()})
@@ -870,6 +881,16 @@ def _offline_dual_catalog_inputs(path, catalog):
     details = data.get("details")
     if not isinstance(details, dict) or len(details) > MAX_DETAILS:
         raise ValueError("TPAC_DUAL_CATALOG_DETAILS_HOLD")
+    if (type(data.get("list_file")) is not str or not data["list_file"]
+            or not isinstance(data.get("list_receipt"), dict)):
+        raise ValueError("TPAC_DUAL_CATALOG_LIST_SCHEMA_HOLD")
+    # Source LIST I/O is an independently held catalog, not an all-source
+    # exception. Skip DETAIL reads on that catalog; it has no usable LIST.
+    try:
+        list_body = Path(data["list_file"]).read_bytes()
+    except OSError:
+        return ({"list_body": None, "list_receipt": data["list_receipt"],
+                 "detail_pairs": {}}, _time(data["now"]))
     pairs = {}
     for sid, row in details.items():
         if (type(sid) is not str or re.fullmatch(r"[1-9][0-9]{0,9}", sid) is None
@@ -886,7 +907,7 @@ def _offline_dual_catalog_inputs(path, catalog):
         except OSError:
             continue
         pairs[sid] = {"body": body, "receipt": row["receipt"]}
-    return ({"list_body": Path(data["list_file"]).read_bytes(),
+    return ({"list_body": list_body,
              "list_receipt": data["list_receipt"], "detail_pairs": pairs},
             _time(data["now"]))
 
