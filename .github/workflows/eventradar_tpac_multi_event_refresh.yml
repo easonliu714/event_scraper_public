@@ -827,6 +827,38 @@ jobs:
           assert restored['candidates']['tpac:event:1301']['fields']['title']['value']
           assert restored['candidates']['tpac:program:2040']['fields']['title']['value']
           assert restored['candidates']['tpac:event:2072']['fields']['title']['value']
+          # Persisted evidence contracts must remain field-level traceable;
+          # the prior candidate format discarded the provenance and HOLD reason.
+          ledger=json.loads(Path('evidence/tpac_archived_field_provenance_38_id.json').read_text())
+          assert len(ledger['records'])==38
+          review_roles=held_roles=0
+          for identity,raw in ledger['records'].items():
+              saved=restored['candidates'][identity]
+              assert saved['event_id']==raw['event_id']
+              assert saved['detail_source_url']==raw['detail_source_url']
+              assert saved['source_current']==raw['archive_evidence_current']
+              assert set(saved['fields']).isdisjoint(saved['held_fields'])
+              assert set(saved['fields']) | set(saved['held_fields']) == set(raw['fields'])
+              for field_name,evidence in raw['fields'].items():
+                  if evidence['decision']=='REVIEW':
+                      review_roles+=1
+                      item=saved['fields'][field_name]
+                      assert item['decision']=='REVIEW_ONLY_NOT_ACCEPTED'
+                      for key in ('value','role','event_id','source_url',
+                                  'observed_at','source_body_sha256','hold_reason'):
+                          assert item[key]==evidence[key], (identity,field_name,key)
+                  else:
+                      held_roles+=1
+                      item=saved['held_fields'][field_name]
+                      assert item['decision']=='HOLD' and item['value'] is None
+                      for key in ('role','event_id','source_url','observed_at',
+                                  'source_body_sha256','hold_reason'):
+                          assert item[key]==evidence[key], (identity,field_name,key)
+          assert review_roles>=3 and held_roles>300
+          assert restored['candidates']['tpac:event:1301']['held_fields']['show_start']['value'] is None
+          assert restored['candidates']['tpac:event:1301']['fields']['activity_period']['role']=='EXHIBITION_PERIOD'
+          assert not (root/'docs/data.json').exists()
+          print('PASS_ARCHIVED_38_ID_FIELD_REVIEW_HOLD_PROVENANCE_PERSISTENCE_NO_PUBLICATION')
           # Replaying without a current candidate SHA must fail closed and retain all 38 siblings.
           rejected=subprocess.run(cli+['--export-archive-fields','--expected-sha',current,
                                      '--diff-prior-archive-sha',previous,
