@@ -2873,6 +2873,32 @@ class ArchivedFieldCandidateSnapshotPersistenceTests(unittest.TestCase):
                 write_archived_field_candidate_snapshot(reduced, td, second["sha256"])
             self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), second["sha256"])
 
+    def test_prior_candidate_corruption_and_source_swap_fail_closed(self):
+        # Existing canonical bytes must still prove field provenance and
+        # stable source identity before an update can replace the LKG.
+        from scripts.p30_tpac_multi_event_refresh import (
+            write_archived_field_candidate_snapshot, _canonical)
+        with tempfile.TemporaryDirectory() as td:
+            first = write_archived_field_candidate_snapshot(self._delta(), td)
+            target = Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json"
+            prior = json.loads(target.read_bytes())
+            prior["candidates"]["tpac:event:2072"]["fields"]["show_start"]["decision"] = "ACCEPTED"
+            raw = _canonical(prior)
+            target.write_bytes(raw)
+            tampered_sha = hashlib.sha256(raw).hexdigest()
+            with self.assertRaisesRegex(ValueError, "PRIOR_CORRUPT_OR_REMOVAL_HOLD"):
+                write_archived_field_candidate_snapshot(self._delta("New"), td, tampered_sha)
+            self.assertEqual(target.read_bytes(), raw)
+
+        with tempfile.TemporaryDirectory() as td:
+            first = write_archived_field_candidate_snapshot(self._delta(), td)
+            target = Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json"
+            changed = self._delta("New")
+            changed["candidates"]["tpac:event:2072"]["source_namespace"] = "program"
+            with self.assertRaisesRegex(ValueError, "PRIOR_SOURCE_IDENTITY_HOLD"):
+                write_archived_field_candidate_snapshot(changed, td, first["sha256"])
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), first["sha256"])
+
     def test_candidate_snapshot_rejects_published_and_empty_without_write(self):
         from scripts.p30_tpac_multi_event_refresh import write_archived_field_candidate_snapshot
         with tempfile.TemporaryDirectory() as td:
