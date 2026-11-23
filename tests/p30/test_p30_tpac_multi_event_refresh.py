@@ -792,6 +792,32 @@ class ReviewRoleDeltaRegressionTests(unittest.TestCase):
         self.assertEqual(base["price"], "")
 
 
+    def test_field_specific_hold_and_authority_transition_updates_review(self):
+        # Identical display values cannot hide a field-level authority/HOLD
+        # transition; observation time and raw receipt SHA remain metadata.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_event_id": "2040", "title": "Source-owned event",
+                "price": "", "_candidate": {"field_roles": {"price": {
+                    "role": "EVENT_GENERAL_ADMISSION_PRICE_RANGE",
+                    "value": None, "decision": "HOLD",
+                    "hold_reason": "TICKET_IDENTITY_UNVERIFIED",
+                    "authority": "SOURCE_REVIEW_ONLY",
+                    "observed_at": OBS, "source_body_sha256": "a" * 64}}}}
+        baseline = _semantic_event_payload(base)
+        for field, value in (("hold_reason", "TICKET_PRICE_CONFLICT"),
+                             ("authority", "INDEPENDENT_REVIEW_REQUIRED"),
+                             ("decision", "REVIEW_NOT_FORMAL")):
+            changed = deepcopy(base)
+            changed["_candidate"]["field_roles"]["price"][field] = value
+            self.assertNotEqual(baseline, _semantic_event_payload(changed))
+        receipt_only = deepcopy(base)
+        receipt_only["_candidate"]["field_roles"]["price"]["observed_at"] = (
+            "2026-11-22T12:00:00Z")
+        receipt_only["_candidate"]["field_roles"]["price"]["source_body_sha256"] = "b" * 64
+        self.assertEqual(baseline, _semantic_event_payload(receipt_only))
+        self.assertEqual(base["price"], "")
+
     def test_malformed_persisted_review_role_fails_closed(self):
         # Persisted REVIEW evidence with a scalar role must not crash with
         # AttributeError or silently be classified as unchanged.
