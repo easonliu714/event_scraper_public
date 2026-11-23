@@ -177,6 +177,40 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             self.assertEqual((report["new_official_get"], report["accepted_fields"],
                               report["published"]), (0, 0, 0))
 
+    def test_jsonld_place_reference_is_document_local(self):
+        # A matching @id in a second script must not supply an Event venue.
+        # A same-document Place with a multi-type schema remains supported.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            entry = manifest["sources"]["kktix"]["details"]["abc123"]
+            title = "已封存同一活動 ID 測試 kktix"
+            event = {"@type": "Event", "url": "https://kktix.com/events/abc123",
+                     "name": title, "startDate": "2026-12-01T19:30:00+08:00",
+                     "location": {"@id": "#venue"}}
+            place = {"@id": "#venue", "@type": ["Thing", "Place"],
+                     "name": "同文件場館"}
+            def replay(documents):
+                scripts = "".join("<script type='application/ld+json'>" +
+                                  json.dumps(document, ensure_ascii=False) +
+                                  "</script>" for document in documents)
+                raw = ("<article><h1>" + title + "</h1>" + scripts +
+                       "</article>").encode()
+                (root / entry["detail_file"]).write_bytes(raw)
+                entry["receipt"]["body_sha256"] = hashlib.sha256(raw).hexdigest()
+                return replay_offline_sources(manifest, root)
+            split = replay([{"@graph": [event]}, {"@graph": [place]}])
+            self.assertEqual(split["records"]["kktix:abc123"]["fields"]["venue"]["decision"], "HOLD")
+            self.assertEqual(split["records"]["kktix:abc123"]["fields"]["show_start"]["decision"], "REVIEW")
+            self.assertEqual(split["records"]["accupass:abc123"]["fields"]["title"]["decision"], "REVIEW")
+            joined = replay([{"@graph": [event, place]}])
+            self.assertEqual(joined["records"]["kktix:abc123"]["fields"]["venue"]["value"], "同文件場館")
+            self.assertEqual((joined["new_official_get"], joined["accepted_fields"],
+                              joined["published"]), (0, 0, 0))
+            # A duplicate same-document Place ID is ambiguous even with matching names.
+            duplicate = replay([{"@graph": [event, place, dict(place)]}])
+            self.assertEqual(duplicate["records"]["kktix:abc123"]["fields"]["venue"]["decision"], "HOLD")
+
     def test_two_platforms_same_id_are_independent_and_never_publish(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
