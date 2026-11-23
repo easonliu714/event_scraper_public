@@ -2716,6 +2716,65 @@ class ArchivedFieldCandidateDeltaTests(unittest.TestCase):
         updated = self._ledger("REVIEW", "B", "e" * 64, True)
         self.assertEqual(build_archived_field_candidate_delta(old, updated)["counts"]["changed_events"], 1)
 
+    def test_field_provenance_and_hold_reason_survive_candidate_cas_and_restart(self):
+        # Durable Quality Gate inputs must not lose source-owned field proof
+        # when the field ledger is compacted into REVIEW/HOLD candidates.
+        import copy
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_archived_field_candidate_delta, write_archived_field_candidate_snapshot,
+            load_archived_field_candidate_snapshot)
+        old = self._ledger()
+        current = self._ledger("REVIEW", "2026-11-28 19:30", sha="c" * 64,
+                               current=True, receipt="d" * 64)
+        identity = "tpac:program:2040"
+        current["records"][identity]["fields"]["price"] = {
+            "value": None, "role": "UNKNOWN", "event_id": "2040",
+            "source_url": "https://tpac.org.taipei/program/2040",
+            "observed_at": "2026-11-22T00:00:00Z",
+            "source_body_sha256": "d" * 64, "decision": "HOLD",
+            "hold_reason": "PRICE_UNVERIFIED_HOLD"}
+        delta = build_archived_field_candidate_delta(old, current)
+        candidate = delta["candidates"][identity]
+        expected = current["records"][identity]["fields"]["show_start"]
+        review = candidate["fields"]["show_start"]
+        self.assertEqual(review["decision"], "REVIEW_ONLY_NOT_ACCEPTED")
+        for key in ("value", "role", "event_id", "source_url",
+                    "observed_at", "source_body_sha256", "hold_reason"):
+            self.assertEqual(review[key], expected[key])
+        self.assertEqual(candidate["detail_source_url"], expected["source_url"])
+        held = candidate["held_fields"]["price"]
+        self.assertEqual(held["decision"], "HOLD")
+        self.assertIsNone(held["value"])
+        self.assertEqual(held["event_id"], "2040")
+        self.assertEqual(held["source_body_sha256"], "d" * 64)
+        self.assertEqual(held["hold_reason"], "PRICE_UNVERIFIED_HOLD")
+        self.assertTrue(candidate["source_current"])
+        self.assertEqual((delta["accepted_fields"], delta["published"]), (0, 0))
+        with tempfile.TemporaryDirectory() as temp:
+            persisted = write_archived_field_candidate_snapshot(delta, temp)
+            restarted = load_archived_field_candidate_snapshot(temp, persisted["sha256"])
+            self.assertEqual(restarted["candidates"][identity], candidate)
+            self.assertEqual((restarted["accepted_fields"], restarted["published"]), (0, 0))
+            # A forged source reference or forged HOLD authority must not
+            # replace the exact, previously validated REVIEW LKG.
+            for tamper in ("review_url", "held_event", "held_value", "held_reason"):
+                forged = copy.deepcopy(delta)
+                row = forged["candidates"][identity]
+                if tamper == "review_url":
+                    row["fields"]["show_start"]["source_url"] = "https://invalid.example/999"
+                elif tamper == "held_event":
+                    row["held_fields"]["price"]["event_id"] = "999"
+                elif tamper == "held_value":
+                    row["held_fields"]["price"]["value"] = "1900"
+                else:
+                    row["held_fields"]["price"]["hold_reason"] = None
+                with self.subTest(tamper=tamper):
+                    with self.assertRaisesRegex(ValueError, "TPAC_CANDIDATE_SNAPSHOT_FIELD_HOLD"):
+                        write_archived_field_candidate_snapshot(forged, temp, persisted["sha256"])
+                    self.assertEqual(
+                        load_archived_field_candidate_snapshot(temp, persisted["sha256"]),
+                        restarted)
+
     def test_source_currentness_transition_is_semantic_but_sha_only_is_not(self):
         from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
         old = self._ledger("HOLD", current=False)
