@@ -872,8 +872,16 @@ def refresh_dual_catalog_plan(program_inputs, event_inputs, prior, now):
             # Some catalog planners report source receipt HOLD as a plan
             # rather than raising. Normalize both forms to the same per-source
             # isolation contract; never treat the returned HOLD as qualified.
-            if planned.get("decision") in {"HOLD_LIST_" + reason for reason in source_receipt_holds}:
-                source_reason = planned["decision"][len("HOLD_LIST_"):]
+            # Program and event planners use different LIST HOLD prefixes.
+            # Preserve their native receipt reason without promoting either
+            # archived or rejected evidence into a qualified observation.
+            decision = planned.get("decision")
+            prefixes = ("HOLD_LIST_", "HOLD_" + catalog.upper() + "_LIST_")
+            source_reason = next(
+                (decision[len(prefix):] for prefix in prefixes
+                 if isinstance(decision, str) and decision.startswith(prefix)
+                 and decision[len(prefix):] in source_receipt_holds), None)
+            if source_reason is not None:
                 return {"events": dict(baseline["events"]), "qualified": 0,
                         "rejected": {catalog: source_reason},
                         "decision": "HOLD_" + catalog.upper() + "_SOURCE_RECEIPT"}
