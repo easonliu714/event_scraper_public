@@ -3033,6 +3033,9 @@ class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
             self.assertEqual(denied_result["qualified"], 1)
             self.assertEqual(denied_result["catalog_decisions"]["event"],
                              "HOLD_EVENT_SOURCE_RECEIPT")
+            # Returned (not raised) receipt HOLD must retain its exact cause.
+            self.assertEqual(denied_result["rejected"]["event:event"],
+                             "TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD")
             self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
             # Both source receipts denied: do not commit a zero-event snapshot.
             program_path.write_text(json.dumps(stale_program), encoding="utf-8")
