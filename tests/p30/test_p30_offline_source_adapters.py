@@ -44,6 +44,54 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_structured_same_event_show_and_venue_review_and_candidate_restart(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            entry = manifest["sources"]["kktix"]["details"]["abc123"]
+            title = "已封存同一活動 ID 測試 kktix"
+            event = {"@context": "https://schema.org", "@type": "Event",
+                     "url": "https://kktix.com/events/abc123", "name": title,
+                     "startDate": "2026-12-01T19:30:00+08:00",
+                     "location": {"@type": "Place", "name": "測試展演廳"}}
+            def seal(obj):
+                raw = ("<article><h1>" + title + "</h1><script type='application/ld+json'>" +
+                       json.dumps(obj, ensure_ascii=False) + "</script></article>").encode()
+                (root / entry["detail_file"]).write_bytes(raw)
+                entry["receipt"]["body_sha256"] = hashlib.sha256(raw).hexdigest()
+            seal(event)
+            report = replay_offline_sources(manifest, root)
+            fields = report["records"]["kktix:abc123"]["fields"]
+            self.assertEqual(fields["show_start"]["value"], event["startDate"])
+            self.assertEqual(fields["venue"]["value"], "測試展演廳")
+            self.assertEqual(fields["price"]["decision"], "HOLD")
+            self.assertEqual(fields["show_start"]["decision"], "REVIEW")
+            committed = commit_offline_candidate_lkg(report, root)
+            saved = load_offline_candidate_lkg(root, committed["sha256"])
+            self.assertEqual(saved["candidates"]["kktix:abc123"]["fields"]["venue"]["value"], "測試展演廳")
+            self.assertEqual(saved["candidates"]["kktix:abc123"]["fields"]["show_start"]["decision"], "REVIEW_ONLY_NOT_ACCEPTED")
+            self.assertEqual((report["new_official_get"], report["accepted_fields"], report["published"]), (0, 0, 0))
+            for invalid in (
+                dict(event, url="https://kktix.com/events/other"),
+                dict(event, startDate="2026-12-01T19:30:00"),
+                dict(event, name="Other event"),
+            ):
+                seal(invalid)
+                degraded = replay_offline_sources(manifest, root)["records"]["kktix:abc123"]["fields"]
+                self.assertEqual(degraded["show_start"]["decision"], "HOLD")
+                self.assertEqual(degraded["venue"]["decision"], "HOLD")
+            seal(event)
+            raw = (root / entry["detail_file"]).read_text()
+            raw = raw.replace("</article>", "<script type='application/ld+json'>" +
+                              json.dumps(event, ensure_ascii=False) + "</script></article>")
+            (root / entry["detail_file"]).write_text(raw)
+            entry["receipt"]["body_sha256"] = hashlib.sha256(raw.encode()).hexdigest()
+            ambiguous = replay_offline_sources(manifest, root)["records"]["kktix:abc123"]["fields"]
+            self.assertEqual(ambiguous["show_start"]["decision"], "HOLD")
+            self.assertEqual(ambiguous["venue"]["decision"], "HOLD")
+
     def test_two_platforms_same_id_are_independent_and_never_publish(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
