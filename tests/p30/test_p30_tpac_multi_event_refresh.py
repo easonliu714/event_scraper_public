@@ -2942,3 +2942,93 @@ class ArchivedCandidateRestartReadTests(unittest.TestCase):
                 self.assertEqual(main(args), 0)
             with self.assertRaisesRegex(ValueError, "MODE_HOLD"):
                 main(args + ["--export-archive-fields"])
+
+
+class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
+    """One normal CLI transaction processes both catalogs without a native request."""
+
+    def test_two_catalogs_one_cas_and_failed_detail_preserves_sibling(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from scripts.p30_tpac_multi_event_refresh import main, load_isolated_prior
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        name = "2026北藝夜遊：Beats到天臺"
+        event_list = ('<a class="card-event" title="連結到' + name +
+                      '" href="/event/2072"><div class="card-event__text-title">' +
+                      name + '</div><div class="card-event__text-datecate"><p>'
+                      '2026-11-10 - 2026-11-12</p><p>專題導覽</p></div></a>').encode()
+        event_body = event_detail(name, "專題導覽",
+                                  "2026-11-11 - 2026-11-13",
+                                  ["2026-11-11 (三) 19:00"])
+        program_list = listing(("2111",))
+        program_body = detail("2111")
+        observed = "2026-11-08T14:54:00+00:00"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            isolated = root / "isolated"
+            manifests = {}
+            for catalog, list_body, body, sid, list_receipt, detail_receipt in (
+                ("program", program_list, program_body, "2111",
+                 receipt(ROOT, program_list),
+                 receipt(ROOT + "/2111", program_body)),
+                ("event", event_list, event_body, "2072",
+                 event_receipt("https://tpac.org.taipei/event", event_list),
+                 event_receipt("https://tpac.org.taipei/event/2072", event_body)),
+            ):
+                listing_file = root / (catalog + "_list.html")
+                detail_file = root / (catalog + "_detail.html")
+                listing_file.write_bytes(list_body)
+                detail_file.write_bytes(body)
+                manifest = {"catalog": catalog, "list_file": str(listing_file),
+                            "list_receipt": list_receipt,
+                            "details": {sid: {"detail_file": str(detail_file),
+                                              "receipt": detail_receipt}},
+                            "now": observed}
+                manifest_file = root / (catalog + ".json")
+                manifest_file.write_text(json.dumps(manifest, ensure_ascii=False),
+                                         encoding="utf-8")
+                manifests[catalog] = str(manifest_file)
+            dual = root / "dual.json"
+            dual.write_text(json.dumps(manifests), encoding="utf-8")
+            argv = ["--dual-input", str(dual), "--prior-from-lkg",
+                    "--repo-root", str(isolated)]
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            result = json.loads(captured.getvalue())
+            self.assertEqual(result["qualified"], 2)
+            self.assertEqual(result["published"], 0)
+            snapshot, sha = load_isolated_prior(isolated)
+            self.assertEqual(sha, result["result"]["sha256"])
+            self.assertEqual(set(snapshot["events"]), {"tpac:2111", "tpac:event:2072"})
+            # One missing DETAIL cannot delete either sibling or prior evidence.
+            (root / "event_detail.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            degraded = json.loads(captured.getvalue())
+            self.assertEqual(degraded["qualified"], 1)
+            self.assertIn("event:2072", degraded["rejected"])
+            retained, new_sha = load_isolated_prior(isolated)
+            self.assertEqual(retained, snapshot)
+            self.assertEqual(new_sha, sha)
+            # All missing DETAILs: fail closed, do not write an empty LKG.
+            (root / "program_detail.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 49)
+            self.assertEqual(json.loads(captured.getvalue())["qualified"], 0)
+            self.assertEqual(load_isolated_prior(isolated)[1], sha)
+            self.assertFalse((isolated / "docs" / "data.json").exists())
+
+    def test_dual_cli_requires_explicit_isolated_prior_and_both_catalogs(self):
+        from scripts.p30_tpac_multi_event_refresh import main
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = root / "dual.json"
+            manifest.write_text(json.dumps({"program": "missing.json",
+                                            "event": "missing.json"}))
+            with self.assertRaisesRegex(ValueError, "DUAL_CATALOG_CLI_MODE_HOLD"):
+                main(["--dual-input", str(manifest), "--repo-root", str(root)])
+            with self.assertRaisesRegex(ValueError, "DUAL_CATALOG_CLI_MODE_HOLD"):
+                main(["--dual-input", str(manifest), "--prior-from-lkg",
+                      "--expected-sha", "a" * 64, "--repo-root", str(root)])
