@@ -144,5 +144,60 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
                 "accupass_list.html", "accupass_detail.html"})
 
 
+    def test_shared_core_candidate_cas_restart_sibling_hold_and_rollback(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg,
+            rollback_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            initial = replay_offline_sources(manifest, root)
+            first = commit_offline_candidate_lkg(initial, root)
+            snap = load_offline_candidate_lkg(root, first["sha256"])
+            self.assertEqual(set(snap["candidates"]), {"kktix:abc123", "accupass:abc123"})
+            self.assertEqual(snap["candidates"]["kktix:abc123"]["fields"]["title"]["decision"],
+                             "REVIEW_ONLY_NOT_ACCEPTED")
+            self.assertEqual(snap["candidates"]["accupass:abc123"]["held_fields"]["price"]["decision"], "HOLD")
+            self.assertFalse(snap["candidates"]["kktix:abc123"]["source_current"])
+            manifest["sources"]["accupass"]["list_file"] = "missing.html"
+            second_report = replay_offline_sources(manifest, root)
+            second = commit_offline_candidate_lkg(second_report, root, first["sha256"])
+            self.assertEqual(set(load_offline_candidate_lkg(root, second["sha256"])["candidates"]),
+                             {"kktix:abc123", "accupass:abc123"})
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_CAS_HOLD"):
+                commit_offline_candidate_lkg(second_report, root, "0" * 64)
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_ROLLBACK_CAS_HOLD"):
+                rollback_offline_candidate_lkg(root, first["sha256"], "0" * 64)
+            restored = rollback_offline_candidate_lkg(root, first["sha256"], second["sha256"])
+            self.assertEqual(restored["sha256"], first["sha256"])
+            self.assertEqual(load_offline_candidate_lkg(root, first["sha256"]), snap)
+            self.assertFalse((root / "docs" / "data.json").exists())
+
+    def test_shared_core_rejects_tampered_candidate_and_destructive_identity(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            report = replay_offline_sources(manifest, root)
+            first = commit_offline_candidate_lkg(report, root)
+            forged = copy.deepcopy(report)
+            forged["records"]["kktix:abc123"]["fields"]["price"]["value"] = 100
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_FIELD_AUTHORITY_HOLD"):
+                commit_offline_candidate_lkg(forged, root, first["sha256"])
+            forged = copy.deepcopy(report)
+            forged["records"]["kktix:abc123"]["detail_source_url"] = (
+                "https://www.accupass.com/event/abc123")
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_SOURCE_URL_HOLD"):
+                commit_offline_candidate_lkg(forged, root, first["sha256"])
+            forged = copy.deepcopy(report)
+            forged["records"].pop("kktix:abc123")
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_DESTRUCTIVE_REMOVAL_HOLD"):
+                commit_offline_candidate_lkg(forged, root, first["sha256"])
+            path = root / "_isolated_multi_source_candidates" / "candidate_lkg.json"
+            path.write_bytes(path.read_bytes() + b" ")
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_READ_CAS_HOLD"):
+                load_offline_candidate_lkg(root, first["sha256"])
+
 if __name__ == "__main__":
     unittest.main()
