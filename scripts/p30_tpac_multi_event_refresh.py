@@ -828,6 +828,69 @@ def load_isolated_prior(repo_root):
     return document, _sha(raw)
 
 
+def refresh_dual_catalog_plan(program_inputs, event_inputs, prior, now):
+    """Combine both offline catalog planners into one non-destructive CAS plan.
+
+    A failed LIST or DETAIL in one catalog must not erase the other catalog's
+    qualified observations or any previously verified sibling. No native GET.
+    """
+    if (not isinstance(program_inputs, dict) or not isinstance(event_inputs, dict)
+            or not isinstance(prior, dict) or prior.get("kind") != KIND
+            or not isinstance(prior.get("events"), dict)):
+        raise ValueError("TPAC_DUAL_CATALOG_INPUT_HOLD")
+    required = {"list_body", "list_receipt", "detail_pairs"}
+    if set(program_inputs) != required or set(event_inputs) != required:
+        raise ValueError("TPAC_DUAL_CATALOG_INPUT_HOLD")
+    program = refresh_plan(**program_inputs, prior=prior, now=now)
+    intermediate = {"kind": KIND, "events": program["events"]}
+    event = refresh_event_plan(**event_inputs, prior=intermediate, now=now)
+    qualified = program["qualified"] + event["qualified"]
+    rejected = {"program:" + key: value for key, value in program["rejected"].items()}
+    rejected.update({"event:" + key: value for key, value in event["rejected"].items()})
+    if qualified == 0:
+        return {"kind": KIND, "decision": "HOLD_DUAL_CATALOG_NO_QUALIFIED_DETAILS",
+                "events": dict(prior["events"]), "qualified": 0,
+                "rejected": rejected, "catalog_decisions":
+                    {"program": program["decision"], "event": event["decision"]},
+                "release_state": "HARD_HOLD_NO_PUBLICATION", "published": 0,
+                "native_attestation": "REQUIRES_INDEPENDENT_READBACK"}
+    return {"kind": KIND, "decision": "REVIEW_SNAPSHOT_READY_NOT_FORMAL",
+            "events": event["events"], "qualified": qualified,
+            "rejected": rejected,
+            "catalog_decisions": {"program": program["decision"], "event": event["decision"]},
+            "release_state": "HARD_HOLD_NO_PUBLICATION", "published": 0,
+            "native_attestation": "REQUIRES_INDEPENDENT_READBACK"}
+
+
+def _offline_dual_catalog_inputs(path, catalog):
+    """Read bounded, caller-provided offline receipts; unreadable DETAIL is per-ID HOLD."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or data.get("catalog") != catalog:
+        raise ValueError("TPAC_DUAL_CATALOG_MANIFEST_HOLD")
+    details = data.get("details")
+    if not isinstance(details, dict) or len(details) > MAX_DETAILS:
+        raise ValueError("TPAC_DUAL_CATALOG_DETAILS_HOLD")
+    pairs = {}
+    for sid, row in details.items():
+        if (type(sid) is not str or re.fullmatch(r"[1-9][0-9]{0,9}", sid) is None
+                or not isinstance(row, dict)
+                or set(row) != {"detail_file", "receipt"}
+                or type(row["detail_file"]) is not str
+                or not isinstance(row["receipt"], dict)):
+            raise ValueError("TPAC_DUAL_CATALOG_DETAIL_SCHEMA_HOLD")
+        try:
+            detail_path = Path(row["detail_file"])
+            if not detail_path.is_file():
+                raise OSError("DETAIL_NOT_REGULAR_FILE")
+            body = detail_path.read_bytes()
+        except OSError:
+            continue
+        pairs[sid] = {"body": body, "receipt": row["receipt"]}
+    return ({"list_body": Path(data["list_file"]).read_bytes(),
+             "list_receipt": data["list_receipt"], "detail_pairs": pairs},
+            _time(data["now"]))
+
+
 def main(argv=None):
     import argparse
     ap = argparse.ArgumentParser(description="TPAC multi-event offline REVIEW refresh; no GET or PUBLISH")
@@ -835,6 +898,8 @@ def main(argv=None):
     # legacy /program planner; the default preserves existing program callers.
     ap.add_argument("--catalog", choices=("program", "event"), default="program")
     ap.add_argument("--input", type=Path)
+    ap.add_argument("--dual-input", type=Path,
+                    help="Two offline catalog manifest paths; one shared isolated LKG CAS")
     ap.add_argument("--inventory-input", type=Path,
                     help="Offline two-catalog LIST/DETAIL receipt manifest; no network")
     ap.add_argument("--diff-prior-archive-sha", help="Read-only previous inventory version for candidate field delta")
@@ -854,6 +919,35 @@ def main(argv=None):
     ap.add_argument("--prior-from-lkg", action="store_true",
                     help="CAS-load the current isolated LKG instead of a manifest prior")
     args = ap.parse_args(argv)
+    if args.dual_input is not None:
+        # One shared LKG transaction across /program and /event; no native GET.
+        if (args.input is not None or args.inventory_input is not None
+                or args.export_archive_fields or args.commit_archive_field_candidates
+                or args.read_archive_field_candidates or args.diff_prior_archive_sha is not None
+                or args.candidate_expected_sha is not None or args.restore_archive_version is not None
+                or args.restore_identity is not None or not args.prior_from_lkg
+                or args.expected_sha is not None or args.catalog != "program"):
+            raise ValueError("TPAC_DUAL_CATALOG_CLI_MODE_HOLD")
+        manifest = json.loads(args.dual_input.read_text(encoding="utf-8"))
+        if (not isinstance(manifest, dict) or set(manifest) != {"program", "event"}
+                or any(type(value) is not str or not value for value in manifest.values())):
+            raise ValueError("TPAC_DUAL_CATALOG_MANIFEST_HOLD")
+        program_inputs, program_now = _offline_dual_catalog_inputs(manifest["program"], "program")
+        event_inputs, event_now = _offline_dual_catalog_inputs(manifest["event"], "event")
+        if program_now != event_now:
+            raise ValueError("TPAC_DUAL_CATALOG_OBSERVATION_CLOCK_HOLD")
+        prior, expected_sha = load_isolated_prior(args.repo_root)
+        plan = refresh_dual_catalog_plan(program_inputs, event_inputs, prior, program_now)
+        if plan["decision"] == "REVIEW_SNAPSHOT_READY_NOT_FORMAL":
+            result = write_isolated_plan(plan, args.repo_root, expected_sha)
+        else:
+            result = {"decision": plan["decision"], "sha256": expected_sha,
+                      "rows": len(plan["events"])}
+        print(json.dumps({"result": result, "qualified": plan["qualified"],
+                          "catalog_decisions": plan["catalog_decisions"],
+                          "rejected": plan["rejected"], "published": 0},
+                         ensure_ascii=False, sort_keys=True))
+        return 0 if result["decision"] == "ISOLATED_REVIEW_LKG_COMMITTED_NOT_FORMAL" else 49
     if args.read_archive_field_candidates:
         if (args.export_archive_fields or args.commit_archive_field_candidates
                 or args.diff_prior_archive_sha is not None
