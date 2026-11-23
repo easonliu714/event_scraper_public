@@ -207,6 +207,24 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             self.assertEqual(joined["records"]["kktix:abc123"]["fields"]["venue"]["value"], "同文件場館")
             self.assertEqual((joined["new_official_get"], joined["accepted_fields"],
                               joined["published"]), (0, 0, 0))
+            # Inline multi-type Place must use the same admission predicate
+            # as a same-document @id-resolved Place, not silently HOLD.
+            inline = dict(event, location={"@type": ["Thing", "Place"],
+                                           "name": "內嵌場館"})
+            inline_report = replay([{"@graph": [inline]}])
+            self.assertEqual(
+                inline_report["records"]["kktix:abc123"]["fields"]["venue"]["value"],
+                "內嵌場館")
+            self.assertEqual(
+                inline_report["records"]["kktix:abc123"]["fields"]["venue"]["decision"],
+                "REVIEW")
+            # Multiple Place declarations in one location must fail closed.
+            ambiguous = dict(event, location={"@type": ["Place", "Place"],
+                                              "name": "不可信場館"})
+            ambiguous_report = replay([{"@graph": [ambiguous]}])
+            self.assertEqual(
+                ambiguous_report["records"]["kktix:abc123"]["fields"]["venue"]["decision"],
+                "HOLD")
             # A duplicate same-document Place ID is ambiguous even with matching names.
             duplicate = replay([{"@graph": [event, place, dict(place)]}])
             self.assertEqual(duplicate["records"]["kktix:abc123"]["fields"]["venue"]["decision"], "HOLD")
