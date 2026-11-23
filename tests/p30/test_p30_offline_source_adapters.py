@@ -76,12 +76,20 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             for invalid in (
                 dict(event, url="https://kktix.com/events/other"),
                 dict(event, startDate="2026-12-01T19:30:00"),
+                {key: value for key, value in event.items() if key != "startDate"},
+                dict(event, startDate="not-a-date"),
                 dict(event, name="Other event"),
             ):
                 seal(invalid)
                 degraded = replay_offline_sources(manifest, root)["records"]["kktix:abc123"]["fields"]
                 self.assertEqual(degraded["show_start"]["decision"], "HOLD")
                 self.assertEqual(degraded["venue"]["decision"], "HOLD")
+            # A valid event start with no venue keeps only the independently
+            # evidenced show time in REVIEW, never invents a venue.
+            seal({key: value for key, value in event.items() if key != "location"})
+            partial_fields = replay_offline_sources(manifest, root)["records"]["kktix:abc123"]["fields"]
+            self.assertEqual(partial_fields["show_start"]["decision"], "REVIEW")
+            self.assertEqual(partial_fields["venue"]["decision"], "HOLD")
             seal(event)
             raw = (root / entry["detail_file"]).read_text()
             raw = raw.replace("</article>", "<script type='application/ld+json'>" +
