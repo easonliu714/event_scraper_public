@@ -173,6 +173,82 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             self.assertEqual(load_offline_candidate_lkg(root, first["sha256"]), snap)
             self.assertFalse((root / "docs" / "data.json").exists())
 
+    def test_listed_missing_detail_withdraws_old_review_but_keeps_identity_and_sibling(self):
+        # The multi-source writer must not let one unavailable DETAIL block
+        # updates to an otherwise verified LIST and a healthy second adapter.
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            fixture = self._fixture(root)
+            original_detail = copy.deepcopy(
+                fixture["sources"]["accupass"]["details"]["abc123"])
+            initial_report = replay_offline_sources(fixture, root)
+            first = commit_offline_candidate_lkg(initial_report, root)
+            baseline = load_offline_candidate_lkg(root, first["sha256"])
+            self.assertEqual(
+                initial_report["listed_identities"]["accupass"], ["accupass:abc123"])
+            # Event remains LIST-identified but its DETAIL is now missing.
+            fixture["sources"]["accupass"]["details"].pop("abc123")
+            partial = replay_offline_sources(fixture, root)
+            self.assertEqual(partial["holds"]["accupass:abc123"],
+                             "SOURCE_DETAIL_NOT_PROVIDED_HOLD")
+            self.assertNotIn("accupass:abc123", partial["records"])
+            second = commit_offline_candidate_lkg(partial, root, first["sha256"])
+            saved = load_offline_candidate_lkg(root, second["sha256"])
+            self.assertEqual(set(saved["candidates"]),
+                             {"accupass:abc123", "kktix:abc123"})
+            self.assertEqual(saved["candidates"]["kktix:abc123"],
+                             baseline["candidates"]["kktix:abc123"])
+            held = saved["candidates"]["accupass:abc123"]
+            self.assertEqual(held["fields"], {})
+            self.assertFalse(held["source_current"])
+            self.assertEqual(held["detail_replay_hold_reason"],
+                             "SOURCE_DETAIL_NOT_PROVIDED_HOLD")
+            self.assertEqual(held["held_fields"]["title"]["decision"], "HOLD")
+            self.assertIsNone(held["held_fields"]["title"]["value"])
+            self.assertEqual(held["held_fields"]["title"]["hold_reason"],
+                             "SOURCE_DETAIL_NOT_PROVIDED_HOLD")
+            self.assertEqual(
+                held["held_fields"]["title"]["source_body_sha256"],
+                baseline["candidates"]["accupass:abc123"]["fields"]["title"]
+                        ["source_body_sha256"])
+            # Forging an unsupported HOLD or pretending that an unlisted ID
+            # remains present must not bypass the destructive-removal gate.
+            wrong = copy.deepcopy(partial)
+            wrong["listed_identities"]["accupass"] = []
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_DESTRUCTIVE_REMOVAL_HOLD"):
+                commit_offline_candidate_lkg(wrong, root, second["sha256"])
+            wrong = copy.deepcopy(partial)
+            wrong["holds"]["accupass:abc123"] = "UNTRUSTED_FORCE_KEEP"
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_DESTRUCTIVE_REMOVAL_HOLD"):
+                commit_offline_candidate_lkg(wrong, root, second["sha256"])
+            self.assertEqual(load_offline_candidate_lkg(root, second["sha256"]), saved)
+            # DETAIL recovers; its source-owned title returns as REVIEW only.
+            fixture["sources"]["accupass"]["details"]["abc123"] = original_detail
+            recovered = replay_offline_sources(fixture, root)
+            third = commit_offline_candidate_lkg(recovered, root, second["sha256"])
+            restored = load_offline_candidate_lkg(root, third["sha256"])
+            self.assertEqual(restored, baseline)
+            self.assertEqual(
+                restored["candidates"]["accupass:abc123"]["fields"]["title"]
+                        ["decision"], "REVIEW_ONLY_NOT_ACCEPTED")
+            # LIST has a *different* event now: this is genuine unverified
+            # removal, not a missing DETAIL for the original event.
+            new_list = b'<a href="/event/new_id"><h3>Other event</h3></a>'
+            (root / "accupass_list.html").write_bytes(new_list)
+            fixture["sources"]["accupass"]["list_receipt"]["body_sha256"] = (
+                hashlib.sha256(new_list).hexdigest())
+            fixture["sources"]["accupass"]["details"] = {}
+            removed = replay_offline_sources(fixture, root)
+            self.assertEqual(removed["listed_identities"]["accupass"],
+                             ["accupass:new_id"])
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_DESTRUCTIVE_REMOVAL_HOLD"):
+                commit_offline_candidate_lkg(removed, root, third["sha256"])
+            self.assertEqual(load_offline_candidate_lkg(root, third["sha256"]),
+                             restored)
+            self.assertFalse((root / "docs" / "data.json").exists())
+
     def test_shared_core_rejects_tampered_candidate_and_destructive_identity(self):
         from scripts.p30_offline_source_adapters import (
             commit_offline_candidate_lkg, load_offline_candidate_lkg)
