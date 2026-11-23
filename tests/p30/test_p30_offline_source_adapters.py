@@ -44,6 +44,46 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_list_card_conflicting_title_assertions_hold_provider_only(self):
+        # Source LIST identity is not trustworthy when the same anchor
+        # advertises conflicting visible and attribute titles. Keep the
+        # healthy sibling; never infer or publish a disputed event.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            baseline = replay_offline_sources(manifest, root)
+            self.assertEqual(len(baseline["records"]), 2)
+            for provider in ("kktix", "accupass"):
+                entry = manifest["sources"][provider]
+                original = (root / entry["list_file"]).read_bytes()
+                title = ("已封存同一活動 ID 測試 " + provider)
+                if provider == "kktix":
+                    changed = original.replace(
+                        ('title="' + title + '"').encode(),
+                        b'title="CONFLICTING LIST TITLE"')
+                else:
+                    changed = original.replace(
+                        b'<h3>', b'title="CONFLICTING LIST TITLE"><h3>', 1)
+                    # Ensure the new title attribute is inside the anchor.
+                    changed = changed.replace(
+                        b'<a href="/event/abc123">title="CONFLICTING LIST TITLE">',
+                        b'<a href="/event/abc123" title="CONFLICTING LIST TITLE">')
+                self.assertNotEqual(changed, original)
+                (root / entry["list_file"]).write_bytes(changed)
+                entry["list_receipt"]["body_sha256"] = hashlib.sha256(changed).hexdigest()
+                report = replay_offline_sources(manifest, root)
+                self.assertEqual(report["source_states"][provider], "HOLD_LIST")
+                self.assertEqual(report["holds"][provider],
+                                 "SOURCE_LIST_CARD_TITLE_CONFLICT_HOLD")
+                self.assertNotIn(provider + ":abc123", report["records"])
+                other = "accupass" if provider == "kktix" else "kktix"
+                self.assertIn(other + ":abc123", report["records"])
+                self.assertEqual((report["new_official_get"], report["accepted_fields"],
+                                  report["published"]), (0, 0, 0))
+                (root / entry["list_file"]).write_bytes(original)
+                entry["list_receipt"]["body_sha256"] = hashlib.sha256(original).hexdigest()
+            self.assertEqual(len(replay_offline_sources(manifest, root)["records"]), 2)
+
     def test_jsonld_same_id_title_fallback_without_h1(self):
         # Archived JS-rendered DETAIL may have no H1. A unique same-ID Event
         # assertion can establish title identity, but never a mismatched,
