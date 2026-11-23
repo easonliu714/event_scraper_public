@@ -134,17 +134,21 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
     if len(matches) != 1:
         return {}
     obj = matches[0]
-    fields = {}
+    # A structurally invalid Event startDate invalidates this JSON-LD event
+    # as a field-evidence source; do not retain a venue REVIEW from the same
+    # malformed event while show_start is HOLD.
     start = obj.get("startDate")
-    if isinstance(start, str):
-        try:
-            dt = datetime.fromisoformat(start)
-            if dt.utcoffset() is not None:
-                fields["show_start"] = _field(
-                    start, "EVENT_SHOW_START", sid, detail_url, stamp, sha,
-                    "REVIEW", "SOURCE_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")
-        except ValueError:
-            pass
+    if not isinstance(start, str):
+        return {}
+    try:
+        dt = datetime.fromisoformat(start)
+    except ValueError:
+        return {}
+    if dt.utcoffset() is None:
+        return {}
+    fields = {"show_start": _field(
+        start, "EVENT_SHOW_START", sid, detail_url, stamp, sha,
+        "REVIEW", "SOURCE_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")}
     location = obj.get("location")
     if isinstance(location, dict) and location.get("@type") == "Place":
         name = location.get("name")
