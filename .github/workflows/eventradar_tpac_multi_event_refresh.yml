@@ -226,6 +226,76 @@ jobs:
           assert not Path('evidence/tpac_event_archived_cli/docs/data.json').exists()
           print('PASS_ARCHIVED_NATIVE_EVENT_TO_REAL_CLI_CAS_LKG_TWO_IDS_NO_GET_NO_PUBLISH')
           PY
+      - name: Normal fixed REVIEW CLI survives missing native DETAIL while retaining event sibling (NO GET)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import copy,hashlib,json,subprocess,sys
+          from pathlib import Path
+          original=json.loads(Path('evidence/tpac_event_archived_cli_manifest.json').read_text(encoding='utf-8'))
+          assert original['catalog']=='event' and set(original['details'])=={'1301','2072'}
+          root=Path('evidence/tpac_native_normal_cli_detail_isolation')
+          root.mkdir(parents=True,exist_ok=True)
+          cli=[sys.executable,'-m','scripts.p30_tpac_multi_event_refresh',
+               '--catalog','event','--repo-root',str(root)]
+          def invoke(data,*flags):
+              manifest=root/'normal-cli-input.json'
+              manifest.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
+              proc=subprocess.run(cli+['--input',str(manifest)]+list(flags),
+                                  capture_output=True,text=True,timeout=30)
+              return proc,json.loads(proc.stdout) if proc.stdout else None
+          initial,first=invoke(original)
+          assert initial.returncode==0,(initial.stderr[-400:])
+          assert first['counts']['qualified']==2
+          target=root/'_isolated_review/tpac/tpac_multi_event_lkg.json'
+          baseline=target.read_bytes()
+          baseline_sha=hashlib.sha256(baseline).hexdigest()
+          assert len(json.loads(baseline)['events'])==2
+          changed=copy.deepcopy(original)
+          changed.pop('prior')
+          missing=root/'missing-detail.html'
+          changed['details']['1301']['detail_file']=str(missing)
+          for mode in ('missing','directory'):
+              if mode=='directory':
+                  missing.mkdir()
+              process,report=invoke(changed,'--prior-from-lkg')
+              assert process.returncode==0,(process.stderr[-400:])
+              assert report['counts']['qualified']==1
+              assert report['counts']['retained_previous']==1
+              assert report['rejected']['1301']=='DETAIL_NOT_PROVIDED_HOLD'
+              assert target.read_bytes()==baseline
+          all_missing=copy.deepcopy(changed)
+          all_missing['details']['2072']['detail_file']=str(missing)
+          process,report=invoke(all_missing,'--prior-from-lkg')
+          assert process.returncode==49
+          assert report['result']['decision']=='HOLD_NO_QUALIFIED_EVENT_DETAILS_PRESERVE_LKG'
+          assert target.read_bytes()==baseline
+          # Strict catalog LIST authority is a separate fail-closed condition.
+          bad_list=copy.deepcopy(changed)
+          bad_list['list_file']=str(root/'missing-list.html')
+          process,_=invoke(bad_list,'--prior-from-lkg')
+          assert process.returncode!=0 and target.read_bytes()==baseline
+          missing.rmdir()
+          fixed=copy.deepcopy(original)
+          fixed.pop('prior')
+          process,restored=invoke(fixed,'--prior-from-lkg')
+          assert process.returncode==0,(process.stderr[-400:])
+          assert restored['counts']['qualified']==2
+          assert target.read_bytes()==baseline
+          assert hashlib.sha256(target.read_bytes()).hexdigest()==baseline_sha
+          assert not (root/'docs/data.json').exists()
+          assert not (root/'docs/platform_status.json').exists()
+          evidence={'kind':'TPAC_NORMAL_REVIEW_CLI_DETAIL_IO_ISOLATION_NATIVE_EVENT_V1',
+                    'sealed_source':'event/1301+2072','historical_detail_count':2,
+                    'healthy_sibling_retained':True,'missing_and_directory_isolated':True,
+                    'all_missing_hold':True,'list_missing_rejected':True,
+                    'recoverable_after_restore':True,
+                    'lkg_sha256':baseline_sha,'new_official_get':0,
+                    'accepted_fields':0,'published':0}
+          Path('evidence/tpac_normal_review_cli_detail_io.json').write_text(
+              json.dumps(evidence,sort_keys=True)+'\\n',encoding='utf-8')
+          print('PASS_NATIVE_EVENT_NORMAL_CLI_DETAIL_IO_ISOLATION_NO_NEW_GET_NO_PUBLISH')
+          PY
       - name: Verify real archived native event CAS version history without reGET
         run: |
           set -euo pipefail
