@@ -44,6 +44,41 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_jsonld_same_id_title_fallback_without_h1(self):
+        # Archived JS-rendered DETAIL may have no H1. A unique same-ID Event
+        # assertion can establish title identity, but never a mismatched,
+        # duplicate, or cross-provider identity.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            entry = manifest["sources"]["kktix"]["details"]["abc123"]
+            title = "已封存同一活動 ID 測試 kktix"
+            event = {"@type": "Event", "url": "https://kktix.com/events/abc123",
+                     "name": title, "startDate": "2026-12-01T19:30:00+08:00",
+                     "location": {"@type": "Place", "name": "離線場館"}}
+            def replay(objects):
+                raw = ("<article><div id='app'></div><script type='application/ld+json'>" +
+                       json.dumps({"@graph": objects}, ensure_ascii=False) +
+                       "</script></article>").encode()
+                (root / entry["detail_file"]).write_bytes(raw)
+                entry["receipt"]["body_sha256"] = hashlib.sha256(raw).hexdigest()
+                return replay_offline_sources(manifest, root)
+            accepted = replay([event])
+            self.assertEqual(accepted["records"]["kktix:abc123"]["fields"]["title"]["decision"], "REVIEW")
+            self.assertEqual(accepted["records"]["kktix:abc123"]["fields"]["venue"]["value"], "離線場館")
+            self.assertEqual(accepted["records"]["accupass:abc123"]["fields"]["title"]["decision"], "REVIEW")
+            self.assertEqual((accepted["new_official_get"], accepted["accepted_fields"],
+                              accepted["published"]), (0, 0, 0))
+            for invalid in ([dict(event, name="錯誤標題")],
+                            [dict(event, url="https://kktix.com/events/other")],
+                            [event, dict(event)],
+                            [dict(event, url="https://www.accupass.com/event/abc123")],
+                            []):
+                degraded = replay(invalid)
+                self.assertNotIn("kktix:abc123", degraded["records"])
+                self.assertIn("kktix:abc123", degraded["holds"])
+                self.assertIn("accupass:abc123", degraded["records"])
+
     def test_structured_same_event_show_and_venue_review_and_candidate_restart(self):
         from scripts.p30_offline_source_adapters import (
             commit_offline_candidate_lkg, load_offline_candidate_lkg)
