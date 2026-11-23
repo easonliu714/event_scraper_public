@@ -195,6 +195,39 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
     return fields
 
 
+def _detail_title_from_jsonld(article, provider, sid, title, detail_url):
+    """Use a unique same-ID JSON-LD Event as title identity when H1 is absent.
+
+    This is an offline identity fallback, not a FIELD acceptance or a network
+    lookup. Ambiguous or conflicting assertions remain HOLD.
+    """
+    matches = 0
+    for script in article.select('script[type="application/ld+json"]'):
+        try:
+            data = json.loads(script.string or script.get_text())
+        except (ValueError, TypeError):
+            continue
+        roots = data if isinstance(data, list) else [data]
+        for root in roots:
+            if not isinstance(root, dict):
+                continue
+            objects = [root]
+            if isinstance(root.get("@graph"), list):
+                objects.extend(item for item in root["@graph"] if isinstance(item, dict))
+            for obj in objects:
+                kinds = obj.get("@type")
+                if not (kinds == "Event" or
+                        isinstance(kinds, list) and kinds.count("Event") == 1):
+                    continue
+                if _canonical_event_url(provider, obj.get("url")) != (sid, detail_url):
+                    continue
+                name = obj.get("name")
+                if not isinstance(name, str) or " ".join(name.split()) != title:
+                    return False
+                matches += 1
+    return matches == 1
+
+
 def replay_offline_sources(manifest, fixture_root):
     """Build a non-publishing two-provider review ledger from sealed fixtures."""
     if (not isinstance(manifest, dict) or set(manifest) != {"mode", "sources"}
@@ -245,11 +278,20 @@ def replay_offline_sources(manifest, fixture_root):
                 article = BeautifulSoup(detail, "html.parser")
                 heads = [node for node in article.select("h1")
                          if node.get_text(" ", strip=True)]
-                if len(heads) != 1:
+                if len(heads) > 1:
                     raise ValueError("SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD")
-                actual = " ".join(heads[0].get_text(" ", strip=True).split())
-                if actual != card["title"]:
-                    raise ValueError("SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
+                if heads:
+                    actual = " ".join(heads[0].get_text(" ", strip=True).split())
+                    if actual != card["title"]:
+                        raise ValueError("SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
+                else:
+                    # Some archived event pages render the visible title via
+                    # client JS. Only a unique same-ID Event assertion may
+                    # supply offline identity; never trust arbitrary metadata.
+                    if not _detail_title_from_jsonld(
+                            article, provider, sid, card["title"], card["url"]):
+                        raise ValueError("SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD")
+                    actual = card["title"]
             except (ValueError, OSError) as exc:
                 holds[identity] = str(exc)
                 continue
