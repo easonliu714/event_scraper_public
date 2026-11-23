@@ -1,0 +1,13 @@
+# Sensitive runtime files must never enter a public repository.
+.env
+.env.*
+!.env.example
+Show_News_log.json
+run.log
+failed_messages.json
+connection_stats.json
+__pycache__/
+*.pyc
+.venv/
+_manual_audit/
+*_audit.json

@@ -1,0 +1,48 @@
+name: Event Radar PR1 - Live Dry Run (NO Publish)
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-pr1-live-dryrun-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+jobs:
+  live-dryrun:
+    if: >-
+      github.event.pull_request.number == 1 &&
+      github.event.pull_request.head.repo.full_name == 'easonliu714/event_scraper_public' &&
+      github.event.pull_request.head.ref == 'fix/event-radar-v44-cloud-20261023'
+    runs-on: ubuntu-latest
+    timeout-minutes: 33
+    env:
+      TZ: Asia/Taipei
+      EVENT_RADAR_ACTIONS: '1'
+      EVENT_RADAR_TELEGRAM: '0'
+      EVENT_RADAR_TERMUX: '0'
+      DETAIL_NEW_LIMIT: '12'
+      DETAIL_REPAIR_LIMIT: '8'
+    steps:
+      - name: Checkout proposed merge without credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify checked-out program and install dependencies
+        run: |
+          bash scripts/run_show_news.sh --version
+          python -m pip install -r requirements-actions.txt
+      - name: Live HTTP scraping in disposable runner directory
+        run: python scripts/pr1_cloud_dryrun.py --run --max-seconds 1200
+      - name: Upload sanitized evidence, even on HOLD
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventradar-pr1-live-dryrun-evidence
+          path: ${{ runner.temp }}/eventradar_pr1_cloud_dryrun/evidence/
+          if-no-files-found: warn
+          retention-days: 7
