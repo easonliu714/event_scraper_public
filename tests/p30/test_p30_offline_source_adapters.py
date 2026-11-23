@@ -136,6 +136,47 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             self.assertEqual(wrong["records"]["kktix:abc123"]["fields"]["venue"]["decision"], "HOLD")
             self.assertEqual(set(wrong["records"]), {"kktix:abc123", "accupass:abc123"})
 
+    def test_jsonld_graph_local_place_reference_review_and_ambiguous_hold(self):
+        # Real JSON-LD @graph Event.location often refers to a separate Place.
+        # Only an unambiguous local graph reference may supply venue evidence.
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            entry = manifest["sources"]["kktix"]["details"]["abc123"]
+            title = "已封存同一活動 ID 測試 kktix"
+            event = {"@type": "Event", "url": "https://kktix.com/events/abc123",
+                     "name": title, "startDate": "2026-12-01T19:30:00+08:00",
+                     "location": {"@id": "#venue"}}
+            place = {"@id": "#venue", "@type": "Place", "name": "獨立圖譜場館"}
+            def replay(nodes):
+                raw = ("<article><h1>" + title +
+                       "</h1><script type='application/ld+json'>" +
+                       json.dumps({"@context": "https://schema.org",
+                                   "@graph": nodes}, ensure_ascii=False) +
+                       "</script></article>").encode()
+                (root / entry["detail_file"]).write_bytes(raw)
+                entry["receipt"]["body_sha256"] = hashlib.sha256(raw).hexdigest()
+                return replay_offline_sources(manifest, root)
+            report = replay([event, place])
+            fields = report["records"]["kktix:abc123"]["fields"]
+            self.assertEqual(fields["venue"]["value"], "獨立圖譜場館")
+            self.assertEqual(fields["show_start"]["decision"], "REVIEW")
+            saved = commit_offline_candidate_lkg(report, root)
+            snap = load_offline_candidate_lkg(root, saved["sha256"])
+            self.assertEqual(snap["candidates"]["kktix:abc123"]["fields"]["venue"]["value"],
+                             "獨立圖譜場館")
+            self.assertEqual(snap["candidates"]["accupass:abc123"]["fields"]["title"]["decision"],
+                             "REVIEW_ONLY_NOT_ACCEPTED")
+            for nodes in ([event], [event, place, dict(place, name="偽造場館")],
+                          [event, dict(place, **{"@id": "#other"})]):
+                degraded = replay(nodes)["records"]["kktix:abc123"]["fields"]
+                self.assertEqual(degraded["venue"]["decision"], "HOLD")
+                self.assertEqual(degraded["show_start"]["decision"], "REVIEW")
+            self.assertEqual((report["new_official_get"], report["accepted_fields"],
+                              report["published"]), (0, 0, 0))
+
     def test_two_platforms_same_id_are_independent_and_never_publish(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
