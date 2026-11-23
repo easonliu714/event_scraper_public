@@ -311,10 +311,14 @@ def _semantic_event_payload(event):
     for role in stable_roles:
         if role in roles and not isinstance(roles[role], dict):
             raise ValueError("TPAC_SEMANTIC_FIELD_ROLE_SCHEMA_HOLD:" + role)
+    # Field-specific HOLD/authority changes are business safety semantics,
+    # not receipt metadata. Do not preserve stale REVIEW when only a field's
+    # rejection reason or evidence authority changes.
     role_values = tuple((role, json.dumps({
         key: roles.get(role, {}).get(key)
         for key in ("role", "value", "min_price_ntd", "max_price_ntd",
-                    "start_area_note", "start_area_role", "decision")
+                    "start_area_note", "start_area_role", "decision",
+                    "hold_reason", "authority")
     }, ensure_ascii=False, sort_keys=True)) for role in stable_roles)
     # Persisted HOLD authority must be an explicit list. Falsey malformed
     # values (None, "", 0, False) must not erase a prior safety decision.
