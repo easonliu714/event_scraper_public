@@ -1,0 +1,87 @@
+# SRC-P30-G1: isolated historical PWA only. No scraper/network requests to event sites.
+name: EventRadar P30 isolated preview PR CI
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+concurrency:
+  group: eventradar-p30-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  p30-isolated-preview:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/eventradar-p30-preview-isolated' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR head read-only
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify branch identity and exact additive changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+          event=json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          pr=event['pull_request']
+          assert os.environ['GITHUB_REPOSITORY']=='easonliu714/event_scraper_public'
+          assert pr['head']['ref']=='feat/eventradar-p30-preview-isolated'
+          assert pr['base']['ref']=='main'
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()==os.environ['HEAD_SHA']
+          assert re.fullmatch('[a-f0-9]{40}',os.environ['HEAD_SHA'])
+          diff=subprocess.check_output(['git','diff','--name-status',os.environ['BASE_SHA'],os.environ['HEAD_SHA']],text=True)
+          for row in diff.splitlines():
+              status,path=row.split('\t',1)
+              if path.startswith('docs/p30-preview/') or path.startswith('tests/p30/') or path=='.github/workflows/eventradar_p30_isolated_pr_ci.yml':
+                  assert status=='A', (status,path)
+              elif path in ('docs/ROADMAP_PR_ISSUE_CLOSURE_AUDIT.md','docs/UI_API_DB_FEATURE_ARCHITECTURE_TREE.md'):
+                  assert status=='M', (status,path)
+              else:
+                  raise AssertionError('HOLD_UNAUTHORIZED_CHANGED_PATH '+path)
+          assert diff.strip(), 'HOLD_EMPTY_DIFF'
+          print(diff)
+          print('PASS P30_SCOPE_ISOLATED; P20 PR HEADS UNMODIFIED')
+          print('GOLDEN_ACCEPTED=0 AUTO_HIDDEN=0 APP_DATA_PUBLISHED=false SOURCE_RUNTIME=DORMANT')
+          PY
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Byte-for-byte reconstructed snapshot, JSON and negative tests
+        run: python -m unittest discover -s tests/p30 -p 'test_*.py' -v
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JS syntax and copied-preview inline script compilation
+        run: |
+          node --check docs/p30-preview/event_visibility.js
+          node --check docs/p30-preview/eventgo_period_gate.js
+          node <<'NODE'
+          const fs=require('node:fs');
+          const vm=require('node:vm');
+          const assert=require('node:assert/strict');
+          const html=fs.readFileSync('docs/p30-preview/index.html','utf8');
+          const scripts=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+            .map(x=>x[1]).filter(x=>x.trim());
+          assert.equal(scripts.length,1);
+          new vm.Script(scripts[0],{filename:'p30-preview-inline.js'});
+          assert(html.includes('loadIsolatedSnapshot()'));
+          assert(html.includes('P30_SNAPSHOT_SHA256_DRIFT'));
+          assert(html.includes('PREVIEW_NOTIFICATIONS_OFF'));
+          assert(!html.includes('fetch(\`data.json'));
+          console.log('PASS P30_UI_INLINE_SYNTAX_NO_NOTIFICATIONS');
+          NODE
+      - name: P30 explicit no-publish gate
+        run: echo 'PASS P30_CI_NO_SCRAPER_NO_WRITER_NO_PAGES_DEPLOY_NO_NOTIFY'
