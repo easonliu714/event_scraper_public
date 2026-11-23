@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>活動雷達｜隔離候選資料實機測試</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;color:#152b39;background:#f5f8fa}
+*{box-sizing:border-box}body{margin:0}header{background:#123447;color:white;padding:26px max(16px,calc((100% - 1030px)/2))}
+h1{margin:0;font-size:clamp(1.4rem,4vw,2rem)}header p{margin:8px 0 0;color:#c8d9e2;line-height:1.7}
+main{max-width:1030px;margin:auto;padding:20px 16px 60px}
+.notice{padding:14px 16px;border:1px solid #dbc995;background:#fffaf0;border-radius:12px;line-height:1.7}
+.controls{display:grid;grid-template-columns:minmax(0,2fr) 1fr 1fr;gap:12px;margin:18px 0}
+.controls label{font-size:.9rem;font-weight:700;display:flex;flex-direction:column;gap:6px}
+input,select,button{font:inherit}input,select{height:44px;border:1px solid #b9c7d0;background:white;border-radius:9px;padding:0 11px;min-width:0}
+.count{margin:14px 0;color:#344d5d}#cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+article{background:white;border:1px solid #d6e1e6;border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+article h2{font-size:1.08rem;line-height:1.5;margin:0;overflow-wrap:anywhere}
+.pills{display:flex;gap:6px;flex-wrap:wrap}.pill{font-size:.78rem;border-radius:99px;padding:4px 9px;background:#e7eef3}
+.meta{color:#4f6473;font-size:.88rem;line-height:1.6}
+button{cursor:pointer;background:#14608b;color:white;border:0;border-radius:9px;padding:10px 13px}
+.card-button{align-self:start;margin-top:auto}.empty{padding:35px;text-align:center;color:#597181}
+dialog{border:0;border-radius:16px;padding:0;max-width:600px;width:calc(100% - 28px);max-height:85vh;box-shadow:0 25px 90px #0006}
+dialog::backdrop{background:#0e2634bb}
+.dialog-body{padding:22px;overflow:auto;max-height:80vh}
+.dialog-body h2{font-size:1.3rem;overflow-wrap:anywhere;margin:10px 0}
+.detail-line{padding:10px 0;border-bottom:1px solid #edf0f2;line-height:1.6;overflow-wrap:anywhere}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;align-items:center}
+.actions a{display:inline-block;background:#14608b;color:white;text-decoration:none;border-radius:9px;padding:10px 14px}
+.actions button{background:#dce8ed;color:#123447}
+footer{margin-top:28px;color:#6b7b83;font-size:.82rem;line-height:1.6}
+@media(max-width:580px){.controls{grid-template-columns:1fr 1fr}.controls label:first-child{grid-column:1/-1}header{padding:22px 16px}#cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+<h1>活動雷達 <small style="font-size:.53em;font-weight:500">P30 隔離候選驗證</small></h1>
+<p>使用真實來源的受限樣本資料，測試手機列表、搜尋、分類及詳情呈現。</p>
+</header>
+<main>
+<div class="notice" role="status">此為<strong>離線／本機驗證版</strong>，不是正式售票或活動目錄。資料僅來自兩個來源的單次抽樣，並非完整或即時清單。日期、地點、價格、售票及名額以官方網站為準；未知資訊會明確標示。</div>
+<div class="controls">
+<label>搜尋活動<input id="search" placeholder="輸入活動名稱或地點" autocomplete="off"></label>
+<label>來源<select id="platform"><option value="">全部來源</option></select></label>
+<label>類別<select id="category"><option value="">全部類別</option></select></label>
+</div>
+<p class="count" id="count" aria-live="polite">載入候選資料中…</p>
+<section id="cards" aria-label="活動清單"></section>
+<dialog id="dialog" aria-label="活動詳細內容">
+<div class="dialog-body">
+<div class="pills" id="detail-pills"></div>
+<h2 id="detail-title"></h2>
+<div id="detail-lines"></div>
+<div class="actions"><a id="official" href="#" target="_blank" rel="noopener noreferrer">查看官方來源</a><button id="close" type="button">關閉</button></div>
+</div>
+</dialog>
+<footer>EventRadar P30-L7-A · Android smoke candidate · 不含自動排程、資料寫入、推播或售票狀態保證。</footer>
+</main>
+<script>
+"use strict";
+const root=document.getElementById("cards");
+const count=document.getElementById("count");
+const search=document.getElementById("search");
+const platform=document.getElementById("platform");
+const category=document.getElementById("category");
+const dialog=document.getElementById("dialog");
+let items=[];
+const t=(tag,value,cls)=>{const n=document.createElement(tag);if(value!==undefined&&value!==null)n.textContent=String(value);if(cls)n.className=cls;return n;};
+const unknown=v=>typeof v==="string"&&v.trim()?v:"未取得（以官方為準）";
+const when=e=>e.dateStart&&e.dateEnd?(e.dateStart===e.dateEnd?e.dateStart:e.dateStart+" ～ "+e.dateEnd):e.rawPeriod?"原始展期："+e.rawPeriod+"（年份待核對）":"日期未取得（以官方為準）";
+function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"&&["event.culture.tw","twtc.com.tw"].includes(u.hostname)?u.href:null;}catch{return null;}}
+function fillPill(node,value){node.appendChild(t("span",value,"pill"));}
+function openDetail(e){
+ const pills=document.getElementById("detail-pills");pills.replaceChildren();
+ fillPill(pills,e.platform);fillPill(pills,e.category);
+ document.getElementById("detail-title").textContent=e.title;
+ const lines=document.getElementById("detail-lines");lines.replaceChildren();
+ const fields=[["活動期間",when(e)],["場地",unknown(e.venue)],
+ ["票價",unknown(e.price)],["售票狀態","未知（請查看官方）"],
+ ["資訊完整度",e.sourceLevel||"來源候選"],["內容摘要",unknown(e.summary)],
+ ["資料狀態","候選／尚未官方逐筆覆核"]];
+ fields.forEach(x=>{const div=t("div",null,"detail-line");const k=t("strong",x[0]+"：");const v=t("span",x[1]);div.append(k,v);lines.append(div);});
+ const link=document.getElementById("official");const url=safeLink(e.officialUrl);
+ link.hidden=!url;if(url)link.href=url;else link.removeAttribute("href");
+ if(typeof dialog.showModal==="function")dialog.showModal();else dialog.setAttribute("open","");
+}
+function render(){
+ const query=search.value.toLocaleLowerCase().trim();
+ const found=items.filter(e=>(!platform.value||e.platform===platform.value)
+  &&(!category.value||e.category===category.value)
+  &&(!query||[e.title,e.venue,e.platform].filter(Boolean).join(" ").toLocaleLowerCase().includes(query)));
+ count.textContent="顯示 "+found.length+" / "+items.length+" 筆候選資料；來源平台 "+new Set(items.map(e=>e.platform)).size+" 個";
+ root.replaceChildren();
+ if(!found.length){root.appendChild(t("p","沒有符合條件的候選活動。","empty"));return;}
+ found.forEach(e=>{
+  const card=t("article");const tags=t("div",null,"pills");fillPill(tags,e.platform);fillPill(tags,e.category);
+  card.append(tags,t("h2",e.title));
+  card.append(t("div",when(e),"meta"));card.append(t("div","地點："+unknown(e.venue),"meta"));
+  card.append(t("div","票況：未知 · 來源："+unknown(e.sourceLevel),"meta"));
+  const btn=t("button","查看摘要與詳情","card-button");
+  btn.type="button";btn.addEventListener("click",()=>openDetail(e));card.append(btn);root.append(card);
+ });
+}
+document.getElementById("close").addEventListener("click",()=>dialog.close?dialog.close():dialog.removeAttribute("open"));
+search.addEventListener("input",render);platform.addEventListener("change",render);category.addEventListener("change",render);
+fetch("./data.json",{cache:"no-store"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json();}).then(data=>{
+ if(data.kind!=="EVENTRADAR_P30_ANDROID_SMOKE_CANDIDATE_NOT_GOLDEN"
+  ||data.published!==false||data.goldenAccepted!==false||!Array.isArray(data.items)
+  ||data.count!==data.items.length)throw Error("HOLD candidate contract");
+ items=data.items.filter(e=>typeof e.title==="string"&&safeLink(e.officialUrl));
+ for(const [select,values] of [[platform,new Set(items.map(e=>e.platform))],[category,new Set(items.map(e=>e.category))]]){
+  Array.from(values).sort((a,b)=>a.localeCompare(b,"zh-Hant")).forEach(v=>{const option=t("option",v);option.value=v;select.append(option);});
+ }
+ render();
+}).catch(err=>{count.textContent="資料讀取失敗："+err.message;root.append(t("p","請使用本機 HTTP 伺服器開啟，不要直接以 file:// 開啟。","empty"));});
+</script>
+</body>
+</html>
