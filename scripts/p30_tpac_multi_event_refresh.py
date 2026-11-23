@@ -1951,7 +1951,7 @@ def build_archived_field_candidate_delta(previous, current):
         old_fields = old.get("fields", {}) if old is not None else {}
         if not isinstance(fields, dict) or not fields or not isinstance(old_fields, dict):
             raise ValueError("TPAC_FIELD_DELTA_FIELDS_HOLD")
-        event_changes, candidate_fields = {}, {}
+        event_changes, candidate_fields, held_fields = {}, {}, {}
         # Source currentness is a semantic authority transition, unlike a
         # receipt/body SHA-only observation. Keep it separate from FIELD names.
         if old is not None:
@@ -1977,10 +1977,31 @@ def build_archived_field_candidate_delta(previous, current):
             if field["decision"] == "REVIEW":
                 if not row.get("archive_evidence_current") or field.get("value") is None:
                     raise ValueError("TPAC_FIELD_DELTA_STALE_REVIEW_HOLD")
-                candidate_fields[name] = {"value": field["value"], "role": field["role"],
-                                          "decision": "REVIEW_ONLY_NOT_ACCEPTED"}
-            elif field.get("value") is not None:
-                raise ValueError("TPAC_FIELD_DELTA_HELD_VALUE_HOLD")
+                # Carry the complete provenance contract into durable
+                # candidates. Previously the snapshot discarded source URL,
+                # field timestamp, body SHA and REVIEW hold_reason, leaving
+                # later independent Quality Gates unable to audit authority.
+                candidate_fields[name] = {
+                    "value": field["value"], "role": field["role"],
+                    "event_id": row["event_id"],
+                    "source_url": field["source_url"],
+                    "observed_at": field.get("observed_at"),
+                    "source_body_sha256": field.get("source_body_sha256"),
+                    "decision": "REVIEW_ONLY_NOT_ACCEPTED",
+                    "hold_reason": field.get("hold_reason"),
+                }
+            else:
+                if field.get("value") is not None:
+                    raise ValueError("TPAC_FIELD_DELTA_HELD_VALUE_HOLD")
+                # HOLD values must never masquerade as current REVIEW fields,
+                # but their reasons/provenance must survive a CAS restart.
+                held_fields[name] = {
+                    "value": None, "role": field.get("role", "UNKNOWN"),
+                    "event_id": row["event_id"], "source_url": field["source_url"],
+                    "observed_at": field.get("observed_at"),
+                    "source_body_sha256": field.get("source_body_sha256"),
+                    "decision": "HOLD", "hold_reason": field.get("hold_reason"),
+                }
             prior = old_fields.get(name)
             if prior is not None and not isinstance(prior, dict):
                 raise ValueError("TPAC_FIELD_DELTA_PRIOR_FIELD_HOLD")
@@ -2009,15 +2030,26 @@ def build_archived_field_candidate_delta(previous, current):
                 "current_value": None,
                 "hold_reason": "FIELD_REMOVED_FROM_CURRENT_EVIDENCE_HOLD",
             }
+            held_fields[name] = {
+                "value": None, "role": "UNKNOWN",
+                "event_id": row["event_id"], "source_url": row["detail_source_url"],
+                "observed_at": None, "source_body_sha256": None,
+                "decision": "HOLD",
+                "hold_reason": "FIELD_REMOVED_FROM_CURRENT_EVIDENCE_HOLD",
+            }
         # Persist source-currentness with the candidate, not only the transient
         # delta. Consumers must not infer freshness from a previous REVIEW value.
         source_current = row.get("archive_evidence_current")
         if not isinstance(source_current, bool):
             raise ValueError("TPAC_FIELD_DELTA_CURRENTNESS_SCHEMA_HOLD")
-        candidates[identity] = {"identity": identity, "source_namespace": row["source_namespace"],
-                                "event_id": row["event_id"], "fields": candidate_fields,
-                                "source_current": source_current,
-                                "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY"}
+        candidates[identity] = {
+            "identity": identity, "source_namespace": row["source_namespace"],
+            "event_id": row["event_id"],
+            "detail_source_url": row["detail_source_url"],
+            "fields": candidate_fields, "held_fields": held_fields,
+            "source_current": source_current,
+            "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY",
+        }
         if event_changes:
             changed[identity] = event_changes
     return {"kind": "TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1",
@@ -2028,6 +2060,44 @@ def build_archived_field_candidate_delta(previous, current):
             "accepted_fields": 0, "published": 0,
             "release_state": "HARD_HOLD_NO_PUBLICATION"}
 
+
+
+
+def _validate_archived_candidate_snapshot_row(identity, row, hold):
+    """Reusable persisted REVIEW/HOLD provenance admission contract."""
+    if (not isinstance(row, dict) or row.get("identity") != identity
+            or row.get("decision") != "ISOLATED_REVIEW_CANDIDATE_ONLY"
+            or not isinstance(row.get("fields"), dict)):
+        raise ValueError(hold)
+    # Field provenance is optional only for legacy synthetic snapshots. All
+    # new Core candidates include it and must bind each role to its owner.
+    if "detail_source_url" in row and (
+            type(row["detail_source_url"]) is not str
+            or not row["detail_source_url"]):
+        raise ValueError(hold)
+    if "source_current" in row and type(row["source_current"]) is not bool:
+        raise ValueError(hold)
+    for field in row["fields"].values():
+        if (not isinstance(field, dict)
+                or field.get("decision") != "REVIEW_ONLY_NOT_ACCEPTED"):
+            raise ValueError(hold)
+        if ("event_id" in field and field["event_id"] != row.get("event_id")) or (
+                "source_url" in field and
+                field["source_url"] != row.get("detail_source_url")):
+            raise ValueError(hold)
+        if "hold_reason" in field and not isinstance(field["hold_reason"], (str, type(None))):
+            raise ValueError(hold)
+    if "held_fields" in row:
+        if not isinstance(row["held_fields"], dict):
+            raise ValueError(hold)
+        for held in row["held_fields"].values():
+            if (not isinstance(held, dict) or held.get("decision") != "HOLD"
+                    or held.get("value") is not None
+                    or held.get("event_id") != row.get("event_id")
+                    or held.get("source_url") != row.get("detail_source_url")
+                    or not isinstance(held.get("hold_reason"), str)
+                    or not held["hold_reason"]):
+                raise ValueError(hold)
 
 
 def write_archived_field_candidate_snapshot(delta, repo_root, expected_sha=None):
@@ -2045,13 +2115,8 @@ def write_archived_field_candidate_snapshot(delta, repo_root, expected_sha=None)
             or not isinstance(delta.get("changed"), dict)):
         raise ValueError("TPAC_CANDIDATE_SNAPSHOT_AUTHORITY_HOLD")
     for identity, row in delta["candidates"].items():
-        if (not isinstance(row, dict) or row.get("identity") != identity
-                or row.get("decision") != "ISOLATED_REVIEW_CANDIDATE_ONLY"
-                or not isinstance(row.get("fields"), dict)):
-            raise ValueError("TPAC_CANDIDATE_SNAPSHOT_IDENTITY_HOLD")
-        for field in row["fields"].values():
-            if not isinstance(field, dict) or field.get("decision") != "REVIEW_ONLY_NOT_ACCEPTED":
-                raise ValueError("TPAC_CANDIDATE_SNAPSHOT_FIELD_HOLD")
+        _validate_archived_candidate_snapshot_row(
+            identity, row, "TPAC_CANDIDATE_SNAPSHOT_FIELD_HOLD")
     if expected_sha is not None and (not isinstance(expected_sha, str)
                                      or re.fullmatch(r"[0-9a-f]{64}", expected_sha) is None):
         raise ValueError("TPAC_CANDIDATE_SNAPSHOT_EXPECTED_SHA_HOLD")
@@ -2134,13 +2199,8 @@ def load_archived_field_candidate_snapshot(repo_root, expected_sha):
             or not isinstance(snapshot["candidates"], dict) or not snapshot["candidates"]):
         raise ValueError("TPAC_CANDIDATE_READ_SCHEMA_HOLD")
     for identity, row in snapshot["candidates"].items():
-        if (not isinstance(row, dict) or row.get("identity") != identity
-                or row.get("decision") != "ISOLATED_REVIEW_CANDIDATE_ONLY"
-                or not isinstance(row.get("fields"), dict)):
-            raise ValueError("TPAC_CANDIDATE_READ_IDENTITY_HOLD")
-        for field in row["fields"].values():
-            if not isinstance(field, dict) or field.get("decision") != "REVIEW_ONLY_NOT_ACCEPTED":
-                raise ValueError("TPAC_CANDIDATE_READ_FIELD_HOLD")
+        _validate_archived_candidate_snapshot_row(
+            identity, row, "TPAC_CANDIDATE_READ_FIELD_HOLD")
     return snapshot
 
 
