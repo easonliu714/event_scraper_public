@@ -3017,6 +3017,10 @@ class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
             self.assertEqual(stale_result["qualified"], 1)
             self.assertEqual(stale_result["catalog_decisions"]["program"],
                              "HOLD_PROGRAM_SOURCE_RECEIPT")
+            # The planner's returned stale LIST HOLD must carry the exact
+            # source reason, not merely a successful sibling's qualification.
+            self.assertEqual(stale_result["rejected"]["program:program"],
+                             "TPAC_SOURCE_STALE_OR_FUTURE_HOLD")
             self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
             program_path.write_text(json.dumps(original_program), encoding="utf-8")
 
