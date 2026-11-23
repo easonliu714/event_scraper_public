@@ -940,8 +940,29 @@ def main(argv=None):
         prior, expected_sha = load_isolated_prior(args.repo_root)
     else:
         prior, expected_sha = data["prior"], args.expected_sha
-    pairs = {sid: {"body": Path(row["detail_file"]).read_bytes(), "receipt": row["receipt"]}
-             for sid, row in data["details"].items()}
+    # An unreadable DETAIL is per-event HOLD, not a reason to discard valid
+    # siblings or their existing LKG. Invalid manifest schemas still fail closed.
+    details = data.get("details")
+    if not isinstance(details, dict) or len(details) > MAX_DETAILS:
+        raise ValueError("TPAC_DETAIL_MANIFEST_SCHEMA_OR_CAP_HOLD")
+    pairs = {}
+    for sid, row in details.items():
+        if (type(sid) is not str or re.fullmatch(r"[1-9][0-9]{0,9}", sid) is None
+                or not isinstance(row, dict)
+                or set(row) != {"detail_file", "receipt"}
+                or type(row["detail_file"]) is not str
+                or not isinstance(row["receipt"], dict)):
+            raise ValueError("TPAC_DETAIL_MANIFEST_ROW_SCHEMA_HOLD")
+        try:
+            detail_path = Path(row["detail_file"])
+            if not detail_path.is_file():
+                raise OSError("DETAIL_NOT_REGULAR_FILE")
+            body = detail_path.read_bytes()
+        except OSError:
+            # Planner emits DETAIL_NOT_PROVIDED_HOLD for this exact ID.
+            # No filesystem paths or failed bytes may enter a REVIEW candidate.
+            continue
+        pairs[sid] = {"body": body, "receipt": row["receipt"]}
     planner = refresh_event_plan if args.catalog == "event" else refresh_plan
     plan = planner(Path(data["list_file"]).read_bytes(), data["list_receipt"],
                    pairs, prior, _time(data["now"]))
