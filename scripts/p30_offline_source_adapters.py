@@ -160,7 +160,35 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
     fields = {"show_start": _field(
         start, "EVENT_SHOW_START", sid, detail_url, stamp, sha,
         "REVIEW", "SOURCE_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")}
+    # JSON-LD may reference a Place by @id in the same local @graph.
+    # Resolve only one exact graph-local Place; never dereference remote URLs
+    # or infer a venue from a different event or an ambiguous graph node.
     location = obj.get("location")
+    if isinstance(location, dict) and set(location) == {"@id"}:
+        reference = location.get("@id")
+        places = []
+        if isinstance(reference, str) and reference:
+            for node in article.select('script[type="application/ld+json"]'):
+                try:
+                    document = json.loads(node.string or node.get_text())
+                except (ValueError, TypeError):
+                    continue
+                roots = document if isinstance(document, list) else [document]
+                for root in roots:
+                    if not isinstance(root, dict):
+                        continue
+                    graph = root.get("@graph")
+                    if not isinstance(graph, list):
+                        continue
+                    for candidate in graph:
+                        if (isinstance(candidate, dict)
+                                and candidate.get("@id") == reference
+                                and candidate.get("@type") == "Place"):
+                            places.append(candidate)
+        if len(places) == 1:
+            location = places[0]
+        else:
+            location = None
     if isinstance(location, dict) and location.get("@type") == "Place":
         name = location.get("name")
         if isinstance(name, str) and 0 < len(name.strip()) <= 200:
