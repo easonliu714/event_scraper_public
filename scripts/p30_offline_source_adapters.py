@@ -107,6 +107,54 @@ def _field(value, role, sid, url, stamp, sha, decision, reason):
             "hold_reason": reason}
 
 
+
+def _structured_event_fields(article, provider, sid, title, detail_url, stamp, sha):
+    """Extract only unambiguous same-event JSON-LD startDate and venue as REVIEW.
+
+    JSON-LD is untrusted archived HTML: no cross-event, timezone-naive,
+    multiple Event, or incomplete venue inference is allowed.
+    """
+    matches = []
+    for node in article.select('script[type="application/ld+json"]'):
+        try:
+            data = json.loads(node.string or node.get_text())
+        except (ValueError, TypeError):
+            continue
+        objects = data if isinstance(data, list) else [data]
+        for obj in objects:
+            if not isinstance(obj, dict):
+                continue
+            if obj.get("@type") not in ("Event", ["Event"]):
+                continue
+            parsed = _canonical_event_url(provider, obj.get("url"))
+            if (parsed != (sid, detail_url)
+                    or " ".join(str(obj.get("name", "")).split()) != title):
+                continue
+            matches.append(obj)
+    if len(matches) != 1:
+        return {}
+    obj = matches[0]
+    fields = {}
+    start = obj.get("startDate")
+    if isinstance(start, str):
+        try:
+            dt = datetime.fromisoformat(start)
+            if dt.utcoffset() is not None:
+                fields["show_start"] = _field(
+                    start, "EVENT_SHOW_START", sid, detail_url, stamp, sha,
+                    "REVIEW", "SOURCE_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")
+        except ValueError:
+            pass
+    location = obj.get("location")
+    if isinstance(location, dict) and location.get("@type") == "Place":
+        name = location.get("name")
+        if isinstance(name, str) and 0 < len(name.strip()) <= 200:
+            fields["venue"] = _field(
+                " ".join(name.split()), "EVENT_VENUE", sid, detail_url,
+                stamp, sha, "REVIEW", "SOURCE_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")
+    return fields
+
+
 def replay_offline_sources(manifest, fixture_root):
     """Build a non-publishing two-provider review ledger from sealed fixtures."""
     if (not isinstance(manifest, dict) or set(manifest) != {"mode", "sources"}
@@ -173,6 +221,7 @@ def replay_offline_sources(manifest, fixture_root):
                 fields[name] = _field(
                     None, "UNKNOWN", sid, card["url"], stamp, sha,
                     "HOLD", "SOURCE_FIELD_ROLE_NOT_VERIFIED")
+            fields.update(_structured_event_fields(article, provider, sid, actual, card["url"], stamp, sha))
             rows[identity] = {
                 "identity": identity, "source_namespace": provider,
                 "event_id": sid, "detail_source_url": card["url"],
