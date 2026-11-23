@@ -848,49 +848,53 @@ jobs:
               json.dumps(evidence,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           print('PASS_REAL_38_ID_FIELD_DELTA_CANDIDATE_CAS_FRESH_RESTART_NO_GET_NO_PUBLISH')
           PY
-      - name: Real archived two-catalog normal REVIEW CLI integration (NO GET, NO PUBLISH)
+      - name: Real sealed dual-catalog archive inventory to field evidence CLI (NO GET, NO PUBLISH)
         run: |
           set -euo pipefail
           python - <<'PY'
-          # Bridge the original sealed 2 LIST + 3 DETAIL manifest to the
-          # production dual-catalog CLI; fail rather than silently substituting
-          # synthetic receipts or claiming that archive provenance is live.
+          # Archived receipts are historical evidence, not fresh LIVE receipts.
+          # Route both catalogs through the existing archive-only CAS domain.
           import json,subprocess,sys
           from pathlib import Path
-          original=json.loads(Path('evidence/tpac_archived_38_id_manifest.json').read_text(encoding='utf-8'))
+          source=Path('evidence/tpac_archived_38_id_manifest.json')
+          original=json.loads(source.read_text(encoding='utf-8'))
+          assert set(original['catalogs'])=={'program','event'}
           root=Path('evidence/tpac_real_dual_catalog_lkg')
           root.mkdir(parents=True,exist_ok=True)
-          now='2026-11-08T14:54:00+00:00'
-          paths={}
-          for catalog in ('program','event'):
-              row=original['catalogs'][catalog]
-              manifest={'catalog':catalog,'now':now,'list_file':row['list_file'],
-                        'list_receipt':row['list_receipt'],'details':row['details']}
-              path=root/(catalog+'_manifest.json')
-              path.write_text(json.dumps(manifest,ensure_ascii=False,sort_keys=True)+'\n',encoding='utf-8')
-              paths[catalog]=str(path)
-          dual=root/'dual_manifest.json'
-          dual.write_text(json.dumps(paths,sort_keys=True)+'\n',encoding='utf-8')
-          cmd=[sys.executable,'-m','scripts.p30_tpac_multi_event_refresh',
-               '--dual-input',str(dual),'--prior-from-lkg','--repo-root',str(root)]
-          attempt=subprocess.run(cmd,capture_output=True,text=True)
-          evidence={'kind':'TPAC_REAL_ARCHIVED_DUAL_CATALOG_CLI_E2E_V1',
-                    'sealed_list_bodies':2,'sealed_detail_bodies':3,
-                    'source_identities':38,'new_official_http':0,'published':0,
-                    'release_state':'HARD_HOLD_NO_PUBLICATION',
-                    'returncode':attempt.returncode,
-                    'stdout':attempt.stdout[-4000:],
-                    'stderr':attempt.stderr[-4000:]}
-          (Path('evidence')/'tpac_real_dual_catalog_cli_e2e.json').write_text(
-              json.dumps(evidence,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
-          if attempt.returncode!=0:
-              raise AssertionError('HOLD_REAL_ARCHIVED_DUAL_CATALOG_INTEGRATION: '+attempt.stderr[-1000:])
-          result=json.loads(attempt.stdout)
-          assert result['published']==0 and result['qualified']==3,result
-          assert result['result']['rows']==3,result
+          archive_manifest=root/'archived_manifest.json'
+          archive_manifest.write_text(json.dumps({'mode':'archived','catalogs':original['catalogs']},
+              ensure_ascii=False,sort_keys=True)+'\n',encoding='utf-8')
+          command=[sys.executable,'-m','scripts.p30_tpac_multi_event_refresh']
+          capture=subprocess.run(command+['--inventory-input',str(archive_manifest),
+              '--repo-root',str(root)],capture_output=True,text=True)
+          assert capture.returncode==0,(capture.stdout,capture.stderr)
+          result=json.loads(capture.stdout)
+          counts=result['counts']
+          assert counts['source_cards']==38,counts
+          assert counts['detail_available']==3,counts
+          assert result['published']==0 and result['accepted_fields']==0,result
+          sha=result['inventory']['sha256']
+          readback=subprocess.run(command+['--export-archive-fields',
+              '--repo-root',str(root),'--expected-sha',sha],
+              capture_output=True,text=True)
+          assert readback.returncode==0,(readback.stdout,readback.stderr)
+          ledger=json.loads(readback.stdout)
+          assert ledger['counts']['events']==38,ledger['counts']
+          assert ledger['counts']['archived_detail_current']==3,ledger['counts']
+          assert ledger['accepted_fields']==0 and ledger['published']==0
+          assert ledger['release_state']=='HARD_HOLD_NO_PUBLICATION'
           assert not (root/'docs/data.json').exists()
           assert not (root/'docs/platform_status.json').exists()
-          print('PASS_REAL_ARCHIVED_TWO_CATALOG_ONE_CAS_CLI_NO_GET_NO_PUBLISH')
+          evidence={'kind':'TPAC_REAL_ARCHIVED_DUAL_CATALOG_CLI_E2E_V2',
+              'sealed_list_bodies':2,'sealed_detail_bodies':3,
+              'source_identities':38,'archive_inventory_sha256':sha,
+              'archive_current_detail_count':3,'new_official_http':0,
+              'accepted_fields':0,'published':0,
+              'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          Path('evidence/tpac_real_dual_catalog_cli_e2e.json').write_text(
+              json.dumps(evidence,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
+              encoding='utf-8')
+          print('PASS_REAL_ARCHIVED_TWO_CATALOG_ARCHIVE_ONLY_CAS_FIELD_CLI_NO_GET_NO_PUBLISH')
           PY
       - name: Diagnose exact native TPAC price section and first-party ticket links
         run: |
