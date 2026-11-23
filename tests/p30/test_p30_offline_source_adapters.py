@@ -100,6 +100,42 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             self.assertEqual(ambiguous["show_start"]["decision"], "HOLD")
             self.assertEqual(ambiguous["venue"]["decision"], "HOLD")
 
+    def test_jsonld_graph_same_id_and_duplicate_fail_closed(self):
+        # Realistic schema.org @graph is parsed without trusting unrelated
+        # Event nodes or accepting duplicate same-ID event assertions.
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            entry = manifest["sources"]["kktix"]["details"]["abc123"]
+            title = "已封存同一活動 ID 測試 kktix"
+            event = {"@type": ["Thing", "Event"],
+                     "url": "https://kktix.com/events/abc123",
+                     "name": title, "startDate": "2026-12-01T19:30:00+08:00",
+                     "location": {"@type": "Place", "name": "圖譜展演廳"}}
+            unrelated = dict(event, url="https://kktix.com/events/unrelated")
+            def replay(graph):
+                raw = ("<article><h1>" + title +
+                       "</h1><script type='application/ld+json'>" +
+                       json.dumps({"@context": "https://schema.org",
+                                   "@graph": graph}, ensure_ascii=False) +
+                       "</script></article>").encode()
+                (root / entry["detail_file"]).write_bytes(raw)
+                entry["receipt"]["body_sha256"] = hashlib.sha256(raw).hexdigest()
+                return replay_offline_sources(manifest, root)
+            report = replay([unrelated, event])
+            fields = report["records"]["kktix:abc123"]["fields"]
+            self.assertEqual(fields["show_start"]["decision"], "REVIEW")
+            self.assertEqual(fields["venue"]["value"], "圖譜展演廳")
+            self.assertEqual(report["accepted_fields"], 0)
+            self.assertEqual(report["published"], 0)
+            duplicate = replay([event, dict(event)])
+            self.assertEqual(duplicate["records"]["kktix:abc123"]["fields"]["show_start"]["decision"], "HOLD")
+            self.assertEqual(duplicate["records"]["kktix:abc123"]["fields"]["venue"]["decision"], "HOLD")
+            wrong = replay([unrelated])
+            self.assertEqual(wrong["records"]["kktix:abc123"]["fields"]["show_start"]["decision"], "HOLD")
+            self.assertEqual(wrong["records"]["kktix:abc123"]["fields"]["venue"]["decision"], "HOLD")
+            self.assertEqual(set(wrong["records"]), {"kktix:abc123", "accupass:abc123"})
+
     def test_two_platforms_same_id_are_independent_and_never_publish(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
