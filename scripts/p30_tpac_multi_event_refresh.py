@@ -868,7 +868,15 @@ def refresh_dual_catalog_plan(program_inputs, event_inputs, prior, now):
             return {"events": dict(baseline["events"]), "qualified": 0,
                     "rejected": {}, "decision": "HOLD_" + catalog.upper() + "_LIST_IO"}
         try:
-            return planner(**inputs, prior=baseline, now=clock)
+            planned = planner(**inputs, prior=baseline, now=clock)
+            # Some catalog planners report source receipt HOLD as a plan
+            # rather than raising. Normalize both forms to the same per-source
+            # isolation contract; never treat the returned HOLD as qualified.
+            if planned.get("decision") == "HOLD_LIST_TPAC_SOURCE_STALE_OR_FUTURE_HOLD":
+                return {"events": dict(baseline["events"]), "qualified": 0,
+                        "rejected": {catalog: "TPAC_SOURCE_STALE_OR_FUTURE_HOLD"},
+                        "decision": "HOLD_" + catalog.upper() + "_SOURCE_RECEIPT"}
+            return planned
         except ValueError as error:
             if str(error) not in source_receipt_holds:
                 raise
