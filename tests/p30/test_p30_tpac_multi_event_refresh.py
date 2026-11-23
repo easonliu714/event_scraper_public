@@ -108,6 +108,80 @@ class MultiEventRefreshTests(unittest.TestCase):
                     self.fail("legacy sentinel must not be adopted")
             self.assertEqual(legacy.read_bytes(), b"")
 
+    def test_fixed_review_cli_unreadable_detail_preserves_siblings_and_recovers(self):
+        # The normal --input route, unlike archive --inventory-input, formerly
+        # read every DETAIL in one comprehension and aborted all valid IDs.
+        import io
+        from contextlib import redirect_stdout
+        from scripts.p30_tpac_multi_event_refresh import main
+        raw, list_receipt, pairs = inputs()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing_file = root / "program-list.html"
+            listing_file.write_bytes(raw)
+            details = {}
+            for sid, pair in pairs.items():
+                file = root / (sid + "-detail.html")
+                file.write_bytes(pair["body"])
+                details[sid] = {"detail_file": str(file), "receipt": pair["receipt"]}
+            manifest = root / "input.json"
+            base = {"catalog": "program", "list_file": str(listing_file),
+                    "list_receipt": list_receipt, "details": details,
+                    "prior": empty_prior(), "now": NOW.isoformat()}
+            def invoke(data, *args):
+                manifest.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+                out = io.StringIO()
+                with redirect_stdout(out):
+                    code = main(["--repo-root", str(root), "--input", str(manifest), *args])
+                return code, json.loads(out.getvalue())
+            initial_code, initial = invoke(base)
+            self.assertEqual(initial_code, 0)
+            self.assertEqual(initial["counts"]["qualified"], 2)
+            target = root / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            initial_sha = hashlib.sha256(original).hexdigest()
+            continuous = {k: v for k,v in base.items() if k != "prior"}
+            continuous["details"] = {key: dict(record) for key,record in details.items()}
+            missing = root / "missing-detail.html"
+            continuous["details"]["2111"]["detail_file"] = str(missing)
+            for mode in ("missing", "directory"):
+                if mode == "directory":
+                    missing.mkdir()
+                code, outcome = invoke(continuous, "--prior-from-lkg")
+                self.assertEqual(code, 0)
+                self.assertEqual(outcome["counts"]["qualified"], 1)
+                self.assertEqual(outcome["counts"]["retained_previous"], 1)
+                self.assertEqual(outcome["rejected"]["2111"], "DETAIL_NOT_PROVIDED_HOLD")
+                self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), initial_sha)
+                self.assertEqual(target.read_bytes(), original)
+            # All unavailable DETAILS is a HOLD, not an empty or destructive commit.
+            all_bad = {**continuous,
+                       "details": {key: {**record, "detail_file": str(missing)}
+                                   for key,record in details.items()}}
+            code, outcome = invoke(all_bad, "--prior-from-lkg")
+            self.assertEqual(code, 49)
+            self.assertIn("HOLD_NO_QUALIFIED_DETAILS", outcome["result"]["decision"])
+            self.assertEqual(target.read_bytes(), original)
+            # A malformed receipt or path schema remains an all-batch admission HOLD.
+            wrong = {**continuous, "details": {
+                **continuous["details"],
+                "2111": {"detail_file": None, "receipt": details["2111"]["receipt"]}}}
+            with self.assertRaisesRegex(ValueError, "TPAC_DETAIL_MANIFEST_ROW_SCHEMA_HOLD"):
+                invoke(wrong, "--prior-from-lkg")
+            self.assertEqual(target.read_bytes(), original)
+            bad_list = {**continuous, "list_file": str(root / "missing-list.html")}
+            with self.assertRaises(OSError):
+                invoke(bad_list, "--prior-from-lkg")
+            self.assertEqual(target.read_bytes(), original)
+            missing.rmdir()
+            continuous["details"]["2111"]["detail_file"] = details["2111"]["detail_file"]
+            code, final = invoke(continuous, "--prior-from-lkg")
+            self.assertEqual(code, 0)
+            self.assertEqual(final["counts"]["qualified"], 2)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertFalse((root / "docs/data.json").exists())
+            self.assertFalse((root / "docs/platform_status.json").exists())
+
     def test_two_distinct_event_ids_generate_repeatable_review_snapshot(self):
         body, rr, details = inputs()
         plan = refresh_plan(body, rr, details, empty_prior(), NOW)
