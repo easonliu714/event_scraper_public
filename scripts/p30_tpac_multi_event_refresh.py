@@ -2233,12 +2233,24 @@ def offline_inventory_cli(manifest_path, repo_root):
     counts = {"source_cards": 0, "detail_available": 0,
               "pending_detail_budget": 0, "parse_hold": 0, "review": 0}
     diagnostics = {}
+    processed_catalogs = 0
     for catalog in ("program", "event"):
         entry = catalogs[catalog]
         if not isinstance(entry, dict) or set(entry) != {"list_file", "list_receipt", "details"}:
             raise ValueError("TPAC_INVENTORY_CLI_CATALOG_SCHEMA_HOLD")
-        raw = Path(entry["list_file"]).read_bytes()
+        # A missing/unreadable LIST is an unavailable source, not an empty LIST.
+        # Preserve its prior inventory while the healthy catalog can advance.
+        try:
+            list_path = Path(entry["list_file"])
+            if not list_path.is_file():
+                raise OSError("LIST_NOT_REGULAR_FILE")
+            raw = list_path.read_bytes()
+        except (OSError, TypeError, ValueError):
+            diagnostics["tpac:" + catalog + ":__list__"] = {
+                "status": "SOURCE_HOLD", "reason": "LIST_IO_HOLD"}
+            continue
         staged = build_detail_inventory(catalog, raw, entry["list_receipt"], now, staged)
+        processed_catalogs += 1
         from scripts.p30_tpac_catalog_topology import discover_catalog
         cards = discover_catalog(catalog, raw, entry["list_receipt"], now)
         details = entry["details"]
@@ -2296,6 +2308,9 @@ def offline_inventory_cli(manifest_path, repo_root):
             row["reason"] = reason
             counts["review" if accepted else "parse_hold"] += 1
             diagnostics[key] = {"status": row["status"], "reason": reason}
+    # Never create an apparent successful inventory cycle from zero readable LISTs.
+    if not processed_catalogs:
+        raise ValueError("TPAC_INVENTORY_CLI_ALL_LIST_UNAVAILABLE_HOLD")
     result = write_detail_inventory(staged, repo_root, expected)
     return {"decision": "ISOLATED_INVENTORY_ONLY_NO_PUBLICATION",
             "inventory": result, "counts": counts,
