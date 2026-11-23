@@ -293,7 +293,7 @@ jobs:
                     'lkg_sha256':baseline_sha,'new_official_get':0,
                     'accepted_fields':0,'published':0}
           Path('evidence/tpac_normal_review_cli_detail_io.json').write_text(
-              json.dumps(evidence,sort_keys=True)+'\\n',encoding='utf-8')
+              json.dumps(evidence,sort_keys=True)+'\n',encoding='utf-8')
           print('PASS_NATIVE_EVENT_NORMAL_CLI_DETAIL_IO_ISOLATION_NO_NEW_GET_NO_PUBLISH')
           PY
       - name: Verify real archived native event CAS version history without reGET
