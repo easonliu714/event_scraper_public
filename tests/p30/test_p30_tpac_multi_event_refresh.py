@@ -3002,6 +3002,42 @@ class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
             snapshot, sha = load_isolated_prior(isolated)
             self.assertEqual(sha, result["result"]["sha256"])
             self.assertEqual(set(snapshot["events"]), {"tpac:2111", "tpac:event:2072"})
+            # Independent source receipt failures must HOLD only their own
+            # catalog, retaining the exact sibling LKG without inventing GETs.
+            program_path = Path(manifests["program"])
+            event_path = Path(manifests["event"])
+            original_program = json.loads(program_path.read_text(encoding="utf-8"))
+            original_event = json.loads(event_path.read_text(encoding="utf-8"))
+            stale_program = json.loads(json.dumps(original_program))
+            stale_program["list_receipt"]["observed_at"] = "2026-11-01T14:54:00+00:00"
+            program_path.write_text(json.dumps(stale_program), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            stale_result = json.loads(captured.getvalue())
+            self.assertEqual(stale_result["qualified"], 1)
+            self.assertEqual(stale_result["catalog_decisions"]["program"],
+                             "HOLD_PROGRAM_SOURCE_RECEIPT")
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            program_path.write_text(json.dumps(original_program), encoding="utf-8")
+
+            denied_event = json.loads(json.dumps(original_event))
+            denied_event["list_receipt"]["robots_allowed"] = False
+            event_path.write_text(json.dumps(denied_event), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            denied_result = json.loads(captured.getvalue())
+            self.assertEqual(denied_result["qualified"], 1)
+            self.assertEqual(denied_result["catalog_decisions"]["event"],
+                             "HOLD_EVENT_SOURCE_RECEIPT")
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            # Both source receipts denied: do not commit a zero-event snapshot.
+            program_path.write_text(json.dumps(stale_program), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 49)
+            self.assertEqual(json.loads(captured.getvalue())["qualified"], 0)
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            program_path.write_text(json.dumps(original_program), encoding="utf-8")
+            event_path.write_text(json.dumps(original_event), encoding="utf-8")
             # A different valid capture clock per catalog must not abort the
             # shared CAS or promote stale source evidence to a new observation.
             event_manifest_path = Path(manifests["event"])
