@@ -120,11 +120,22 @@ def _structured_event_fields(article, provider, sid, title, detail_url, stamp, s
             data = json.loads(node.string or node.get_text())
         except (ValueError, TypeError):
             continue
-        objects = data if isinstance(data, list) else [data]
-        for obj in objects:
-            if not isinstance(obj, dict):
+        # Archived schema.org pages commonly wrap Event nodes in @graph.
+        # Inspect only the top-level graph (never arbitrary nested objects),
+        # and require a single exact same-ID event before admitting fields.
+        roots = data if isinstance(data, list) else [data]
+        objects = []
+        for root in roots:
+            if not isinstance(root, dict):
                 continue
-            if obj.get("@type") not in ("Event", ["Event"]):
+            objects.append(root)
+            graph = root.get("@graph")
+            if isinstance(graph, list):
+                objects.extend(node for node in graph if isinstance(node, dict))
+        for obj in objects:
+            kinds = obj.get("@type")
+            if not (kinds == "Event" or
+                    isinstance(kinds, list) and kinds.count("Event") == 1):
                 continue
             parsed = _canonical_event_url(provider, obj.get("url"))
             if (parsed != (sid, detail_url)
