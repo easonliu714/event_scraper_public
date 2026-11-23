@@ -852,17 +852,33 @@ def refresh_dual_catalog_plan(program_inputs, event_inputs, prior, now):
     # Missing LIST bytes have no source authority. HOLD just that catalog,
     # preserve all prior identities, and let the healthy catalog advance.
     # Never fabricate an empty official LIST or invoke its parser as if valid.
-    if program_inputs["list_body"] is None:
-        program = {"events": dict(prior["events"]), "qualified": 0,
-                   "rejected": {}, "decision": "HOLD_PROGRAM_LIST_IO"}
-    else:
-        program = refresh_plan(**program_inputs, prior=prior, now=program_now)
+    # A source-owned receipt may expire or fail its integrity/robots check
+    # independently of its sibling. Preserve that catalog's prior LKG while
+    # allowing the other catalog's verified offline observations to advance.
+    # Schema/programming errors are deliberately NOT swallowed.
+    source_receipt_holds = {
+        "TPAC_SOURCE_STALE_OR_FUTURE_HOLD",
+        "TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD",
+        "TPAC_RECEIPT_MISSING_HOLD",
+        "TPAC_OFFLINE_FIXTURE_NOT_NATIVE_RECEIPT_HOLD",
+    }
+
+    def plan_catalog(inputs, catalog, baseline, clock, planner):
+        if inputs["list_body"] is None:
+            return {"events": dict(baseline["events"]), "qualified": 0,
+                    "rejected": {}, "decision": "HOLD_" + catalog.upper() + "_LIST_IO"}
+        try:
+            return planner(**inputs, prior=baseline, now=clock)
+        except ValueError as error:
+            if str(error) not in source_receipt_holds:
+                raise
+            return {"events": dict(baseline["events"]), "qualified": 0,
+                    "rejected": {catalog: str(error)},
+                    "decision": "HOLD_" + catalog.upper() + "_SOURCE_RECEIPT"}
+
+    program = plan_catalog(program_inputs, "program", prior, program_now, refresh_plan)
     intermediate = {"kind": KIND, "events": program["events"]}
-    if event_inputs["list_body"] is None:
-        event = {"events": dict(intermediate["events"]), "qualified": 0,
-                 "rejected": {}, "decision": "HOLD_EVENT_LIST_IO"}
-    else:
-        event = refresh_event_plan(**event_inputs, prior=intermediate, now=event_now)
+    event = plan_catalog(event_inputs, "event", intermediate, event_now, refresh_event_plan)
     qualified = program["qualified"] + event["qualified"]
     rejected = {"program:" + key: value for key, value in program["rejected"].items()}
     rejected.update({"event:" + key: value for key, value in event["rejected"].items()})
