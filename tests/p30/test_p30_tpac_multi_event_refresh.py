@@ -3037,6 +3037,22 @@ class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
             self.assertEqual(denied_result["rejected"]["event:event"],
                              "TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD")
             self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            # Event's native planner uses HOLD_EVENT_LIST_ (not HOLD_LIST_).
+            # A stale event receipt must be normalized identically, while
+            # the healthy programme still advances and CAS retains siblings.
+            stale_event = json.loads(json.dumps(original_event))
+            stale_event["list_receipt"]["observed_at"] = "2026-11-01T14:54:00+00:00"
+            event_path.write_text(json.dumps(stale_event), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            event_stale_result = json.loads(captured.getvalue())
+            self.assertEqual(event_stale_result["qualified"], 1)
+            self.assertEqual(event_stale_result["catalog_decisions"]["event"],
+                             "HOLD_EVENT_SOURCE_RECEIPT")
+            self.assertEqual(event_stale_result["rejected"]["event:event"],
+                             "TPAC_SOURCE_STALE_OR_FUTURE_HOLD")
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            event_path.write_text(json.dumps(denied_event), encoding="utf-8")
             # Both source receipts denied: do not commit a zero-event snapshot.
             program_path.write_text(json.dumps(stale_program), encoding="utf-8")
             with redirect_stdout(StringIO()) as captured:
