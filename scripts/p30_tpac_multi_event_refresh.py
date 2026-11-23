@@ -838,6 +838,14 @@ def refresh_dual_catalog_plan(program_inputs, event_inputs, prior, now):
             or not isinstance(prior, dict) or prior.get("kind") != KIND
             or not isinstance(prior.get("events"), dict)):
         raise ValueError("TPAC_DUAL_CATALOG_INPUT_HOLD")
+    # Independent catalogs retain their own observation clocks; never invent shared freshness.
+    if isinstance(now, dict):
+        if set(now) != {"program", "event"} or any(
+                not isinstance(now[key], datetime) for key in ("program", "event")):
+            raise ValueError("TPAC_DUAL_CATALOG_CLOCK_SCHEMA_HOLD")
+        program_now, event_now = now["program"], now["event"]
+    else:
+        program_now = event_now = now
     required = {"list_body", "list_receipt", "detail_pairs"}
     if set(program_inputs) != required or set(event_inputs) != required:
         raise ValueError("TPAC_DUAL_CATALOG_INPUT_HOLD")
@@ -848,13 +856,13 @@ def refresh_dual_catalog_plan(program_inputs, event_inputs, prior, now):
         program = {"events": dict(prior["events"]), "qualified": 0,
                    "rejected": {}, "decision": "HOLD_PROGRAM_LIST_IO"}
     else:
-        program = refresh_plan(**program_inputs, prior=prior, now=now)
+        program = refresh_plan(**program_inputs, prior=prior, now=program_now)
     intermediate = {"kind": KIND, "events": program["events"]}
     if event_inputs["list_body"] is None:
         event = {"events": dict(intermediate["events"]), "qualified": 0,
                  "rejected": {}, "decision": "HOLD_EVENT_LIST_IO"}
     else:
-        event = refresh_event_plan(**event_inputs, prior=intermediate, now=now)
+        event = refresh_event_plan(**event_inputs, prior=intermediate, now=event_now)
     qualified = program["qualified"] + event["qualified"]
     rejected = {"program:" + key: value for key, value in program["rejected"].items()}
     rejected.update({"event:" + key: value for key, value in event["rejected"].items()})
@@ -955,10 +963,9 @@ def main(argv=None):
             raise ValueError("TPAC_DUAL_CATALOG_MANIFEST_HOLD")
         program_inputs, program_now = _offline_dual_catalog_inputs(manifest["program"], "program")
         event_inputs, event_now = _offline_dual_catalog_inputs(manifest["event"], "event")
-        if program_now != event_now:
-            raise ValueError("TPAC_DUAL_CATALOG_OBSERVATION_CLOCK_HOLD")
         prior, expected_sha = load_isolated_prior(args.repo_root)
-        plan = refresh_dual_catalog_plan(program_inputs, event_inputs, prior, program_now)
+        plan = refresh_dual_catalog_plan(program_inputs, event_inputs, prior,
+                                         {"program": program_now, "event": event_now})
         if plan["decision"] == "REVIEW_SNAPSHOT_READY_NOT_FORMAL":
             result = write_isolated_plan(plan, args.repo_root, expected_sha)
         else:
