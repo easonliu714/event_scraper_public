@@ -3018,6 +3018,57 @@ class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
                 self.assertEqual(main(argv), 49)
             self.assertEqual(json.loads(captured.getvalue())["qualified"], 0)
             self.assertEqual(load_isolated_prior(isolated)[1], sha)
+            # Repair both DETAIL files, then remove only the event LIST.
+            # The healthy programme must still commit a genuine changed show.
+            next_program = detail("2111", show="2026-11-22 (日) 13:00")
+            (root / "program_detail.html").write_bytes(next_program)
+            (root / "event_detail.html").write_bytes(event_body)
+            program_manifest_path = Path(manifests["program"])
+            program_manifest = json.loads(program_manifest_path.read_text(encoding="utf-8"))
+            program_manifest["details"]["2111"]["receipt"] = receipt(
+                ROOT + "/2111", next_program)
+            program_manifest_path.write_text(
+                json.dumps(program_manifest, ensure_ascii=False), encoding="utf-8")
+            (root / "event_list.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            event_list_failed = json.loads(captured.getvalue())
+            self.assertEqual(event_list_failed["qualified"], 1)
+            self.assertEqual(event_list_failed["catalog_decisions"]["event"],
+                             "HOLD_EVENT_LIST_IO")
+            advanced, advanced_sha = load_isolated_prior(isolated)
+            self.assertNotEqual(advanced_sha, sha)
+            self.assertEqual(advanced["events"]["tpac:event:2072"],
+                             snapshot["events"]["tpac:event:2072"])
+            self.assertEqual(advanced["events"]["tpac:2111"]["date"],
+                             "2026-11-22 13:00")
+            # The inverse case must also isolate only the failed LIST.
+            (root / "event_list.html").write_bytes(event_list)
+            (root / "program_list.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            program_list_failed = json.loads(captured.getvalue())
+            self.assertEqual(program_list_failed["qualified"], 1)
+            self.assertEqual(program_list_failed["catalog_decisions"]["program"],
+                             "HOLD_PROGRAM_LIST_IO")
+            self.assertEqual(load_isolated_prior(isolated)[1], advanced_sha)
+            # Neither LIST is usable: no empty snapshot, no data removal.
+            (root / "event_list.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 49)
+            both_failed = json.loads(captured.getvalue())
+            self.assertEqual(both_failed["qualified"], 0)
+            self.assertEqual(both_failed["catalog_decisions"],
+                             {"program": "HOLD_PROGRAM_LIST_IO",
+                              "event": "HOLD_EVENT_LIST_IO"})
+            self.assertEqual(load_isolated_prior(isolated)[1], advanced_sha)
+            # Invalid LIST schema remains a hard manifest failure.
+            program_manifest["list_file"] = None
+            program_manifest_path.write_text(
+                json.dumps(program_manifest, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "TPAC_DUAL_CATALOG_LIST_SCHEMA_HOLD"):
+                main(argv)
+            self.assertEqual(load_isolated_prior(isolated)[1], advanced_sha)
             self.assertFalse((isolated / "docs" / "data.json").exists())
 
     def test_dual_cli_requires_explicit_isolated_prior_and_both_catalogs(self):
