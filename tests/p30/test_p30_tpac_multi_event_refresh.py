@@ -3002,6 +3002,20 @@ class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
             snapshot, sha = load_isolated_prior(isolated)
             self.assertEqual(sha, result["result"]["sha256"])
             self.assertEqual(set(snapshot["events"]), {"tpac:2111", "tpac:event:2072"})
+            # A different valid capture clock per catalog must not abort the
+            # shared CAS or promote stale source evidence to a new observation.
+            event_manifest_path = Path(manifests["event"])
+            event_manifest = json.loads(event_manifest_path.read_text(encoding="utf-8"))
+            event_manifest["now"] = "2026-11-08T15:54:00+00:00"
+            event_manifest_path.write_text(
+                json.dumps(event_manifest, ensure_ascii=False), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            independently_timed = json.loads(captured.getvalue())
+            self.assertEqual(independently_timed["qualified"], 2)
+            self.assertEqual(independently_timed["published"], 0)
+            self.assertEqual(load_isolated_prior(isolated)[0], snapshot)
+            self.assertEqual(load_isolated_prior(isolated)[1], sha)
             # One missing DETAIL cannot delete either sibling or prior evidence.
             (root / "event_detail.html").unlink()
             with redirect_stdout(StringIO()) as captured:
