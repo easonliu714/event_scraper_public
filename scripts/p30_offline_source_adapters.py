@@ -114,7 +114,7 @@ def replay_offline_sources(manifest, fixture_root):
             or not isinstance(manifest["sources"], dict)
             or set(manifest["sources"]) != set(SOURCES)):
         raise ValueError("SOURCE_DUAL_ADAPTER_MANIFEST_HOLD")
-    rows, holds, states = {}, {}, {}
+    rows, holds, states, listed = {}, {}, {}, {provider: [] for provider in SOURCES}
     for provider in SOURCES:
         entry = manifest["sources"][provider]
         if (not isinstance(entry, dict)
@@ -136,6 +136,9 @@ def replay_offline_sources(manifest, fixture_root):
             states[provider] = "HOLD_EMPTY_LIST"
             continue
         states[provider] = "REVIEW_IDENTITY_ONLY"
+        # A DETAIL HOLD may preserve an existing identity only if the latest
+        # verified LIST still explicitly contains its provider-owned ID.
+        listed[provider] = [provider + ":" + sid for sid in sorted(cards)]
         for sid in entry["details"]:
             if sid not in cards:
                 raise ValueError("SOURCE_DETAIL_ID_NOT_IN_LIST_HOLD")
@@ -180,6 +183,7 @@ def replay_offline_sources(manifest, fixture_root):
         "kind": "MULTI_SOURCE_OFFLINE_FIELD_EVIDENCE_V1",
         "scope": "SEALED_OFFLINE_REPLAY_ONLY",
         "records": rows, "holds": holds, "source_states": states,
+        "listed_identities": listed,
         "counts": {"review_identities": len(rows), "sources": len(SOURCES)},
         "new_official_get": 0, "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
@@ -197,8 +201,19 @@ def _candidate_rows(report):
             or report.get("new_official_get") != 0
             or report.get("accepted_fields") != 0 or report.get("published") != 0
             or not isinstance(report.get("records"), dict)
+            or not isinstance(report.get("holds"), dict)
             or not isinstance(report.get("source_states"), dict)
-            or set(report["source_states"]) != set(SOURCES)):
+            or set(report["source_states"]) != set(SOURCES)
+            or not isinstance(report.get("listed_identities"), dict)
+            or set(report["listed_identities"]) != set(SOURCES)
+            or any(not isinstance(report["listed_identities"][provider], list)
+                   or len(set(report["listed_identities"][provider])) !=
+                       len(report["listed_identities"][provider])
+                   or any(not isinstance(identity, str)
+                          or not identity.startswith(provider + ":")
+                          or not IDENTIFIER.fullmatch(identity[len(provider) + 1:])
+                          for identity in report["listed_identities"][provider])
+                   for provider in SOURCES)):
         raise ValueError("SOURCE_CANDIDATE_AUTHORITY_HOLD")
     rows = {}
     for identity, record in sorted(report["records"].items()):
@@ -287,7 +302,36 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                                ("source_namespace", "event_id", "detail_source_url")):
                             raise ValueError("SOURCE_CANDIDATE_IDENTITY_SWAP_HOLD")
                     elif report["source_states"][provider] == "REVIEW_IDENTITY_ONLY":
-                        raise ValueError("SOURCE_CANDIDATE_DESTRUCTIVE_REMOVAL_HOLD")
+                        # A healthy LIST may include a known ID whose DETAIL
+                        # is absent/invalid. It is not a deletion: retain the
+                        # identity and immutable historical provenance, but
+                        # withdraw *all* old REVIEW values from current use.
+                        # A missing ID from the verified LIST still fails closed.
+                        held_reason = report["holds"].get(identity)
+                        allowed = {
+                            "SOURCE_DETAIL_NOT_PROVIDED_HOLD",
+                            "SOURCE_FIXTURE_IO_HOLD",
+                            "SOURCE_FIXTURE_PATH_HOLD",
+                            "SOURCE_RECEIPT_PROVENANCE_HOLD",
+                            "SOURCE_RECEIPT_TIME_HOLD",
+                            "SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD",
+                            "SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD",
+                        }
+                        if (identity not in report["listed_identities"][provider]
+                                or held_reason not in allowed):
+                            raise ValueError("SOURCE_CANDIDATE_DESTRUCTIVE_REMOVAL_HOLD")
+                        pending = dict(row)
+                        pending["fields"] = {}
+                        pending["held_fields"] = {
+                            name: {**field, "value": None,
+                                   "role": "UNKNOWN", "decision": "HOLD",
+                                   "hold_reason": held_reason}
+                            for name, field in {**row["held_fields"], **row["fields"]}.items()
+                        }
+                        pending["detail_replay_hold_reason"] = held_reason
+                        _validate_archived_candidate_snapshot_row(
+                            identity, pending, "SOURCE_CANDIDATE_DETAIL_HOLD")
+                        rows[identity] = pending
                     else:
                         rows[identity] = row
             except (TypeError, UnicodeError, json.JSONDecodeError) as exc:
