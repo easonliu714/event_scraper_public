@@ -44,6 +44,60 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_independent_provider_cli_candidate_cas_without_synthetic_sibling(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            fixture = self._fixture(root)
+            single = copy.deepcopy(fixture)
+            del single["sources"]["kktix"]
+            report = replay_offline_sources(single, root)
+            self.assertEqual(report["source_states"]["kktix"], "NOT_ATTEMPTED")
+            self.assertEqual(report["listed_identities"]["kktix"], [])
+            self.assertNotIn("kktix", report["holds"])
+            self.assertEqual(report["counts"]["sources"], 1)
+            self.assertEqual(set(report["records"]), {"accupass:abc123"})
+            for sources in ({}, {"unknown": single["sources"]["accupass"]}):
+                with self.assertRaisesRegex(ValueError, "SOURCE_DUAL_ADAPTER_MANIFEST_HOLD"):
+                    replay_offline_sources(dict(single, sources=sources), root)
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps(single), encoding="utf-8")
+            dest = root / "isolated"
+            cmd = [sys.executable, "-m", "scripts.p30_offline_source_adapters",
+                   "--manifest", str(manifest), "--fixture-root", str(root),
+                   "--candidate-root", str(dest)]
+            created = json.loads(subprocess.check_output(cmd, text=True))
+            first = created["candidate_commit"]["sha256"]
+            stored = load_offline_candidate_lkg(dest, first)
+            self.assertEqual(set(stored["candidates"]), {"accupass:abc123"})
+            sibling = copy.deepcopy(fixture)
+            del sibling["sources"]["accupass"]
+            manifest.write_text(json.dumps(sibling), encoding="utf-8")
+            advanced = json.loads(subprocess.check_output(
+                cmd + ["--expected-sha", first], text=True))
+            second = advanced["candidate_commit"]["sha256"]
+            updated = load_offline_candidate_lkg(dest, second)
+            self.assertEqual(set(updated["candidates"]), {"accupass:abc123", "kktix:abc123"})
+            self.assertEqual(updated["candidates"]["accupass:abc123"],
+                             stored["candidates"]["accupass:abc123"])
+            stale = subprocess.run(cmd + ["--expected-sha", first], capture_output=True, text=True)
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("SOURCE_CANDIDATE_CAS_HOLD", stale.stderr)
+            self.assertEqual(load_offline_candidate_lkg(dest, second), updated)
+            forged = copy.deepcopy(report)
+            forged["source_states"]["accupass"] = "NOT_ATTEMPTED"
+            forged["listed_identities"]["accupass"] = []
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_IDENTITY_HOLD"):
+                commit_offline_candidate_lkg(forged, dest, second)
+            forged["source_states"]["accupass"] = "FORGED"
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_AUTHORITY_HOLD"):
+                commit_offline_candidate_lkg(forged, dest, second)
+            self.assertEqual(load_offline_candidate_lkg(dest, second), updated)
+            self.assertEqual((advanced["new_official_get"], advanced["accepted_fields"],
+                              advanced["published"]), (0, 0, 0))
+            self.assertFalse((dest / "docs" / "data.json").exists())
+
     def test_accupass_observed_search_url_and_canonical_candidate_lineage(self):
         # Reuse the historical #236 exact UTM contract; fixture is NOT
         # official raw evidence. This tests the cross-branch integration.
