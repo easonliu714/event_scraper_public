@@ -265,14 +265,20 @@ def _detail_title_from_jsonld(article, provider, sid, title, detail_url):
 
 
 def replay_offline_sources(manifest, fixture_root):
-    """Build a non-publishing two-provider review ledger from sealed fixtures."""
+    """Replay any nonempty subset of registered providers without network or publication."""
     if (not isinstance(manifest, dict) or set(manifest) != {"mode", "sources"}
             or manifest["mode"] != "SEALED_OFFLINE_REPLAY_ONLY"
             or not isinstance(manifest["sources"], dict)
-            or set(manifest["sources"]) != set(SOURCES)):
+            or not manifest["sources"]
+            or not set(manifest["sources"]).issubset(SOURCES)):
         raise ValueError("SOURCE_DUAL_ADAPTER_MANIFEST_HOLD")
     rows, holds, states, listed = {}, {}, {}, {provider: [] for provider in SOURCES}
     for provider in SOURCES:
+        if provider not in manifest["sources"]:
+            # Not scheduled is not an empty or failed official LIST.
+            # Keep prior sibling snapshots intact without claiming observation.
+            states[provider] = "NOT_ATTEMPTED"
+            continue
         entry = manifest["sources"][provider]
         if (not isinstance(entry, dict)
                 or set(entry) != {"list_file", "list_receipt", "details"}
@@ -365,7 +371,7 @@ def replay_offline_sources(manifest, fixture_root):
         "scope": "SEALED_OFFLINE_REPLAY_ONLY",
         "records": rows, "holds": holds, "source_states": states,
         "listed_identities": listed,
-        "counts": {"review_identities": len(rows), "sources": len(SOURCES)},
+        "counts": {"review_identities": len(rows), "sources": len(manifest["sources"])},
         "new_official_get": 0, "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
@@ -414,6 +420,9 @@ def _candidate_rows(report):
             or not isinstance(report.get("holds"), dict)
             or not isinstance(report.get("source_states"), dict)
             or set(report["source_states"]) != set(SOURCES)
+            or any(state not in ("REVIEW_IDENTITY_ONLY", "HOLD_LIST",
+                                 "HOLD_EMPTY_LIST", "NOT_ATTEMPTED")
+                   for state in report["source_states"].values())
             or not isinstance(report.get("listed_identities"), dict)
             or set(report["listed_identities"]) != set(SOURCES)
             or any(not isinstance(report["listed_identities"][provider], list)
@@ -423,6 +432,9 @@ def _candidate_rows(report):
                           or not identity.startswith(provider + ":")
                           or not IDENTIFIER.fullmatch(identity[len(provider) + 1:])
                           for identity in report["listed_identities"][provider])
+                   for provider in SOURCES)
+            or any(report["source_states"][provider] != "REVIEW_IDENTITY_ONLY"
+                   and report["listed_identities"][provider]
                    for provider in SOURCES)):
         raise ValueError("SOURCE_CANDIDATE_AUTHORITY_HOLD")
     rows = {}
@@ -434,6 +446,11 @@ def _candidate_rows(report):
                 or record.get("archive_evidence_current") is not False
                 or record.get("decision") != "REVIEW_ONLY_NO_FIELD_ACCEPTANCE"
                 or not isinstance(record.get("fields"), dict)):
+            raise ValueError("SOURCE_CANDIDATE_IDENTITY_HOLD")
+        provider = record["source_namespace"]
+        if (report["source_states"][provider] != "REVIEW_IDENTITY_ONLY"
+                or identity not in report["listed_identities"][provider]
+                or identity in report["holds"]):
             raise ValueError("SOURCE_CANDIDATE_IDENTITY_HOLD")
         url = _canonical_event_url(record["source_namespace"], record.get("detail_source_url"))
         if url is None or url[0] != record["event_id"] or url[1] != record["detail_source_url"]:
@@ -474,7 +491,7 @@ def _candidate_canonical(obj):
 
 
 def commit_offline_candidate_lkg(report, root, expected_sha=None):
-    """Non-destructive, locked CAS of two provider-namespaced Candidate ledgers.
+    """Non-destructive, locked CAS of provider-namespaced Candidate ledgers.
 
     Failed source replays retain their prior candidate, never replace it with
     an empty source result. Historical versions remain available for rollback.
@@ -676,12 +693,23 @@ def rollback_offline_candidate_lkg(root, archived_sha, expected_current_sha):
     return {"sha256": archived_sha, "decision": "ISOLATED_ROLLBACK_NOT_FORMAL"}
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Offline two-source LIST+DETAIL; no GET/publish")
+    parser = argparse.ArgumentParser(description="Offline selected-source LIST+DETAIL; no GET/publish")
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--fixture-root", required=True, type=Path)
+    parser.add_argument("--candidate-root", type=Path,
+                        help="Explicit isolated Candidate CAS destination; default is read-only")
+    parser.add_argument("--expected-sha",
+                        help="Current Candidate SHA for CAS; omit only for first creation")
     args = parser.parse_args(argv)
+    if args.expected_sha is not None and args.candidate_root is None:
+        parser.error("--expected-sha requires --candidate-root")
     data = json.loads(args.manifest.read_text(encoding="utf-8"))
     report = replay_offline_sources(data, args.fixture_root)
+    if args.candidate_root is not None:
+        result = commit_offline_candidate_lkg(report, args.candidate_root, args.expected_sha)
+        # Verify the persisted canonical bytes with the existing restart reader.
+        load_offline_candidate_lkg(args.candidate_root, result["sha256"])
+        report["candidate_commit"] = result
     print(json.dumps(report, ensure_ascii=False, sort_keys=True))
     return 0
 
