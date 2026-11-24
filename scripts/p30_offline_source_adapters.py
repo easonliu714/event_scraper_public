@@ -10,7 +10,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qsl, urljoin, urlsplit
 from bs4 import BeautifulSoup
 
 SOURCES = {
@@ -22,23 +22,46 @@ IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$")
 
 
 def _canonical_event_url(provider, href):
-    """Keep only exact provider event IDs; reject redirects and cross-host aliases."""
+    """Keep exact event IDs; reuse #236 ACCUPASS discovery-query rules."""
     host, prefix = SOURCES[provider]
-    if not isinstance(href, str):
+    if not isinstance(href, str) or not href or href.startswith("//"):
         return None
-    url = urlsplit(urljoin("https://" + host + "/", href))
-    if (url.scheme != "https" or url.hostname != host or url.port is not None
-            or url.username is not None or url.password is not None
-            or url.query or url.fragment):
+    try:
+        url = urlsplit(urljoin("https://" + host + "/", href))
+        if (url.scheme != "https" or url.hostname != host or url.port is not None
+                or url.username is not None or url.password is not None
+                or url.fragment):
+            return None
+        if url.query:
+            if provider != "accupass":
+                return None
+            # Port the exact observed key/value allowlist from #236
+            # p30_ab_kktix_fuzhong_native.exact_detail (08167a0a).
+            query = parse_qsl(url.query, keep_blank_values=True, strict_parsing=True)
+            allowed = {"utm_campaign": "accu_e_", "utm_medium": "search_result_",
+                       "utm_source": "web"}
+            if (len(query) != len(set(k for k, _ in query))
+                    or any(allowed.get(k) != v for k, v in query)):
+                return None
+        path = url.path.split("/")
+        if len(path) != 3 or path[0] != "" or path[1] != prefix:
+            return None
+        sid = path[2]
+        if not IDENTIFIER.fullmatch(sid):
+            return None
+        return sid, "https://" + host + "/" + prefix + "/" + sid
+    except ValueError:
         return None
-    path = url.path.split("/")
-    if len(path) != 3 or path[0] != "" or path[1] != prefix:
-        return None
-    sid = path[2]
-    if not IDENTIFIER.fullmatch(sid):
-        return None
-    return sid, "https://" + host + "/" + prefix + "/" + sid
 
+
+def _list_url(provider, receipt):
+    """Only the known public LIST endpoints; retain legacy root fixtures."""
+    root = "https://" + SOURCES[provider][0] + "/"
+    observed = receipt.get("source_url") if isinstance(receipt, dict) else None
+    allowed = {root, root + "search"} if provider == "accupass" else {root}
+    if not isinstance(observed, str) or observed not in allowed:
+        raise ValueError("SOURCE_RECEIPT_PROVENANCE_HOLD")
+    return observed
 
 def _read_fixture(root, relative):
     """Fail closed on path traversal, symlinks, directories and oversized files."""
@@ -104,7 +127,12 @@ def _owned_list(provider, body):
         # earlier source-owned identity.
         if sid in found and found[sid]["title"] != name:
             raise ValueError("SOURCE_LIST_DUPLICATE_IDENTITY_HOLD")
-        found[sid] = {"id": sid, "title": name, "url": detail_url}
+        # Keep the actual LIST edge distinct from canonical identity.
+        link_url = urljoin("https://" + SOURCES[provider][0] + "/", link.get("href"))
+        edges = set(found.get(sid, {}).get("source_link_urls", []))
+        edges.add(link_url)
+        found[sid] = {"id": sid, "title": name, "url": detail_url,
+                      "source_link_urls": sorted(edges)}
     return found
 
 
@@ -251,10 +279,10 @@ def replay_offline_sources(manifest, fixture_root):
                 or not isinstance(entry["details"], dict)
                 or len(entry["details"]) > 20):
             raise ValueError("SOURCE_ADAPTER_INPUT_SCHEMA_HOLD")
-        list_url = "https://" + SOURCES[provider][0] + "/"
         try:
+            list_url = _list_url(provider, entry["list_receipt"])
             raw = _read_fixture(fixture_root, entry["list_file"])
-            _receipt(raw, entry["list_receipt"], list_url)
+            list_stamp = _receipt(raw, entry["list_receipt"], list_url)
             cards = _owned_list(provider, raw)
         except (ValueError, OSError) as exc:
             holds[provider] = str(exc)
@@ -282,7 +310,14 @@ def replay_offline_sources(manifest, fixture_root):
                 raise ValueError("SOURCE_DETAIL_SCHEMA_HOLD")
             try:
                 detail = _read_fixture(fixture_root, record["detail_file"])
-                stamp = _receipt(detail, record["receipt"], card["url"])
+                # Bind bytes to their original observed URL, not a rewritten
+                # canonical URL. A canonical fetch is also a valid LIST edge.
+                receipt = record["receipt"]
+                observed_url = receipt.get("source_url") if isinstance(receipt, dict) else None
+                if (observed_url not in [card["url"], *card["source_link_urls"]]
+                        or _canonical_event_url(provider, observed_url) != (sid, card["url"])):
+                    raise ValueError("SOURCE_RECEIPT_PROVENANCE_HOLD")
+                stamp = _receipt(detail, receipt, observed_url)
                 article = BeautifulSoup(detail, "html.parser")
                 heads = [node for node in article.select("h1")
                          if node.get_text(" ", strip=True)]
@@ -316,6 +351,13 @@ def replay_offline_sources(manifest, fixture_root):
                 "identity": identity, "source_namespace": provider,
                 "event_id": sid, "detail_source_url": card["url"],
                 "archive_evidence_current": False,
+                "source_evidence": {
+                    "list_url": list_url,
+                    "list_observed_at": list_stamp,
+                    "list_body_sha256": hashlib.sha256(raw).hexdigest(),
+                    "list_link_urls": card["source_link_urls"],
+                    "detail_observed_url": observed_url,
+                },
                 "fields": fields, "decision": "REVIEW_ONLY_NO_FIELD_ACCEPTANCE",
             }
     return {
@@ -331,6 +373,35 @@ def replay_offline_sources(manifest, fixture_root):
 
 # Shared Candidate/Core integration: the existing provenance validator is reused
 # rather than introducing a second, weaker field admission contract.
+def _validate_source_evidence(row):
+    """Validate new URL lineage while retaining legacy sealed snapshots."""
+    if "source_evidence" not in row:
+        return
+    evidence = row["source_evidence"]
+    provider, canonical = row["source_namespace"], row["detail_source_url"]
+    expected = (row["event_id"], canonical)
+    if (not isinstance(evidence, dict)
+            or set(evidence) != {"list_url", "list_observed_at", "list_body_sha256",
+                                 "list_link_urls", "detail_observed_url"}
+            or not isinstance(evidence["list_body_sha256"], str)
+            or re.fullmatch(r"[0-9a-f]{64}", evidence["list_body_sha256"]) is None
+            or not isinstance(evidence["list_link_urls"], list)
+            or not evidence["list_link_urls"]
+            or any(not isinstance(url, str) or not url.startswith("https://")
+                   or _canonical_event_url(provider, url) != expected
+                   for url in evidence["list_link_urls"])
+            or evidence["detail_observed_url"] not in [canonical, *evidence["list_link_urls"]]
+            or _canonical_event_url(provider, evidence["detail_observed_url"]) != expected):
+        raise ValueError("SOURCE_CANDIDATE_SOURCE_EVIDENCE_HOLD")
+    _list_url(provider, {"source_url": evidence["list_url"]})
+    try:
+        stamp = datetime.fromisoformat(evidence["list_observed_at"])
+        if stamp.utcoffset() is None:
+            raise ValueError("naive")
+    except (ValueError, TypeError):
+        raise ValueError("SOURCE_CANDIDATE_SOURCE_EVIDENCE_HOLD") from None
+
+
 def _candidate_rows(report):
     from scripts.p30_tpac_multi_event_refresh import _validate_archived_candidate_snapshot_row
     if (not isinstance(report, dict)
@@ -387,6 +458,11 @@ def _candidate_rows(report):
                "event_id": record["event_id"], "detail_source_url": url[1],
                "fields": accepted, "held_fields": held, "source_current": False,
                "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY"}
+        # Keep observed source URL and canonical event identity separate
+        # through CAS and restart, without promoting archive authority.
+        if "source_evidence" in record:
+            row["source_evidence"] = record["source_evidence"]
+            _validate_source_evidence(row)
         _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_CORE_HOLD")
         rows[identity] = row
     return rows
@@ -435,6 +511,7 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                 for identity, row in old["candidates"].items():
                     _validate_archived_candidate_snapshot_row(
                         identity, row, "SOURCE_CANDIDATE_PRIOR_FIELD_HOLD")
+                    _validate_source_evidence(row)
                     provider = row["source_namespace"]
                     if identity in rows:
                         if any(row.get(k) != rows[identity].get(k) for k in
@@ -542,6 +619,7 @@ def load_offline_candidate_lkg(root, expected_sha):
         raise ValueError("SOURCE_CANDIDATE_READ_SCHEMA_HOLD")
     for identity, row in snapshot["candidates"].items():
         _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_READ_FIELD_HOLD")
+        _validate_source_evidence(row)
     return snapshot
 
 
@@ -582,6 +660,7 @@ def rollback_offline_candidate_lkg(root, archived_sha, expected_current_sha):
         from scripts.p30_tpac_multi_event_refresh import _validate_archived_candidate_snapshot_row
         for identity, row in historical["candidates"].items():
             _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_ROLLBACK_FIELD_HOLD")
+            _validate_source_evidence(row)
         temp = None
         try:
             with tempfile.NamedTemporaryFile(dir=directory, prefix=".rollback-", delete=False) as out:
