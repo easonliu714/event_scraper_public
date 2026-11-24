@@ -44,6 +44,55 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_accupass_observed_search_url_and_canonical_candidate_lineage(self):
+        # Reuse the historical #236 exact UTM contract; fixture is NOT
+        # official raw evidence. This tests the cross-branch integration.
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            manifest = self._fixture(root)
+            entry = manifest["sources"]["accupass"]
+            canonical = "https://www.accupass.com/event/abc123"
+            query = "?utm_campaign=accu_e_&utm_medium=search_result_&utm_source=web"
+            original = (root / entry["list_file"]).read_bytes()
+            def seal(suffix, observed_url):
+                body = original.replace(b'/event/abc123"', ("/event/abc123" + suffix + '"').encode())
+                (root / entry["list_file"]).write_bytes(body)
+                entry["list_receipt"]["body_sha256"] = hashlib.sha256(body).hexdigest()
+                entry["list_receipt"]["source_url"] = "https://www.accupass.com/search"
+                entry["details"]["abc123"]["receipt"]["source_url"] = observed_url
+                return replay_offline_sources(manifest, root)
+            report = seal(query, canonical + query)
+            row = report["records"]["accupass:abc123"]
+            self.assertEqual(row["detail_source_url"], canonical)
+            self.assertEqual(row["source_evidence"]["detail_observed_url"], canonical + query)
+            self.assertEqual(row["source_evidence"]["list_link_urls"], [canonical + query])
+            self.assertEqual(row["source_evidence"]["list_url"], "https://www.accupass.com/search")
+            self.assertEqual(row["source_evidence"]["list_body_sha256"],
+                             entry["list_receipt"]["body_sha256"])
+            saved = commit_offline_candidate_lkg(report, root)
+            candidate = load_offline_candidate_lkg(root, saved["sha256"])["candidates"]["accupass:abc123"]
+            self.assertEqual(candidate["source_evidence"], row["source_evidence"])
+            self.assertEqual(candidate["detail_source_url"], canonical)
+            self.assertEqual((report["new_official_get"], report["accepted_fields"],
+                              report["published"]), (0, 0, 0))
+            # A canonical request and a LIST-discovery URL are distinct.
+            self.assertIn("accupass:abc123", seal(query, canonical)["records"])
+            for suffix in ("?utm_source=other", "?utm_source=web&utm_source=web",
+                           "?session=abc", "?utm_other=web", "#fragment"):
+                rejected = seal(suffix, canonical + suffix)
+                self.assertNotIn("accupass:abc123", rejected["records"])
+                self.assertIn("kktix:abc123", rejected["records"])
+            mismatched = seal(query, canonical + "?utm_source=web")
+            self.assertEqual(mismatched["holds"]["accupass:abc123"],
+                             "SOURCE_RECEIPT_PROVENANCE_HOLD")
+            forged = copy.deepcopy(report)
+            forged["records"]["accupass:abc123"]["source_evidence"]["detail_observed_url"] = (
+                "https://www.accupass.com/event/other")
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_SOURCE_EVIDENCE_HOLD"):
+                commit_offline_candidate_lkg(forged, root, saved["sha256"])
+
     def test_list_card_conflicting_title_assertions_hold_provider_only(self):
         # Source LIST identity is not trustworthy when the same anchor
         # advertises conflicting visible and attribute titles. Keep the
