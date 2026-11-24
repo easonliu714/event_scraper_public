@@ -59,6 +59,12 @@ def _list_url(provider, receipt):
     root = "https://" + SOURCES[provider][0] + "/"
     observed = receipt.get("source_url") if isinstance(receipt, dict) else None
     allowed = {root, root + "search"} if provider == "accupass" else {root}
+    if provider == "accupass":
+        # Indexed regional/category entrances, not proof of live coverage.
+        # Exact allowlist only; no guessed pagination or arbitrary query keys.
+        allowed.update(root + "?area=" + area for area in ("north", "center", "south"))
+        allowed.update(root + "?area=north&channel=" + channel
+                       for channel in ("1", "2", "3"))
     if not isinstance(observed, str) or observed not in allowed:
         raise ValueError("SOURCE_RECEIPT_PROVENANCE_HOLD")
     return observed
@@ -264,6 +270,49 @@ def _detail_title_from_jsonld(article, provider, sid, title, detail_url):
     return matches == 1
 
 
+def _sealed_list_union(provider, entries, fixture_root):
+    """Union verified LIST observations without claiming provider completeness.
+
+    Per-card page lineage is retained so a DETAIL receipt cannot borrow a
+    discovery link from a different page while attributing the first page SHA.
+    """
+    cards, pages, failures, seen_urls = {}, [], {}, set()
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict) or set(entry) != {"list_file", "list_receipt"}:
+            raise ValueError("SOURCE_PARTITION_SCHEMA_HOLD")
+        try:
+            url = _list_url(provider, entry["list_receipt"])
+            if url in seen_urls:
+                raise ValueError("SOURCE_PARTITION_DUPLICATE_URL_HOLD")
+            seen_urls.add(url)
+            raw = _read_fixture(fixture_root, entry["list_file"])
+            stamp = _receipt(raw, entry["list_receipt"], url)
+            found = _owned_list(provider, raw)
+        except (ValueError, OSError) as exc:
+            if str(exc) == "SOURCE_PARTITION_DUPLICATE_URL_HOLD":
+                raise
+            failures[str(index)] = str(exc)
+            continue
+        if not found:
+            failures[str(index)] = "SOURCE_EMPTY_LIST_HOLD"
+            continue
+        digest = hashlib.sha256(raw).hexdigest()
+        pages.append({"list_url": url, "list_observed_at": stamp,
+                      "list_body_sha256": digest,
+                      "event_ids": sorted(found)})
+        for sid, card in found.items():
+            if sid in cards and cards[sid]["title"] != card["title"]:
+                raise ValueError("SOURCE_LIST_DUPLICATE_IDENTITY_HOLD")
+            target = cards.setdefault(sid, {**card, "list_observations": []})
+            target["source_link_urls"] = sorted(set(target["source_link_urls"])
+                                                 | set(card["source_link_urls"]))
+            target["list_observations"].append({
+                "list_url": url, "list_observed_at": stamp,
+                "list_body_sha256": digest, "list_link_urls": card["source_link_urls"],
+            })
+    return cards, pages, failures
+
+
 def replay_offline_sources(manifest, fixture_root):
     """Replay any nonempty subset of registered providers without network or publication."""
     if (not isinstance(manifest, dict) or set(manifest) != {"mode", "sources"}
@@ -273,6 +322,7 @@ def replay_offline_sources(manifest, fixture_root):
             or not set(manifest["sources"]).issubset(SOURCES)):
         raise ValueError("SOURCE_DUAL_ADAPTER_MANIFEST_HOLD")
     rows, holds, states, listed = {}, {}, {}, {provider: [] for provider in SOURCES}
+    partition_inventory = {}
     for provider in SOURCES:
         if provider not in manifest["sources"]:
             # Not scheduled is not an empty or failed official LIST.
@@ -281,24 +331,54 @@ def replay_offline_sources(manifest, fixture_root):
             continue
         entry = manifest["sources"][provider]
         if (not isinstance(entry, dict)
-                or set(entry) != {"list_file", "list_receipt", "details"}
+                or set(entry) not in ({"list_file", "list_receipt", "details"},
+                                      {"lists", "details"})
                 or not isinstance(entry["details"], dict)
                 or len(entry["details"]) > 20):
             raise ValueError("SOURCE_ADAPTER_INPUT_SCHEMA_HOLD")
+        multi = "lists" in entry
+        if multi and (provider != "accupass" or not isinstance(entry["lists"], list)
+                      or not entry["lists"] or len(entry["lists"]) > 100):
+            raise ValueError("SOURCE_PARTITION_SCHEMA_HOLD")
+        # Legacy whole-source manifests remain compatible. Regional URL inputs
+        # and explicit multi-LIST manifests never imply full provider coverage.
         try:
-            list_url = _list_url(provider, entry["list_receipt"])
-            raw = _read_fixture(fixture_root, entry["list_file"])
-            list_stamp = _receipt(raw, entry["list_receipt"], list_url)
-            cards = _owned_list(provider, raw)
+            if multi:
+                cards, pages, failures = _sealed_list_union(
+                    provider, entry["lists"], fixture_root)
+                partial = True
+            else:
+                list_url = _list_url(provider, entry["list_receipt"])
+                raw = _read_fixture(fixture_root, entry["list_file"])
+                list_stamp = _receipt(raw, entry["list_receipt"], list_url)
+                cards = _owned_list(provider, raw)
+                partial = provider == "accupass" and bool(urlsplit(list_url).query)
+                digest = hashlib.sha256(raw).hexdigest()
+                pages = [{"list_url": list_url, "list_observed_at": list_stamp,
+                          "list_body_sha256": digest, "event_ids": sorted(cards)}]
+                failures = {}
+                for card in cards.values():
+                    card["list_observations"] = [{
+                        "list_url": list_url, "list_observed_at": list_stamp,
+                        "list_body_sha256": digest,
+                        "list_link_urls": card["source_link_urls"],
+                    }]
         except (ValueError, OSError) as exc:
             holds[provider] = str(exc)
             states[provider] = "HOLD_LIST"
             continue
+        if partial:
+            partition_inventory[provider] = {
+                "coverage": "PARTIAL_NOT_PROVIDER_COMPLETE",
+                "pages": pages, "failed_pages": failures,
+                "event_ids": sorted(cards),
+                "detail_backlog": sorted(set(cards) - set(entry["details"])),
+            }
         if not cards:
             holds[provider] = "SOURCE_EMPTY_LIST_HOLD"
             states[provider] = "HOLD_EMPTY_LIST"
             continue
-        states[provider] = "REVIEW_IDENTITY_ONLY"
+        states[provider] = "REVIEW_PARTITION_ONLY" if partial else "REVIEW_IDENTITY_ONLY"
         # A DETAIL HOLD may preserve an existing identity only if the latest
         # verified LIST still explicitly contains its provider-owned ID.
         listed[provider] = [provider + ":" + sid for sid in sorted(cards)]
@@ -324,6 +404,11 @@ def replay_offline_sources(manifest, fixture_root):
                         or _canonical_event_url(provider, observed_url) != (sid, card["url"])):
                     raise ValueError("SOURCE_RECEIPT_PROVENANCE_HOLD")
                 stamp = _receipt(detail, receipt, observed_url)
+                # Choose the actual page bearing the observed edge; a
+                # canonical URL may use any verified page containing this ID.
+                page_evidence = next(
+                    page for page in card["list_observations"]
+                    if observed_url == card["url"] or observed_url in page["list_link_urls"])
                 article = BeautifulSoup(detail, "html.parser")
                 heads = [node for node in article.select("h1")
                          if node.get_text(" ", strip=True)]
@@ -358,20 +443,21 @@ def replay_offline_sources(manifest, fixture_root):
                 "event_id": sid, "detail_source_url": card["url"],
                 "archive_evidence_current": False,
                 "source_evidence": {
-                    "list_url": list_url,
-                    "list_observed_at": list_stamp,
-                    "list_body_sha256": hashlib.sha256(raw).hexdigest(),
-                    "list_link_urls": card["source_link_urls"],
+                    **page_evidence,
                     "detail_observed_url": observed_url,
                 },
                 "fields": fields, "decision": "REVIEW_ONLY_NO_FIELD_ACCEPTANCE",
             }
+    for provider, inventory in partition_inventory.items():
+        inventory["detail_backlog"] = [
+            sid for sid in inventory["event_ids"] if provider + ":" + sid not in rows]
     return {
         "kind": "MULTI_SOURCE_OFFLINE_FIELD_EVIDENCE_V1",
         "scope": "SEALED_OFFLINE_REPLAY_ONLY",
         "records": rows, "holds": holds, "source_states": states,
         "listed_identities": listed,
         "counts": {"review_identities": len(rows), "sources": len(manifest["sources"])},
+        "partition_inventory": partition_inventory,
         "new_official_get": 0, "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
@@ -420,7 +506,7 @@ def _candidate_rows(report):
             or not isinstance(report.get("holds"), dict)
             or not isinstance(report.get("source_states"), dict)
             or set(report["source_states"]) != set(SOURCES)
-            or any(state not in ("REVIEW_IDENTITY_ONLY", "HOLD_LIST",
+            or any(state not in ("REVIEW_IDENTITY_ONLY", "REVIEW_PARTITION_ONLY", "HOLD_LIST",
                                  "HOLD_EMPTY_LIST", "NOT_ATTEMPTED")
                    for state in report["source_states"].values())
             or not isinstance(report.get("listed_identities"), dict)
@@ -433,7 +519,7 @@ def _candidate_rows(report):
                           or not IDENTIFIER.fullmatch(identity[len(provider) + 1:])
                           for identity in report["listed_identities"][provider])
                    for provider in SOURCES)
-            or any(report["source_states"][provider] != "REVIEW_IDENTITY_ONLY"
+            or any(report["source_states"][provider] not in ("REVIEW_IDENTITY_ONLY", "REVIEW_PARTITION_ONLY")
                    and report["listed_identities"][provider]
                    for provider in SOURCES)):
         raise ValueError("SOURCE_CANDIDATE_AUTHORITY_HOLD")
@@ -448,7 +534,7 @@ def _candidate_rows(report):
                 or not isinstance(record.get("fields"), dict)):
             raise ValueError("SOURCE_CANDIDATE_IDENTITY_HOLD")
         provider = record["source_namespace"]
-        if (report["source_states"][provider] != "REVIEW_IDENTITY_ONLY"
+        if (report["source_states"][provider] not in ("REVIEW_IDENTITY_ONLY", "REVIEW_PARTITION_ONLY")
                 or identity not in report["listed_identities"][provider]
                 or identity in report["holds"]):
             raise ValueError("SOURCE_CANDIDATE_IDENTITY_HOLD")
@@ -534,7 +620,13 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                         if any(row.get(k) != rows[identity].get(k) for k in
                                ("source_namespace", "event_id", "detail_source_url")):
                             raise ValueError("SOURCE_CANDIDATE_IDENTITY_SWAP_HOLD")
-                    elif report["source_states"][provider] == "REVIEW_IDENTITY_ONLY":
+                    elif (report["source_states"][provider] == "REVIEW_PARTITION_ONLY"
+                          and identity not in report["listed_identities"][provider]):
+                        # An unobserved identity is not a removed event. Prior
+                        # archive authority remains historical, never current.
+                        rows[identity] = row
+                    elif report["source_states"][provider] in (
+                            "REVIEW_IDENTITY_ONLY", "REVIEW_PARTITION_ONLY"):
                         # A healthy LIST may include a known ID whose DETAIL
                         # is absent/invalid. It is not a deletion: retain the
                         # identity and immutable historical provenance, but
