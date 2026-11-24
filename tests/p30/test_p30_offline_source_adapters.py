@@ -44,6 +44,93 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_accupass_partition_union_backlog_and_non_destructive_cas(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            fixture = self._fixture(root)
+            entry = fixture["sources"]["accupass"]
+            template = entry["list_receipt"]
+            base = "https://www.accupass.com/"
+            def listing(name, url, raw):
+                (root / name).write_bytes(raw)
+                return {"list_file": name, "list_receipt": {
+                    **template, "source_url": url,
+                    "body_sha256": hashlib.sha256(raw).hexdigest()}}
+            north = listing("north.html", base + "?area=north",
+                            (root / entry["list_file"]).read_bytes())
+            # The identical event appears in several regions/categories.
+            # Only the second page carries this particular observed UTM edge.
+            edge = base + "event/abc123?utm_source=web"
+            title = "已封存同一活動 ID 測試 accupass"
+            south = listing("south.html", base + "?area=south",
+                            ('<a href="' + edge + '"><h3>' + title +
+                             '</h3></a>' + ''.join(
+                                 '<a href="/event/s%d"><h3>South %d</h3></a>' % (i, i)
+                                 for i in range(25))).encode())
+            broken = listing("center.html", base + "?area=center",
+                             b'<a href="/event/center"><h3>Center</h3></a>')
+            broken["list_receipt"]["body_sha256"] = "0" * 64
+            detail = copy.deepcopy(entry["details"]["abc123"])
+            detail["receipt"]["source_url"] = edge
+            manifest = {"mode": fixture["mode"], "sources": {"accupass": {
+                "lists": [north, south, broken], "details": {"abc123": detail}}}}
+            report = replay_offline_sources(manifest, root)
+            inv = report["partition_inventory"]["accupass"]
+            self.assertEqual(report["source_states"]["accupass"], "REVIEW_PARTITION_ONLY")
+            self.assertEqual(inv["coverage"], "PARTIAL_NOT_PROVIDER_COMPLETE")
+            self.assertEqual(len(inv["event_ids"]), 26)
+            self.assertEqual(len(inv["detail_backlog"]), 25)
+            self.assertEqual(len(inv["pages"]), 2)
+            self.assertEqual(inv["failed_pages"]["2"], "SOURCE_RECEIPT_PROVENANCE_HOLD")
+            self.assertEqual(set(report["records"]), {"accupass:abc123"})
+            evidence = report["records"]["accupass:abc123"]["source_evidence"]
+            self.assertEqual(evidence["list_url"], base + "?area=south")
+            self.assertEqual(evidence["list_body_sha256"], south["list_receipt"]["body_sha256"])
+            self.assertEqual(evidence["list_link_urls"], [edge])
+            first = commit_offline_candidate_lkg(report, root)
+            baseline = load_offline_candidate_lkg(root, first["sha256"])
+
+            # A later category-only observation must not erase an event
+            # outside that category. A new ID is independently admitted.
+            category = listing("learning.html", base + "?area=north&channel=1",
+                               b'<a href="/event/new_id"><h3>New event</h3></a>')
+            body = b'<h1>New event</h1>'
+            (root / "new.html").write_bytes(body)
+            new_detail = {"detail_file": "new.html", "receipt": {
+                **template, "source_url": base + "event/new_id",
+                "body_sha256": hashlib.sha256(body).hexdigest()}}
+            partial = {"mode": fixture["mode"], "sources": {"accupass": {
+                **category, "details": {"new_id": new_detail}}}}
+            next_report = replay_offline_sources(partial, root)
+            second = commit_offline_candidate_lkg(next_report, root, first["sha256"])
+            stored = load_offline_candidate_lkg(root, second["sha256"])
+            self.assertEqual(set(stored["candidates"]), {"accupass:abc123", "accupass:new_id"})
+            self.assertEqual(stored["candidates"]["accupass:abc123"],
+                             baseline["candidates"]["accupass:abc123"])
+
+            # No arbitrary query or duplicate partition URL; conflicting
+            # titles across pages cannot be silently overwritten.
+            invalid = copy.deepcopy(manifest)
+            invalid["sources"]["accupass"]["lists"] = [north, north]
+            denied = replay_offline_sources(invalid, root)
+            self.assertEqual(denied["holds"]["accupass"], "SOURCE_PARTITION_DUPLICATE_URL_HOLD")
+            conflict = listing("conflict.html", base + "?area=north&channel=2",
+                               b'<a href="/event/abc123"><h3>Different title</h3></a>')
+            invalid["sources"]["accupass"]["lists"] = [north, conflict]
+            denied = replay_offline_sources(invalid, root)
+            self.assertEqual(denied["holds"]["accupass"], "SOURCE_LIST_DUPLICATE_IDENTITY_HOLD")
+            invalid["sources"]["accupass"]["lists"] = [
+                listing("unknown.html", base + "?area=north&page=2",
+                        b'<a href="/event/abc123"><h3>Unknown query</h3></a>')]
+            denied = replay_offline_sources(invalid, root)
+            self.assertEqual(denied["partition_inventory"]["accupass"]["failed_pages"]["0"],
+                             "SOURCE_RECEIPT_PROVENANCE_HOLD")
+            self.assertEqual(denied["records"], {})
+            self.assertEqual(load_offline_candidate_lkg(root, second["sha256"]), stored)
+            self.assertFalse((root / "docs" / "data.json").exists())
+
     def test_independent_provider_cli_candidate_cas_without_synthetic_sibling(self):
         from scripts.p30_offline_source_adapters import (
             commit_offline_candidate_lkg, load_offline_candidate_lkg)
