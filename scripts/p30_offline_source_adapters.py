@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 SOURCES = {
     "kktix": ("kktix.com", "events"),
     "accupass": ("www.accupass.com", "event"),
+    "twtc": ("twtc.com.tw", "exhibition_more.aspx"),
 }
 LIMIT = 2_000_000
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$")
@@ -32,6 +33,17 @@ def _canonical_event_url(provider, href):
                 or url.username is not None or url.password is not None
                 or url.fragment):
             return None
+        if provider == "twtc":
+            if url.path != "/exhibition_more.aspx":
+                return None
+            query = parse_qsl(url.query, keep_blank_values=True, strict_parsing=True)
+            params = dict(query)
+            if (len(query) != len(params) or set(params) - {"id", "p"}
+                    or not re.fullmatch(r"[0-9]{2,12}", params.get("id", ""))
+                    or params.get("p", "home") != "home"):
+                return None
+            sid = params["id"]
+            return sid, "https://twtc.com.tw/exhibition_more.aspx?id=" + sid + "&p=home"
         if url.query:
             if provider != "accupass":
                 return None
@@ -59,6 +71,8 @@ def _list_url(provider, receipt):
     root = "https://" + SOURCES[provider][0] + "/"
     observed = receipt.get("source_url") if isinstance(receipt, dict) else None
     allowed = {root, root + "search"} if provider == "accupass" else {root}
+    if provider == "twtc":
+        allowed = {"https://twtc.com.tw/exhibition?p=home"}
     if provider == "accupass":
         # Indexed regional/category entrances, not proof of live coverage.
         # Exact allowlist only; no guessed pagination or arbitrary query keys.
@@ -103,7 +117,77 @@ def _receipt(body, receipt, url):
     return stamp
 
 
+def _twtc_list(body):
+    """Port the verified L3-A title-cell/table contract, without the 39-row freeze.
+
+    L3-A #11 a63baf94 / L4-A #13 b1651e6f: preserve period text, exact
+    official detail ID and title ownership; conflicting IDs fail closed.
+    """
+    soup = BeautifulSoup(body, "html.parser")
+    found = {}
+    for tr in soup.find_all("tr"):
+        cols = tr.find_all("td", recursive=False)
+        if len(cols) < 3:
+            continue
+        period = " ".join(cols[0].stripped_strings)
+        if not (re.fullmatch(r"[0-9]{1,2}/[0-9]{1,2}\s*[~～-]\s*[0-9]{1,2}/[0-9]{1,2}", period)
+                or period == "延期未定"):
+            continue
+        title = " ".join(" ".join(x for x in cols[1].stripped_strings
+                                  if x.strip().casefold() not in ("more", "詳情")).split())
+        edges = {}
+        for link in cols[1].find_all("a", href=True):
+            href = link["href"]
+            parsed = _canonical_event_url("twtc", href)
+            if parsed is not None:
+                sid, canonical = parsed
+                edges.setdefault(sid, (canonical, set()))[1].add(
+                    urljoin("https://twtc.com.tw/", href))
+        # Unknown rows cannot be silently dropped from a claimed LIST.
+        if len(edges) != 1 or len(title) < 4:
+            raise ValueError("SOURCE_TWTC_LIST_IDENTITY_HOLD")
+        sid, (canonical, urls) = next(iter(edges.items()))
+        previous = found.get(sid)
+        if previous and (previous["title"] != title or previous["period"] != period):
+            raise ValueError("SOURCE_LIST_DUPLICATE_IDENTITY_HOLD")
+        found[sid] = {"id": sid, "title": title, "url": canonical, "period": period,
+                      "source_link_urls": sorted(urls | set(
+                          previous["source_link_urls"] if previous else []))}
+        if len(found) > 100:
+            raise ValueError("SOURCE_TWTC_LIST_CAP_HOLD")
+    return found
+
+
+def _twtc_period_fields(article, card, sid, stamp, sha):
+    """Reuse L4-A exact full-year period + LIST MM/DD parity, never infer year."""
+    from datetime import date
+    raw = card["period"]
+    if raw == "延期未定":
+        reason = "SOURCE_TWTC_POSTPONED_HOLD"
+    else:
+        matches = re.findall(
+            r"展出日期\s*[:：]\s*(20[0-9]{2}/[0-9]{1,2}/[0-9]{1,2})\s*[~～-]\s*(20[0-9]{2}/[0-9]{1,2}/[0-9]{1,2})",
+            " ".join(article.stripped_strings))
+        reason = "SOURCE_TWTC_PERIOD_AMBIGUOUS_HOLD"
+        if len(matches) == 1:
+            try:
+                start, end = [date(*map(int, x.split("/"))) for x in matches[0]]
+                md = [tuple(map(int, x.split("/"))) for x in re.split(r"\s*[~～-]\s*", raw)]
+                if start <= end and md == [(start.month, start.day), (end.month, end.day)]:
+                    return {"activity_period": _field(
+                        [start.isoformat(), end.isoformat()], "EXHIBITION_PERIOD", sid,
+                        card["url"], stamp, sha, "REVIEW",
+                        "SOURCE_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")}
+                reason = "SOURCE_TWTC_LIST_DETAIL_PERIOD_CONFLICT_HOLD"
+            except ValueError:
+                reason = "SOURCE_TWTC_INVALID_DATE_HOLD"
+    return {"activity_period": _field(None, "UNKNOWN", sid, card["url"], stamp, sha,
+                                        "HOLD", reason)}
+
+
 def _owned_list(provider, body):
+    if provider == "twtc":
+        return _twtc_list(body)
     soup = BeautifulSoup(body, "html.parser")
     found = {}
     for link in soup.select("a[href]"):
@@ -323,6 +407,7 @@ def replay_offline_sources(manifest, fixture_root):
         raise ValueError("SOURCE_DUAL_ADAPTER_MANIFEST_HOLD")
     rows, holds, states, listed = {}, {}, {}, {provider: [] for provider in SOURCES}
     partition_inventory = {}
+    twtc_list_body_sha256 = None
     for provider in SOURCES:
         if provider not in manifest["sources"]:
             # Not scheduled is not an empty or failed official LIST.
@@ -354,6 +439,8 @@ def replay_offline_sources(manifest, fixture_root):
                 cards = _owned_list(provider, raw)
                 partial = provider == "accupass" and bool(urlsplit(list_url).query)
                 digest = hashlib.sha256(raw).hexdigest()
+                if provider == "twtc":
+                    twtc_list_body_sha256 = digest
                 pages = [{"list_url": list_url, "list_observed_at": list_stamp,
                           "list_body_sha256": digest, "event_ids": sorted(cards)}]
                 failures = {}
@@ -411,8 +498,15 @@ def replay_offline_sources(manifest, fixture_root):
                     page for page in card["list_observations"]
                     if observed_url == card["url"] or observed_url in page["list_link_urls"])
                 article = BeautifulSoup(detail, "html.parser")
-                heads = [node for node in article.select("h1")
-                         if node.get_text(" ", strip=True)]
+                # TWTC L4-A uses exact H1/H2/H3 title parity (not page-wide text).
+                if provider == "twtc":
+                    heads = [node for node in article.select("h1,h2,h3")
+                             if " ".join(node.get_text(" ", strip=True).split()) == card["title"]]
+                    if len(heads) != 1:
+                        raise ValueError("SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
+                else:
+                    heads = [node for node in article.select("h1")
+                             if node.get_text(" ", strip=True)]
                 if len(heads) > 1:
                     raise ValueError("SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD")
                 if heads:
@@ -438,7 +532,10 @@ def replay_offline_sources(manifest, fixture_root):
                 fields[name] = _field(
                     None, "UNKNOWN", sid, card["url"], stamp, sha,
                     "HOLD", "SOURCE_FIELD_ROLE_NOT_VERIFIED")
-            fields.update(_structured_event_fields(article, provider, sid, actual, card["url"], stamp, sha))
+            if provider == "twtc":
+                fields.update(_twtc_period_fields(article, card, sid, stamp, sha))
+            else:
+                fields.update(_structured_event_fields(article, provider, sid, actual, card["url"], stamp, sha))
             rows[identity] = {
                 "identity": identity, "source_namespace": provider,
                 "event_id": sid, "detail_source_url": card["url"],
@@ -459,6 +556,7 @@ def replay_offline_sources(manifest, fixture_root):
         "listed_identities": listed,
         "counts": {"review_identities": len(rows), "sources": len(manifest["sources"])},
         "partition_inventory": partition_inventory,
+        **({"twtc_list_body_sha256": twtc_list_body_sha256} if twtc_list_body_sha256 else {}),
         "new_official_get": 0, "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
@@ -832,6 +930,12 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
     import tempfile
     from scripts.p30_tpac_multi_event_refresh import (
         _isolated_writer_lock, _validate_archived_candidate_snapshot_row)
+    if (isinstance(report, dict)
+            and isinstance(report.get("source_states"), dict)
+            and isinstance(report.get("listed_identities"), dict)
+            and set(report["source_states"]) == set(report["listed_identities"]) == {"kktix", "accupass"}):
+        report = dict(report, source_states=dict(report["source_states"], twtc="NOT_ATTEMPTED"),
+                      listed_identities=dict(report["listed_identities"], twtc=[]))
     rows = _candidate_rows(report)
     incoming_pages = _partition_report_pages(report)
     if (tpac_archive_root is None) != (tpac_inventory_sha is None):
@@ -890,6 +994,14 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
                           and identity not in report["listed_identities"][provider]):
                         # An unobserved identity is not a removed event. Prior
                         # archive authority remains historical, never current.
+                        rows[identity] = row
+                    elif (provider == "twtc"
+                          and identity in report["listed_identities"][provider]
+                          and report["holds"].get(identity) == "SOURCE_DETAIL_NOT_PROVIDED_HOLD"
+                          and row.get("source_evidence", {}).get("list_body_sha256")
+                              == report.get("twtc_list_body_sha256")):
+                        # Same sealed list, subsequent bounded DETAIL batch:
+                        # absence of a supplied body is not a new failure.
                         rows[identity] = row
                     elif report["source_states"][provider] in (
                             "REVIEW_IDENTITY_ONLY", "REVIEW_PARTITION_ONLY"):
