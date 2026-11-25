@@ -373,6 +373,7 @@ def replay_offline_sources(manifest, fixture_root):
                 "pages": pages, "failed_pages": failures,
                 "event_ids": sorted(cards),
                 "detail_backlog": sorted(set(cards) - set(entry["details"])),
+                "detail_attempt_ids": sorted(entry["details"]),
             }
         if not cards:
             holds[provider] = "SOURCE_EMPTY_LIST_HOLD"
@@ -626,6 +627,16 @@ def _partition_report_pages(report):
             or item.get("detail_backlog") !=
                 [sid for sid in ids if "accupass:" + sid not in report["records"]]):
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    attempted = item.get("detail_attempt_ids")
+    if (not isinstance(attempted, list)
+            or any(not isinstance(sid, str) or sid not in ids for sid in attempted)
+            or attempted != sorted(set(attempted)) or len(attempted) > 20):
+        raise ValueError("SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD")
+    expected = [sid for sid in ids if "accupass:" + sid in report["records"]
+                or report["holds"].get("accupass:" + sid)
+                    != "SOURCE_DETAIL_NOT_PROVIDED_HOLD"]
+    if attempted != expected:
+        raise ValueError("SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD")
     return pages
 
 
@@ -636,7 +647,7 @@ def _page_binds_row(page, row):
                     ("list_url", "list_observed_at", "list_body_sha256")))
 
 
-def _partition_ledger(pages, rows):
+def _partition_ledger(pages, rows, attempts=None):
     """Persist all discovered IDs, page receipts and completion in one CAS."""
     ids = sorted({sid for page in pages.values() for sid in page["event_ids"]})
     items = {}
@@ -652,10 +663,54 @@ def _partition_ledger(pages, rows):
             "status": "DETAIL_REVIEW_ONLY" if complete else "PENDING_DETAIL",
             "detail_body_sha256": title["source_body_sha256"] if complete else None,
         }
-    return {"coverage": "PARTIAL_NOT_PROVIDER_COMPLETE",
-            "pages": pages, "items": items,
-            "detail_backlog": [sid for sid, item in items.items()
-                               if item["status"] == "PENDING_DETAIL"]}
+    ledger = {"coverage": "PARTIAL_NOT_PROVIDER_COMPLETE",
+              "pages": pages, "items": items,
+              "detail_backlog": [sid for sid, item in items.items()
+                                 if item["status"] == "PENDING_DETAIL"]}
+    # Legacy V1 snapshots (no attempt journal) remain readable/rollbackable.
+    # New snapshots count only explicitly supplied DETAIL replay attempts.
+    if attempts is not None:
+        if not isinstance(attempts, dict) or set(attempts) - set(items):
+            raise ValueError("SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD")
+        for sid, attempt in attempts.items():
+            if (not isinstance(attempt, dict)
+                    or set(attempt) != {"count", "last_outcome"}
+                    or type(attempt["count"]) is not int or attempt["count"] < 1
+                    or attempt["last_outcome"] not in _PARTITION_ATTEMPT_OUTCOMES):
+                raise ValueError("SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD")
+        ledger["detail_attempts"] = attempts
+        ledger["detail_backlog"].sort(key=lambda sid: (
+            attempts.get(sid, {}).get("count", 0), sid))
+    return ledger
+
+
+_PARTITION_ATTEMPT_OUTCOMES = {
+    "DETAIL_REVIEW_ONLY",
+    "SOURCE_FIXTURE_IO_HOLD",
+    "SOURCE_FIXTURE_PATH_HOLD",
+    "SOURCE_RECEIPT_PROVENANCE_HOLD",
+    "SOURCE_RECEIPT_TIME_HOLD",
+    "SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD",
+    "SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD",
+}
+
+
+def _advance_partition_attempts(prior, report, incoming_pages):
+    """Count committed offline attempts, not absent DETAIL or live requests."""
+    attempts = dict(prior)
+    if not incoming_pages:
+        return attempts
+    for sid in report["partition_inventory"]["accupass"]["detail_attempt_ids"]:
+        identity = "accupass:" + sid
+        outcome = ("DETAIL_REVIEW_ONLY" if identity in report["records"]
+                   else report["holds"].get(identity))
+        if outcome not in _PARTITION_ATTEMPT_OUTCOMES:
+            raise ValueError("SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD")
+        attempts[sid] = {
+            "count": attempts.get(sid, {}).get("count", 0) + 1,
+            "last_outcome": outcome,
+        }
+    return attempts
 
 
 def _validate_partition_ledger(snapshot):
@@ -666,13 +721,14 @@ def _validate_partition_ledger(snapshot):
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
     pages = _partition_page_index(list(ledger["pages"].values()))
     if (not pages or pages != ledger["pages"]
-            or _partition_ledger(pages, snapshot["candidates"]) != ledger):
+            or _partition_ledger(pages, snapshot["candidates"],
+                                 ledger.get("detail_attempts")) != ledger):
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
     return pages
 
 
 def select_partition_pending(snapshot, limit=20):
-    """Deterministic bounded selection; no request or publication authority."""
+    """Least-attempted pending IDs first; deterministic ties; no GET authority."""
     _validate_partition_ledger(snapshot)
     if type(limit) is not int or not 0 <= limit <= 20:
         raise ValueError("SOURCE_PARTITION_SELECTION_LIMIT_HOLD")
@@ -711,7 +767,7 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
         actual = hashlib.sha256(prior).hexdigest() if prior is not None else None
         if actual != expected_sha:
             raise ValueError("SOURCE_CANDIDATE_CAS_HOLD")
-        prior_pages = {}
+        prior_pages, prior_attempts = {}, {}
         if prior is not None:
             try:
                 old = json.loads(prior)
@@ -722,6 +778,7 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                         or not isinstance(old.get("candidates"), dict)):
                     raise ValueError("SOURCE_CANDIDATE_PRIOR_CORRUPT_HOLD")
                 prior_pages = _validate_partition_ledger(old)
+                prior_attempts = old.get("partition_inventory", {}).get("detail_attempts", {})
                 for identity, row in old["candidates"].items():
                     _validate_archived_candidate_snapshot_row(
                         identity, row, "SOURCE_CANDIDATE_PRIOR_FIELD_HOLD")
@@ -792,7 +849,8 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                     "candidates": rows, "release_state": "HARD_HOLD_NO_PUBLICATION",
                     "accepted_fields": 0, "published": 0}
         if merged_pages:
-            snapshot["partition_inventory"] = _partition_ledger(merged_pages, rows)
+            attempts = _advance_partition_attempts(prior_attempts, report, incoming_pages)
+            snapshot["partition_inventory"] = _partition_ledger(merged_pages, rows, attempts)
         payload = _candidate_canonical(snapshot)
         digest = hashlib.sha256(payload).hexdigest()
         versions = directory / "versions"
