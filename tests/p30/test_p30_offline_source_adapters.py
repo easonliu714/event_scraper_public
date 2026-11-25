@@ -44,6 +44,66 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_twtc_variable_list_batched_dates_and_sibling_retention(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            stamp = "2026-11-25T20:00:00+08:00"
+            base = "https://twtc.com.tw"
+            list_url = base + "/exhibition?p=home"
+            ids = [str(29418+i) for i in range(23)]
+            def receipt(raw, url):
+                return {"evidence_class": "SEALED_OFFLINE_FIXTURE_ONLY",
+                        "source_url": url, "observed_at": stamp,
+                        "body_sha256": hashlib.sha256(raw).hexdigest()}
+            def title(sid):
+                return "展覽測試活動" + sid
+            def url(sid):
+                return base + "/exhibition_more.aspx?id=" + sid + "&p=home"
+            def row(sid, period="11/06 ~ 11/09", suffix=""):
+                return ('<tr><td>'+period+'</td><td><a href="'+url(sid)+'">'+
+                        title(sid)+'</a>'+suffix+'</td><td>主辦</td></tr>')
+            listing = ("<table>"+ "".join(row(sid, "延期未定" if sid==ids[-1]
+                                            else "11/06 ~ 11/09") for sid in ids)+"</table>").encode()
+            (root/"twtc.html").write_bytes(listing)
+            entry = {"list_file":"twtc.html","list_receipt":receipt(listing,list_url),"details":{}}
+            manifest = {"mode":"SEALED_OFFLINE_REPLAY_ONLY","sources":{"twtc":entry}}
+            def detail(sid, period="2026/11/06 ~ 2026/11/09"):
+                raw = ("<h2>"+title(sid)+"</h2><p>展出日期："+period+"</p>").encode()
+                name = sid+".html"
+                (root/name).write_bytes(raw)
+                return {"detail_file":name,"receipt":receipt(raw,url(sid))}
+            entry["details"] = {sid:detail(sid) for sid in ids[:20]}
+            first = replay_offline_sources(manifest,root)
+            self.assertEqual(len(first["listed_identities"]["twtc"]),23)
+            self.assertEqual(len(first["records"]),20)
+            self.assertEqual(first["records"]["twtc:"+ids[0]]["fields"]["activity_period"]["value"],
+                             ["2026-11-06","2026-11-09"])
+            self.assertIsNone(first["records"]["twtc:"+ids[0]]["fields"]["show_start"]["value"])
+            a = commit_offline_candidate_lkg(first, root)
+            entry["details"] = {sid:detail(sid) for sid in ids[20:]}
+            entry["details"][ids[20]] = detail(ids[20],"2026/11/07 ~ 2026/11/09")
+            b = commit_offline_candidate_lkg(replay_offline_sources(manifest,root), root,a["sha256"])
+            saved = load_offline_candidate_lkg(root,b["sha256"])
+            self.assertEqual(len(saved["candidates"]),23)
+            self.assertEqual(saved["candidates"]["twtc:"+ids[0]]["fields"]["activity_period"]["role"],
+                             "EXHIBITION_PERIOD")
+            self.assertEqual(saved["candidates"]["twtc:"+ids[20]]["held_fields"]["activity_period"]["hold_reason"],
+                             "SOURCE_TWTC_LIST_DETAIL_PERIOD_CONFLICT_HOLD")
+            self.assertEqual(saved["candidates"]["twtc:"+ids[-1]]["held_fields"]["activity_period"]["hold_reason"],
+                             "SOURCE_TWTC_POSTPONED_HOLD")
+            self.assertEqual(saved["accepted_fields"],0)
+            self.assertEqual(saved["published"],0)
+            conflict = ("<table>"+row(ids[0],suffix='<a href="'+url(ids[1])+'">詳情</a>')+"</table>").encode()
+            (root/"twtc.html").write_bytes(conflict)
+            entry["list_receipt"] = receipt(conflict,list_url)
+            entry["details"] = {}
+            hold = replay_offline_sources(manifest,root)
+            self.assertEqual(hold["source_states"]["twtc"],"HOLD_LIST")
+            self.assertEqual(commit_offline_candidate_lkg(hold,root,b["sha256"])["sha256"],b["sha256"])
+            self.assertFalse((root/"docs/data.json").exists())
+
     def test_partition_archive_index_fixed_batch_cli_and_fail_closed(self):
         from scripts.p30_offline_source_adapters import (
             build_partition_archive_batch, load_offline_candidate_lkg,
@@ -773,7 +833,7 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             self.assertEqual(result["counts"]["review_identities"], 2)
             self.assertEqual(result["source_states"], {
                 "kktix": "REVIEW_IDENTITY_ONLY",
-                "accupass": "REVIEW_IDENTITY_ONLY"})
+                "accupass": "REVIEW_IDENTITY_ONLY", "twtc": "NOT_ATTEMPTED"})
             for provider in ("kktix", "accupass"):
                 row = result["records"][provider + ":abc123"]
                 title = row["fields"]["title"]
