@@ -124,11 +124,19 @@ jobs:
                          row['fields'][n]['value'] is None
                          for n in ('date','show_start','price','venue','image'))
           # Per-provider LIST failure cannot erase a healthy sibling.
-          (root/'accupass_list.html').unlink()
-          held=json.loads(subprocess.check_output(cmd,text=True))
-          assert held['source_states']['accupass']=='HOLD_LIST'
-          assert set(held['records'])=={'kktix:abc123'}
-          assert held['published']==0
+          negative_list=root/'accupass_list.html'
+          saved_list=negative_list.read_bytes()
+          try:
+              negative_list.unlink()
+              held=json.loads(subprocess.check_output(cmd,text=True))
+              assert held['source_states']['accupass']=='HOLD_LIST'
+              assert set(held['records'])=={'kktix:abc123'}
+              assert held['published']==0
+          finally:
+              # The later real TPAC/shared CAS step reuses the intact fixture.
+              negative_list.write_bytes(saved_list)
+          assert hashlib.sha256(negative_list.read_bytes()).hexdigest()==manifest['sources']['accupass']['list_receipt']['body_sha256']
+          assert json.loads(subprocess.check_output(cmd,text=True))==first
           (root/'two_provider_review.json').write_text(
               json.dumps(first,ensure_ascii=False,sort_keys=True,indent=2)+'\n',
               encoding='utf-8')
