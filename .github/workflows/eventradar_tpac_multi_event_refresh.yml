@@ -945,6 +945,84 @@ jobs:
               json.dumps(evidence,sort_keys=True,indent=2)+'\n',encoding='utf-8')
           print('PASS_REAL_38_ID_FIELD_DELTA_CANDIDATE_CAS_FRESH_RESTART_NO_GET_NO_PUBLISH')
           PY
+      - name: Real archived TPAC inventory to shared multisource Candidate CAS (NO GET, NO PUBLISH)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib,json,subprocess,sys
+          from pathlib import Path
+          from scripts.p30_offline_source_adapters import (
+              load_offline_candidate_lkg,rollback_offline_candidate_lkg)
+          source=Path('evidence/tpac_native_crash_recovery')
+          report=json.loads(Path('evidence/tpac_native_archive_process_crash_recovery.json').read_text())
+          inventory_sha=report['recovered_sha256']
+          ledger=json.loads(Path('evidence/tpac_archived_field_provenance_38_id.json').read_text())
+          fixture=Path('evidence/two_provider_offline')
+          dest=Path('evidence/shared_candidate_tpac_import')
+          cmd=[sys.executable,'-m','scripts.p30_offline_source_adapters']
+          def run(*args):
+              return json.loads(subprocess.check_output(cmd+list(args),text=True))
+          seed=['--manifest',str(fixture/'manifest.json'),'--fixture-root',str(fixture),
+                '--candidate-root',str(dest)]
+          initial=run(*seed)['candidate_commit']['sha256']
+          prior=load_offline_candidate_lkg(dest,initial)
+          assert set(prior['candidates'])=={'kktix:abc123','accupass:abc123'}
+          imported=['--tpac-archive-root',str(source),'--tpac-inventory-sha',inventory_sha,
+                    '--candidate-root',str(dest)]
+          result=run(*imported,'--expected-sha',initial)['candidate_commit']
+          sha=result['sha256']
+          assert result['tpac_archive_identities']==38 and result['events']==40
+          snapshot=load_offline_candidate_lkg(dest,sha)
+          assert snapshot['accepted_fields']==snapshot['published']==0
+          for key,row in prior['candidates'].items():
+              assert snapshot['candidates'][key]==row
+          review_count=0
+          for key,raw in ledger['records'].items():
+              saved=snapshot['candidates'][key]
+              assert saved['source_current'] is False
+              assert saved['tpac_archive_evidence']['inventory_sha256']==inventory_sha
+              assert saved['tpac_archive_evidence']['archive_detail_current']==raw['archive_evidence_current']
+              assert saved['tpac_archive_evidence']['list_body_sha256']==raw['list_body_sha256']
+              assert set(saved['fields'])|set(saved['held_fields'])==set(raw['fields'])
+              if saved['fields']:
+                  review_count+=1
+              for name,field in raw['fields'].items():
+                  expected=dict(field)
+                  if field['decision']=='REVIEW':
+                      expected['decision']='REVIEW_ONLY_NOT_ACCEPTED'
+                      assert saved['fields'][name]==expected,(key,name)
+                  else:
+                      assert saved['held_fields'][name]==expected,(key,name)
+          assert review_count==3
+          assert run(*imported,'--expected-sha',sha)['candidate_commit']['sha256']==sha
+          assert run(*seed,'--expected-sha',sha)['candidate_commit']['sha256']==sha
+          for args,reason in (
+              (imported+['--expected-sha',initial],'SOURCE_CANDIDATE_CAS_HOLD'),
+              (['--tpac-archive-root',str(source),'--tpac-inventory-sha','0'*64,
+                '--candidate-root',str(dest),'--expected-sha',sha],
+               'SOURCE_TPAC_ARCHIVE_INVENTORY_CAS_HOLD')):
+              failed=subprocess.run(cmd+args,capture_output=True,text=True)
+              assert failed.returncode!=0 and reason in failed.stderr,failed.stderr
+              assert load_offline_candidate_lkg(dest,sha)==snapshot
+          target=dest/'_isolated_multi_source_candidates'/'candidate_lkg.json'
+          assert hashlib.sha256(target.read_bytes()).hexdigest()==sha
+          rollback_offline_candidate_lkg(dest,initial,sha)
+          assert load_offline_candidate_lkg(dest,initial)==prior
+          assert run(*imported,'--expected-sha',initial)['candidate_commit']['sha256']==sha
+          assert not (dest/'docs/data.json').exists()
+          assert not (dest/'docs/platform_status.json').exists()
+          evidence={'kind':'TPAC_REAL_ARCHIVE_SHARED_CANDIDATE_CAS_V1',
+                    'source_archive_inventory_sha256':inventory_sha,
+                    'shared_candidate_sha256':sha,'tpac_identities':38,
+                    'tpac_archived_detail_review':review_count,'tpac_pending_or_held':35,
+                    'synthetic_other_provider_siblings':2,'rollback_and_reimport':True,
+                    'stale_cas_rejected':True,'new_official_http':0,
+                    'accepted_fields':0,'published':0,
+                    'release_state':'HARD_HOLD_NO_PUBLICATION'}
+          Path('evidence/tpac_real_archive_shared_candidate_cas.json').write_text(
+              json.dumps(evidence,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('PASS_REAL_TPAC_38_ID_ARCHIVE_SHARED_MULTISOURCE_CAS_3_REVIEW_35_HOLD_NO_GET')
+          PY
       - name: Real sealed dual-catalog archive inventory to field evidence CLI (NO GET, NO PUBLISH)
         run: |
           set -euo pipefail
