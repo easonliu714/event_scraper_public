@@ -44,6 +44,90 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_partition_failed_batch_does_not_starve_unattempted_ids(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg,
+            rollback_offline_candidate_lkg, select_partition_pending)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            base = "https://www.accupass.com/"
+            ids = ["id%02d" % i for i in range(26)]
+            raw = "".join('<a href="/event/%s"><h3>%s</h3></a>' %
+                          (sid, sid) for sid in ids).encode()
+            (root / "north.html").write_bytes(raw)
+            def receipt(body, url):
+                return {"evidence_class": "SEALED_OFFLINE_FIXTURE_ONLY",
+                        "source_url": url, "observed_at": "2026-11-25T08:00:00+08:00",
+                        "body_sha256": hashlib.sha256(body).hexdigest()}
+            entry = {"list_file": "north.html",
+                     "list_receipt": receipt(raw, base + "?area=north"), "details": {}}
+            manifest = {"mode": "SEALED_OFFLINE_REPLAY_ONLY",
+                        "sources": {"accupass": entry}}
+            def commit(expected=None):
+                return commit_offline_candidate_lkg(
+                    replay_offline_sources(manifest, root), root, expected)
+            def fail(batch):
+                entry["details"] = {}
+                for sid in batch:
+                    body = ("<h1>" + sid + "</h1>").encode()
+                    (root / (sid + ".html")).write_bytes(body)
+                    item = receipt(body, base + "event/" + sid)
+                    item["body_sha256"] = "0" * 64
+                    entry["details"][sid] = {"detail_file": sid + ".html", "receipt": item}
+            first = commit()
+            self.assertEqual(first["next_detail_ids"], ids[:20])
+            fail(ids[:20])
+            second = commit(first["sha256"])
+            saved = load_offline_candidate_lkg(root, second["sha256"])
+            self.assertEqual(second["pending_details"], 26)
+            self.assertEqual(second["next_detail_ids"][:6], ids[20:])
+            self.assertEqual(select_partition_pending(saved, 6), ids[20:])
+            attempts = saved["partition_inventory"]["detail_attempts"]
+            self.assertEqual(set(attempts), set(ids[:20]))
+            self.assertEqual(attempts[ids[0]], {"count": 1,
+                "last_outcome": "SOURCE_RECEIPT_PROVENANCE_HOLD"})
+            # Discovery-only replays do not manufacture attempts.
+            entry["details"] = {}
+            self.assertEqual(commit(second["sha256"])["sha256"], second["sha256"])
+            fail(ids[20:])
+            third = commit(second["sha256"])
+            self.assertEqual(third["next_detail_ids"], ids[:20])
+            fail(ids[:20])
+            fourth = commit(third["sha256"])
+            self.assertEqual(fourth["next_detail_ids"][:6], ids[20:])
+            snap = load_offline_candidate_lkg(root, fourth["sha256"])
+            self.assertEqual(snap["partition_inventory"]["detail_attempts"][ids[0]]["count"], 2)
+            # Recovery marks the explicit successful replay, not field acceptance.
+            sid = ids[20]
+            body = ("<h1>" + sid + "</h1>").encode()
+            entry["details"] = {sid: {"detail_file": sid + ".html",
+                "receipt": receipt(body, base + "event/" + sid)}}
+            recovered = commit(fourth["sha256"])
+            current = load_offline_candidate_lkg(root, recovered["sha256"])
+            self.assertEqual(recovered["pending_details"], 25)
+            self.assertEqual(current["partition_inventory"]["detail_attempts"][sid],
+                             {"count": 2, "last_outcome": "DETAIL_REVIEW_ONLY"})
+            self.assertNotIn(sid, recovered["next_detail_ids"])
+            self.assertEqual(current["accepted_fields"], 0)
+            forged = copy.deepcopy(current)
+            forged["partition_inventory"]["detail_attempts"][ids[0]]["count"] = -1
+            with self.assertRaisesRegex(ValueError, "SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD"):
+                select_partition_pending(forged)
+            forged = replay_offline_sources(manifest, root)
+            forged["partition_inventory"]["accupass"]["detail_attempt_ids"] = []
+            with self.assertRaisesRegex(ValueError, "SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD"):
+                commit_offline_candidate_lkg(forged, root, recovered["sha256"])
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_CAS_HOLD"):
+                commit(fourth["sha256"])
+            rollback_offline_candidate_lkg(root, second["sha256"], recovered["sha256"])
+            self.assertEqual(load_offline_candidate_lkg(root, second["sha256"]), saved)
+            # A legacy snapshot without attempt metadata still validates.
+            legacy = copy.deepcopy(saved)
+            del legacy["partition_inventory"]["detail_attempts"]
+            legacy["partition_inventory"]["detail_backlog"] = sorted(ids)
+            self.assertEqual(select_partition_pending(legacy), ids[:20])
+            self.assertFalse((root / "docs" / "data.json").exists())
+
     def test_accupass_partition_backlog_persists_across_cli_batches_and_restart(self):
         from scripts.p30_offline_source_adapters import (
             load_offline_candidate_lkg, rollback_offline_candidate_lkg,
@@ -118,7 +202,7 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
                 "list_file": "south.html",
                 "list_receipt": receipt(other, base + "?area=south"), "details": {}}
             fifth = run(failed["sha256"])
-            self.assertEqual(fifth["next_detail_ids"], [ids[0], "south"])
+            self.assertEqual(fifth["next_detail_ids"], ["south", ids[0]])
             saved = load_offline_candidate_lkg(dest, fifth["sha256"])
             self.assertEqual(len(saved["partition_inventory"]["items"]), 27)
             with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_CAS_HOLD"):
