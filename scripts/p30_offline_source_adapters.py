@@ -466,8 +466,94 @@ def replay_offline_sources(manifest, fixture_root):
 
 # Shared Candidate/Core integration: the existing provenance validator is reused
 # rather than introducing a second, weaker field admission contract.
+def _validate_tpac_archive_candidate(row):
+    """TPAC historical archive authority, distinct from current LIVE evidence."""
+    ev = row.get("tpac_archive_evidence")
+    catalog, sid = row.get("source_namespace"), row.get("event_id")
+    if (catalog not in ("program", "event") or not isinstance(sid, str)
+            or not re.fullmatch(r"[1-9][0-9]{0,9}", sid)
+            or row.get("identity") != "tpac:" + catalog + ":" + sid
+            or row.get("detail_source_url") != "https://tpac.org.taipei/" + catalog + "/" + sid
+            or row.get("source_current") is not False
+            or not isinstance(ev, dict)
+            or set(ev) != {"inventory_sha256", "list_source_url", "list_body_sha256",
+                          "archive_detail_current"}
+            or ev["list_source_url"] != "https://tpac.org.taipei/" + catalog
+            or type(ev["archive_detail_current"]) is not bool
+            or any(not isinstance(ev[k], str) or not re.fullmatch(r"[0-9a-f]{64}", ev[k])
+                   for k in ("inventory_sha256", "list_body_sha256"))
+            or "source_evidence" in row):
+        raise ValueError("SOURCE_TPAC_ARCHIVE_AUTHORITY_HOLD")
+    fields, held = row.get("fields"), row.get("held_fields")
+    allowed = {"title": {"EVENT_TITLE"}, "show_start": {"EVENT_SHOW_START"},
+               "show_count": {"SOURCE_SHOW_COUNT"},
+               "activity_period": {"ACTIVITY_PERIOD", "EXHIBITION_PERIOD"}}
+    if (not isinstance(fields, dict) or not isinstance(held, dict)
+            or set(fields) & set(held)
+            or set(fields) | set(held) != {"title", "date", "show_start", "show_count",
+                                          "activity_period", "price", "venue", "description", "image"}
+            or (bool(fields) != ev["archive_detail_current"])
+            or (fields and "title" not in fields)):
+        raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
+    for name, field in fields.items():
+        if (not isinstance(field, dict) or field.get("role") not in allowed.get(name, set())
+                or field.get("value") is None
+                or field.get("event_id") != sid
+                or field.get("source_url") != row["detail_source_url"]
+                or field.get("decision") != "REVIEW_ONLY_NOT_ACCEPTED"
+                or field.get("hold_reason") != "ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
+                or not isinstance(field.get("source_body_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", field["source_body_sha256"])):
+            raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
+        try:
+            if datetime.fromisoformat(field["observed_at"]).utcoffset() is None:
+                raise ValueError("naive")
+        except (TypeError, ValueError, KeyError):
+            raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD") from None
+    for field in held.values():
+        if (not isinstance(field, dict) or field.get("role") != "UNKNOWN"
+                or field.get("decision") != "HOLD" or field.get("value") is not None):
+            raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
+
+
+def _tpac_archive_rows(repo_root, expected_inventory_sha):
+    """Import only an exact existing archive inventory via the established parser/Core."""
+    from scripts.p30_tpac_multi_event_refresh import (
+        load_detail_inventory, build_archived_field_review_export,
+        build_archived_field_candidate_delta, _validate_archived_candidate_snapshot_row)
+    if (not isinstance(expected_inventory_sha, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_inventory_sha)):
+        raise ValueError("SOURCE_TPAC_ARCHIVE_EXPECTED_SHA_HOLD")
+    archive_root = Path(repo_root).resolve() / "_isolated_archive_replay"
+    if any(p.is_symlink() for p in (archive_root, archive_root / "_isolated_review",
+                                    archive_root / "_isolated_review" / "tpac")):
+        raise ValueError("SOURCE_TPAC_ARCHIVE_PATH_HOLD")
+    inventory, actual = load_detail_inventory(archive_root)
+    if actual != expected_inventory_sha or not inventory["items"]:
+        raise ValueError("SOURCE_TPAC_ARCHIVE_INVENTORY_CAS_HOLD")
+    ledger = build_archived_field_review_export(inventory, actual)
+    delta = build_archived_field_candidate_delta(dict(ledger, records={}), ledger)
+    rows = delta["candidates"]
+    for identity, row in rows.items():
+        original = ledger["records"][identity]
+        # Current within the historical archive is NOT current official HTTP.
+        row["source_current"] = False
+        row["tpac_archive_evidence"] = {
+            "inventory_sha256": actual,
+            "list_source_url": original["list_source_url"],
+            "list_body_sha256": original["list_body_sha256"],
+            "archive_detail_current": original["archive_evidence_current"],
+        }
+        _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_TPAC_ARCHIVE_CORE_HOLD")
+        _validate_tpac_archive_candidate(row)
+    return rows
+
+
 def _validate_source_evidence(row):
     """Validate new URL lineage while retaining legacy sealed snapshots."""
+    if row.get("source_namespace") in ("program", "event") or "tpac_archive_evidence" in row:
+        _validate_tpac_archive_candidate(row)
+        return
     if "source_evidence" not in row:
         return
     evidence = row["source_evidence"]
@@ -735,7 +821,8 @@ def select_partition_pending(snapshot, limit=20):
     return snapshot.get("partition_inventory", {}).get("detail_backlog", [])[:limit]
 
 
-def commit_offline_candidate_lkg(report, root, expected_sha=None):
+def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
+                                 tpac_archive_root=None, tpac_inventory_sha=None):
     """Non-destructive, locked CAS of provider-namespaced Candidate ledgers.
 
     Failed source replays retain their prior candidate, never replace it with
@@ -747,6 +834,11 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
         _isolated_writer_lock, _validate_archived_candidate_snapshot_row)
     rows = _candidate_rows(report)
     incoming_pages = _partition_report_pages(report)
+    if (tpac_archive_root is None) != (tpac_inventory_sha is None):
+        raise ValueError("SOURCE_TPAC_ARCHIVE_ARGUMENT_HOLD")
+    tpac_rows = (_tpac_archive_rows(tpac_archive_root, tpac_inventory_sha)
+                 if tpac_archive_root is not None else {})
+    rows.update(tpac_rows)
     # A successful DETAIL must point at a verified page in this partition run.
     for identity, row in rows.items():
         if (incoming_pages and row["source_namespace"] == "accupass"
@@ -788,6 +880,12 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                         if any(row.get(k) != rows[identity].get(k) for k in
                                ("source_namespace", "event_id", "detail_source_url")):
                             raise ValueError("SOURCE_CANDIDATE_IDENTITY_SWAP_HOLD")
+                    elif provider in ("program", "event"):
+                        # A different provider's replay must not erase TPAC.
+                        # An explicit TPAC import may not drop an existing ID.
+                        if tpac_rows:
+                            raise ValueError("SOURCE_TPAC_ARCHIVE_DESTRUCTIVE_REMOVAL_HOLD")
+                        rows[identity] = row
                     elif (report["source_states"][provider] == "REVIEW_PARTITION_ONLY"
                           and identity not in report["listed_identities"][provider]):
                         # An unobserved identity is not a removed event. Prior
@@ -1062,9 +1160,13 @@ def main(argv=None):
     inputs.add_argument("--manifest", type=Path)
     inputs.add_argument("--archive-index", type=Path,
                         help="Resolve next pending batch from sealed local archive")
+    inputs.add_argument("--tpac-archive-root", type=Path,
+                        help="Import existing TPAC archive inventory into shared isolated CAS")
+    parser.add_argument("--tpac-inventory-sha",
+                        help="Exact existing TPAC archive inventory SHA256")
     parser.add_argument("--batch-limit", type=int, default=20,
                         help="Archive batch size, 1-20")
-    parser.add_argument("--fixture-root", required=True, type=Path)
+    parser.add_argument("--fixture-root", type=Path)
     parser.add_argument("--candidate-root", type=Path,
                         help="Explicit isolated Candidate CAS destination; default is read-only")
     parser.add_argument("--expected-sha",
@@ -1072,6 +1174,30 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.expected_sha is not None and args.candidate_root is None:
         parser.error("--expected-sha requires --candidate-root")
+    if args.tpac_archive_root is not None:
+        if args.candidate_root is None or args.tpac_inventory_sha is None:
+            parser.error("--tpac-archive-root requires --candidate-root and --tpac-inventory-sha")
+        report = {"kind": "MULTI_SOURCE_OFFLINE_FIELD_EVIDENCE_V1",
+                  "scope": "SEALED_OFFLINE_REPLAY_ONLY",
+                  "records": {}, "holds": {},
+                  "source_states": {p: "NOT_ATTEMPTED" for p in SOURCES},
+                  "listed_identities": {p: [] for p in SOURCES},
+                  "new_official_get": 0, "accepted_fields": 0, "published": 0,
+                  "release_state": "HARD_HOLD_NO_PUBLICATION"}
+        result = commit_offline_candidate_lkg(
+            report, args.candidate_root, args.expected_sha,
+            tpac_archive_root=args.tpac_archive_root,
+            tpac_inventory_sha=args.tpac_inventory_sha)
+        snapshot = load_offline_candidate_lkg(args.candidate_root, result["sha256"])
+        result["tpac_archive_identities"] = sum(
+            key.startswith("tpac:") for key in snapshot["candidates"])
+        print(json.dumps({"candidate_commit": result, "new_official_get": 0,
+                          "accepted_fields": 0, "published": 0}, sort_keys=True))
+        return 0
+    if args.tpac_inventory_sha is not None:
+        parser.error("--tpac-inventory-sha requires --tpac-archive-root")
+    if args.fixture_root is None:
+        parser.error("--fixture-root is required for manifest or archive index")
     if args.archive_index is not None:
         if args.candidate_root is None or args.expected_sha is None:
             parser.error("--archive-index requires --candidate-root and --expected-sha")
