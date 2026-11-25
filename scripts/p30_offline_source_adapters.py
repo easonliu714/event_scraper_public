@@ -976,9 +976,94 @@ def rollback_offline_candidate_lkg(root, archived_sha, expected_current_sha):
                 temp.unlink(missing_ok=True)
     return {"sha256": archived_sha, "decision": "ISOLATED_ROLLBACK_NOT_FORMAL"}
 
+def build_partition_archive_batch(snapshot, archive_index, fixture_root, limit=20):
+    """Resolve the next fair batch from existing, SHA-pinned offline bytes.
+
+    The index is reusable across CAS versions; the caller must load the exact
+    current snapshot. It is a locator, not a source authority or permission
+    to fetch. Only page receipts already present in the ledger are admitted.
+    """
+    selected = select_partition_pending(snapshot, limit)
+    if not selected:
+        raise ValueError("SOURCE_ARCHIVE_NO_PENDING_HOLD")
+    if (not isinstance(archive_index, dict)
+            or set(archive_index) != {"kind", "lists", "details"}
+            or archive_index["kind"] != "ACCUPASS_SEALED_ARCHIVE_INDEX_V1"
+            or not isinstance(archive_index["lists"], list)
+            or not 0 < len(archive_index["lists"]) <= 100
+            or not isinstance(archive_index["details"], dict)
+            or any(not isinstance(sid, str) or not IDENTIFIER.fullmatch(sid)
+                   for sid in archive_index["details"])):
+        raise ValueError("SOURCE_ARCHIVE_INDEX_SCHEMA_HOLD")
+
+    ledger_pages = _validate_partition_ledger(snapshot)
+    indexed, seen_urls = {}, set()
+    # Verify every supplied LIST against its real bytes, parsed IDs, and the
+    # exact previously admitted page receipt. A filename alone proves nothing.
+    for entry in archive_index["lists"]:
+        if not isinstance(entry, dict) or set(entry) != {"list_file", "list_receipt"}:
+            raise ValueError("SOURCE_ARCHIVE_INDEX_SCHEMA_HOLD")
+        url = _list_url("accupass", entry["list_receipt"])
+        raw = _read_fixture(fixture_root, entry["list_file"])
+        stamp = _receipt(raw, entry["list_receipt"], url)
+        cards = _owned_list("accupass", raw)
+        page = {"list_url": url, "list_observed_at": stamp,
+                "list_body_sha256": hashlib.sha256(raw).hexdigest(),
+                "event_ids": sorted(cards)}
+        key = hashlib.sha256(_candidate_canonical(page)).hexdigest()
+        if key not in ledger_pages or ledger_pages[key] != page:
+            raise ValueError("SOURCE_ARCHIVE_PAGE_NOT_IN_LEDGER_HOLD")
+        # The existing replay contract permits one observation per LIST URL.
+        # A conflicting archive version cannot be silently substituted.
+        if url in seen_urls:
+            raise ValueError("SOURCE_ARCHIVE_DUPLICATE_PAGE_URL_HOLD")
+        seen_urls.add(url)
+        indexed[key] = (entry, cards)
+
+    lists, details, used = [], {}, set()
+    for sid in selected:
+        record = archive_index["details"].get(sid)
+        if record is None:
+            raise ValueError("SOURCE_ARCHIVE_DETAIL_MISSING_HOLD:" + sid)
+        if not isinstance(record, dict) or set(record) != {"detail_file", "receipt"}:
+            raise ValueError("SOURCE_ARCHIVE_INDEX_SCHEMA_HOLD")
+        receipt = record["receipt"]
+        url = receipt.get("source_url") if isinstance(receipt, dict) else None
+        canonical = "https://www.accupass.com/event/" + sid
+        if _canonical_event_url("accupass", url) != (sid, canonical):
+            raise ValueError("SOURCE_RECEIPT_PROVENANCE_HOLD")
+        # Select only a real archived LIST edge bearing this event and observed
+        # URL. Preserve the original tracked URL rather than inventing a link.
+        matching = [key for key in snapshot["partition_inventory"]["items"][sid]["page_keys"]
+                    if key in indexed and sid in indexed[key][1]
+                    and url in [canonical, *indexed[key][1][sid]["source_link_urls"]]]
+        if not matching:
+            raise ValueError("SOURCE_ARCHIVE_LIST_MISSING_HOLD:" + sid)
+        key = matching[0]
+        if key not in used:
+            lists.append(indexed[key][0])
+            used.add(key)
+        raw = _read_fixture(fixture_root, record["detail_file"])
+        _receipt(raw, receipt, url)
+        details[sid] = record
+
+    # Validate cross-page identity conflicts with the established union code.
+    # No second event parser, no network, and no mutation during planning.
+    cards, _, failures = _sealed_list_union("accupass", lists, fixture_root)
+    if failures or not set(selected).issubset(cards):
+        raise ValueError("SOURCE_ARCHIVE_BATCH_LIST_HOLD")
+    return {"mode": "SEALED_OFFLINE_REPLAY_ONLY", "sources": {
+        "accupass": {"lists": lists, "details": details}}}
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Offline selected-source LIST+DETAIL; no GET/publish")
-    parser.add_argument("--manifest", required=True, type=Path)
+    inputs = parser.add_mutually_exclusive_group(required=True)
+    inputs.add_argument("--manifest", type=Path)
+    inputs.add_argument("--archive-index", type=Path,
+                        help="Resolve next pending batch from sealed local archive")
+    parser.add_argument("--batch-limit", type=int, default=20,
+                        help="Archive batch size, 1-20")
     parser.add_argument("--fixture-root", required=True, type=Path)
     parser.add_argument("--candidate-root", type=Path,
                         help="Explicit isolated Candidate CAS destination; default is read-only")
@@ -987,8 +1072,30 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.expected_sha is not None and args.candidate_root is None:
         parser.error("--expected-sha requires --candidate-root")
-    data = json.loads(args.manifest.read_text(encoding="utf-8"))
+    if args.archive_index is not None:
+        if args.candidate_root is None or args.expected_sha is None:
+            parser.error("--archive-index requires --candidate-root and --expected-sha")
+        if not 1 <= args.batch_limit <= 20:
+            parser.error("--batch-limit must be 1-20")
+        prior = load_offline_candidate_lkg(args.candidate_root, args.expected_sha)
+        archive = json.loads(args.archive_index.read_text(encoding="utf-8"))
+        data = build_partition_archive_batch(prior, archive, args.fixture_root,
+                                             args.batch_limit)
+    else:
+        data = json.loads(args.manifest.read_text(encoding="utf-8"))
     report = replay_offline_sources(data, args.fixture_root)
+    if args.archive_index is not None:
+        # Reuse the normal DETAIL parser and CAS path; ensure planning and
+        # replay did not diverge before admitting any mutation.
+        intended = set(data["sources"]["accupass"]["details"])
+        inv = report["partition_inventory"].get("accupass", {})
+        if (report["source_states"]["accupass"] != "REVIEW_PARTITION_ONLY"
+                or set(inv.get("detail_attempt_ids", [])) != intended
+                or inv.get("failed_pages")):
+            raise ValueError("SOURCE_ARCHIVE_BATCH_REPLAY_HOLD")
+        report["archive_batch"] = {"snapshot_sha256": args.expected_sha,
+                                   "event_ids": sorted(intended),
+                                   "new_official_get": 0}
     if args.candidate_root is not None:
         result = commit_offline_candidate_lkg(report, args.candidate_root, args.expected_sha)
         # Verify the persisted canonical bytes with the existing restart reader.
