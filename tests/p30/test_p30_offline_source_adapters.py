@@ -44,6 +44,104 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_partition_archive_index_fixed_batch_cli_and_fail_closed(self):
+        from scripts.p30_offline_source_adapters import (
+            build_partition_archive_batch, load_offline_candidate_lkg,
+            commit_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            base = "https://www.accupass.com/"
+            ids = ["id%02d" % i for i in range(26)]
+            def receipt(raw, url):
+                return {"evidence_class": "SEALED_OFFLINE_FIXTURE_ONLY",
+                        "source_url": url, "observed_at": "2026-11-25T12:00:00+08:00",
+                        "body_sha256": hashlib.sha256(raw).hexdigest()}
+            def listing(name, area, group):
+                raw = "".join('<a href="/event/%s"><h3>%s</h3></a>' %
+                              (sid, sid) for sid in group).encode()
+                (root / name).write_bytes(raw)
+                return {"list_file": name,
+                        "list_receipt": receipt(raw, base + "?area=" + area)}
+            north = listing("north.html", "north", ids[:13])
+            south = listing("south.html", "south", ids[13:])
+            archive = {"kind": "ACCUPASS_SEALED_ARCHIVE_INDEX_V1",
+                       "lists": [north, south], "details": {}}
+            for sid in ids:
+                raw = ("<h1>" + sid + "</h1>").encode()
+                filename = sid + ".html"
+                (root / filename).write_bytes(raw)
+                archive["details"][sid] = {"detail_file": filename,
+                    "receipt": receipt(raw, base + "event/" + sid)}
+            dest = root / "isolated"
+            discovery = {"mode": "SEALED_OFFLINE_REPLAY_ONLY", "sources": {
+                "accupass": {"lists": [north, south], "details": {}}}}
+            first = commit_offline_candidate_lkg(
+                replay_offline_sources(discovery, root), dest)
+            snapshot = load_offline_candidate_lkg(dest, first["sha256"])
+            manifest = build_partition_archive_batch(snapshot, archive, root)
+            self.assertEqual(list(manifest["sources"]["accupass"]["details"]), ids[:20])
+            self.assertEqual(manifest["sources"]["accupass"]["lists"], [north, south])
+            self.assertEqual(load_offline_candidate_lkg(dest, first["sha256"]), snapshot)
+            bad = copy.deepcopy(archive)
+            del bad["details"][ids[0]]
+            with self.assertRaisesRegex(ValueError, "SOURCE_ARCHIVE_DETAIL_MISSING_HOLD"):
+                build_partition_archive_batch(snapshot, bad, root)
+            bad = copy.deepcopy(archive)
+            bad["details"][ids[0]]["detail_file"] = "../outside.html"
+            with self.assertRaisesRegex(ValueError, "SOURCE_FIXTURE_PATH_HOLD"):
+                build_partition_archive_batch(snapshot, bad, root)
+            bad = copy.deepcopy(archive)
+            bad["details"][ids[0]]["receipt"]["body_sha256"] = "0" * 64
+            with self.assertRaisesRegex(ValueError, "SOURCE_RECEIPT_PROVENANCE_HOLD"):
+                build_partition_archive_batch(snapshot, bad, root)
+            bad = copy.deepcopy(archive)
+            bad["details"][ids[0]]["receipt"]["source_url"] = base + "event/" + ids[1]
+            with self.assertRaisesRegex(ValueError, "SOURCE_RECEIPT_PROVENANCE_HOLD"):
+                build_partition_archive_batch(snapshot, bad, root)
+            bad = copy.deepcopy(archive)
+            bad["lists"] = [south]
+            with self.assertRaisesRegex(ValueError, "SOURCE_ARCHIVE_LIST_MISSING_HOLD"):
+                build_partition_archive_batch(snapshot, bad, root)
+            bad = copy.deepcopy(archive)
+            bad["lists"][0]["list_receipt"]["observed_at"] = "2026-11-25T13:00:00+08:00"
+            with self.assertRaisesRegex(ValueError, "SOURCE_ARCHIVE_PAGE_NOT_IN_LEDGER_HOLD"):
+                build_partition_archive_batch(snapshot, bad, root)
+            bad = copy.deepcopy(archive)
+            bad["lists"].append(north)
+            with self.assertRaisesRegex(ValueError, "SOURCE_ARCHIVE_DUPLICATE_PAGE_URL_HOLD"):
+                build_partition_archive_batch(snapshot, bad, root)
+            self.assertEqual(load_offline_candidate_lkg(dest, first["sha256"]), snapshot)
+
+            # The reusable archive index drives two separate CLI processes,
+            # with no manual manifest reconstruction and exact CAS readback.
+            index = root / "archive.json"
+            index.write_text(json.dumps(archive), encoding="utf-8")
+            cmd = [sys.executable, "-m", "scripts.p30_offline_source_adapters",
+                   "--archive-index", str(index), "--fixture-root", str(root),
+                   "--candidate-root", str(dest), "--expected-sha"]
+            second_report = json.loads(subprocess.check_output(
+                cmd + [first["sha256"]], text=True))
+            second = second_report["candidate_commit"]
+            self.assertEqual(second_report["archive_batch"]["event_ids"], ids[:20])
+            self.assertEqual(second["pending_details"], 6)
+            stale = subprocess.run(cmd + [first["sha256"]], capture_output=True, text=True)
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertIn("SOURCE_CANDIDATE_READ_CAS_HOLD", stale.stderr)
+            third_report = json.loads(subprocess.check_output(
+                cmd + [second["sha256"]], text=True))
+            third = third_report["candidate_commit"]
+            self.assertEqual(third_report["archive_batch"]["event_ids"], ids[20:])
+            self.assertEqual(third["pending_details"], 0)
+            finished = load_offline_candidate_lkg(dest, third["sha256"])
+            self.assertEqual(len(finished["candidates"]), 26)
+            self.assertTrue(all(x["count"] == 1 for x in
+                                finished["partition_inventory"]["detail_attempts"].values()))
+            self.assertEqual(finished["accepted_fields"], 0)
+            self.assertEqual(finished["published"], 0)
+            with self.assertRaisesRegex(ValueError, "SOURCE_ARCHIVE_NO_PENDING_HOLD"):
+                build_partition_archive_batch(finished, archive, root)
+            self.assertFalse((dest / "docs" / "data.json").exists())
+
     def test_partition_failed_batch_does_not_starve_unattempted_ids(self):
         from scripts.p30_offline_source_adapters import (
             commit_offline_candidate_lkg, load_offline_candidate_lkg,
