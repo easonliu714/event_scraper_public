@@ -44,6 +44,94 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_accupass_partition_backlog_persists_across_cli_batches_and_restart(self):
+        from scripts.p30_offline_source_adapters import (
+            load_offline_candidate_lkg, rollback_offline_candidate_lkg,
+            select_partition_pending, commit_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            base = "https://www.accupass.com/"
+            stamp = "2026-11-24T10:00:00+08:00"
+            def receipt(raw, url):
+                return {"evidence_class": "SEALED_OFFLINE_FIXTURE_ONLY",
+                        "source_url": url, "observed_at": stamp,
+                        "body_sha256": hashlib.sha256(raw).hexdigest()}
+            ids = ["id%02d" % i for i in range(26)]
+            raw = "".join('<a href="/event/%s"><h3>%s</h3></a>' %
+                          (sid, sid) for sid in ids).encode()
+            (root / "north.html").write_bytes(raw)
+            entry = {"list_file": "north.html",
+                     "list_receipt": receipt(raw, base + "?area=north"),
+                     "details": {}}
+            manifest = {"mode": "SEALED_OFFLINE_REPLAY_ONLY",
+                        "sources": {"accupass": entry}}
+            mf = root / "manifest.json"
+            dest = root / "isolated"
+            cmd = [sys.executable, "-m", "scripts.p30_offline_source_adapters",
+                   "--manifest", str(mf), "--fixture-root", str(root),
+                   "--candidate-root", str(dest)]
+            def run(expected=None):
+                mf.write_text(json.dumps(manifest), encoding="utf-8")
+                extra = [] if expected is None else ["--expected-sha", expected]
+                return json.loads(subprocess.check_output(cmd + extra, text=True))[
+                    "candidate_commit"]
+            def fill(batch):
+                entry["details"] = {}
+                for sid in batch:
+                    body = ("<h1>" + sid + "</h1>").encode()
+                    filename = sid + ".html"
+                    (root / filename).write_bytes(body)
+                    entry["details"][sid] = {"detail_file": filename,
+                        "receipt": receipt(body, base + "event/" + sid)}
+            first = run()
+            self.assertEqual(first["pending_details"], 26)
+            initial = load_offline_candidate_lkg(dest, first["sha256"])
+            self.assertEqual(initial["candidates"], {})
+            self.assertEqual(select_partition_pending(initial), ids[:20])
+            fill(first["next_detail_ids"])
+            second = run(first["sha256"])
+            self.assertEqual(second["pending_details"], 6)
+            self.assertEqual(second["next_detail_ids"], ids[20:])
+            middle = load_offline_candidate_lkg(dest, second["sha256"])
+            self.assertEqual(len(middle["candidates"]), 20)
+            fill(second["next_detail_ids"])
+            third = run(second["sha256"])
+            self.assertEqual(third["pending_details"], 0)
+            finished = load_offline_candidate_lkg(dest, third["sha256"])
+            self.assertEqual(len(finished["candidates"]), 26)
+            self.assertEqual(finished["partition_inventory"]["items"][ids[0]]["status"],
+                             "DETAIL_REVIEW_ONLY")
+            self.assertEqual(finished["candidates"]["accupass:" + ids[0]],
+                             middle["candidates"]["accupass:" + ids[0]])
+            # An identical archived LIST with no newly supplied detail is
+            # idempotent. An explicitly failed DETAIL is not equivalent.
+            entry["details"] = {}
+            self.assertEqual(run(third["sha256"])["sha256"], third["sha256"])
+            fill([ids[0]])
+            entry["details"][ids[0]]["receipt"]["body_sha256"] = "0" * 64
+            failed = run(third["sha256"])
+            self.assertEqual(failed["next_detail_ids"], [ids[0]])
+            # A different partition adds an ID without losing older pending work.
+            other = b'<a href="/event/south"><h3>South</h3></a>'
+            (root / "south.html").write_bytes(other)
+            manifest["sources"]["accupass"] = {
+                "list_file": "south.html",
+                "list_receipt": receipt(other, base + "?area=south"), "details": {}}
+            fifth = run(failed["sha256"])
+            self.assertEqual(fifth["next_detail_ids"], [ids[0], "south"])
+            saved = load_offline_candidate_lkg(dest, fifth["sha256"])
+            self.assertEqual(len(saved["partition_inventory"]["items"]), 27)
+            with self.assertRaisesRegex(ValueError, "SOURCE_CANDIDATE_CAS_HOLD"):
+                commit_offline_candidate_lkg(replay_offline_sources(manifest, root),
+                                             dest, third["sha256"])
+            forged = copy.deepcopy(saved)
+            forged["partition_inventory"]["detail_backlog"] = []
+            with self.assertRaisesRegex(ValueError, "SOURCE_PARTITION_LEDGER_SCHEMA_HOLD"):
+                select_partition_pending(forged)
+            rollback_offline_candidate_lkg(dest, second["sha256"], fifth["sha256"])
+            self.assertEqual(load_offline_candidate_lkg(dest, second["sha256"]), middle)
+            self.assertFalse((dest / "docs" / "data.json").exists())
+
     def test_accupass_partition_union_backlog_and_non_destructive_cas(self):
         from scripts.p30_offline_source_adapters import (
             commit_offline_candidate_lkg, load_offline_candidate_lkg)
