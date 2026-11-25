@@ -576,6 +576,109 @@ def _candidate_canonical(obj):
                        separators=(",", ":")) + "\n").encode("utf-8")
 
 
+def _partition_page_index(pages):
+    """Content-addressed page receipts, never a claim of full coverage."""
+    if not isinstance(pages, list):
+        raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    index = {}
+    for page in pages:
+        if (not isinstance(page, dict)
+                or set(page) != {"list_url", "list_observed_at", "list_body_sha256", "event_ids"}
+                or not isinstance(page["list_body_sha256"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", page["list_body_sha256"])
+                or not isinstance(page["event_ids"], list)
+                or not page["event_ids"]
+                or any(not isinstance(sid, str) or not IDENTIFIER.fullmatch(sid)
+                       for sid in page["event_ids"])
+                or page["event_ids"] != sorted(set(page["event_ids"]))):
+            raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+        _list_url("accupass", {"source_url": page["list_url"]})
+        try:
+            if datetime.fromisoformat(page["list_observed_at"]).utcoffset() is None:
+                raise ValueError("naive")
+        except (ValueError, TypeError):
+            raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD") from None
+        key = hashlib.sha256(_candidate_canonical(page)).hexdigest()
+        index[key] = page
+    return index
+
+
+def _partition_report_pages(report):
+    inventories = report.get("partition_inventory", {})
+    if not isinstance(inventories, dict) or set(inventories) - {"accupass"}:
+        raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    item = inventories.get("accupass")
+    if item is None:
+        if report["source_states"]["accupass"] == "REVIEW_PARTITION_ONLY":
+            raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+        return {}
+    if (not isinstance(item, dict)
+            or item.get("coverage") != "PARTIAL_NOT_PROVIDER_COMPLETE"
+            or not isinstance(item.get("failed_pages"), dict)):
+        raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    # Empty or unreadable observations must never replace historical receipts.
+    if report["source_states"]["accupass"] != "REVIEW_PARTITION_ONLY":
+        return {}
+    pages = _partition_page_index(item.get("pages"))
+    ids = sorted({sid for page in pages.values() for sid in page["event_ids"]})
+    if (not ids or item.get("event_ids") != ids
+            or report["listed_identities"]["accupass"] != ["accupass:" + sid for sid in ids]
+            or item.get("detail_backlog") !=
+                [sid for sid in ids if "accupass:" + sid not in report["records"]]):
+        raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    return pages
+
+
+def _page_binds_row(page, row):
+    evidence = row.get("source_evidence", {})
+    return (row.get("event_id") in page["event_ids"]
+            and all(evidence.get(k) == page[k] for k in
+                    ("list_url", "list_observed_at", "list_body_sha256")))
+
+
+def _partition_ledger(pages, rows):
+    """Persist all discovered IDs, page receipts and completion in one CAS."""
+    ids = sorted({sid for page in pages.values() for sid in page["event_ids"]})
+    items = {}
+    for sid in ids:
+        refs = sorted(key for key, page in pages.items() if sid in page["event_ids"])
+        row = rows.get("accupass:" + sid, {})
+        title = row.get("fields", {}).get("title")
+        complete = (isinstance(title, dict)
+                    and title.get("decision") == "REVIEW_ONLY_NOT_ACCEPTED"
+                    and any(_page_binds_row(pages[key], row) for key in refs))
+        items[sid] = {
+            "page_keys": refs,
+            "status": "DETAIL_REVIEW_ONLY" if complete else "PENDING_DETAIL",
+            "detail_body_sha256": title["source_body_sha256"] if complete else None,
+        }
+    return {"coverage": "PARTIAL_NOT_PROVIDER_COMPLETE",
+            "pages": pages, "items": items,
+            "detail_backlog": [sid for sid, item in items.items()
+                               if item["status"] == "PENDING_DETAIL"]}
+
+
+def _validate_partition_ledger(snapshot):
+    ledger = snapshot.get("partition_inventory")
+    if ledger is None and "partition_inventory" not in snapshot:
+        return {}
+    if not isinstance(ledger, dict) or not isinstance(ledger.get("pages"), dict):
+        raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    pages = _partition_page_index(list(ledger["pages"].values()))
+    if (not pages or pages != ledger["pages"]
+            or _partition_ledger(pages, snapshot["candidates"]) != ledger):
+        raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    return pages
+
+
+def select_partition_pending(snapshot, limit=20):
+    """Deterministic bounded selection; no request or publication authority."""
+    _validate_partition_ledger(snapshot)
+    if type(limit) is not int or not 0 <= limit <= 20:
+        raise ValueError("SOURCE_PARTITION_SELECTION_LIMIT_HOLD")
+    return snapshot.get("partition_inventory", {}).get("detail_backlog", [])[:limit]
+
+
 def commit_offline_candidate_lkg(report, root, expected_sha=None):
     """Non-destructive, locked CAS of provider-namespaced Candidate ledgers.
 
@@ -587,6 +690,12 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
     from scripts.p30_tpac_multi_event_refresh import (
         _isolated_writer_lock, _validate_archived_candidate_snapshot_row)
     rows = _candidate_rows(report)
+    incoming_pages = _partition_report_pages(report)
+    # A successful DETAIL must point at a verified page in this partition run.
+    for identity, row in rows.items():
+        if (incoming_pages and row["source_namespace"] == "accupass"
+                and not any(_page_binds_row(page, row) for page in incoming_pages.values())):
+            raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
     if expected_sha is not None and not re.fullmatch(r"[0-9a-f]{64}", expected_sha):
         raise ValueError("SOURCE_CANDIDATE_EXPECTED_SHA_HOLD")
     root = Path(root).resolve()
@@ -602,6 +711,7 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
         actual = hashlib.sha256(prior).hexdigest() if prior is not None else None
         if actual != expected_sha:
             raise ValueError("SOURCE_CANDIDATE_CAS_HOLD")
+        prior_pages = {}
         if prior is not None:
             try:
                 old = json.loads(prior)
@@ -611,6 +721,7 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                         or old.get("accepted_fields") != 0 or old.get("published") != 0
                         or not isinstance(old.get("candidates"), dict)):
                     raise ValueError("SOURCE_CANDIDATE_PRIOR_CORRUPT_HOLD")
+                prior_pages = _validate_partition_ledger(old)
                 for identity, row in old["candidates"].items():
                     _validate_archived_candidate_snapshot_row(
                         identity, row, "SOURCE_CANDIDATE_PRIOR_FIELD_HOLD")
@@ -633,6 +744,19 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                         # withdraw *all* old REVIEW values from current use.
                         # A missing ID from the verified LIST still fails closed.
                         held_reason = report["holds"].get(identity)
+                        # Replaying the identical archived LIST to drain a
+                        # later batch is not a fresh failed DETAIL observation.
+                        # Keep an already reviewed row only for known receipts.
+                        if (provider == "accupass" and incoming_pages
+                                and held_reason == "SOURCE_DETAIL_NOT_PROVIDED_HOLD"
+                                and row.get("fields", {}).get("title")
+                                and any(_page_binds_row(page, row) for page in prior_pages.values())
+                                and {key for key, page in incoming_pages.items()
+                                     if row["event_id"] in page["event_ids"]}
+                                and all(key in prior_pages for key, page in incoming_pages.items()
+                                        if row["event_id"] in page["event_ids"])):
+                            rows[identity] = row
+                            continue
                         allowed = {
                             "SOURCE_DETAIL_NOT_PROVIDED_HOLD",
                             "SOURCE_FIXTURE_IO_HOLD",
@@ -661,11 +785,14 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                         rows[identity] = row
             except (TypeError, UnicodeError, json.JSONDecodeError) as exc:
                 raise ValueError("SOURCE_CANDIDATE_PRIOR_CORRUPT_HOLD") from exc
-        if not rows:
+        merged_pages = {**prior_pages, **incoming_pages}
+        if not rows and not merged_pages:
             raise ValueError("SOURCE_CANDIDATE_EMPTY_HOLD")
         snapshot = {"kind": "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1",
                     "candidates": rows, "release_state": "HARD_HOLD_NO_PUBLICATION",
                     "accepted_fields": 0, "published": 0}
+        if merged_pages:
+            snapshot["partition_inventory"] = _partition_ledger(merged_pages, rows)
         payload = _candidate_canonical(snapshot)
         digest = hashlib.sha256(payload).hexdigest()
         versions = directory / "versions"
@@ -699,7 +826,10 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None):
                 temp.unlink(missing_ok=True)
         return {"sha256": digest, "events": len(rows),
                 "decision": "ISOLATED_MULTI_SOURCE_CANDIDATE_COMMITTED_NOT_FORMAL",
-                "accepted_fields": 0, "published": 0}
+                "accepted_fields": 0, "published": 0,
+                **({"pending_details": len(snapshot["partition_inventory"]["detail_backlog"]),
+                    "next_detail_ids": select_partition_pending(snapshot)}
+                   if merged_pages else {})}
 
 
 def load_offline_candidate_lkg(root, expected_sha):
@@ -719,8 +849,10 @@ def load_offline_candidate_lkg(root, expected_sha):
     except (UnicodeError, ValueError) as exc:
         raise ValueError("SOURCE_CANDIDATE_READ_SCHEMA_HOLD") from exc
     if (_candidate_canonical(snapshot) != raw
-            or set(snapshot) != {"kind", "candidates", "release_state",
-                                 "accepted_fields", "published"}
+            or set(snapshot) not in ({"kind", "candidates", "release_state",
+                                     "accepted_fields", "published"},
+                                    {"kind", "candidates", "release_state",
+                                     "accepted_fields", "published", "partition_inventory"})
             or snapshot["kind"] != "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1"
             or snapshot["release_state"] != "HARD_HOLD_NO_PUBLICATION"
             or snapshot["accepted_fields"] != 0 or snapshot["published"] != 0
@@ -729,6 +861,7 @@ def load_offline_candidate_lkg(root, expected_sha):
     for identity, row in snapshot["candidates"].items():
         _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_READ_FIELD_HOLD")
         _validate_source_evidence(row)
+    _validate_partition_ledger(snapshot)
     return snapshot
 
 
@@ -770,6 +903,7 @@ def rollback_offline_candidate_lkg(root, archived_sha, expected_current_sha):
         for identity, row in historical["candidates"].items():
             _validate_archived_candidate_snapshot_row(identity, row, "SOURCE_CANDIDATE_ROLLBACK_FIELD_HOLD")
             _validate_source_evidence(row)
+        _validate_partition_ledger(historical)
         temp = None
         try:
             with tempfile.NamedTemporaryFile(dir=directory, prefix=".rollback-", delete=False) as out:
