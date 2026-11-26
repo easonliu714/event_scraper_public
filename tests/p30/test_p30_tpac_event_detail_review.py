@@ -79,6 +79,32 @@ class RealRoleSemanticsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "SHOW_ROLE_HOLD"):
             inspect_event_detail(entry, data, receipt(entry["detail_url"], data), NOW)
 
+    def test_real_event_sidebar_shape_price_venue_and_missing_or_ambiguous_hold(self):
+        title = "2026北藝夜遊：Beats到天臺"
+        entry = card("2072", title, "專題導覽", "2026-11-11 - 2026-11-13")
+        original = detail(title, "專題導覽", "2026-11-11 - 2026-11-13",
+                          ["2026-11-11 (三) 19:00"])
+        venue = ('<div class="page-event__aside-place"><div class="page-event__aside-place-venue">'
+                 '<h3>場地</h3><p></p><div>臺北表演藝術中心 參觀回路、排練場、天臺</div>'
+                 '</div></div>')
+        price = ('<div class="page-event__aside-ticket"><div class="page-event__aside-ticket-price">'
+                 '<span>票價</span><h3>600 <i>元</i></h3></div></div>')
+        def roles(extra):
+            data = original.replace(b"</main>", extra.encode() + b"</main>")
+            result = inspect_event_detail(entry, data, receipt(entry["detail_url"], data), NOW)
+            self.assertFalse(result["formal_field_pass"])
+            self.assertFalse(result["published"])
+            return result["verified_core_roles"]
+        result = roles(venue + price)
+        self.assertEqual(result["EVENT_VENUE_SPACE"], "臺北表演藝術中心 參觀回路、排練場、天臺")
+        self.assertEqual(result["EVENT_ADVERTISED_PRICE_RANGE_NTD"], [600, 600])
+        self.assertNotIn("EVENT_ADVERTISED_PRICE_RANGE_NTD", roles(venue))
+        self.assertNotIn("EVENT_ADVERTISED_PRICE_RANGE_NTD", roles(price + price))
+        self.assertNotIn("EVENT_ADVERTISED_PRICE_RANGE_NTD", roles(price.replace("600", "優惠600")))
+        self.assertNotIn("EVENT_VENUE_SPACE", roles(venue + venue))
+        self.assertNotIn("EVENT_VENUE_SPACE", roles(venue.replace("<p></p>", "<p hidden></p>")))
+        self.assertNotIn("EVENT_ADVERTISED_PRICE_RANGE_NTD", roles(price.replace("600", "0")))
+
     def test_native_receipt_hash_drift_fail_closed(self):
         entry = card("1301", "展覽 ABC", "展覽", "2025-07-23 - 2026-12-30")
         data = detail("展覽 ABC", "展覽", "2025-07-24 - 2026-12-31")
