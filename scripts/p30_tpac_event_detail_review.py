@@ -10,6 +10,7 @@ No new network, formal JSON write, Golden update or recurring publisher.
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -20,6 +21,53 @@ from scripts.p30_tpac_multi_event_refresh import (
 
 MAX_SHOWS = 40
 TPE = timezone(timedelta(hours=8))
+
+
+def event_venue_price_roles(soup):
+    """Source-owned /event sidebar roles, not formal acceptance or availability.
+
+    The real /event template may render an empty venue <p> and put the
+    actual venue in its sibling <div>. The /program-only price parser cannot
+    parse this template's single NT-dollar value.
+    """
+    roles = {}
+    places = soup.select("div.page-event__aside-place")
+    venues = soup.select("div.page-event__aside-place-venue")
+    if (len(places) == len(venues) == 1
+            and venues[0].find_parent("div", class_="page-event__aside-place") is places[0]
+            and _visible(venues[0])):
+        box = venues[0]
+        headings = box.find_all("h3", recursive=False)
+        names = box.find_all("p", recursive=False)
+        notes = box.find_all("div", recursive=False)
+        if (len(headings) == len(names) == 1 and len(notes) <= 1
+                and all(_visible(x) for x in headings + names + notes)
+                and _text(headings[0]) == "場地"):
+            name = _text(names[0])
+            note = _text(notes[0]) if notes else ""
+            parts = list(dict.fromkeys(x for x in (name, note) if x and x != "其他"))
+            space = "／".join(parts)
+            if (0 < len(space) <= 240 and "http" not in space.lower()
+                    and not any(c in space for c in "<>")):
+                roles["EVENT_VENUE_SPACE"] = space
+    tickets = soup.select("div.page-event__aside-ticket")
+    prices = soup.select("div.page-event__aside-ticket-price")
+    if (len(tickets) == len(prices) == 1
+            and prices[0].find_parent("div", class_="page-event__aside-ticket") is tickets[0]
+            and _visible(prices[0])):
+        box = prices[0]
+        labels = box.find_all("span", recursive=False)
+        amounts = box.find_all("h3", recursive=False)
+        if (len(labels) == len(amounts) == 1 and _visible(labels[0])
+                and _visible(amounts[0]) and _text(labels[0]) == "票價"):
+            match = re.fullmatch(r"([0-9]{1,7}|[0-9]{1,3}(?:,[0-9]{3})+)(?:\\s*[-–～~]\\s*([0-9]{1,7}|[0-9]{1,3}(?:,[0-9]{3})+))?\\s*元",
+                                 _text(amounts[0]))
+            if match:
+                low = int(match[1].replace(",", ""))
+                high = int((match[2] or match[1]).replace(",", ""))
+                if 0 < low <= 999999 and 0 < high <= 999999:
+                    roles["EVENT_ADVERTISED_PRICE_RANGE_NTD"] = sorted([low, high])
+    return roles
 
 
 def inspect_event_detail(card, raw, receipt, now):
@@ -55,7 +103,7 @@ def inspect_event_detail(card, raw, receipt, now):
     now = now.astimezone(timezone.utc)
     if period[1] < now.astimezone(TPE).date():
         raise ValueError("TPAC_ACTIVITY_ALREADY_ENDED_HOLD")
-    roles = {"EVENT_TITLE": name}
+    roles = {"EVENT_TITLE": name, **event_venue_price_roles(soup)}
     showtimes = []
     if category == "展覽":
         roles["EXHIBITION_PERIOD"] = [x.isoformat() for x in period]
