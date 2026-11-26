@@ -651,7 +651,7 @@ def replay_offline_sources(manifest, fixture_root):
                 raw = _read_fixture(fixture_root, entry["list_file"])
                 list_stamp = _receipt(raw, entry["list_receipt"], list_url)
                 cards = _owned_list(provider, raw)
-                partial = provider == "accupass" and bool(urlsplit(list_url).query)
+                partial = provider in ("twtc", "cksmh") or (provider == "accupass" and bool(urlsplit(list_url).query))
                 digest = hashlib.sha256(raw).hexdigest()
                 if provider == "twtc":
                     twtc_list_body_sha256 = digest
@@ -986,7 +986,7 @@ def _candidate_canonical(obj):
                        separators=(",", ":")) + "\n").encode("utf-8")
 
 
-def _partition_page_index(pages):
+def _partition_page_index(pages, provider="accupass"):
     """Content-addressed page receipts, never a claim of full coverage."""
     if not isinstance(pages, list):
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
@@ -1002,7 +1002,7 @@ def _partition_page_index(pages):
                        for sid in page["event_ids"])
                 or page["event_ids"] != sorted(set(page["event_ids"]))):
             raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
-        _list_url("accupass", {"source_url": page["list_url"]})
+        _list_url(provider, {"source_url": page["list_url"]})
         try:
             if datetime.fromisoformat(page["list_observed_at"]).utcoffset() is None:
                 raise ValueError("naive")
@@ -1013,13 +1013,13 @@ def _partition_page_index(pages):
     return index
 
 
-def _partition_report_pages(report):
+def _partition_report_pages(report, provider="accupass"):
     inventories = report.get("partition_inventory", {})
-    if not isinstance(inventories, dict) or set(inventories) - {"accupass"}:
+    if not isinstance(inventories, dict) or set(inventories) - {"accupass", "twtc", "cksmh"}:
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
-    item = inventories.get("accupass")
+    item = inventories.get(provider)
     if item is None:
-        if report["source_states"]["accupass"] == "REVIEW_PARTITION_ONLY":
+        if report["source_states"][provider] == "REVIEW_PARTITION_ONLY":
             raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
         return {}
     if (not isinstance(item, dict)
@@ -1027,22 +1027,22 @@ def _partition_report_pages(report):
             or not isinstance(item.get("failed_pages"), dict)):
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
     # Empty or unreadable observations must never replace historical receipts.
-    if report["source_states"]["accupass"] != "REVIEW_PARTITION_ONLY":
+    if report["source_states"][provider] != "REVIEW_PARTITION_ONLY":
         return {}
-    pages = _partition_page_index(item.get("pages"))
+    pages = _partition_page_index(item.get("pages"), provider)
     ids = sorted({sid for page in pages.values() for sid in page["event_ids"]})
     if (not ids or item.get("event_ids") != ids
-            or report["listed_identities"]["accupass"] != ["accupass:" + sid for sid in ids]
+            or report["listed_identities"][provider] != [provider + ":" + sid for sid in ids]
             or item.get("detail_backlog") !=
-                [sid for sid in ids if "accupass:" + sid not in report["records"]]):
+                [sid for sid in ids if provider + ":" + sid not in report["records"]]):
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
     attempted = item.get("detail_attempt_ids")
     if (not isinstance(attempted, list)
             or any(not isinstance(sid, str) or sid not in ids for sid in attempted)
             or attempted != sorted(set(attempted)) or len(attempted) > 20):
         raise ValueError("SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD")
-    expected = [sid for sid in ids if "accupass:" + sid in report["records"]
-                or report["holds"].get("accupass:" + sid)
+    expected = [sid for sid in ids if provider + ":" + sid in report["records"]
+                or report["holds"].get(provider + ":" + sid)
                     != "SOURCE_DETAIL_NOT_PROVIDED_HOLD"]
     if attempted != expected:
         raise ValueError("SOURCE_PARTITION_ATTEMPT_SCHEMA_HOLD")
@@ -1056,13 +1056,13 @@ def _page_binds_row(page, row):
                     ("list_url", "list_observed_at", "list_body_sha256")))
 
 
-def _partition_ledger(pages, rows, attempts=None):
+def _partition_ledger(pages, rows, attempts=None, provider="accupass"):
     """Persist all discovered IDs, page receipts and completion in one CAS."""
     ids = sorted({sid for page in pages.values() for sid in page["event_ids"]})
     items = {}
     for sid in ids:
         refs = sorted(key for key, page in pages.items() if sid in page["event_ids"])
-        row = rows.get("accupass:" + sid, {})
+        row = rows.get(provider + ":" + sid, {})
         title = row.get("fields", {}).get("title")
         complete = (isinstance(title, dict)
                     and title.get("decision") == "REVIEW_ONLY_NOT_ACCEPTED"
@@ -1104,13 +1104,13 @@ _PARTITION_ATTEMPT_OUTCOMES = {
 }
 
 
-def _advance_partition_attempts(prior, report, incoming_pages):
+def _advance_partition_attempts(prior, report, incoming_pages, provider="accupass"):
     """Count committed offline attempts, not absent DETAIL or live requests."""
     attempts = dict(prior)
     if not incoming_pages:
         return attempts
-    for sid in report["partition_inventory"]["accupass"]["detail_attempt_ids"]:
-        identity = "accupass:" + sid
+    for sid in report["partition_inventory"][provider]["detail_attempt_ids"]:
+        identity = provider + ":" + sid
         outcome = ("DETAIL_REVIEW_ONLY" if identity in report["records"]
                    else report["holds"].get(identity))
         if outcome not in _PARTITION_ATTEMPT_OUTCOMES:
@@ -1122,26 +1122,43 @@ def _advance_partition_attempts(prior, report, incoming_pages):
     return attempts
 
 
-def _validate_partition_ledger(snapshot):
-    ledger = snapshot.get("partition_inventory")
-    if ledger is None and "partition_inventory" not in snapshot:
+def _partition_ledgers(snapshot):
+    """Read legacy ACCUPASS flat ledger or source-isolated envelope."""
+    if "partition_inventory" not in snapshot:
         return {}
-    if not isinstance(ledger, dict) or not isinstance(ledger.get("pages"), dict):
+    raw = snapshot["partition_inventory"]
+    if not isinstance(raw, dict):
         raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
-    pages = _partition_page_index(list(ledger["pages"].values()))
-    if (not pages or pages != ledger["pages"]
-            or _partition_ledger(pages, snapshot["candidates"],
-                                 ledger.get("detail_attempts")) != ledger):
-        raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
-    return pages
+    if set(raw) == {"providers"}:
+        ledgers = raw["providers"]
+        if (not isinstance(ledgers, dict) or not ledgers
+                or set(ledgers) - {"accupass", "twtc", "cksmh"}):
+            raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    else:
+        ledgers = {"accupass": raw}
+    for provider, ledger in ledgers.items():
+        if not isinstance(ledger, dict) or not isinstance(ledger.get("pages"), dict):
+            raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+        pages = _partition_page_index(list(ledger["pages"].values()), provider)
+        if (not pages or pages != ledger["pages"]
+                or _partition_ledger(pages, snapshot["candidates"],
+                                     ledger.get("detail_attempts"), provider) != ledger):
+            raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
+    return ledgers
 
 
-def select_partition_pending(snapshot, limit=20):
-    """Least-attempted pending IDs first; deterministic ties; no GET authority."""
-    _validate_partition_ledger(snapshot)
+def _validate_partition_ledger(snapshot, provider="accupass"):
+    return _partition_ledgers(snapshot).get(provider, {}).get("pages", {})
+
+
+def select_partition_pending(snapshot, limit=20, provider="accupass"):
+    """Least-attempted pending IDs per source; no cross-source ID collisions."""
+    ledgers = _partition_ledgers(snapshot)
     if type(limit) is not int or not 0 <= limit <= 20:
         raise ValueError("SOURCE_PARTITION_SELECTION_LIMIT_HOLD")
-    return snapshot.get("partition_inventory", {}).get("detail_backlog", [])[:limit]
+    if provider not in ("accupass", "twtc", "cksmh"):
+        raise ValueError("SOURCE_PARTITION_PROVIDER_HOLD")
+    return ledgers.get(provider, {}).get("detail_backlog", [])[:limit]
 
 
 def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
@@ -1167,7 +1184,9 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
                       listed_identities={**report["listed_identities"],
                                          **{p: [] for p in missing}})
     rows = _candidate_rows(report)
-    incoming_pages = _partition_report_pages(report)
+    incoming_by_provider = {p: _partition_report_pages(report, p)
+                            for p in ("accupass", "twtc", "cksmh")}
+    incoming_pages = incoming_by_provider["accupass"]
     if (tpac_archive_root is None) != (tpac_inventory_sha is None):
         raise ValueError("SOURCE_TPAC_ARCHIVE_ARGUMENT_HOLD")
     tpac_rows = (_tpac_archive_rows(tpac_archive_root, tpac_inventory_sha)
@@ -1175,8 +1194,9 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
     rows.update(tpac_rows)
     # A successful DETAIL must point at a verified page in this partition run.
     for identity, row in rows.items():
-        if (incoming_pages and row["source_namespace"] == "accupass"
-                and not any(_page_binds_row(page, row) for page in incoming_pages.values())):
+        source_pages = incoming_by_provider.get(row["source_namespace"], {})
+        if (source_pages
+                and not any(_page_binds_row(page, row) for page in source_pages.values())):
             raise ValueError("SOURCE_PARTITION_LEDGER_SCHEMA_HOLD")
     if expected_sha is not None and not re.fullmatch(r"[0-9a-f]{64}", expected_sha):
         raise ValueError("SOURCE_CANDIDATE_EXPECTED_SHA_HOLD")
@@ -1193,7 +1213,7 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
         actual = hashlib.sha256(prior).hexdigest() if prior is not None else None
         if actual != expected_sha:
             raise ValueError("SOURCE_CANDIDATE_CAS_HOLD")
-        prior_pages, prior_attempts = {}, {}
+        prior_pages, prior_ledgers = {}, {}
         if prior is not None:
             try:
                 old = json.loads(prior)
@@ -1203,8 +1223,8 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
                         or old.get("accepted_fields") != 0 or old.get("published") != 0
                         or not isinstance(old.get("candidates"), dict)):
                     raise ValueError("SOURCE_CANDIDATE_PRIOR_CORRUPT_HOLD")
-                prior_pages = _validate_partition_ledger(old)
-                prior_attempts = old.get("partition_inventory", {}).get("detail_attempts", {})
+                prior_ledgers = _partition_ledgers(old)
+                prior_pages = prior_ledgers.get("accupass", {}).get("pages", {})
                 for identity, row in old["candidates"].items():
                     _validate_archived_candidate_snapshot_row(
                         identity, row, "SOURCE_CANDIDATE_PRIOR_FIELD_HOLD")
@@ -1228,8 +1248,8 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
                     elif (provider in ("twtc", "cksmh")
                           and identity in report["listed_identities"][provider]
                           and report["holds"].get(identity) == "SOURCE_DETAIL_NOT_PROVIDED_HOLD"
-                          and row.get("source_evidence", {}).get("list_body_sha256")
-                              == report.get(provider + "_list_body_sha256")):
+                          and any(_page_binds_row(page, row)
+                                  for page in incoming_by_provider[provider].values())):
                         # Same sealed list, subsequent bounded DETAIL batch:
                         # absence of a supplied body is not a new failure.
                         rows[identity] = row
@@ -1282,15 +1302,23 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
                         rows[identity] = row
             except (TypeError, UnicodeError, json.JSONDecodeError) as exc:
                 raise ValueError("SOURCE_CANDIDATE_PRIOR_CORRUPT_HOLD") from exc
-        merged_pages = {**prior_pages, **incoming_pages}
-        if not rows and not merged_pages:
+        ledgers = {}
+        for provider, new_pages in incoming_by_provider.items():
+            old_ledger = prior_ledgers.get(provider, {})
+            merged = {**old_ledger.get("pages", {}), **new_pages}
+            if merged:
+                attempts = _advance_partition_attempts(
+                    old_ledger.get("detail_attempts", {}), report, new_pages, provider)
+                ledgers[provider] = _partition_ledger(merged, rows, attempts, provider)
+        if not rows and not ledgers:
             raise ValueError("SOURCE_CANDIDATE_EMPTY_HOLD")
         snapshot = {"kind": "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1",
                     "candidates": rows, "release_state": "HARD_HOLD_NO_PUBLICATION",
                     "accepted_fields": 0, "published": 0}
-        if merged_pages:
-            attempts = _advance_partition_attempts(prior_attempts, report, incoming_pages)
-            snapshot["partition_inventory"] = _partition_ledger(merged_pages, rows, attempts)
+        if ledgers:
+            # Preserve the legacy ACCUPASS-only wire format.
+            snapshot["partition_inventory"] = (ledgers["accupass"]
+                if set(ledgers) == {"accupass"} else {"providers": ledgers})
         payload = _candidate_canonical(snapshot)
         digest = hashlib.sha256(payload).hexdigest()
         versions = directory / "versions"
@@ -1325,9 +1353,13 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
         return {"sha256": digest, "events": len(rows),
                 "decision": "ISOLATED_MULTI_SOURCE_CANDIDATE_COMMITTED_NOT_FORMAL",
                 "accepted_fields": 0, "published": 0,
-                **({"pending_details": len(snapshot["partition_inventory"]["detail_backlog"]),
-                    "next_detail_ids": select_partition_pending(snapshot)}
-                   if merged_pages else {})}
+                **({"pending_details": len(ledgers.get("accupass", {}).get("detail_backlog", [])),
+                    "next_detail_ids": select_partition_pending(snapshot),
+                    **({"pending_by_provider": {p: len(l["detail_backlog"]) for p,l in ledgers.items()},
+                        "next_by_provider": {p: select_partition_pending(snapshot, provider=p)
+                                             for p in ledgers}}
+                       if set(ledgers) - {"accupass"} else {})}
+                   if ledgers else {})}
 
 
 def load_offline_candidate_lkg(root, expected_sha):
@@ -1423,12 +1455,17 @@ def build_partition_archive_batch(snapshot, archive_index, fixture_root, limit=2
     current snapshot. It is a locator, not a source authority or permission
     to fetch. Only page receipts already present in the ledger are admitted.
     """
-    selected = select_partition_pending(snapshot, limit)
+    kinds = {"ACCUPASS_SEALED_ARCHIVE_INDEX_V1": "accupass",
+             "TWTC_SEALED_ARCHIVE_INDEX_V1": "twtc",
+             "CKSMH_SEALED_ARCHIVE_INDEX_V1": "cksmh"}
+    provider = kinds.get(archive_index.get("kind")) if isinstance(archive_index, dict) else None
+    if provider is None:
+        raise ValueError("SOURCE_ARCHIVE_INDEX_SCHEMA_HOLD")
+    selected = select_partition_pending(snapshot, limit, provider)
     if not selected:
         raise ValueError("SOURCE_ARCHIVE_NO_PENDING_HOLD")
     if (not isinstance(archive_index, dict)
             or set(archive_index) != {"kind", "lists", "details"}
-            or archive_index["kind"] != "ACCUPASS_SEALED_ARCHIVE_INDEX_V1"
             or not isinstance(archive_index["lists"], list)
             or not 0 < len(archive_index["lists"]) <= 100
             or not isinstance(archive_index["details"], dict)
@@ -1436,17 +1473,18 @@ def build_partition_archive_batch(snapshot, archive_index, fixture_root, limit=2
                    for sid in archive_index["details"])):
         raise ValueError("SOURCE_ARCHIVE_INDEX_SCHEMA_HOLD")
 
-    ledger_pages = _validate_partition_ledger(snapshot)
+    ledger = _partition_ledgers(snapshot)[provider]
+    ledger_pages = ledger["pages"]
     indexed, seen_urls = {}, set()
     # Verify every supplied LIST against its real bytes, parsed IDs, and the
     # exact previously admitted page receipt. A filename alone proves nothing.
     for entry in archive_index["lists"]:
         if not isinstance(entry, dict) or set(entry) != {"list_file", "list_receipt"}:
             raise ValueError("SOURCE_ARCHIVE_INDEX_SCHEMA_HOLD")
-        url = _list_url("accupass", entry["list_receipt"])
+        url = _list_url(provider, entry["list_receipt"])
         raw = _read_fixture(fixture_root, entry["list_file"])
         stamp = _receipt(raw, entry["list_receipt"], url)
-        cards = _owned_list("accupass", raw)
+        cards = _owned_list(provider, raw)
         page = {"list_url": url, "list_observed_at": stamp,
                 "list_body_sha256": hashlib.sha256(raw).hexdigest(),
                 "event_ids": sorted(cards)}
@@ -1469,13 +1507,15 @@ def build_partition_archive_batch(snapshot, archive_index, fixture_root, limit=2
             raise ValueError("SOURCE_ARCHIVE_INDEX_SCHEMA_HOLD")
         receipt = record["receipt"]
         url = receipt.get("source_url") if isinstance(receipt, dict) else None
-        canonical = "https://www.accupass.com/event/" + sid
-        if _canonical_event_url("accupass", url) != (sid, canonical):
+        parsed = _canonical_event_url(provider, url)
+        if parsed is None or parsed[0] != sid:
             raise ValueError("SOURCE_RECEIPT_PROVENANCE_HOLD")
+        canonical = parsed[1]
         # Select only a real archived LIST edge bearing this event and observed
         # URL. Preserve the original tracked URL rather than inventing a link.
-        matching = [key for key in snapshot["partition_inventory"]["items"][sid]["page_keys"]
+        matching = [key for key in ledger["items"][sid]["page_keys"]
                     if key in indexed and sid in indexed[key][1]
+                    and canonical == indexed[key][1][sid]["url"]
                     and url in [canonical, *indexed[key][1][sid]["source_link_urls"]]]
         if not matching:
             raise ValueError("SOURCE_ARCHIVE_LIST_MISSING_HOLD:" + sid)
@@ -1489,11 +1529,16 @@ def build_partition_archive_batch(snapshot, archive_index, fixture_root, limit=2
 
     # Validate cross-page identity conflicts with the established union code.
     # No second event parser, no network, and no mutation during planning.
-    cards, _, failures = _sealed_list_union("accupass", lists, fixture_root)
+    if provider != "accupass":
+        if len(lists) != 1:
+            raise ValueError("SOURCE_ARCHIVE_BATCH_LIST_HOLD")
+        return {"mode": "SEALED_OFFLINE_REPLAY_ONLY", "sources": {
+            provider: {**lists[0], "details": details}}}
+    cards, _, failures = _sealed_list_union(provider, lists, fixture_root)
     if failures or not set(selected).issubset(cards):
         raise ValueError("SOURCE_ARCHIVE_BATCH_LIST_HOLD")
     return {"mode": "SEALED_OFFLINE_REPLAY_ONLY", "sources": {
-        "accupass": {"lists": lists, "details": details}}}
+        provider: {"lists": lists, "details": details}}}
 
 
 def main(argv=None):
@@ -1555,9 +1600,10 @@ def main(argv=None):
     if args.archive_index is not None:
         # Reuse the normal DETAIL parser and CAS path; ensure planning and
         # replay did not diverge before admitting any mutation.
-        intended = set(data["sources"]["accupass"]["details"])
-        inv = report["partition_inventory"].get("accupass", {})
-        if (report["source_states"]["accupass"] != "REVIEW_PARTITION_ONLY"
+        provider = next(iter(data["sources"]))
+        intended = set(data["sources"][provider]["details"])
+        inv = report["partition_inventory"].get(provider, {})
+        if (report["source_states"][provider] != "REVIEW_PARTITION_ONLY"
                 or set(inv.get("detail_attempt_ids", [])) != intended
                 or inv.get("failed_pages")):
             raise ValueError("SOURCE_ARCHIVE_BATCH_REPLAY_HOLD")
