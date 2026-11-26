@@ -181,6 +181,72 @@ class TestSafety(unittest.TestCase):
             verify_rollback_manifest(raw,bad)
         self.assertFalse(p["commit_permitted"])
 
+class TestSharedCandidatePreflight(unittest.TestCase):
+    def snapshot(self):
+        rows={}
+        for key,ns,sid,url in (
+            ("tpac:program:2040","program","2040",U),
+            ("tpac:event:2040","event","2040","https://tpac.org.taipei/event/2040"),
+            ("twtc:29418","twtc","29418","https://twtc.com.tw/exhibition_more.aspx?id=29418&p=home"),
+            ("cksmh:61021","cksmh","61021","https://event.culture.tw/mocweb/reg/CKSMH/Detail.init.ctr?actId=61021")):
+            proof={"event_id":sid,"source_url":url,"observed_at":"2026-11-26T12:00:00+08:00",
+                   "source_body_sha256":"a"*64,"hold_reason":"INDEPENDENT_ACCEPTANCE_HOLD"}
+            rows[key]={"identity":key,"source_namespace":ns,"event_id":sid,
+                       "detail_source_url":url,"source_current":False,
+                       "decision":"ISOLATED_REVIEW_CANDIDATE_ONLY",
+                       "fields":{"title":dict(proof,value="fixture",role="EVENT_TITLE",
+                                             decision="REVIEW_ONLY_NOT_ACCEPTED")},
+                       "held_fields":{"price":dict(proof,value=None,role="UNKNOWN",decision="HOLD")}}
+        return {"kind":"MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1","candidates":rows,
+                "release_state":"HARD_HOLD_NO_PUBLICATION","accepted_fields":0,"published":0}
+
+    def evaluate(self,snapshot,expected=None):
+        import hashlib
+        raw=(json.dumps(snapshot,ensure_ascii=False,sort_keys=True,separators=(",",":"))+"\n").encode()
+        formal,sha=feed()
+        return plan(formal,[],sha,shared_candidate_raw=raw,
+                    shared_candidate_sha=expected or hashlib.sha256(raw).hexdigest())
+
+    def test_review_isolated_from_formal_diff(self):
+        p=self.evaluate(self.snapshot())
+        self.assertEqual(p["shared_candidate_count"],4)
+        self.assertEqual(p["review_only_count"],4)
+        self.assertEqual(p["shape_valid"],0)
+        self.assertEqual(p["would_add"],[])
+        self.assertEqual(p["would_change"],[])
+        self.assertEqual(p["versioned_diff"],[])
+        self.assertEqual(p["formal_rows_before"],p["formal_rows_after"])
+        self.assertEqual(p["lkg_retained"],1)
+        self.assertFalse(p["commit_permitted"])
+        self.assertFalse(p["shared_candidate_field_authority"])
+        self.assertEqual({r["identity"] for r in p["review_only"]},set(self.snapshot()["candidates"]))
+        self.assertTrue(all(r["decision"]=="SHARED_CANDIDATE_REVIEW_ONLY" for r in p["review_only"]))
+
+    def test_snapshot_digest_and_authority_forgery_fail_closed(self):
+        with self.assertRaisesRegex(ValueError,"SHARED_CANDIDATE_CAS"):
+            self.evaluate(self.snapshot(),"0"*64)
+        for field,value in (("accepted_fields",1),("published",True),("release_state","RELEASED")):
+            s=self.snapshot(); s[field]=value
+            with self.assertRaisesRegex(ValueError,"SHARED_CANDIDATE_SCHEMA"):
+                self.evaluate(s)
+        for field,value in (("source_current",True),("formal_field_pass",True)):
+            s=self.snapshot(); s["candidates"]["tpac:program:2040"][field]=value
+            with self.assertRaisesRegex(ValueError,"SHARED_CANDIDATE_ROW"):
+                self.evaluate(s)
+        s=self.snapshot(); s["candidates"]["tpac:program:2040"]["fields"]["title"]["decision"]="ACCEPTED"
+        with self.assertRaisesRegex(ValueError,"SHARED_CANDIDATE_FIELD"):
+            self.evaluate(s)
+        s=self.snapshot(); s["candidates"]["tpac:program:2040"]["detail_source_url"]="https://tpac.org.taipei/event/2040"
+        with self.assertRaisesRegex(ValueError,"SHARED_CANDIDATE_IDENTITY"):
+            self.evaluate(s)
+        s=self.snapshot(); s["candidates"]["cksmh:61021"]["held_fields"]["price"]["value"]=100
+        with self.assertRaisesRegex(ValueError,"SHARED_CANDIDATE_FIELD"):
+            self.evaluate(s)
+        raw,sha=feed()
+        with self.assertRaisesRegex(ValueError,"SHARED_CANDIDATE_PAIR_REQUIRED"):
+            plan(raw,[],sha,shared_candidate_sha="0"*64)
+
+
 class TestOnDemandRefreshPreflight(unittest.TestCase):
     """Gateway-only eligibility does not authorize a public browser dispatch."""
 
