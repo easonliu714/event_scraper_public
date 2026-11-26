@@ -60,7 +60,8 @@ def event_venue_price_roles(soup):
         amounts = box.find_all("h3", recursive=False)
         if (len(labels) == len(amounts) == 1 and _visible(labels[0])
                 and _visible(amounts[0]) and _text(labels[0]) == "票價"):
-            match = re.fullmatch(r"([0-9]{1,7}|[0-9]{1,3}(?:,[0-9]{3})+)(?:\\s*[-–～~]\\s*([0-9]{1,7}|[0-9]{1,3}(?:,[0-9]{3})+))?\\s*元",
+            # Raw regex uses a single backslash for whitespace, including nested 元 markup.
+            match = re.fullmatch(r"([0-9]{1,7}|[0-9]{1,3}(?:,[0-9]{3})+)(?:\s*[-–～~]\s*([0-9]{1,7}|[0-9]{1,3}(?:,[0-9]{3})+))?\s*元",
                                  _text(amounts[0]))
             if match:
                 low = int(match[1].replace(",", ""))
