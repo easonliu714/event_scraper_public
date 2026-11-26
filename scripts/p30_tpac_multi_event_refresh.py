@@ -497,13 +497,24 @@ def refresh_event_plan(list_body, list_receipt, detail_pairs, prior, now):
                                "observed_at": review["observed_at"],
                                "decision": "REVIEW_NOT_FORMAL"}
             start = review["verified_core_roles"].get("NEXT_EVENT_SHOW_START")
+            # Preserve source-owned venue and advertised price in REVIEW LKG;
+            # no separate ticket-source acceptance or availability is implied.
+            space = review["verified_core_roles"].get("EVENT_VENUE_SPACE")
+            price_range = review["verified_core_roles"].get("EVENT_ADVERTISED_PRICE_RANGE_NTD")
+            price_label = ""
+            if price_range:
+                low, high = price_range
+                price_label = (f"NT${low:,}" if low == high else
+                               f"NT${low:,}–{high:,}")
+            location_label = (space if space and space.startswith("臺北表演藝術中心")
+                              else "臺北表演藝術中心" + ("／" + space if space else ""))
             event = {
                 "source_namespace": "event", "identity": identity,
                 "source_event_id": sid, "url": review["url"],
                 "title": review["title"], "platform": "臺北表演藝術中心",
                 "type": review["activity_kind"],
                 "date": datetime.fromisoformat(start).strftime("%Y-%m-%d %H:%M") if start else "",
-                "location": "", "price": "", "img_url": None,
+                "location": location_label, "price": price_label, "img_url": None,
                 "scraped_at": _time(review["observed_at"]).astimezone(TIMEZONE).isoformat(),
                 "description": "官方活動詳情與場次請參閱來源；尚未正式接受欄位。",
                 "published": False, "formal_field_pass": False, "golden_accepted": False,
