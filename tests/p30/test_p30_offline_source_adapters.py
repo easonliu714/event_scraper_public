@@ -44,6 +44,89 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_venue_backlog_restart_archive_fairness_and_legacy_compatibility(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg,load_offline_candidate_lkg,
+            rollback_offline_candidate_lkg,select_partition_pending,
+            build_partition_archive_batch)
+        with tempfile.TemporaryDirectory() as td:
+            root=Path(td)
+            stamp="2026-11-26T21:00:00+08:00"
+            ids=[str(61000+i) for i in range(23)]
+            def receipt(raw,url):
+                return {"evidence_class":"SEALED_OFFLINE_FIXTURE_ONLY",
+                        "source_url":url,"observed_at":stamp,
+                        "body_sha256":hashlib.sha256(raw).hexdigest()}
+            def seed(provider):
+                if provider=="twtc":
+                    base="https://twtc.com.tw/exhibition_more.aspx?id="
+                    url=lambda sid:base+sid+"&p=home"
+                    list_url="https://twtc.com.tw/exhibition?p=home"
+                    html="<table>"+"".join('<tr><td>11/06 ~ 11/09</td><td><a href="'+url(sid)+'">活動測試'+sid+'</a></td><td>主辦</td></tr>' for sid in ids)+"</table>"
+                else:
+                    base="https://event.culture.tw/mocweb/reg/CKSMH/"
+                    url=lambda sid:base+"Detail.init.ctr?actId="+sid
+                    list_url=base+"Query.list.ctr"
+                    html="".join('<a href="'+url(sid)+'">活動測試'+sid+'</a>' for sid in ids)
+                raw=html.encode()
+                lp=provider+".html"
+                (root/lp).write_bytes(raw)
+                listing={"list_file":lp,"list_receipt":receipt(raw,list_url)}
+                details={}
+                for sid in ids:
+                    body=("<h2>活動測試"+sid+"</h2><p>展出日期：2026/11/06 ~ 2026/11/09</p>").encode()
+                    name=provider+"-"+sid+".html"
+                    (root/name).write_bytes(body)
+                    details[sid]={"detail_file":name,"receipt":receipt(body,url(sid))}
+                return {"kind":provider.upper()+"_SEALED_ARCHIVE_INDEX_V1",
+                        "lists":[listing],"details":details}
+            t,c=seed("twtc"),seed("cksmh")
+            manifest={"mode":"SEALED_OFFLINE_REPLAY_ONLY","sources":{
+                "twtc":dict(t["lists"][0],details={}),
+                "cksmh":dict(c["lists"][0],details={})}}
+            first=commit_offline_candidate_lkg(replay_offline_sources(manifest,root),root)
+            snap=load_offline_candidate_lkg(root,first["sha256"])
+            self.assertEqual(first["pending_by_provider"],{"twtc":23,"cksmh":23})
+            self.assertEqual(select_partition_pending(snap,20,"twtc"),ids[:20])
+            self.assertEqual(select_partition_pending(snap,20,"cksmh"),ids[:20])
+            # Same numeric IDs in two sources are independently tracked.
+            plan=build_partition_archive_batch(snap,t,root,20)
+            self.assertEqual(sorted(plan["sources"]["twtc"]["details"]),ids[:20])
+            # A failed supplied DETAIL is counted, not accepted.
+            bad=copy.deepcopy(plan)
+            bad["sources"]["twtc"]["details"][ids[0]]["receipt"]["body_sha256"]="0"*64
+            second=commit_offline_candidate_lkg(replay_offline_sources(bad,root),root,first["sha256"])
+            snap=load_offline_candidate_lkg(root,second["sha256"])
+            self.assertEqual(select_partition_pending(snap,20,"twtc"),ids[20:]+ids[:1])
+            self.assertEqual(select_partition_pending(snap,20,"cksmh"),ids[:20])
+            ledger=snap["partition_inventory"]["providers"]
+            self.assertEqual(ledger["twtc"]["detail_attempts"][ids[0]]["count"],1)
+            self.assertEqual(ledger["cksmh"]["detail_attempts"],{})
+            # Exercise the fixed CLI in a fresh process, then resume the other source.
+            index=root/"twtc-index.json"
+            index.write_text(json.dumps(t),encoding="utf-8")
+            command=[sys.executable,"-m","scripts.p30_offline_source_adapters",
+                     "--archive-index",str(index),"--fixture-root",str(root),
+                     "--candidate-root",str(root),"--expected-sha",second["sha256"]]
+            run=json.loads(subprocess.check_output(command,text=True))
+            third=run["candidate_commit"]
+            self.assertEqual(third["pending_by_provider"]["twtc"],0)
+            self.assertEqual(third["pending_by_provider"]["cksmh"],23)
+            snap=load_offline_candidate_lkg(root,third["sha256"])
+            self.assertEqual(len(snap["candidates"]),23)
+            self.assertEqual(snap["partition_inventory"]["providers"]["twtc"]["detail_attempts"][ids[0]]["count"],2)
+            cp=build_partition_archive_batch(snap,c,root,20)
+            fourth=commit_offline_candidate_lkg(replay_offline_sources(cp,root),root,third["sha256"])
+            snap=load_offline_candidate_lkg(root,fourth["sha256"])
+            self.assertEqual(len(snap["candidates"]),43)
+            self.assertEqual(select_partition_pending(snap,20,"cksmh"),ids[20:])
+            self.assertEqual(select_partition_pending(snap,20,"twtc"),[])
+            self.assertEqual(snap["accepted_fields"],0)
+            self.assertEqual(snap["published"],0)
+            rollback_offline_candidate_lkg(root,first["sha256"],fourth["sha256"])
+            self.assertEqual(load_offline_candidate_lkg(root,first["sha256"])["candidates"],{})
+            self.assertFalse((root/"docs/data.json").exists())
+
     def test_cksmh_shared_candidate_distinct_sessions_registration_and_identity(self):
         from scripts.p30_offline_source_adapters import (
             commit_offline_candidate_lkg, load_offline_candidate_lkg,
