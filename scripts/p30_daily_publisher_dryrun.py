@@ -253,7 +253,99 @@ def replay_tpac_event_archive(raw,expected_sha):
     except (zipfile.BadZipFile,UnicodeError,KeyError,TypeError,json.JSONDecodeError) as e:
         raise ValueError("ARCHIVE_STRUCTURE_HOLD") from e
 
-def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None):
+def shared_candidate_review_only(raw, expected_sha):
+    """Read the #243 isolated LKG wire contract, NOT a formal acceptance input.
+
+    The digest binds supplied bytes; it is not an independent native receipt.
+    Keep this boundary independent of the other unmerged PR's Python modules.
+    """
+    if (not isinstance(raw, bytes) or not 0 < len(raw) <= 20_000_000
+            or not isinstance(expected_sha, str)
+            or not re.fullmatch(r"[a-f0-9]{64}", expected_sha)
+            or hashlib.sha256(raw).hexdigest() != expected_sha):
+        raise ValueError("SHARED_CANDIDATE_CAS_HOLD")
+    try:
+        snapshot = json.loads(raw)
+        canonical = (json.dumps(snapshot, ensure_ascii=False, sort_keys=True,
+                                separators=(",", ":")) + "\n").encode("utf-8")
+    except (ValueError, UnicodeError, TypeError) as exc:
+        raise ValueError("SHARED_CANDIDATE_JSON_HOLD") from exc
+    keys = {"kind", "candidates", "release_state", "accepted_fields", "published"}
+    if (not isinstance(snapshot, dict) or set(snapshot) not in (keys, keys | {"partition_inventory"})
+            or raw != canonical
+            or snapshot.get("kind") != "MULTI_SOURCE_ISOLATED_CANDIDATE_LKG_V1"
+            or snapshot.get("release_state") != HOLD
+            or any(type(snapshot.get(k)) is not int or snapshot[k] != 0
+                   for k in ("accepted_fields", "published"))
+            or not isinstance(snapshot.get("candidates"), dict)
+            or not 0 < len(snapshot["candidates"]) <= 2000):
+        raise ValueError("SHARED_CANDIDATE_SCHEMA_HOLD")
+    reviews = []
+    for key, row in sorted(snapshot["candidates"].items()):
+        if not isinstance(row, dict):
+            raise ValueError("SHARED_CANDIDATE_ROW_HOLD")
+        ns, sid, url = (row.get(k) for k in ("source_namespace", "event_id", "detail_source_url"))
+        if (not isinstance(sid, str) or not isinstance(url, str)
+                or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,99}", sid)
+                or row.get("identity") != key or row.get("source_current") is not False
+                or row.get("decision") != "ISOLATED_REVIEW_CANDIDATE_ONLY"
+                or set(row) - {"identity","source_namespace","event_id","detail_source_url",
+                               "fields","held_fields","source_current","decision",
+                               "source_evidence","tpac_archive_evidence","detail_replay_hold_reason"}):
+            raise ValueError("SHARED_CANDIDATE_ROW_HOLD")
+        if ns in ("program", "event"):
+            valid = (key == "tpac:" + ns + ":" + sid and re.fullmatch(r"[1-9][0-9]{0,9}", sid)
+                     and url == "https://tpac.org.taipei/" + ns + "/" + sid)
+            provider = "tpac"
+        elif ns == "twtc":
+            valid = (key == ns + ":" + sid and re.fullmatch(r"[0-9]{2,12}", sid)
+                     and url == "https://twtc.com.tw/exhibition_more.aspx?id=" + sid + "&p=home")
+            provider = ns
+        elif ns == "cksmh":
+            valid = (key == ns + ":" + sid and re.fullmatch(r"[0-9]{3,9}", sid)
+                     and url in ("https://event.culture.tw/mocweb/reg/CKSMH/Detail.init.ctr?actId=" + sid,
+                                 "https://event.culture.tw/CKSMH/portal/Registration/C0103MAction?actId=" + sid))
+            provider = ns
+        elif ns in ("kktix", "accupass"):
+            prefix = "https://kktix.com/events/" if ns == "kktix" else "https://www.accupass.com/event/"
+            valid = key == ns + ":" + sid and url == prefix + sid
+            provider = ns
+        else:
+            valid = False
+        if not valid:
+            raise ValueError("SHARED_CANDIDATE_IDENTITY_HOLD")
+        fields, held = row.get("fields"), row.get("held_fields")
+        if (not isinstance(fields, dict) or not isinstance(held, dict)
+                or set(fields) & set(held) or not (fields or held)):
+            raise ValueError("SHARED_CANDIDATE_FIELD_HOLD")
+        for group, decision in ((fields,"REVIEW_ONLY_NOT_ACCEPTED"), (held,"HOLD")):
+            for name, field in group.items():
+                if (not isinstance(field, dict) or field.get("decision") != decision
+                        or field.get("event_id") != sid or field.get("source_url") != url
+                        or not isinstance(field.get("hold_reason"), str) or not field["hold_reason"]
+                        or (decision == "HOLD" and field.get("value") is not None)
+                        or (decision != "HOLD" and (field.get("value") is None
+                            or not isinstance(field.get("source_body_sha256"), str)
+                            or not re.fullmatch(r"[a-f0-9]{64}", field["source_body_sha256"])))):
+                    raise ValueError("SHARED_CANDIDATE_FIELD_HOLD")
+                if decision != "HOLD":
+                    try:
+                        stamp = datetime.fromisoformat(field["observed_at"])
+                        if stamp.utcoffset() is None:
+                            raise ValueError()
+                    except (ValueError, TypeError, KeyError) as exc:
+                        raise ValueError("SHARED_CANDIDATE_FIELD_TIME_HOLD") from exc
+        reviews.append({"identity":key, "provider":provider, "namespace":ns,
+                        "source_event_id":sid, "url":url,
+                        "review_field_names":sorted(fields), "held_field_names":sorted(held),
+                        "decision":"SHARED_CANDIDATE_REVIEW_ONLY",
+                        "first_failure":"INDEPENDENT_FIELD_ACCEPTANCE_AND_FRESHNESS_HOLD",
+                        "row_sha256":_json_sha(row)})
+    return reviews
+
+
+def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None,
+         *,shared_candidate_raw=None,shared_candidate_sha=None):
     if not isinstance(formal_raw,bytes) or not re.fullmatch("[a-f0-9]{40}",expected_blob):
         raise ValueError("CAS_INPUT_HOLD")
     actual=blob_sha(formal_raw)
@@ -275,6 +367,12 @@ def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None):
     archived_reviews=(replay_tpac_event_archive(archive_zip,archive_sha)
                       if archive_zip is not None else [])
     review_only.extend(archived_reviews)
+    if (shared_candidate_raw is None) != (shared_candidate_sha is None):
+        raise ValueError("SHARED_CANDIDATE_PAIR_REQUIRED_HOLD")
+    shared_reviews = (shared_candidate_review_only(shared_candidate_raw, shared_candidate_sha)
+                      if shared_candidate_raw is not None else [])
+    # Never send shared REVIEW/HOLD rows through verified_shape or diff proposal.
+    review_only.extend(shared_reviews)
     for n,row in enumerate(candidates):
         try:
             if isinstance(row,dict) and row.get("kind")=="EVENTRADAR_AB_ISOLATED_REVIEW_BRIDGE_V1":
@@ -313,6 +411,9 @@ def plan(formal_raw,candidates,expected_blob,archive_zip=None,archive_sha=None):
             "candidate_count":len(candidates),"shape_valid":len(proposed),
             "review_only_count":len(review_only),
             "archived_native_review_count":len(archived_reviews),
+            "shared_candidate_count":len(shared_reviews),
+            "shared_candidate_sha256":shared_candidate_sha,
+            "shared_candidate_field_authority":False,
             "archived_native_list_rows":18 if archived_reviews else 0,"review_only":review_only,
             "would_add":sorted(added),"would_change":sorted(changed),
             "unchanged":sorted(unchanged),"rejected":rejected,
@@ -433,6 +534,8 @@ def main():
     for flag in ("formal","candidates","expected-blob","output"): a.add_argument("--"+flag,required=True)
     a.add_argument("--archived-tpac-zip")
     a.add_argument("--archived-tpac-sha256")
+    a.add_argument("--shared-candidate")
+    a.add_argument("--shared-candidate-sha256")
     x=a.parse_args()
     root=Path(__file__).resolve().parents[1]
     out=Path(x.output).resolve()
@@ -441,7 +544,9 @@ def main():
     raw=Path(x.formal).read_bytes()
     archived=Path(x.archived_tpac_zip).read_bytes() if x.archived_tpac_zip else None
     result=plan(raw,json.loads(Path(x.candidates).read_text(encoding="utf-8")),
-                x.expected_blob,archived,x.archived_tpac_sha256)
+                x.expected_blob,archived,x.archived_tpac_sha256,
+                shared_candidate_raw=Path(x.shared_candidate).read_bytes() if x.shared_candidate else None,
+                shared_candidate_sha=x.shared_candidate_sha256)
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(result,ensure_ascii=False,sort_keys=True,indent=2)+"\n",encoding="utf-8")
     if Path(x.formal).read_bytes()!=raw: raise ValueError("FORMAL_CHANGED_HOLD")
