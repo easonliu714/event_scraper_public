@@ -184,6 +184,12 @@ jobs:
           assert tour['identity']=='tpac:event:2072'
           assert tour['verified_core_roles']['NEXT_EVENT_SHOW_START']=='2026-11-11T19:00:00+08:00'
           assert tour['verified_core_roles']['EXACT_EVENT_SHOW_COUNT']==3
+          # Owner Android mismatch: real original source bytes, not synthetic fields.
+          assert exhibit['verified_core_roles']['EVENT_VENUE_SPACE']=='一樓廣場'
+          assert 'EVENT_ADVERTISED_PRICE_RANGE_NTD' not in exhibit['verified_core_roles']
+          assert tour['verified_core_roles']['EVENT_VENUE_SPACE']=='臺北表演藝術中心 參觀回路、排練場、天臺'
+          assert tour['verified_core_roles']['EVENT_ADVERTISED_PRICE_RANGE_NTD']==[600,600]
+          print('PASS_ARCHIVED_REAL_EVENT_VENUE_AND_ADVERTISED_PRICE_REVIEW')
           assert 'LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD' in tour['held_fields']
           for key in ('1301','2072'):
               assert rows['records'][key]['published'] is False
@@ -223,7 +229,9 @@ jobs:
           assert set(plan['events'])=={'tpac:event:1301','tpac:event:2072'}
           exhibition=plan['events']['tpac:event:1301']
           tour=plan['events']['tpac:event:2072']
-          assert exhibition['date']=='' and exhibition['location']==''
+          assert exhibition['date']=='' and exhibition['location']=='臺北表演藝術中心／一樓廣場'
+          assert plan['events']['tpac:event:2072']['price']=='NT$600'
+          assert plan['events']['tpac:event:2072']['location']=='臺北表演藝術中心 參觀回路、排練場、天臺'
           assert 'EXHIBITION_PERIOD' in exhibition['_candidate']['field_roles']
           assert 'NEXT_EVENT_SHOW_START' not in exhibition['_candidate']['field_roles']
           assert tour['date']=='2026-11-11 19:00'
