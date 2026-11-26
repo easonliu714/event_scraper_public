@@ -17,6 +17,7 @@ SOURCES = {
     "kktix": ("kktix.com", "events"),
     "accupass": ("www.accupass.com", "event"),
     "twtc": ("twtc.com.tw", "exhibition_more.aspx"),
+    "cksmh": ("event.culture.tw", "mocweb/reg/CKSMH/Detail.init.ctr"),
 }
 LIMIT = 2_000_000
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$")
@@ -33,6 +34,16 @@ def _canonical_event_url(provider, href):
                 or url.username is not None or url.password is not None
                 or url.fragment):
             return None
+        if provider == "cksmh":
+            if url.path not in ("/mocweb/reg/CKSMH/Detail.init.ctr",
+                                "/CKSMH/portal/Registration/C0103MAction"):
+                return None
+            query = parse_qsl(url.query, keep_blank_values=True, strict_parsing=True)
+            if len(query) != 1 or query[0][0] != "actId" or not re.fullmatch(
+                    r"[0-9]{3,9}", query[0][1]):
+                return None
+            sid = query[0][1]
+            return sid, "https://event.culture.tw" + url.path + "?actId=" + sid
         if provider == "twtc":
             if url.path != "/exhibition_more.aspx":
                 return None
@@ -71,6 +82,8 @@ def _list_url(provider, receipt):
     root = "https://" + SOURCES[provider][0] + "/"
     observed = receipt.get("source_url") if isinstance(receipt, dict) else None
     allowed = {root, root + "search"} if provider == "accupass" else {root}
+    if provider == "cksmh":
+        allowed = {"https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr"}
     if provider == "twtc":
         allowed = {"https://twtc.com.tw/exhibition?p=home"}
     if provider == "accupass":
@@ -185,7 +198,207 @@ def _twtc_period_fields(article, card, sid, stamp, sha):
                                         "HOLD", reason)}
 
 
+def _cksmh_list(body):
+    """Reuse L2-B actId/list-anchor ownership, not its one-shot network runner."""
+    listing = "https://event.culture.tw/mocweb/reg/CKSMH/Query.list.ctr"
+    soup = BeautifulSoup(body, "html.parser")
+    found = {}
+    for link in soup.find_all("a", href=True):
+        href = urljoin(listing, link["href"])
+        parsed = _canonical_event_url("cksmh", href)
+        if parsed is None:
+            continue
+        sid, canonical = parsed
+        title = " ".join(link.get_text(" ", strip=True).split())
+        attr = " ".join((link.get("title") or "").split())
+        if title in ("詳內容", "報名", "立即報名", "活動詳情", "詳細內容"):
+            continue
+        if title and attr and title != attr:
+            raise ValueError("SOURCE_LIST_CARD_TITLE_CONFLICT_HOLD")
+        title = title or attr
+        if len(title) < 3 or len(title) > 300:
+            continue
+        if sid in found and (found[sid]["title"] != title or found[sid]["url"] != canonical):
+            raise ValueError("SOURCE_LIST_DUPLICATE_IDENTITY_HOLD")
+        found[sid] = {"id": sid, "title": title, "url": canonical,
+                      "source_link_urls": [canonical]}
+        if len(found) > 60:
+            raise ValueError("SOURCE_CKSMH_LIST_CAP_HOLD")
+    return found
+
+
+def _cksmh_semantic_roles(page, title):
+    """Port pure L4-C parser from #18 2656c43f, no historical GET or frozen count."""
+    import unicodedata
+    def short_title(text):
+        s = " ".join(text.split())
+        for suffix in ("圖片說明", "圖片描述", "圖片資訊"):
+            if s.endswith(suffix):
+                s = s[:-len(suffix)].rstrip()
+        return s
+    def normalize(text):
+        return re.sub(r"\s+", "", unicodedata.normalize("NFKC", str(text))).casefold()
+
+    SECTION_START = re.compile(r"場\s*次\s*資\s*料")
+    SESSION_MARK = re.compile(r"場\s*次\s*[:：]")
+    REG_MARK = re.compile(r"報\s*名\s*期\s*間")
+    INTRO_MARK = re.compile(r"活動\s*內\s*容\s*介\s*紹")
+    VENUE_MARK = re.compile(r"場\s*地\s*[:：]?")
+    NEXT_INFO = re.compile(r"(?:名\s*額|講\s*師|名額剩|正取剩|報\s*名\s*期\s*間|場\s*次\s*介\s*紹)")
+    FULL_RANGE = re.compile(
+        r"(?P<d1>20\d{2}/\d{1,2}/\d{1,2})\s+"
+        r"(?P<t1>\d{2}:\d{2})\s*[～~\-]\s*"
+        r"(?P<d2>20\d{2}/\d{1,2}/\d{1,2})\s+"
+        r"(?P<t2>\d{2}:\d{2})")
+    HEADING_RANGE = re.compile(
+        r"(?P<d>20\d{2}/\d{1,2}/\d{1,2})\s*"
+        r"(?:[\(（]\s*[一二三四五六日天]\s*[\)）])?\s*"
+        r"(?P<t1>\d{2}:?\d{2})\s*[～~\-]\s*(?P<t2>\d{2}:?\d{2})(?![/\d:])")
+    DATEISH = re.compile(r"20\d{2}/\d{1,2}/\d{1,2}")
+
+
+    def iso_time(s):
+        if re.fullmatch(r"\d{4}",s):return s[:2]+":"+s[2:]
+        if re.fullmatch(r"\d{2}:\d{2}",s):return s
+        raise ValueError("INVALID_CLOCK")
+
+
+    def date_pair(d1,t1,d2,t2):
+        a=datetime.fromisoformat(d1.replace("/","-")+"T"+iso_time(t1))
+        b=datetime.fromisoformat(d2.replace("/","-")+"T"+iso_time(t2))
+        if b<a or (b-a).days>370:
+            raise ValueError("TIME_REVERSED_OR_TOO_LONG")
+        return {"start":a.isoformat(timespec="minutes"),"end":b.isoformat(timespec="minutes"),
+                "timeZone":"Asia/Taipei"}
+
+
+    def exact_one(values):
+        """Require exactly one unique occurrence, not one arbitrary date from prose."""
+        seen={(x["start"],x["end"]) for x in values}
+        return values[0] if len(seen)==1 else None
+
+
+    def occurrence(section):
+        values=[]
+        for m in FULL_RANGE.finditer(section):
+            try:values.append(date_pair(m["d1"],m["t1"],m["d2"],m["t2"]))
+            except ValueError:pass
+        for m in HEADING_RANGE.finditer(section):
+            try:values.append(date_pair(m["d"],m["t1"],m["d"],m["t2"]))
+            except ValueError:pass
+        return exact_one(values)
+
+
+    def paragraphs(page):
+        soup=BeautifulSoup(page,"html.parser")
+        # NFKC normalizes fullwidth digits/whitespace while keeping content literal.
+        return unicodedata.normalize("NFKC"," ".join(soup.stripped_strings))
+
+
+    def parse_event(page,row):
+        soup=BeautifulSoup(page,"html.parser")
+        title=short_title(row["title"])
+        exact=[normalize(x) for x in list(soup.stripped_strings)[:65]]
+        if normalize(title) not in exact:
+            return {"state":"HOLD_EVENT_TITLE_IDENTITY","sessions":[],"registrationWindows":[],
+                    "eventDateStart":None,"eventDateEnd":None}
+        whole=paragraphs(page)
+        begin=SECTION_START.search(whole)
+        if not begin:
+            # No sessions: retain L4B date only if the role was a separate
+            # uniquely actId-bound official listing PERIOD; it is not a session.
+            return {"state":"NO_SESSION_SECTION","sessions":[],"registrationWindows":[],
+                    "eventDateStart":None,"eventDateEnd":None}
+        segment=whole[begin.end():]
+        stop=INTRO_MARK.search(segment)
+        if stop:segment=segment[:stop.start()]
+        chunks=SESSION_MARK.split(segment)[1:]
+        if len(chunks)>20:
+            return {"state":"HOLD_SESSION_CAP","sessions":[],"registrationWindows":[]}
+        sessions=[]
+        registrations=[]
+        warnings=[]
+        for index,chunk in enumerate(chunks):
+            mark=REG_MARK.search(chunk)
+            header=chunk[:mark.start()] if mark else chunk
+            # A bare '2026/10/16 ~ ...' after '報名期間' must never be used as EVENT.
+            event=occurrence(header)
+            if not event:
+                warnings.append({"block":index+1,"reason":"EVENT_TIME_UNPROVEN"})
+                continue
+            # One session per explicit '場次:' block. No duplicate acts or borrowed dates.
+            label=header[:240]
+            if len(label)>180:label=label[:180]
+            v=VENUE_MARK.search(chunk)
+            venue=None
+            if v:
+                next_marker=NEXT_INFO.search(chunk,v.end())
+                raw=chunk[v.end():next_marker.start() if next_marker else len(chunk)]
+                raw=re.sub(r"\s+"," ",raw).strip()
+                raw=re.sub(r"(?:名額剩|正取剩|名單|報名|登入).*$","",raw).strip()
+                if 2<=len(raw)<=160:venue=raw
+            entry={"ordinal":index+1,"title":label.strip(),"start":event["start"],
+                   "end":event["end"],"timeZone":"Asia/Taipei",
+                   "role":"OFFICIAL_EVENT_SESSION_TIME","venue":venue}
+            if mark:
+                # Registration window is captured separately and only after the
+                # explicit label, in this SAME session block.
+                regpart=chunk[mark.end():]
+                matches=list(FULL_RANGE.finditer(regpart))
+                rm=matches[0] if len(matches)==1 else None
+                if rm:
+                    try:
+                        r=date_pair(rm["d1"],rm["t1"],rm["d2"],rm["t2"])
+                        entry["registration"]={**r,"role":"OFFICIAL_REGISTRATION_WINDOW"}
+                        registrations.append({**r,"sessionOrdinal":index+1,
+                                              "role":"OFFICIAL_REGISTRATION_WINDOW"})
+                    except ValueError:
+                        warnings.append({"block":index+1,"reason":"REG_WINDOW_INVALID"})
+            sessions.append(entry)
+        # Extra date-like values in blocks lacking an event are not proof.
+        if not sessions:
+            return {"state":"HOLD_NO_OFFICIAL_EVENT_SESSION","sessions":[],
+                    "registrationWindows":registrations,
+                    "eventDateStart":None,"eventDateEnd":None,"warnings":warnings,
+                    "sessionBlocks":len(chunks)}
+        dates=sorted(x["start"][:10] for x in sessions)
+        ends=sorted(x["end"][:10] for x in sessions)
+        return {"state":"OFFICIAL_EVENT_SESSIONS_VERIFIED",
+                "sessions":sessions,"registrationWindows":registrations,
+                "eventDateStart":dates[0],"eventDateEnd":ends[-1],
+                "eventTimeRole":"OFFICIAL_EVENT_SESSION_BOUNDS",
+                "sessionBlocks":len(chunks),"warnings":warnings}
+    return parse_event(page, {"title": title})
+
+
+def _cksmh_role_fields(roles, card, sid, stamp, sha):
+    """Explicit session/registration roles; never turn a list period into SHOW."""
+    fields = {}
+    sessions = roles.get("sessions", [])
+    registrations = roles.get("registrationWindows", [])
+    def evidence(value, role, reason):
+        return _field(value, role if value is not None else "UNKNOWN", sid,
+                      card["url"], stamp, sha, "REVIEW" if value is not None else "HOLD",
+                      "SOURCE_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE" if value is not None else reason)
+    # Partial blocks cannot prove complete occurrence bounds.
+    complete = (roles["state"] == "OFFICIAL_EVENT_SESSIONS_VERIFIED"
+                and len(sessions) == roles.get("sessionBlocks"))
+    fields["sessions"] = evidence(sessions or None, "OFFICIAL_EVENT_SESSIONS",
+                                  "SOURCE_CKSMH_SESSION_UNPROVEN_HOLD")
+    fields["registration_windows"] = evidence(registrations or None,
+        "OFFICIAL_REGISTRATION_WINDOWS", "SOURCE_CKSMH_REGISTRATION_UNPROVEN_HOLD")
+    if complete:
+        fields["show_start"] = evidence(min(x["start"] for x in sessions) + "+08:00",
+                                        "EVENT_SHOW_START", "")
+        venues = [x.get("venue") for x in sessions]
+        if venues and all(venues) and len(set(venues)) == 1:
+            fields["venue"] = evidence(venues[0], "EVENT_VENUE", "")
+    return fields
+
+
 def _owned_list(provider, body):
+    if provider == "cksmh":
+        return _cksmh_list(body)
     if provider == "twtc":
         return _twtc_list(body)
     soup = BeautifulSoup(body, "html.parser")
@@ -408,6 +621,7 @@ def replay_offline_sources(manifest, fixture_root):
     rows, holds, states, listed = {}, {}, {}, {provider: [] for provider in SOURCES}
     partition_inventory = {}
     twtc_list_body_sha256 = None
+    cksmh_list_body_sha256 = None
     for provider in SOURCES:
         if provider not in manifest["sources"]:
             # Not scheduled is not an empty or failed official LIST.
@@ -441,6 +655,8 @@ def replay_offline_sources(manifest, fixture_root):
                 digest = hashlib.sha256(raw).hexdigest()
                 if provider == "twtc":
                     twtc_list_body_sha256 = digest
+                if provider == "cksmh":
+                    cksmh_list_body_sha256 = digest
                 pages = [{"list_url": list_url, "list_observed_at": list_stamp,
                           "list_body_sha256": digest, "event_ids": sorted(cards)}]
                 failures = {}
@@ -498,29 +714,35 @@ def replay_offline_sources(manifest, fixture_root):
                     page for page in card["list_observations"]
                     if observed_url == card["url"] or observed_url in page["list_link_urls"])
                 article = BeautifulSoup(detail, "html.parser")
-                # TWTC L4-A uses exact H1/H2/H3 title parity (not page-wide text).
-                if provider == "twtc":
-                    heads = [node for node in article.select("h1,h2,h3")
-                             if " ".join(node.get_text(" ", strip=True).split()) == card["title"]]
-                    if len(heads) != 1:
+                if provider == "cksmh":
+                    roles = _cksmh_semantic_roles(detail, card["title"])
+                    if roles["state"] == "HOLD_EVENT_TITLE_IDENTITY":
                         raise ValueError("SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
-                else:
-                    heads = [node for node in article.select("h1")
-                             if node.get_text(" ", strip=True)]
-                if len(heads) > 1:
-                    raise ValueError("SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD")
-                if heads:
-                    actual = " ".join(heads[0].get_text(" ", strip=True).split())
-                    if actual != card["title"]:
-                        raise ValueError("SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
-                else:
-                    # Some archived event pages render the visible title via
-                    # client JS. Only a unique same-ID Event assertion may
-                    # supply offline identity; never trust arbitrary metadata.
-                    if not _detail_title_from_jsonld(
-                            article, provider, sid, card["title"], card["url"]):
-                        raise ValueError("SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD")
                     actual = card["title"]
+                else:
+                    # TWTC L4-A uses exact H1/H2/H3 title parity (not page-wide text).
+                    if provider == "twtc":
+                        heads = [node for node in article.select("h1,h2,h3")
+                                 if " ".join(node.get_text(" ", strip=True).split()) == card["title"]]
+                        if len(heads) != 1:
+                            raise ValueError("SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
+                    else:
+                        heads = [node for node in article.select("h1")
+                                 if node.get_text(" ", strip=True)]
+                    if len(heads) > 1:
+                        raise ValueError("SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD")
+                    if heads:
+                        actual = " ".join(heads[0].get_text(" ", strip=True).split())
+                        if actual != card["title"]:
+                            raise ValueError("SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
+                    else:
+                        # Some archived event pages render the visible title via
+                        # client JS. Only a unique same-ID Event assertion may
+                        # supply offline identity; never trust arbitrary metadata.
+                        if not _detail_title_from_jsonld(
+                                article, provider, sid, card["title"], card["url"]):
+                            raise ValueError("SOURCE_DETAIL_TITLE_AMBIGUOUS_HOLD")
+                        actual = card["title"]
             except (ValueError, OSError) as exc:
                 holds[identity] = str(exc)
                 continue
@@ -534,6 +756,8 @@ def replay_offline_sources(manifest, fixture_root):
                     "HOLD", "SOURCE_FIELD_ROLE_NOT_VERIFIED")
             if provider == "twtc":
                 fields.update(_twtc_period_fields(article, card, sid, stamp, sha))
+            elif provider == "cksmh":
+                fields.update(_cksmh_role_fields(roles, card, sid, stamp, sha))
             else:
                 fields.update(_structured_event_fields(article, provider, sid, actual, card["url"], stamp, sha))
             rows[identity] = {
@@ -557,6 +781,7 @@ def replay_offline_sources(manifest, fixture_root):
         "counts": {"review_identities": len(rows), "sources": len(manifest["sources"])},
         "partition_inventory": partition_inventory,
         **({"twtc_list_body_sha256": twtc_list_body_sha256} if twtc_list_body_sha256 else {}),
+        **({"cksmh_list_body_sha256": cksmh_list_body_sha256} if cksmh_list_body_sha256 else {}),
         "new_official_get": 0, "accepted_fields": 0, "published": 0,
         "release_state": "HARD_HOLD_NO_PUBLICATION",
     }
@@ -933,9 +1158,14 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
     if (isinstance(report, dict)
             and isinstance(report.get("source_states"), dict)
             and isinstance(report.get("listed_identities"), dict)
-            and set(report["source_states"]) == set(report["listed_identities"]) == {"kktix", "accupass"}):
-        report = dict(report, source_states=dict(report["source_states"], twtc="NOT_ATTEMPTED"),
-                      listed_identities=dict(report["listed_identities"], twtc=[]))
+            and set(report["source_states"]) == set(report["listed_identities"])
+                and set(report["source_states"]) in ({"kktix", "accupass"},
+                                                     {"kktix", "accupass", "twtc"})):
+        missing = set(SOURCES) - set(report["source_states"])
+        report = dict(report, source_states={**report["source_states"],
+                                            **{p: "NOT_ATTEMPTED" for p in missing}},
+                      listed_identities={**report["listed_identities"],
+                                         **{p: [] for p in missing}})
     rows = _candidate_rows(report)
     incoming_pages = _partition_report_pages(report)
     if (tpac_archive_root is None) != (tpac_inventory_sha is None):
@@ -995,11 +1225,11 @@ def commit_offline_candidate_lkg(report, root, expected_sha=None, *,
                         # An unobserved identity is not a removed event. Prior
                         # archive authority remains historical, never current.
                         rows[identity] = row
-                    elif (provider == "twtc"
+                    elif (provider in ("twtc", "cksmh")
                           and identity in report["listed_identities"][provider]
                           and report["holds"].get(identity) == "SOURCE_DETAIL_NOT_PROVIDED_HOLD"
                           and row.get("source_evidence", {}).get("list_body_sha256")
-                              == report.get("twtc_list_body_sha256")):
+                              == report.get(provider + "_list_body_sha256")):
                         # Same sealed list, subsequent bounded DETAIL batch:
                         # absence of a supplied body is not a new failure.
                         rows[identity] = row
