@@ -44,6 +44,87 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             }
         return manifest
 
+    def test_cksmh_shared_candidate_distinct_sessions_registration_and_identity(self):
+        from scripts.p30_offline_source_adapters import (
+            commit_offline_candidate_lkg, load_offline_candidate_lkg,
+            rollback_offline_candidate_lkg)
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            base = "https://event.culture.tw/mocweb/reg/CKSMH/"
+            list_url = base + "Query.list.ctr"
+            stamp = "2026-11-26T12:00:00+08:00"
+            ids = ["61021", "61024", "51331", "61004"]
+            titles = ["講座測試", "新書分享測試", "常設展測試", "日期未公告測試"]
+            def url(sid):
+                return base+"Detail.init.ctr?actId="+sid
+            def receipt(raw, source):
+                return {"evidence_class":"SEALED_OFFLINE_FIXTURE_ONLY",
+                        "source_url":source,"observed_at":stamp,
+                        "body_sha256":hashlib.sha256(raw).hexdigest()}
+            listing = "".join('<a href="Detail.init.ctr?actId='+sid+'">'+title+'</a>'
+                              for sid,title in zip(ids,titles)).encode()
+            (root/"cksmh-list.html").write_bytes(listing)
+            entry={"list_file":"cksmh-list.html","list_receipt":receipt(listing,list_url),"details":{}}
+            manifest={"mode":"SEALED_OFFLINE_REPLAY_ONLY","sources":{"cksmh":entry}}
+            def put(sid,body):
+                raw=body.encode()
+                name=sid+".html"
+                (root/name).write_bytes(raw)
+                return {"detail_file":name,"receipt":receipt(raw,url(sid))}
+            lecture=('<h2>講座測試</h2><h3>場次資料</h3>'
+                '<div>場次: 2026/11/07 (六) 1400-1600</div>'
+                '<p>報 名 期 間 2026/10/16 11:30 ~ 2026/11/07 16:00</p>'
+                '<p>場 地 中正紀念堂1樓演藝廳</p>'
+                '<div>場次: 2026/11/13 (五) 1400-1600</div>'
+                '<p>報 名 期 間 2026/10/16 11:30 ~ 2026/11/13 16:00</p>'
+                '<p>場 地 中正紀念堂1樓圖書室</p>'
+                '<h3>活動內容介紹</h3><p>摘要</p>')
+            entry["details"]={ids[0]:put(ids[0],lecture)}
+            first=replay_offline_sources(manifest,root)
+            self.assertEqual(len(first["listed_identities"]["cksmh"]),4)
+            f=first["records"]["cksmh:61021"]["fields"]
+            self.assertEqual(f["show_start"]["value"],"2026-11-07T14:00+08:00")
+            self.assertEqual(len(f["sessions"]["value"]),2)
+            self.assertEqual(f["registration_windows"]["value"][0]["start"],"2026-10-16T11:30")
+            self.assertNotEqual(f["sessions"]["value"][0]["venue"],f["sessions"]["value"][1]["venue"])
+            self.assertIsNone(f["venue"]["value"])
+            a=commit_offline_candidate_lkg(first,root)
+            entry["details"]={
+                ids[1]:put(ids[1],'<h2>新書分享測試</h2><h3>場次資料</h3>'
+                           '<p>場次: 2026/11/04 14:40 ~ 2026/11/04 16:00</p>'
+                           '<p>報名期間 2026/10/01 10:00 ~ 2026/10/29 12:00</p>'),
+                ids[2]:put(ids[2],'<h2>常設展測試</h2><h3>活動內容介紹</h3>2025/11/24 ~ 2030/11/24'),
+                ids[3]:put(ids[3],'<h2>日期未公告測試</h2><h3>場次資料</h3>'
+                           '<p>場次: 未公告 報名期間 2026/10/16 11:30 ~ 2026/11/07 16:00</p>')}
+            b=commit_offline_candidate_lkg(replay_offline_sources(manifest,root),root,a["sha256"])
+            saved=load_offline_candidate_lkg(root,b["sha256"])
+            self.assertEqual(len(saved["candidates"]),4)
+            self.assertEqual(saved["candidates"]["cksmh:61021"]["fields"]["show_start"]["value"],
+                             "2026-11-07T14:00+08:00")
+            for sid in ids[2:]:
+                self.assertIsNone(saved["candidates"]["cksmh:"+sid]["held_fields"]["show_start"]["value"])
+            self.assertEqual(saved["accepted_fields"],0)
+            self.assertEqual(saved["published"],0)
+            bad=put(ids[0],"<h2>其他活動</h2>")
+            entry["details"]={ids[0]:bad}
+            wrong=replay_offline_sources(manifest,root)
+            self.assertEqual(wrong["holds"]["cksmh:61021"],"SOURCE_LIST_DETAIL_TITLE_PARITY_HOLD")
+            bad=put(ids[0],lecture)
+            bad["receipt"]["source_url"]=url(ids[1])
+            entry["details"]={ids[0]:bad}
+            wrong=replay_offline_sources(manifest,root)
+            self.assertEqual(wrong["holds"]["cksmh:61021"],"SOURCE_RECEIPT_PROVENANCE_HOLD")
+            conflict=listing+('<a href="'+url(ids[0])+'">另一個名稱</a>').encode()
+            (root/"cksmh-list.html").write_bytes(conflict)
+            entry["list_receipt"]=receipt(conflict,list_url)
+            entry["details"]={}
+            held=replay_offline_sources(manifest,root)
+            self.assertEqual(held["source_states"]["cksmh"],"HOLD_LIST")
+            self.assertEqual(commit_offline_candidate_lkg(held,root,b["sha256"])["sha256"],b["sha256"])
+            rollback_offline_candidate_lkg(root,a["sha256"],b["sha256"])
+            self.assertEqual(len(load_offline_candidate_lkg(root,a["sha256"])["candidates"]),1)
+            self.assertFalse((root/"docs/data.json").exists())
+
     def test_twtc_variable_list_batched_dates_and_sibling_retention(self):
         from scripts.p30_offline_source_adapters import (
             commit_offline_candidate_lkg, load_offline_candidate_lkg)
@@ -833,7 +914,7 @@ class TwoProviderOfflineAdapterTests(unittest.TestCase):
             self.assertEqual(result["counts"]["review_identities"], 2)
             self.assertEqual(result["source_states"], {
                 "kktix": "REVIEW_IDENTITY_ONLY",
-                "accupass": "REVIEW_IDENTITY_ONLY", "twtc": "NOT_ATTEMPTED"})
+                "accupass": "REVIEW_IDENTITY_ONLY", "twtc": "NOT_ATTEMPTED", "cksmh": "NOT_ATTEMPTED"})
             for provider in ("kktix", "accupass"):
                 row = result["records"][provider + ":abc123"]
                 title = row["fields"]["title"]
