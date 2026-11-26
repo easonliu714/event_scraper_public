@@ -88,11 +88,63 @@ jobs:
           PY
           (cd _isolated_review/daily && sha256sum plan.json > SHA256SUMS.txt)
           git diff --exit-code -- docs/data.json docs/platform_status.json
+      - name: Exact upstream shared Candidate archive into existing publisher preflight (NO GET, NO PUBLISH)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 0 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/easonliu714/event_scraper_public/actions/artifacts/15087251831/zip" \
+            -o _isolated_review/daily/shared-upstream.zip
+          echo "003a4824429e162d0cd03d7e15bf42ffb970327195d4263949ddbb4c3afcbbca  _isolated_review/daily/shared-upstream.zip" | sha256sum -c -
+          python - <<'PY'
+          import hashlib,json,zipfile
+          from pathlib import Path
+          from scripts.p30_daily_publisher_dryrun import plan,verify_rollback_manifest
+          dest=Path('_isolated_review/daily')
+          snapshot_name='shared_candidate_tpac_import/_isolated_multi_source_candidates/candidate_lkg.json'
+          report_name='tpac_real_archive_shared_candidate_cas.json'
+          with zipfile.ZipFile(dest/'shared-upstream.zip') as z:
+              assert z.namelist().count(snapshot_name)==z.namelist().count(report_name)==1
+              assert all(z.getinfo(n).file_size<=20_000_000 for n in (snapshot_name,report_name))
+              raw=z.read(snapshot_name)
+              upstream=json.loads(z.read(report_name))
+          assert upstream['kind']=='TPAC_REAL_ARCHIVE_SHARED_CANDIDATE_CAS_V1'
+          sha=upstream['shared_candidate_sha256']
+          assert hashlib.sha256(raw).hexdigest()==sha
+          formal=Path('docs/data.json').read_bytes()
+          p=plan(formal,[],'342eb7c101115b05dbc6ff90de7bd97d5bd63d59',
+                 shared_candidate_raw=raw,shared_candidate_sha=sha)
+          assert p['shared_candidate_count']==p['review_only_count']==40
+          tpac=[x for x in p['review_only'] if x['provider']=='tpac']
+          assert len(tpac)==38
+          assert sum(bool(x['review_field_names']) for x in tpac)==3
+          assert sum(not x['review_field_names'] for x in tpac)==35
+          assert {x['provider'] for x in p['review_only']}=={'tpac','kktix','accupass'}
+          assert p['shape_valid']==p['published_delta']==p['native_get']==0
+          assert p['would_add']==p['would_change']==p['versioned_diff']==[]
+          assert p['formal_rows_before']==p['formal_rows_after']==p['lkg_retained']==1
+          assert p['shared_candidate_field_authority'] is False
+          assert p['commit_permitted'] is p['scheduler_enabled'] is False
+          assert verify_rollback_manifest(formal,p['rollback_manifest'])
+          assert Path('docs/data.json').read_bytes()==formal
+          p['upstream_artifact_id']=15087251831
+          p['upstream_head']='94c5d40eb64cd117c8ddfd6b143945def362a408'
+          p['historical_tpac_review_rows']=3
+          p['historical_tpac_held_rows']=35
+          p['synthetic_sibling_rows']=2
+          (dest/'shared_candidate_preflight.json').write_text(
+              json.dumps(p,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8')
+          print('PASS_CROSS_PR_REAL_TPAC_38_ID_SHARED_CANDIDATE_REVIEW_ONLY_NO_FORMAL_DIFF')
+          PY
+          (cd _isolated_review/daily && sha256sum plan.json shared_candidate_preflight.json > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          git diff --exit-code -- docs/data.json docs/platform_status.json
       - uses: actions/upload-artifact@v4
         with:
           name: eventradar-daily-publisher-dryrun-evidence
           path: |
             _isolated_review/daily/plan.json
+            _isolated_review/daily/shared_candidate_preflight.json
             _isolated_review/daily/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14
