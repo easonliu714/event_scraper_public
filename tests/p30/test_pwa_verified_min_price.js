@@ -81,3 +81,33 @@ assert.equal(summary({...verified,_publication:{...verified._publication,
 assert.match(script,/formalCardPriceSummary\(e\)/);
 console.log("PASS_TPAC_PRICE_1500_NEW_STRICT_FIELD_RECEIPT_NO_GOLDEN_CHANGE");
 console.log("PASS_PRICE_DISCOUNTS_FEES_WRONG_SOURCE_ID_HASH_AND_REVIEW_ALL_HOLD");
+
+// Regression reproduces TPAC 2072 historical price; not fresh HTTP.
+const candidateStart=script.indexOf("    function candidateReviewField(");
+const candidateEnd=script.indexOf("    // Avoid network requests",candidateStart);
+assert.ok(candidateStart>=0 && candidateEnd>candidateStart);
+vm.runInContext(script.slice(candidateStart,candidateEnd)+
+    "\nthis.reviewField=candidateReviewField;this.reviewPrice=candidatePriceSummary;",context);
+const eventUrl="https://tpac.org.taipei/event/2072";
+const row={url:eventUrl,price:"官網票價：NT$600"};
+const receipt={role:"EVENT_ADMISSION_PRICE",decision:"REVIEW",
+    source:eventUrl,value:row.price,observed_at:"2026-11-08T14:49:00Z"};
+const show=(r,e=receipt)=>{
+    const meta={sources:[eventUrl],field_evidence:{price:e}};
+    const field=context.reviewField(r,meta,"price",["EVENT_ADMISSION_PRICE"]);
+    return context.reviewPrice(field.value,e);
+};
+assert.equal(show(row),"官網票價 NT$600（詳官方）");
+for(const change of [{source:"https://tpac.org.taipei/event/1301"},
+    {decision:"FIELD_ACCEPTED"},{role:"SERVICE_FEE"},{value:"官網票價：NT$601"},
+    {observed_at:"2026-11-08T14:49:00"}]){
+    assert.equal(show(row,{...receipt,...change}),"票價詳官方資訊");
+}
+for(const price of ["官網票價：NT$0","官網票價：NT$1,000,000",
+    "官網票價：NT$600；另加手續費","官網票價：NT$600（會員）"]){
+    assert.equal(show({...row,price},{...receipt,value:price}),"票價詳官方資訊");
+}
+assert.equal(show({...row,price:"未確認"}),"票價詳官方資訊");
+assert.equal(show({...row,price:"一般票：NT$1,500–3,500"},
+    {...receipt,value:"一般票：NT$1,500–3,500"}),"NT$1,500 起（詳官方）");
+console.log("PASS_TPAC_2072_ADVERTISED_REVIEW_PRICE_AND_PROVENANCE_NEGATIVES");
