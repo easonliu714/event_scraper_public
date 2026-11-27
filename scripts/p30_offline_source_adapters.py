@@ -1547,10 +1547,111 @@ def build_partition_archive_batch(snapshot, archive_index, fixture_root, limit=2
         provider: {"lists": lists, "details": details}}}
 
 
+def project_tpac_archive_preview(root, expected_sha):
+    """Read exact shared CAS and reuse the existing L7 PWA REVIEW normalizer.
+
+    Only TPAC sealed, same-ID DETAIL rows are exported; other provider fixture
+    siblings and pending LIST-only rows are intentionally excluded. No writes,
+    new GETs, accepted fields, or availability assertion.
+    """
+    from scripts.p30_candidate_review_pipeline import build_candidate_dataset
+    snapshot = load_offline_candidate_lkg(root, expected_sha)
+    inputs, provenance = [], {}
+    for identity, row in sorted(snapshot["candidates"].items()):
+        if not identity.startswith("tpac:"):
+            continue
+        _validate_tpac_archive_candidate(row)
+        if not row["tpac_archive_evidence"]["archive_detail_current"]:
+            continue
+        fields = row["fields"]
+        title = fields["title"]
+        url, stamp, sha = row["detail_source_url"], title["observed_at"], title["source_body_sha256"]
+        if any(f["observed_at"] != stamp or f["source_body_sha256"] != sha
+               for f in fields.values()):
+            raise ValueError("TPAC_PREVIEW_MIXED_DETAIL_RECEIPT_HOLD")
+        namespace, sid = row["source_namespace"], row["event_id"]
+        raw = {"title": title["value"], "url": url,
+               "platform": "臺北表演藝術中心", "type": "其他", "scraped_at": stamp,
+               "_candidate": {"scope": "CANDIDATE_PREVIEW_ONLY",
+                   "decision": "REVIEW_WITH_HOLD", "record_id": identity,
+                   "platform_id": "tpac", "source_event_id": namespace + ":" + sid,
+                   "source_class": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+                   "sources": [url], "hold_reasons": [
+                       "HISTORICAL_ARCHIVE_NOT_CURRENT_OFFICIAL_DATA",
+                       "INDEPENDENT_FIELD_ACCEPTANCE_REQUIRED",
+                       "NOT_TICKET_AVAILABILITY"],
+                   "field_evidence": {}, "published": False,
+                   "golden_accepted": False, "formal_field_pass": False}}
+        meta = raw["_candidate"]
+        def display(key, value, role):
+            raw[key] = value
+            meta["field_evidence"][key] = {"value": value, "role": role,
+                "source": url, "observed_at": stamp, "decision": "REVIEW"}
+        period = fields.get("activity_period")
+        show = fields.get("show_start")
+        if period:
+            display("date", " ～ ".join(period["value"]), "VENUE_EVENT_DATE")
+        elif show:
+            display("date", datetime.fromisoformat(show["value"]).strftime("%Y-%m-%d %H:%M"),
+                    "EVENT_DATE")
+        if "venue" in fields:
+            value = fields["venue"]["value"]
+            display("location", value if value.startswith(raw["platform"]) else
+                    raw["platform"] + "／" + value, "EVENT_VENUE")
+        else:
+            meta["hold_reasons"].append("EVENT_VENUE_SPACE_NOT_PROVEN")
+        if "price" in fields:
+            receipt = fields["price"]
+            low, high = receipt["value"]
+            label = "一般票：" if receipt["role"] == "EVENT_GENERAL_ADMISSION_PRICE_RANGE" else "官網票價："
+            display("price", label + (f"NT${low:,}" if low == high else f"NT${low:,}–{high:,}"),
+                    "EVENT_ADMISSION_PRICE")
+        else:
+            meta["hold_reasons"].append("OFFICIAL_PRICE_NOT_PROVEN")
+        inputs.append(raw)
+        provenance[identity] = {"candidate_snapshot_sha256": expected_sha,
+            "historical_only": True, "source_fields": fields,
+            "held_fields": row["held_fields"]}
+    if not inputs or len(inputs) > 500:
+        raise ValueError("TPAC_PREVIEW_EMPTY_OR_CAP_HOLD")
+    preview, report = build_candidate_dataset(inputs)
+    if report["rejectedRows"] or len(preview) != len(inputs):
+        raise ValueError("TPAC_PREVIEW_NORMALIZER_HOLD")
+    # Retain source roles/SHA alongside the existing UI-compatible receipts.
+    # Detail evidence is an allowlisted projection, never arbitrary HTML.
+    for raw, normalized in zip(inputs, preview):
+        meta = normalized["_candidate"]
+        if any(normalized[key] != raw[key] for key in ("date", "location", "price") if key in raw):
+            raise ValueError("TPAC_PREVIEW_FIELD_LOSS_HOLD")
+        source = provenance[meta["record_id"]]
+        meta["archive_provenance"] = source
+        original = source["source_fields"]
+        detail = []
+        for key, label, role in (("show_start", "首場開始（歷史）", "EVENT_DATE"),
+                                  ("activity_period", "活動期間（歷史）", "VENUE_EVENT_DATE"),
+                                  ("venue", "官方場地（歷史）", "EVENT_VENUE"),
+                                  ("price", "官網票價（歷史）", "VENUE_ADVERTISED_PRICE")):
+            if key in original:
+                value = original[key]["value"]
+                if key == "price":
+                    value = normalized["price"]
+                elif key == "activity_period":
+                    value = " ～ ".join(value)
+                elif key == "show_start":
+                    value = datetime.fromisoformat(value).strftime("%Y-%m-%d %H:%M")
+                detail.append({"label": label, "role": role, "value": value,
+                    "source": normalized["url"], "observed_at": original[key]["observed_at"],
+                    "decision": "REVIEW"})
+        meta["detail_evidence"] = detail
+    return preview
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Offline selected-source LIST+DETAIL; no GET/publish")
     inputs = parser.add_mutually_exclusive_group(required=True)
     inputs.add_argument("--manifest", type=Path)
+    inputs.add_argument("--export-tpac-preview", action="store_true",
+                        help="Read exact CAS and print historical TPAC PWA REVIEW array only")
     inputs.add_argument("--archive-index", type=Path,
                         help="Resolve next pending batch from sealed local archive")
     inputs.add_argument("--tpac-archive-root", type=Path,
@@ -1567,6 +1668,12 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.expected_sha is not None and args.candidate_root is None:
         parser.error("--expected-sha requires --candidate-root")
+    if args.export_tpac_preview:
+        if args.candidate_root is None or args.expected_sha is None or args.tpac_inventory_sha is not None:
+            parser.error("--export-tpac-preview requires --candidate-root and --expected-sha only")
+        print(json.dumps(project_tpac_archive_preview(args.candidate_root, args.expected_sha),
+                         ensure_ascii=False, sort_keys=True))
+        return 0
     if args.tpac_archive_root is not None:
         if args.candidate_root is None or args.tpac_inventory_sha is None:
             parser.error("--tpac-archive-root requires --candidate-root and --tpac-inventory-sha")
