@@ -810,7 +810,9 @@ def _validate_tpac_archive_candidate(row):
     fields, held = row.get("fields"), row.get("held_fields")
     allowed = {"title": {"EVENT_TITLE"}, "show_start": {"EVENT_SHOW_START"},
                "show_count": {"SOURCE_SHOW_COUNT"},
-               "activity_period": {"ACTIVITY_PERIOD", "EXHIBITION_PERIOD"}}
+               "activity_period": {"ACTIVITY_PERIOD", "EXHIBITION_PERIOD"},
+               "venue": {"EVENT_VENUE_SPACE"},
+               "price": {"EVENT_ADVERTISED_PRICE_RANGE_NTD", "EVENT_GENERAL_ADMISSION_PRICE_RANGE"}}
     if (not isinstance(fields, dict) or not isinstance(held, dict)
             or set(fields) & set(held)
             or set(fields) | set(held) != {"title", "date", "show_start", "show_count",
@@ -818,6 +820,7 @@ def _validate_tpac_archive_candidate(row):
             or (bool(fields) != ev["archive_detail_current"])
             or (fields and "title" not in fields)):
         raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
+    from scripts.p30_tpac_multi_event_refresh import _valid_archived_venue_price
     for name, field in fields.items():
         if (not isinstance(field, dict) or field.get("role") not in allowed.get(name, set())
                 or field.get("value") is None
@@ -827,6 +830,9 @@ def _validate_tpac_archive_candidate(row):
                 or field.get("hold_reason") != "ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
                 or not isinstance(field.get("source_body_sha256"), str)
                 or not re.fullmatch(r"[0-9a-f]{64}", field["source_body_sha256"])):
+            raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
+        if name in ("venue", "price") and not _valid_archived_venue_price(
+                name, field["role"], field["value"], catalog):
             raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
         try:
             if datetime.fromisoformat(field["observed_at"]).utcoffset() is None:
