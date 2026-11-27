@@ -1620,6 +1620,9 @@ def _archived_detail_date_roles(catalog, article, soup, detail_url, body_sha, st
             if len(nodes) != 1:
                 return roles
             dates = _period(_text(nodes[0]))
+            # Preserve the official programme period independently of showtimes.
+            roles["activity_period"] = evidence("ACTIVITY_PERIOD",
+                [dates[0].isoformat(), dates[1].isoformat()])
             # Performance dates are evidence only when sourced from an exact
             # owned showtime block; the programme period alone is not a show.
             blocks = [x for x in soup.select(".page-program__aside-place-showtimes")
