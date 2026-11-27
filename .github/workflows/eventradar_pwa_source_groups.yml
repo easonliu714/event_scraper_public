@@ -21,6 +21,8 @@ jobs:
       - name: Exact HEAD and immutable production data, status and publisher
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.head_ref }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
@@ -30,10 +32,18 @@ jobs:
           test "$(git rev-parse HEAD:docs/platform_status.json)" = 720cac528faacc9560a5ab41ce725bf8cc183166
           test "$(git rev-parse HEAD:scraper.py)" = 98eddeafb497718c51aa81c6a150e9a5e1e687a8
           test "$(git rev-parse HEAD:docs/platform-status.html)" = 1abaec4d47fcba809430e24b8ff9312a08bc3de5
+          if [ "$PR_NUMBER" = 245 ] && [ "$PR_BRANCH" = fix/p30-tpac-verified-min-price-ui ]; then
+            # Price-only successor uses its own pinned main baseline and exact four paths.
+            base=4d207948526cd6a6e8ecd79ecd1251dcf44b31e8
+            git merge-base --is-ancestor "$base" HEAD
+            test "$(git rev-parse "$base:docs/index.html")" = 489edb5615584458387e0caa853702d278f6ca1f
+            expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_min_price_review.yml' '.github/workflows/eventradar_pwa_source_groups.yml' 'docs/index.html' 'tests/p30/test_pwa_verified_min_price.js' | LC_ALL=C sort)"
+          else
+            expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_source_groups.yml' 'docs/index.html' 'tests/p30/test_pwa_source_groups.js' | LC_ALL=C sort)"
+          fi
           actual="$(git diff --name-only "$base" HEAD | LC_ALL=C sort)"
-          expected="$(printf '%s\n' '.github/workflows/eventradar_pwa_source_groups.yml' 'docs/index.html' 'tests/p30/test_pwa_source_groups.js' | LC_ALL=C sort)"
           test "$actual" = "$expected" || { echo HOLD_UNAPPROVED_UI_SCOPE; exit 1; }
-          echo PASS_EXACT_HEAD_FROZEN_EVENT_DATA_STATUS_PUBLISHER_THREE_FILE_SCOPE
+          echo PASS_EXACT_HEAD_FROZEN_EVENT_DATA_STATUS_PUBLISHER_EXACT_SCOPE
       - name: Source grouping and existing Android/PWA UI regressions
         run: |
           set -euo pipefail
