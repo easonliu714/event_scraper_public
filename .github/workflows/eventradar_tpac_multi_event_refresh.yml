@@ -846,7 +846,8 @@ jobs:
                          f['source_url']==row['detail_source_url'] and
                          f['decision'] in ('REVIEW','HOLD')
                          for f in fields.values())
-              assert fields['price']['value'] is None and fields['price']['decision']=='HOLD'
+              if identity not in expected or identity=='tpac:event:1301':
+                  assert fields['price']['value'] is None and fields['price']['decision']=='HOLD'
               assert fields['date']['value'] is None and fields['date']['decision']=='HOLD'
               if identity in expected:
                   assert row['archive_evidence_current'] is True
@@ -860,6 +861,15 @@ jobs:
           assert ledger['records']['tpac:event:1301']['fields']['show_start']['value'] is None
           assert ledger['records']['tpac:event:2072']['fields']['show_start']['role']=='EVENT_SHOW_START'
           assert ledger['records']['tpac:program:2040']['fields']['show_start']['role']=='EVENT_SHOW_START'
+          real_fields={key:ledger['records'][key]['fields'] for key in expected}
+          assert real_fields['tpac:event:1301']['venue']['value']=='一樓廣場'
+          assert real_fields['tpac:event:2072']['venue']['value']=='臺北表演藝術中心 參觀回路、排練場、天臺'
+          assert real_fields['tpac:event:2072']['price']['value']==[600,600]
+          assert real_fields['tpac:program:2040']['venue']['value']=='藍盒子'
+          assert real_fields['tpac:program:2040']['price']['value']==[1500,3500]
+          assert all(real_fields[key]['venue']['decision']=='REVIEW' for key in expected)
+          assert all(real_fields[key]['price']['decision']=='REVIEW' for key in expected-{'tpac:event:1301'})
+          print('PASS_REAL_3_ID_ARCHIVED_VENUE_2_PRICE_FIELD_REVIEW')
           assert load_detail_inventory(root/'_isolated_archive_replay')[1]==sha
           assert not (root/'docs/data.json').exists()
           Path('evidence/tpac_archived_field_provenance_38_id.json').write_text(
@@ -1010,6 +1020,17 @@ jobs:
                   else:
                       assert saved['held_fields'][name]==expected,(key,name)
           assert review_count==3
+          from copy import deepcopy
+          from scripts.p30_offline_source_adapters import _validate_tpac_archive_candidate
+          for key in ('tpac:event:2072','tpac:program:2040'):
+              good=snapshot['candidates'][key]
+              assert good['fields']['price']['decision']=='REVIEW_ONLY_NOT_ACCEPTED'
+              for name,value in (('price',[3500,1500]),('price',[True,600]),('venue','https://invalid.example')):
+                  bad=deepcopy(good); bad['fields'][name]['value']=value
+                  try: _validate_tpac_archive_candidate(bad)
+                  except ValueError: pass
+                  else: raise AssertionError('UNSAFE_FIELD_ACCEPTED')
+          print('PASS_REAL_ARCHIVE_VENUE_PRICE_SHARED_CAS_NEGATIVE_SHAPES')
           assert run(*imported,'--expected-sha',sha)['candidate_commit']['sha256']==sha
           assert run(*seed,'--expected-sha',sha)['candidate_commit']['sha256']==sha
           for args,reason in (
