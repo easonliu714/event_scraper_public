@@ -1210,6 +1210,21 @@ def build_detail_inventory(catalog, raw, receipt, now, previous=None):
 
 
 
+def _valid_archived_venue_price(key, role, value, catalog):
+    """Shared archive field shape check, never independent acceptance."""
+    if key == "venue":
+        return (role == "EVENT_VENUE_SPACE" and type(value) is str
+                and 0 < len(value.strip()) <= 240 and value == value.strip()
+                and value != "其他" and "http" not in value.lower()
+                and not any(c in value for c in "<>\\r\\n"))
+    expected = {"event": "EVENT_ADVERTISED_PRICE_RANGE_NTD",
+                "program": "EVENT_GENERAL_ADMISSION_PRICE_RANGE"}.get(catalog)
+    return (key == "price" and expected is not None and role == expected
+            and type(value) is list and len(value) == 2
+            and all(type(x) is int for x in value)
+            and 0 < value[0] <= value[1] <= 999999)
+
+
 def _validate_archived_review_row(row):
     """Fail closed on corrupted archived FIELD evidence before CAS/readback.
 
@@ -1257,7 +1272,9 @@ def _validate_archived_review_row(row):
     allowed = {"title": ("EVENT_TITLE",),
                "show_start": ("EVENT_SHOW_START",),
                "show_count": ("SOURCE_SHOW_COUNT",),
-               "activity_period": ("ACTIVITY_PERIOD", "EXHIBITION_PERIOD")}
+               "activity_period": ("ACTIVITY_PERIOD", "EXHIBITION_PERIOD"),
+               "venue": ("EVENT_VENUE_SPACE",),
+               "price": ("EVENT_ADVERTISED_PRICE_RANGE_NTD", "EVENT_GENERAL_ADMISSION_PRICE_RANGE")}
     if (type(roles) is not dict or "title" not in roles
             or set(roles) - set(allowed) or type(holds) is not dict
             or set(holds) != {"date", "price", "venue", "description", "image"}):
@@ -1284,7 +1301,10 @@ def _validate_archived_review_row(row):
                 candidate.get("observed_at") != stamped):
             raise ValueError("TPAC_ARCHIVE_FIELD_ROLE_AUTHORITY_HOLD")
         value = candidate["value"]
-        if key == "show_count":
+        if key in ("venue", "price"):
+            if not _valid_archived_venue_price(key, candidate["role"], value, row["source_namespace"]):
+                raise ValueError("TPAC_ARCHIVE_FIELD_VENUE_PRICE_VALUE_HOLD")
+        elif key == "show_count":
             if type(value) is not int or not 1 <= value <= 40:
                 raise ValueError("TPAC_ARCHIVE_FIELD_SHOW_COUNT_HOLD")
         elif key == "show_start":
@@ -1312,7 +1332,7 @@ def _validate_archived_review_row(row):
                 field["decision"] != "HOLD" or field["value"] is not None or
                 field["source_url"] != url or
                 field["source_body_sha256"] != sha or
-                field["hold_reason"] != (expected_reason if key == "date" else
+                field["hold_reason"] != (expected_reason if key == "date" or key in roles else
                                          "ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED")):
             raise ValueError("TPAC_ARCHIVE_FIELD_HOLD_AUTHORITY_HOLD")
 
@@ -1688,6 +1708,34 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
     date_roles = _archived_detail_date_roles(
         catalog, articles[0], soup, card["detail_url"],
         detail_receipt["body_sha256"], stamped)
+    # Reuse the actual sidebar parsers after exact archived identity/SHA validation.
+    # Preserve both catalogs' roles; no LIVE receipt or accepted flag is minted.
+    semantic_roles = {}
+    if catalog == "event":
+        from scripts.p30_tpac_event_detail_review import event_venue_price_roles
+        parsed = event_venue_price_roles(soup)
+        for key, role in (("venue", "EVENT_VENUE_SPACE"),
+                          ("price", "EVENT_ADVERTISED_PRICE_RANGE_NTD")):
+            if role in parsed:
+                semantic_roles[key] = (role, parsed[role])
+    else:
+        try:
+            venue = _venue_role_review(soup)
+        except ValueError:
+            pass
+        else:
+            semantic_roles["venue"] = ("EVENT_VENUE_SPACE", venue["value"])
+        price = extract_tpac_price_review(detail_raw, detail_receipt, event_id, name)
+        if price.get("decision") == "SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL":
+            semantic_roles["price"] = (price["role"],
+                                       [price["min_price_ntd"], price["max_price_ntd"]])
+    field_roles = {key: {"role": role, "value": value,
+                         "source_url": card["detail_url"],
+                         "source_body_sha256": detail_receipt["body_sha256"],
+                         "observed_at": stamped,
+                         "decision": "ARCHIVED_SEMANTIC_REVIEW_NOT_FIELD_ACCEPTED"}
+                   for key, (role, value) in semantic_roles.items()
+                   if _valid_archived_venue_price(key, role, value, catalog)}
     return {
         "kind": "TPAC_ARCHIVED_SAME_ID_DETAIL_REVIEW_V1",
         "identity": card["identity"], "source_namespace": catalog,
@@ -1702,7 +1750,7 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
                       "source_url": card["detail_url"],
                       "source_body_sha256": detail_receipt["body_sha256"],
                       "decision": "ARCHIVED_IDENTITY_PARITY_REVIEW_ONLY"},
-            **date_roles
+            **date_roles, **field_roles
         },
         # The archived H1 proves identity only. These field roles are explicit
         # UNKNOWNs, not values inferred from the card, surrounding text, or
@@ -1710,7 +1758,7 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
         "field_holds": {
             role: {"decision": "HOLD", "value": None,
                    "hold_reason": ("ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
-                                    if role == "date" and date_roles else
+                                    if (role == "date" and (date_roles or field_roles)) or role in field_roles else
                                     "ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED"),
                    "source_url": card["detail_url"],
                    "source_body_sha256": detail_receipt["body_sha256"]}
