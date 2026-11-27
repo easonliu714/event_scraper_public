@@ -276,6 +276,13 @@
         if (value === '未確認' || !receipt || receipt.role !== 'EVENT_ADMISSION_PRICE'
             || receipt.decision !== 'REVIEW') return '票價詳官方資訊';
         const head = value.split(/[；;\n]/)[0].trim();
+        // Preserve explicit venue-advertised prices without promoting them to accepted general minima.
+        const advertised = /^官網票價：NT\$\s*(\d{1,3}(?:,\d{3})+|\d{1,6})$/u.exec(head);
+        if (advertised && value.trim() === head && receipt.value === value) {
+            const n = Number(advertised[1].replace(/,/g, ''));
+            if (Number.isSafeInteger(n) && n > 0 && n < 1000000)
+                return '官網票價 NT$' + n.toLocaleString('en-US') + '（詳官方）';
+        }
         const normal = /^(?:一般票|標準票|一般入場票)\s*[:：]?\s*(.*)$/u.exec(head);
         if (normal && !/服務費|手續費|加價|升級|優惠|折扣|補差額|會員|限資格/u.test(normal[1])) {
             const amounts = [...normal[1].matchAll(/(?:NT\$\s*)?(\d{1,3}(?:,\d{3})+|\d{3,7})(?!\d)/g)]
