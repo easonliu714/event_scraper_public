@@ -1020,6 +1020,33 @@ jobs:
                   else:
                       assert saved['held_fields'][name]==expected,(key,name)
           assert review_count==3
+          # Real sealed archive -> shared CAS -> existing L7 PWA import contract.
+          preview_cmd=cmd+['--export-tpac-preview','--candidate-root',str(dest),'--expected-sha',sha]
+          preview_raw=subprocess.check_output(preview_cmd)
+          preview=json.loads(preview_raw)
+          assert len(preview)==3 and preview_raw==subprocess.check_output(preview_cmd)
+          projected={row['_candidate']['record_id']:row for row in preview}
+          assert set(projected)=={'tpac:event:1301','tpac:event:2072','tpac:program:2040'}
+          assert projected['tpac:event:1301']['location']=='臺北表演藝術中心／一樓廣場'
+          assert projected['tpac:event:1301']['price']=='未確認'
+          assert projected['tpac:event:2072']['price']=='官網票價：NT$600'
+          assert projected['tpac:program:2040']['price']=='一般票：NT$1,500–3,500'
+          assert projected['tpac:program:2040']['location']=='臺北表演藝術中心／藍盒子'
+          for row in preview:
+              meta=row['_candidate']
+              assert meta['scope']=='CANDIDATE_PREVIEW_ONLY' and meta['published'] is False
+              assert meta['formal_field_pass'] is meta['golden_accepted'] is False
+              assert meta['archive_provenance']['historical_only'] is True
+              assert meta['archive_provenance']['candidate_snapshot_sha256']==sha
+              for key,receipt in meta['field_evidence'].items():
+                  assert receipt['source']==row['url'] and receipt['value']==row[key]
+                  assert receipt['decision']=='REVIEW'
+          stale=subprocess.run(cmd+['--export-tpac-preview','--candidate-root',str(dest),
+                                   '--expected-sha','0'*64],capture_output=True,text=True)
+          assert stale.returncode!=0 and 'SOURCE_CANDIDATE_READ_CAS_HOLD' in stale.stderr
+          assert load_offline_candidate_lkg(dest,sha)==snapshot
+          Path('evidence/tpac_pwa_review_preview.json').write_bytes(preview_raw)
+          print('PASS_REAL_TPAC_3_ID_FIXED_PWA_REVIEW_PROJECTION_NO_PUBLICATION')
           from copy import deepcopy
           from scripts.p30_offline_source_adapters import _validate_tpac_archive_candidate
           for key in ('tpac:event:2072','tpac:program:2040'):
