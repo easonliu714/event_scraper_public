@@ -43,7 +43,8 @@ def _validated_receipt(body, detail_url, source_event_id, receipt):
             or url.username or url.password
             or url.path.rsplit("/", 1)[-1] != str(source_event_id)):
         raise ValueError("TPAC_PRICE_SOURCE_EVENT_ID_HOLD")
-    observed = receipt.get("started_at") if "started_at" in receipt else receipt.get("observed_at")
+    observed = (receipt.get("started_at") if "started_at" in receipt else
+                receipt.get("observed_at") or receipt.get("capture_started_at"))
     try:
         dt = datetime.fromisoformat(observed.replace("Z", "+00:00"))
     except (AttributeError, ValueError) as e:
@@ -68,7 +69,19 @@ def _validated_receipt(body, detail_url, source_event_id, receipt):
         and receipt.get("http_status") == 200
         and receipt.get("robots_allowed") is True
     )
-    if not archived and not fresh_detail:
+    # Sealed archive receipts carry no invented LIVE HTTP or robots authority.
+    sealed_archive = (
+        receipt.get("evidence_class") == "VERIFIED_ARCHIVED_BODY_ONLY"
+        and receipt.get("source_url") == detail_url
+        and receipt.get("body_sha256") == sha
+        and receipt.get("body_bytes") == len(body)
+        and receipt.get("http_status") is None
+        and receipt.get("robots_allowed") is None
+        and receipt.get("observed_at") is None
+        and isinstance(receipt.get("capture_started_at"), str)
+        and "started_at" not in receipt
+    )
+    if not archived and not fresh_detail and not sealed_archive:
         raise ValueError("TPAC_PRICE_BODY_PROVENANCE_HOLD")
     return dt.astimezone(timezone.utc).isoformat(), sha
 
