@@ -1216,7 +1216,7 @@ def _valid_archived_venue_price(key, role, value, catalog):
         return (role == "EVENT_VENUE_SPACE" and type(value) is str
                 and 0 < len(value.strip()) <= 240 and value == value.strip()
                 and value != "其他" and "http" not in value.lower()
-                and not any(c in value for c in "<>\\r\\n"))
+                and not any(c in value for c in "<>\r\n"))
     expected = {"event": "EVENT_ADVERTISED_PRICE_RANGE_NTD",
                 "program": "EVENT_GENERAL_ADMISSION_PRICE_RANGE"}.get(catalog)
     return (key == "price" and expected is not None and role == expected
@@ -1680,7 +1680,7 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
     """Compare sealed LIST and same-ID DETAIL bytes/identity (OFFLINE only).
 
     Archive receipt provenance does not prove fresh HTTP, robots or live access.
-    Only the source-owned DETAIL article H1 is reviewed, never published.
+    Exact DETAIL H1 and source-owned semantic roles are reviewed, never published.
     """
     if (catalog not in ("program", "event")
             or type(event_id) is not str
@@ -1752,9 +1752,8 @@ def bind_archived_detail_identity(catalog, list_raw, list_receipt,
                       "decision": "ARCHIVED_IDENTITY_PARITY_REVIEW_ONLY"},
             **date_roles, **field_roles
         },
-        # The archived H1 proves identity only. These field roles are explicit
-        # UNKNOWNs, not values inferred from the card, surrounding text, or
-        # unverified historical HTML. This makes partial replay safe for LKG.
+        # REVIEW fields still require independent acceptance. Missing roles
+        # stay HOLD rather than borrowing a value from surrounding text.
         "field_holds": {
             role: {"decision": "HOLD", "value": None,
                    "hold_reason": ("ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
