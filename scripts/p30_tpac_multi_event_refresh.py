@@ -1225,6 +1225,38 @@ def _valid_archived_venue_price(key, role, value, catalog):
             and 0 < value[0] <= value[1] <= 999999)
 
 
+def _validate_archived_show_times(fields):
+    """Validate complete source show list, not ticket sessions or availability.
+
+    Legacy archives with only first/count remain readable; never invent the
+    missing list. A new list must bind to its own period, first, and count.
+    """
+    if "show_times" not in fields:
+        return
+    try:
+        values = fields["show_times"]["value"]
+        period = fields["activity_period"]
+        if (type(values) is not list or not 1 <= len(values) <= 40
+                or period["role"] != "ACTIVITY_PERIOD"
+                or type(fields["show_count"]["value"]) is not int
+                or fields["show_count"]["value"] != len(values)
+                or fields["show_start"]["value"] != values[0]
+                or any(type(v) is not str for v in values)):
+            raise ValueError("shape")
+        bounds = [datetime.fromisoformat(v).date() for v in period["value"]]
+        moments = [datetime.fromisoformat(v) for v in values]
+        if (len(bounds) != 2 or bounds[0] > bounds[1]
+                or moments != sorted(set(moments))
+                or any(t.utcoffset() != timedelta(hours=8)
+                       or t.isoformat() != v
+                       or t.second or t.microsecond
+                       or not bounds[0] <= t.date() <= bounds[1]
+                       for t, v in zip(moments, values))):
+            raise ValueError("semantics")
+    except (ValueError, TypeError, KeyError, IndexError, OverflowError) as exc:
+        raise ValueError("TPAC_ARCHIVE_SHOW_TIMES_HOLD") from exc
+
+
 def _validate_archived_review_row(row):
     """Fail closed on corrupted archived FIELD evidence before CAS/readback.
 
@@ -1272,6 +1304,7 @@ def _validate_archived_review_row(row):
     allowed = {"title": ("EVENT_TITLE",),
                "show_start": ("EVENT_SHOW_START",),
                "show_count": ("SOURCE_SHOW_COUNT",),
+               "show_times": ("SOURCE_SHOW_STARTS",),
                "activity_period": ("ACTIVITY_PERIOD", "EXHIBITION_PERIOD"),
                "venue": ("EVENT_VENUE_SPACE",),
                "price": ("EVENT_ADVERTISED_PRICE_RANGE_NTD", "EVENT_GENERAL_ADMISSION_PRICE_RANGE")}
@@ -1304,6 +1337,8 @@ def _validate_archived_review_row(row):
         if key in ("venue", "price"):
             if not _valid_archived_venue_price(key, candidate["role"], value, row["source_namespace"]):
                 raise ValueError("TPAC_ARCHIVE_FIELD_VENUE_PRICE_VALUE_HOLD")
+        elif key == "show_times":
+            _validate_archived_show_times(roles)
         elif key == "show_count":
             if type(value) is not int or not 1 <= value <= 40:
                 raise ValueError("TPAC_ARCHIVE_FIELD_SHOW_COUNT_HOLD")
@@ -1672,6 +1707,7 @@ def _archived_detail_date_roles(catalog, article, soup, detail_url, body_sha, st
         # claim a future event, price or availability.
         roles["show_start"] = evidence("EVENT_SHOW_START", times[0].isoformat())
         roles["show_count"] = evidence("SOURCE_SHOW_COUNT", len(times))
+        roles["show_times"] = evidence("SOURCE_SHOW_STARTS", [t.isoformat() for t in times])
     except (ValueError, TypeError, KeyError, IndexError, OverflowError):
         # Bad dates or unexpected DOM can only remove REVIEW candidates.
         return {}
@@ -1915,7 +1951,7 @@ def build_archived_field_review_export(inventory, inventory_sha):
             or re.fullmatch(r"[0-9a-f]{64}", inventory_sha) is None):
         raise ValueError("TPAC_ARCHIVE_FIELD_EXPORT_SHA_HOLD")
     select_pending_details(inventory, 0)  # Reuse persistent evidence authority validation.
-    field_names = ("title", "date", "show_start", "show_count", "activity_period",
+    field_names = ("title", "date", "show_start", "show_count", "show_times", "activity_period",
                    "price", "venue", "description", "image")
     items = {}
     current_count = 0
