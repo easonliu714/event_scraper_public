@@ -18,6 +18,7 @@ PREFIX = "/repos/" + REPO
 REF_PREFIX = "refs/heads/source-claims/raw5-tpac-"
 RECEIPT_REF_PREFIX = "refs/heads/source-claims/raw5-receipt-"
 RECEIPT_MSG_PREFIX = "RAW5_ATTEMPT_V1_BLOB "
+RECEIPT_TREE_PATH = "raw5_attempt.json"
 RUN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{7,127}\Z")
 
 
@@ -261,8 +262,33 @@ class GitHubRaw5AttemptProvider:
             raise ValueError("RAW5_RECEIPT_REF_SCOPE_HOLD")
         return RECEIPT_REF_PREFIX + slot_ref[len(REF_PREFIX):] + "-" + run_id
 
+    @staticmethod
+    def _receipt_tree_sha(blob_sha):
+        """Compute the exact single-file Git tree identity from the blob SHA."""
+        if type(blob_sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", blob_sha):
+            raise ValueError("RAW5_RECEIPT_COMMIT_SHA_HOLD")
+        raw = (b"100644 " + RECEIPT_TREE_PATH.encode("ascii") + bytes([0])
+               + bytes.fromhex(blob_sha))
+        return hashlib.sha1(b"tree " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
+
+    def _read_receipt_tree(self, tree_sha, blob_sha):
+        # A SHA written only in a commit message is not a Git object edge.
+        # Legacy anchor-tree receipts may be readable but are not durable proof.
+        if tree_sha != self._receipt_tree_sha(blob_sha):
+            raise ValueError("RAW5_RECEIPT_TREE_LINK_HOLD")
+        status, tree = self._call("GET", "/git/trees/" + tree_sha)
+        entries = tree.get("tree")
+        if (status != 200 or tree.get("sha") != tree_sha
+                or tree.get("truncated") is not False or type(entries) is not list
+                or len(entries) != 1 or type(entries[0]) is not dict
+                or entries[0].get("path") != RECEIPT_TREE_PATH
+                or entries[0].get("mode") != "100644"
+                or entries[0].get("type") != "blob"
+                or entries[0].get("sha") != blob_sha):
+            raise ValueError("RAW5_RECEIPT_TREE_READBACK_HOLD")
+
     def _read_commit_binding(self, commit_sha, blob_sha):
-        """Require a real Git commit with pinned parent/tree and blob identity."""
+        """Require a real Git commit with pinned parent and reachable blob."""
         if (type(commit_sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", commit_sha)
                 or type(blob_sha) is not str or not re.fullmatch(r"[0-9a-f]{40}", blob_sha)):
             raise ValueError("RAW5_RECEIPT_COMMIT_SHA_HOLD")
@@ -277,10 +303,7 @@ class GitHubRaw5AttemptProvider:
                 or type(parents[0]) is not dict or parents[0].get("sha") != self._anchor
                 or obj.get("message") != RECEIPT_MSG_PREFIX + blob_sha):
             raise ValueError("RAW5_RECEIPT_COMMIT_BINDING_HOLD")
-        status, anchor = self._call("GET", "/git/commits/" + self._anchor)
-        if (status != 200 or type(anchor.get("tree")) is not dict
-                or anchor["tree"].get("sha") != tree["sha"]):
-            raise ValueError("RAW5_RECEIPT_ANCHOR_TREE_HOLD")
+        self._read_receipt_tree(tree["sha"], blob_sha)
 
     def _read_verified_blob(self, blob_sha):
         import base64
@@ -335,8 +358,8 @@ class GitHubRaw5AttemptProvider:
     def write_attempt(self, *, source_host, owner_run_id, fencing_token, attempted_at):
         """Store canonical JSON blob behind a real protected-scope Git commit.
 
-        Creating a refs/heads branch directly at a Git blob SHA is not valid
-        branch storage. Use a commit with the pinned anchor tree and parent.
+        A branch must point at a commit. Its tree must actually contain the
+        receipt blob, not merely mention its SHA in the commit message.
         """
         import base64
         if (source_host != HOST or owner_run_id != self._run
@@ -362,13 +385,21 @@ class GitHubRaw5AttemptProvider:
         if status != 200 or type(tree_sha) is not str or not re.fullmatch(
                 r"[0-9a-f]{40}", tree_sha):
             raise ValueError("RAW5_RECEIPT_ANCHOR_TREE_HOLD")
+        expected_tree_sha = self._receipt_tree_sha(expected_blob_sha)
+        status, receipt_tree = self._call("POST", "/git/trees", {"tree": [{
+            "path": RECEIPT_TREE_PATH, "mode": "100644", "type": "blob",
+            "sha": expected_blob_sha}]})
+        if status != 201 or receipt_tree.get("sha") != expected_tree_sha:
+            raise ValueError("RAW5_RECEIPT_TREE_CREATE_HOLD")
+        self._read_receipt_tree(expected_tree_sha, expected_blob_sha)
         status, commit = self._call("POST", "/git/commits", {
             "message": RECEIPT_MSG_PREFIX + expected_blob_sha,
-            "tree": tree_sha, "parents": [self._anchor]})
+            "tree": expected_tree_sha, "parents": [self._anchor]})
         commit_sha = commit.get("sha")
         if status != 201 or type(commit_sha) is not str or not re.fullmatch(
                 r"[0-9a-f]{40}", commit_sha):
             raise ValueError("RAW5_RECEIPT_COMMIT_CREATE_HOLD")
+        self._read_commit_binding(commit_sha, expected_blob_sha)
         ref = self._receipt_branch(self._ref, self._run)
         status, _ = self._call("POST", "/git/refs", {"ref": ref, "sha": commit_sha})
         if status != 201:

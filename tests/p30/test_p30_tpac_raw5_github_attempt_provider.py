@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta, timezone
 
 from scripts.p30_tpac_raw5_github_attempt_provider import (
-    GitHubRaw5AttemptProvider, HOST, REF_PREFIX, RECEIPT_REF_PREFIX,
+    GitHubRaw5AttemptProvider, HOST, REF_PREFIX, RECEIPT_REF_PREFIX, RECEIPT_TREE_PATH,
 )
 from scripts.p30_tpac_r4_source_policy import reserve_durable_source_attempt
 
@@ -143,6 +143,7 @@ class SharedGitHubCommitAPI:
         import copy
         self.refs = {}
         self.blobs = {}
+        self.trees = {}
         self.commits = {ANCHOR: {
             "sha": ANCHOR, "tree": {"sha": self.TREE},
             "parents": [], "message": "main"}}
@@ -160,6 +161,18 @@ class SharedGitHubCommitAPI:
             sha = hashlib.sha1(b"blob " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
             self.blobs[sha] = payload["content"]
             return 201, {"sha": sha}, self.server_time
+        if method == "POST" and path.endswith("/git/trees"):
+            entries = payload["tree"]
+            raw = b"".join(e["mode"].encode() + b" " + e["path"].encode()
+                           + bytes([0]) + bytes.fromhex(e["sha"]) for e in entries)
+            sha = hashlib.sha1(b"tree " + str(len(raw)).encode() + bytes([0]) + raw).hexdigest()
+            self.trees[sha] = {"sha": sha, "tree": [dict(e) for e in entries], "truncated": False}
+            return 201, {"sha": sha}, self.server_time
+        if method == "GET" and "/git/trees/" in path:
+            sha = path.rsplit("/", 1)[-1]
+            if sha not in self.trees:
+                return 404, {}, self.server_time
+            return 200, self.trees[sha], self.server_time
         if method == "POST" and path.endswith("/git/commits"):
             sha = hashlib.sha1(json.dumps(payload, sort_keys=True).encode()).hexdigest()
             self.commits[sha] = {
@@ -262,10 +275,69 @@ class ReceiptRoundTripTests(unittest.TestCase):
         ):
             commit.update(replacement)
             with self.subTest(replacement=replacement), self.assertRaisesRegex(
-                    ValueError, "RECEIPT_COMMIT_BINDING_HOLD|RECEIPT_ANCHOR_TREE_HOLD"):
+                    ValueError, "RECEIPT_COMMIT_BINDING_HOLD|RECEIPT_TREE_LINK_HOLD"):
                 writer.read_attempt(source_host=HOST, owner_run_id="runner-one-0001")
             commit.clear()
             commit.update(saved)
+
+    def test_legacy_message_only_blob_is_not_durable_history(self):
+        api, writer = self._written()
+        api.commits[writer._receipt_commit_sha]["tree"] = {"sha": api.TREE}
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        with self.assertRaisesRegex(ValueError, "RECEIPT_TREE_LINK_HOLD"):
+            reader.verify_receipt_from_fresh_executor(**self._fresh(writer))
+        self.assertIn(writer._receipt_sha, api.blobs)
+
+    def test_receipt_tree_must_be_exact_and_complete(self):
+        import copy
+        api, writer = self._written()
+        sha = api.commits[writer._receipt_commit_sha]["tree"]["sha"]
+        original = copy.deepcopy(api.trees[sha])
+        reader = GitHubRaw5AttemptProvider(api, ANCHOR, NOW)
+        for change in ({"truncated": True}, {"tree": []}, {"sha": "f" * 40},
+                       {"tree": [{**original["tree"][0], "mode": "100755"}]},
+                       {"tree": [{**original["tree"][0], "path": "wrong.json"}]},
+                       {"tree": [{**original["tree"][0], "sha": "f" * 40}]},
+                       {"tree": original["tree"] * 2}):
+            api.trees[sha] = {**original, **change}
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, "RECEIPT_TREE_READBACK_HOLD"):
+                reader.verify_receipt_from_fresh_executor(**self._fresh(writer))
+
+    def test_tree_readback_failure_prevents_receipt_ref_creation(self):
+        api = SharedGitHubCommitAPI()
+        def bad_tree(method, path, payload):
+            if method == "GET" and "/git/trees/" in path:
+                return 404, {}, NOW
+            return api(method, path, payload)
+        writer = GitHubRaw5AttemptProvider(bad_tree, ANCHOR, NOW)
+        lease = writer.acquire_atomic(source_host=HOST, owner_run_id="runner-one-0001")
+        with self.assertRaisesRegex(ValueError, "RECEIPT_TREE_READBACK_HOLD"):
+            writer.write_attempt(source_host=HOST, owner_run_id="runner-one-0001",
+                                 fencing_token=lease["fencing_token"], attempted_at=NOW)
+        self.assertEqual(set(api.refs), {writer._ref})
+
+    def test_real_git_gc_retains_only_tree_linked_receipt(self):
+        import subprocess
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            def git(*args, data=None):
+                return subprocess.check_output(["git", "-C", d, *args], input=data).decode().strip()
+            git("init", "-q", "--object-format=sha1")
+            git("config", "user.name", "RAW5 isolated test")
+            git("config", "user.email", "raw5@example.invalid")
+            empty = git("mktree", data=b"")
+            anchor = git("commit-tree", empty, data=b"anchor\n")
+            old = git("hash-object", "-w", "--stdin", data=b"old message-only receipt")
+            new = git("hash-object", "-w", "--stdin", data=b"new tree-linked receipt")
+            tree = git("mktree", data=("100644 blob " + new + "\t" + RECEIPT_TREE_PATH + "\n").encode())
+            self.assertEqual(tree, GitHubRaw5AttemptProvider._receipt_tree_sha(new))
+            for ref, blob, tree_sha in (("legacy", old, empty), ("linked", new, tree)):
+                commit = git("commit-tree", tree_sha, "-p", anchor,
+                             data=("RAW5_ATTEMPT_V1_BLOB " + blob + "\n").encode())
+                git("update-ref", "refs/heads/" + ref, commit)
+            git("gc", "--prune=now")
+            self.assertNotEqual(subprocess.run(["git", "-C", d, "cat-file", "-e", old], capture_output=True).returncode, 0)
+            self.assertEqual(git("cat-file", "-p", new), "new tree-linked receipt")
 
     def test_blob_bytes_substitution_is_detected(self):
         api, writer = self._written()
