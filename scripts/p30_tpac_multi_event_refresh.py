@@ -1305,6 +1305,7 @@ def _validate_archived_review_row(row):
                "show_start": ("EVENT_SHOW_START",),
                "show_count": ("SOURCE_SHOW_COUNT",),
                "show_times": ("SOURCE_SHOW_STARTS",),
+               "open_hours": ("OPEN_HOURS",),
                "activity_period": ("ACTIVITY_PERIOD", "EXHIBITION_PERIOD"),
                "venue": ("EVENT_VENUE_SPACE",),
                "price": ("EVENT_ADVERTISED_PRICE_RANGE_NTD", "EVENT_GENERAL_ADMISSION_PRICE_RANGE")}
@@ -1337,6 +1338,8 @@ def _validate_archived_review_row(row):
         if key in ("venue", "price"):
             if not _valid_archived_venue_price(key, candidate["role"], value, row["source_namespace"]):
                 raise ValueError("TPAC_ARCHIVE_FIELD_VENUE_PRICE_VALUE_HOLD")
+        elif key == "open_hours":
+            _validate_archived_open_hours(roles, row["source_namespace"])
         elif key == "show_times":
             _validate_archived_show_times(roles)
         elif key == "show_count":
@@ -1638,6 +1641,78 @@ def _archived_cards(catalog, raw, receipt):
 
 
 
+def _exhibition_hours_value(schedule, notices):
+    """Bounded source-owned daily evening-to-next-morning opening hours."""
+    if type(schedule) is not str or type(notices) is not list or len(notices) > 4:
+        raise ValueError("TPAC_ARCHIVE_OPEN_HOURS_HOLD")
+    match = re.fullmatch(r"每日晚上([1-9]|1[0-2]):([0-5][0-9])至凌晨(0[0-9]|1[0-2]|[0-9]):([0-5][0-9])", schedule)
+    if not match or any(type(n) is not str or not 0 < len(n) <= 250
+                        or n != n.strip() or "<" in n or ">" in n
+                        or not any(k in n for k in ("休展", "暫停", "異動", "調整", "閉館"))
+                        for n in notices):
+        raise ValueError("TPAC_ARCHIVE_OPEN_HOURS_HOLD")
+    start = int(match[1]) % 12 + 12
+    end = int(match[3]) % 12
+    if end >= start:
+        raise ValueError("TPAC_ARCHIVE_OPEN_HOURS_HOLD")
+    return {"start": f"{start:02d}:{match[2]}", "end": f"{end:02d}:{match[4]}",
+            "end_day_offset": 1, "timezone": "Asia/Taipei",
+            "source_schedule": schedule, "source_notices": notices}
+
+
+def _archived_exhibition_hours(article):
+    """Use only a unique explicit exhibition-time paragraph; keep exceptions."""
+    blocks = []
+    for p in article.select(".page-event__article-content .pageflex-paragragh .content p"):
+        first = p.find("strong", recursive=False)
+        if first and _text(first) == "展覽時間" and _visible(p):
+            blocks.append(p)
+    if len(blocks) != 1:
+        return None
+    p = blocks[0]
+    if any(not _visible(n) for n in p.find_all(True)):
+        return None
+    lines, parts = [], []
+    for child in p.children:
+        if getattr(child, "name", None) == "br":
+            line = " ".join(" ".join(parts).split())
+            if line:
+                lines.append(line)
+            parts = []
+        else:
+            parts.append(_text(child) if getattr(child, "name", None) else str(child))
+    line = " ".join(" ".join(parts).split())
+    if line:
+        lines.append(line)
+    if not lines or lines[0] != "展覽時間":
+        return None
+    rest = lines[1:]
+    if rest and re.fullmatch(r"20[0-9]{2}\.[0-9]{2}\.[0-9]{2} 開展", rest[0]):
+        rest = rest[1:]
+    if not rest:
+        return None
+    try:
+        return _exhibition_hours_value(rest[0], rest[1:])
+    except ValueError:
+        return None
+
+
+def _validate_archived_open_hours(fields, catalog):
+    if "open_hours" not in fields:
+        return
+    try:
+        entry = fields["open_hours"]
+        value = entry["value"]
+        if (catalog != "event" or fields["activity_period"]["role"] != "EXHIBITION_PERIOD"
+                or any(k in fields for k in ("show_start", "show_count", "show_times"))
+                or entry["role"] != "OPEN_HOURS" or type(value) is not dict
+                or type(value.get("end_day_offset")) is not int
+                or value != _exhibition_hours_value(value["source_schedule"], value["source_notices"])):
+            raise ValueError("shape")
+    except (ValueError, TypeError, KeyError) as exc:
+        raise ValueError("TPAC_ARCHIVE_OPEN_HOURS_HOLD") from exc
+
+
 def _archived_detail_date_roles(catalog, article, soup, detail_url, body_sha, stamped):
     """Parse source-owned date semantics without fabricating LIVE field acceptance.
 
@@ -1680,7 +1755,10 @@ def _archived_detail_date_roles(catalog, article, soup, detail_url, body_sha, st
             roles["activity_period"] = evidence(period_role,
                 [dates[0].isoformat(), dates[1].isoformat()])
             if category == "展覽":
-                # Exhibition range must NOT become show start or opening hours.
+                # Opening hours must come from a separate, owned time block.
+                hours = _archived_exhibition_hours(article)
+                if hours is not None:
+                    roles["open_hours"] = evidence("OPEN_HOURS", hours)
                 return roles
             blocks = [x for x in soup.select(".page-event__aside-place-showtimes")
                       if _visible(x) and len(x.select("h3")) == 1
@@ -1952,7 +2030,7 @@ def build_archived_field_review_export(inventory, inventory_sha):
         raise ValueError("TPAC_ARCHIVE_FIELD_EXPORT_SHA_HOLD")
     select_pending_details(inventory, 0)  # Reuse persistent evidence authority validation.
     field_names = ("title", "date", "show_start", "show_count", "show_times", "activity_period",
-                   "price", "venue", "description", "image")
+                   "price", "venue", "description", "image", "open_hours")
     items = {}
     current_count = 0
     for identity, row in sorted(inventory["items"].items()):
