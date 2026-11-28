@@ -810,17 +810,22 @@ def _validate_tpac_archive_candidate(row):
     fields, held = row.get("fields"), row.get("held_fields")
     allowed = {"title": {"EVENT_TITLE"}, "show_start": {"EVENT_SHOW_START"},
                "show_count": {"SOURCE_SHOW_COUNT"},
+               "show_times": {"SOURCE_SHOW_STARTS"},
                "activity_period": {"ACTIVITY_PERIOD", "EXHIBITION_PERIOD"},
                "venue": {"EVENT_VENUE_SPACE"},
                "price": {"EVENT_ADVERTISED_PRICE_RANGE_NTD", "EVENT_GENERAL_ADMISSION_PRICE_RANGE"}}
     if (not isinstance(fields, dict) or not isinstance(held, dict)
             or set(fields) & set(held)
-            or set(fields) | set(held) != {"title", "date", "show_start", "show_count",
-                                          "activity_period", "price", "venue", "description", "image"}
+            or set(fields) | set(held) not in ({"title", "date", "show_start", "show_count",
+                                          "activity_period", "price", "venue", "description", "image"},
+                                         {"title", "date", "show_start", "show_count", "show_times",
+                                          "activity_period", "price", "venue", "description", "image"})
             or (bool(fields) != ev["archive_detail_current"])
             or (fields and "title" not in fields)):
         raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
-    from scripts.p30_tpac_multi_event_refresh import _valid_archived_venue_price
+    from scripts.p30_tpac_multi_event_refresh import (_valid_archived_venue_price,
+                                                     _validate_archived_show_times)
+    _validate_archived_show_times(fields)
     for name, field in fields.items():
         if (not isinstance(field, dict) or field.get("role") not in allowed.get(name, set())
                 or field.get("value") is None
@@ -1641,6 +1646,18 @@ def project_tpac_archive_preview(root, expected_sha):
                     value = datetime.fromisoformat(value).strftime("%Y-%m-%d %H:%M")
                 detail.append({"label": label, "role": role, "value": value,
                     "source": normalized["url"], "observed_at": original[key]["observed_at"],
+                    "decision": "REVIEW"})
+        # Existing PWA detail receipts allow <=500 chars and 16 blocks.
+        # Chunk the complete list without changing UI or claiming ticket inventory.
+        if "show_times" in original:
+            times = original["show_times"]
+            values = times["value"]
+            for offset in range(0, len(values), 10):
+                chunk = values[offset:offset+10]
+                detail.append({"label": f"官方場次（歷史） {offset+1}–{offset+len(chunk)}／{len(values)}",
+                    "role": "EVENT_DATE",
+                    "value": "、".join(datetime.fromisoformat(v).strftime("%Y-%m-%d %H:%M") for v in chunk),
+                    "source": normalized["url"], "observed_at": times["observed_at"],
                     "decision": "REVIEW"})
         meta["detail_evidence"] = detail
     return preview
