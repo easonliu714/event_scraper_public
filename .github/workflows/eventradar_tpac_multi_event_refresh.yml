@@ -862,6 +862,13 @@ jobs:
           assert ledger['records']['tpac:event:2072']['fields']['show_start']['role']=='EVENT_SHOW_START'
           assert ledger['records']['tpac:program:2040']['fields']['show_start']['role']=='EVENT_SHOW_START'
           real_fields={key:ledger['records'][key]['fields'] for key in expected}
+          hours=real_fields['tpac:event:1301']['open_hours']
+          assert hours['role']=='OPEN_HOURS' and hours['decision']=='REVIEW'
+          value=hours['value']
+          assert (value['start'],value['end'],value['end_day_offset'],value['timezone'])==('20:00','01:00',1,'Asia/Taipei')
+          assert value['source_schedule']=='每日晚上8:00至凌晨01:00'
+          assert len(value['source_notices'])==1 and '9/5(六)-9/6(日) 17:30-22:30' in value['source_notices'][0] and '休展' in value['source_notices'][0]
+          assert all(real_fields[key]['open_hours']['decision']=='HOLD' for key in expected-{'tpac:event:1301'})
           assert real_fields['tpac:event:1301']['show_times']['value'] is None
           assert real_fields['tpac:event:1301']['show_times']['decision']=='HOLD'
           assert real_fields['tpac:program:2040']['activity_period']['value']==['2026-11-20','2026-11-29']
@@ -1060,6 +1067,27 @@ jobs:
                   else: raise AssertionError('INVALID_SHOW_LIST_ACCEPTED')
           assert not any(r['label'].startswith('官方場次（歷史）') for r in projected['tpac:event:1301']['_candidate']['detail_evidence'])
           print('PASS_REAL_COMPLETE_SHOW_LIST_PWA_AND_NEGATIVE_CASES')
+          exhibition=projected['tpac:event:1301']['_candidate']
+          open_rows=[r for r in exhibition['detail_evidence'] if r['role']=='OPEN_HOURS']
+          assert len(open_rows)==2 and '20:00～翌日 01:00' in open_rows[0]['value'] and '休展' in open_rows[1]['value']
+          good=snapshot['candidates']['tpac:event:1301']
+          for key,value in (('end_day_offset',0),('start','08:00'),('source_schedule','每日晚上8:00至凌晨25:00'),
+                            ('source_notices',['任意無關文字'])):
+              bad=deepcopy(good);bad['fields']['open_hours']['value'][key]=value
+              try: _validate_tpac_archive_candidate(bad)
+              except ValueError as exc: assert 'OPEN_HOURS_HOLD' in str(exc)
+              else: raise AssertionError('INVALID_OPEN_HOURS_ACCEPTED')
+          bad=deepcopy(good);bad['fields']['open_hours']['event_id']='2072'
+          try: _validate_tpac_archive_candidate(bad)
+          except ValueError: pass
+          else: raise AssertionError('FOREIGN_OPEN_HOURS_ACCEPTED')
+          from bs4 import BeautifulSoup
+          from scripts.p30_tpac_multi_event_refresh import _archived_exhibition_hours
+          sample='<article><div class="page-event__article-content"><div class="pageflex-paragragh"><div class="content"><p><strong>展覽時間</strong><br/>每日晚上8:00至凌晨01:00<br/>休展公告</p></div></div></div></article>'
+          for invalid in (sample.replace('展覽時間','售票時間'),sample.replace('凌晨01:00','凌晨25:00'),
+                          sample.replace('<p>','<p hidden>'),sample.replace('休展公告','不明文字')):
+              assert _archived_exhibition_hours(BeautifulSoup(invalid,'html.parser').article) is None
+          print('PASS_REAL_EXHIBITION_OVERNIGHT_HOURS_NOTICE_PWA_AND_NEGATIVES')
           for row in preview:
               meta=row['_candidate']
               assert meta['scope']=='CANDIDATE_PREVIEW_ONLY' and meta['published'] is False
