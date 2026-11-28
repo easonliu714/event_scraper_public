@@ -862,6 +862,15 @@ jobs:
           assert ledger['records']['tpac:event:2072']['fields']['show_start']['role']=='EVENT_SHOW_START'
           assert ledger['records']['tpac:program:2040']['fields']['show_start']['role']=='EVENT_SHOW_START'
           real_fields={key:ledger['records'][key]['fields'] for key in expected}
+          assert real_fields['tpac:event:1301']['show_times']['value'] is None
+          assert real_fields['tpac:event:1301']['show_times']['decision']=='HOLD'
+          assert real_fields['tpac:program:2040']['activity_period']['value']==['2026-11-20','2026-11-29']
+          for key,count in (('tpac:event:2072',3),('tpac:program:2040',8)):
+              f=real_fields[key]; times=f['show_times']['value']
+              assert f['show_times']['role']=='SOURCE_SHOW_STARTS' and f['show_times']['decision']=='REVIEW'
+              assert len(times)==f['show_count']['value']==count and times[0]==f['show_start']['value']
+              assert len(set(times))==count
+          print('PASS_REAL_ARCHIVE_COMPLETE_11_SHOW_STARTS_AND_PERIOD')
           assert real_fields['tpac:event:1301']['venue']['value']=='一樓廣場'
           assert real_fields['tpac:event:2072']['venue']['value']=='臺北表演藝術中心 參觀回路、排練場、天臺'
           assert real_fields['tpac:event:2072']['price']['value']==[600,600]
@@ -1032,6 +1041,25 @@ jobs:
           assert projected['tpac:event:2072']['price']=='官網票價：NT$600'
           assert projected['tpac:program:2040']['price']=='一般票：NT$1,500–3,500'
           assert projected['tpac:program:2040']['location']=='臺北表演藝術中心／藍盒子'
+          from datetime import datetime
+          from copy import deepcopy
+          from scripts.p30_offline_source_adapters import _validate_tpac_archive_candidate
+          for key,count in (('tpac:event:2072',3),('tpac:program:2040',8)):
+              meta=projected[key]['_candidate']; f=meta['archive_provenance']['source_fields']
+              shown=[r for r in meta['detail_evidence'] if r['label'].startswith('官方場次（歷史）')]
+              flattened=[v for r in shown for v in r['value'].split('、')]
+              assert flattened==[datetime.fromisoformat(v).strftime('%Y-%m-%d %H:%M') for v in f['show_times']['value']]
+              assert len(flattened)==count and all(len(r['value'])<=500 for r in shown)
+              good=snapshot['candidates'][key]
+              original=good['fields']['show_times']['value']
+              for corrupt in (list(reversed(original)),original[:-1], [original[0]]*count,
+                              [original[0].replace('+08:00','+00:00')]+original[1:]):
+                  bad=deepcopy(good); bad['fields']['show_times']['value']=corrupt
+                  try: _validate_tpac_archive_candidate(bad)
+                  except ValueError as exc: assert 'SHOW_TIMES_HOLD' in str(exc)
+                  else: raise AssertionError('INVALID_SHOW_LIST_ACCEPTED')
+          assert not any(r['label'].startswith('官方場次（歷史）') for r in projected['tpac:event:1301']['_candidate']['detail_evidence'])
+          print('PASS_REAL_COMPLETE_SHOW_LIST_PWA_AND_NEGATIVE_CASES')
           for row in preview:
               meta=row['_candidate']
               assert meta['scope']=='CANDIDATE_PREVIEW_ONLY' and meta['published'] is False
