@@ -811,6 +811,7 @@ def _validate_tpac_archive_candidate(row):
     allowed = {"title": {"EVENT_TITLE"}, "show_start": {"EVENT_SHOW_START"},
                "show_count": {"SOURCE_SHOW_COUNT"},
                "show_times": {"SOURCE_SHOW_STARTS"},
+               "open_hours": {"OPEN_HOURS"},
                "activity_period": {"ACTIVITY_PERIOD", "EXHIBITION_PERIOD"},
                "venue": {"EVENT_VENUE_SPACE"},
                "price": {"EVENT_ADVERTISED_PRICE_RANGE_NTD", "EVENT_GENERAL_ADMISSION_PRICE_RANGE"}}
@@ -819,13 +820,17 @@ def _validate_tpac_archive_candidate(row):
             or set(fields) | set(held) not in ({"title", "date", "show_start", "show_count",
                                           "activity_period", "price", "venue", "description", "image"},
                                          {"title", "date", "show_start", "show_count", "show_times",
-                                          "activity_period", "price", "venue", "description", "image"})
+                                          "activity_period", "price", "venue", "description", "image"},
+                                         {"title", "date", "show_start", "show_count", "show_times",
+                                          "activity_period", "price", "venue", "description", "image", "open_hours"})
             or (bool(fields) != ev["archive_detail_current"])
             or (fields and "title" not in fields)):
         raise ValueError("SOURCE_TPAC_ARCHIVE_FIELD_HOLD")
     from scripts.p30_tpac_multi_event_refresh import (_valid_archived_venue_price,
-                                                     _validate_archived_show_times)
+                                                     _validate_archived_show_times,
+                                                     _validate_archived_open_hours)
     _validate_archived_show_times(fields)
+    _validate_archived_open_hours(fields, catalog)
     for name, field in fields.items():
         if (not isinstance(field, dict) or field.get("role") not in allowed.get(name, set())
                 or field.get("value") is None
@@ -1659,6 +1664,17 @@ def project_tpac_archive_preview(root, expected_sha):
                     "value": "、".join(datetime.fromisoformat(v).strftime("%Y-%m-%d %H:%M") for v in chunk),
                     "source": normalized["url"], "observed_at": times["observed_at"],
                     "decision": "REVIEW"})
+        if "open_hours" in original:
+            hours = original["open_hours"]
+            v = hours["value"]
+            detail.append({"label": "展覽開放時間（歷史）", "role": "OPEN_HOURS",
+                "value": f"每日 {v['start']}～翌日 {v['end']}（休展異動依官方公告）",
+                "source": normalized["url"], "observed_at": hours["observed_at"],
+                "decision": "REVIEW"})
+            for notice in v["source_notices"]:
+                detail.append({"label": "展覽時間例外（歷史公告）", "role": "OPEN_HOURS",
+                    "value": notice, "source": normalized["url"],
+                    "observed_at": hours["observed_at"], "decision": "REVIEW"})
         meta["detail_evidence"] = detail
     return preview
 
