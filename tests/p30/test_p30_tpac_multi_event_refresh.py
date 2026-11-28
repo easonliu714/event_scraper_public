@@ -1,0 +1,3318 @@
+"""Deterministic two-ID positive/negative TPAC fixed multi-event refresh tests."""
+import hashlib
+import json
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+
+from scripts.p30_tpac_multi_event_refresh import (
+    KIND, ROOT, discover_list, refresh_plan, refresh_event_plan, write_isolated_plan,
+    restore_isolated_version,
+)
+
+NOW = datetime(2026, 11, 8, 14, 0, tzinfo=timezone.utc)
+OBS = "2026-11-08T13:55:00Z"
+TITLES = {"2040": "沉浸式劇場《士林YES！》",
+          "2111": "測試官方展演活動 A",
+          "2112": "測試官方展演活動 B"}
+FIRST = {"2040": "2026-11-20 (五) 19:30",
+         "2111": "2026-11-21 (六) 19:30",
+         "2112": "2026-11-22 (日) 12:30"}
+
+
+def receipt(url, body, observed=OBS, status=200, robots=True):
+    return {"http_status": status, "final_url": url,
+            "robots_allowed": robots, "observed_at": observed,
+            "body_sha256": hashlib.sha256(body).hexdigest(),
+            "body_bytes": len(body)}
+
+
+def listing(ids=("2111", "2112")):
+    html = "<main>"
+    for sid in ids:
+        title = TITLES[sid]
+        html += ('<a class="card-program" title="' + title
+                 + '" href="/program/' + sid + '">'
+                 + '<span class="card-program__text-title">' + title + '</span>'
+                 + '<span class="card-program__text-date">2026-11-19 - 2026-11-28</span>'
+                 + '</a>')
+    return (html + "</main>").encode()
+
+
+def detail(sid, title=None, show=None):
+    title = title or TITLES[sid]
+    show = show or FIRST[sid]
+    return ('<main><article class="page-program__article">'
+            '<h1>' + title + '</h1>'
+            '<div class="page-program__article-top">2026-11-20 - 2026-11-30</div>'
+            '</article><div class="page-program__aside-place-showtimes">'
+            '<h3>場次</h3><ul><li><p>' + show
+            + '</p></li></ul></div></main>').encode()
+
+
+def inputs(ids=("2111", "2112")):
+    raw = listing(ids)
+    rr = receipt(ROOT, raw)
+    details = {}
+    for sid in ids:
+        d = detail(sid)
+        details[sid] = {"body": d, "receipt": receipt(ROOT + "/" + sid, d)}
+    return raw, rr, details
+
+
+def empty_prior():
+    return {"kind": KIND, "events": {}}
+
+
+class MultiEventRefreshTests(unittest.TestCase):
+    def test_posix_writer_crash_releases_lock_without_removing_legacy_sentinel(self):
+        import os
+        import subprocess
+        import sys
+        if os.name != "posix":
+            self.skipTest("POSIX flock recovery")
+        from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as temp:
+            initial = write_isolated_plan(plan, temp)
+            folder = Path(temp) / "_isolated_review" / "tpac"
+            lock = folder / ".write.lock"
+            child_code = (
+                "import sys; from pathlib import Path; "
+                "from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock; "
+                "guard = _isolated_writer_lock(Path(sys.argv[1]), 'HOLD'); "
+                "guard.__enter__(); print('LOCKED', flush=True); sys.stdin.read()"
+            )
+            child = subprocess.Popen(
+                [sys.executable, "-c", child_code, str(lock)],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True)
+            try:
+                self.assertEqual(child.stdout.readline().strip(), "LOCKED")
+                with self.assertRaisesRegex(ValueError, "TPAC_CONCURRENT_WRITER_HOLD"):
+                    write_isolated_plan(plan, temp, initial["sha256"])
+            finally:
+                child.kill()
+                child.communicate(timeout=10)
+            self.assertTrue(lock.is_file())
+            resumed = write_isolated_plan(plan, temp, initial["sha256"])
+            self.assertEqual(resumed["sha256"], initial["sha256"])
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                write_isolated_plan(plan, temp, None)
+            legacy = folder / ".inventory.lock"
+            legacy.write_bytes(b"")
+            with self.assertRaisesRegex(ValueError, "LEGACY_HOLD"):
+                with _isolated_writer_lock(legacy, "LEGACY_HOLD"):
+                    self.fail("legacy sentinel must not be adopted")
+            self.assertEqual(legacy.read_bytes(), b"")
+
+    def test_fixed_review_cli_unreadable_detail_preserves_siblings_and_recovers(self):
+        # The normal --input route, unlike archive --inventory-input, formerly
+        # read every DETAIL in one comprehension and aborted all valid IDs.
+        import io
+        from contextlib import redirect_stdout
+        from scripts.p30_tpac_multi_event_refresh import main
+        raw, list_receipt, pairs = inputs()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing_file = root / "program-list.html"
+            listing_file.write_bytes(raw)
+            details = {}
+            for sid, pair in pairs.items():
+                file = root / (sid + "-detail.html")
+                file.write_bytes(pair["body"])
+                details[sid] = {"detail_file": str(file), "receipt": pair["receipt"]}
+            manifest = root / "input.json"
+            base = {"catalog": "program", "list_file": str(listing_file),
+                    "list_receipt": list_receipt, "details": details,
+                    "prior": empty_prior(), "now": NOW.isoformat()}
+            def invoke(data, *args):
+                manifest.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+                out = io.StringIO()
+                with redirect_stdout(out):
+                    code = main(["--repo-root", str(root), "--input", str(manifest), *args])
+                return code, json.loads(out.getvalue())
+            initial_code, initial = invoke(base)
+            self.assertEqual(initial_code, 0)
+            self.assertEqual(initial["counts"]["qualified"], 2)
+            target = root / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            initial_sha = hashlib.sha256(original).hexdigest()
+            continuous = {k: v for k,v in base.items() if k != "prior"}
+            continuous["details"] = {key: dict(record) for key,record in details.items()}
+            missing = root / "missing-detail.html"
+            continuous["details"]["2111"]["detail_file"] = str(missing)
+            for mode in ("missing", "directory"):
+                if mode == "directory":
+                    missing.mkdir()
+                code, outcome = invoke(continuous, "--prior-from-lkg")
+                self.assertEqual(code, 0)
+                self.assertEqual(outcome["counts"]["qualified"], 1)
+                self.assertEqual(outcome["counts"]["retained_previous"], 1)
+                self.assertEqual(outcome["rejected"]["2111"], "DETAIL_NOT_PROVIDED_HOLD")
+                self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), initial_sha)
+                self.assertEqual(target.read_bytes(), original)
+            # All unavailable DETAILS is a HOLD, not an empty or destructive commit.
+            all_bad = {**continuous,
+                       "details": {key: {**record, "detail_file": str(missing)}
+                                   for key,record in details.items()}}
+            code, outcome = invoke(all_bad, "--prior-from-lkg")
+            self.assertEqual(code, 49)
+            self.assertIn("HOLD_NO_QUALIFIED_DETAILS", outcome["result"]["decision"])
+            self.assertEqual(target.read_bytes(), original)
+            # A malformed receipt or path schema remains an all-batch admission HOLD.
+            wrong = {**continuous, "details": {
+                **continuous["details"],
+                "2111": {"detail_file": None, "receipt": details["2111"]["receipt"]}}}
+            with self.assertRaisesRegex(ValueError, "TPAC_DETAIL_MANIFEST_ROW_SCHEMA_HOLD"):
+                invoke(wrong, "--prior-from-lkg")
+            self.assertEqual(target.read_bytes(), original)
+            bad_list = {**continuous, "list_file": str(root / "missing-list.html")}
+            with self.assertRaises(OSError):
+                invoke(bad_list, "--prior-from-lkg")
+            self.assertEqual(target.read_bytes(), original)
+            missing.rmdir()
+            continuous["details"]["2111"]["detail_file"] = details["2111"]["detail_file"]
+            code, final = invoke(continuous, "--prior-from-lkg")
+            self.assertEqual(code, 0)
+            self.assertEqual(final["counts"]["qualified"], 2)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertFalse((root / "docs/data.json").exists())
+            self.assertFalse((root / "docs/platform_status.json").exists())
+
+    def test_two_distinct_event_ids_generate_repeatable_review_snapshot(self):
+        body, rr, details = inputs()
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(plan["qualified"], 2)
+        self.assertEqual(plan["source_cards"], 2)
+        self.assertEqual((plan["added"], plan["changed"], plan["unchanged"]), (2, 0, 0))
+        self.assertEqual(set(plan["events"]), {"tpac:2111", "tpac:2112"})
+        self.assertTrue(plan["source_coverage_complete"])
+        self.assertEqual(plan["published"], 0)
+        self.assertEqual(plan["release_state"], "HARD_HOLD_NO_PUBLICATION")
+        for ev in plan["events"].values():
+            self.assertFalse(ev["published"])
+            self.assertFalse(ev["golden_accepted"])
+            self.assertFalse(ev["formal_field_pass"])
+            self.assertEqual(ev["price"], "")
+            self.assertEqual(ev["_candidate"]["field_roles"]["date"]["role"], "EVENT_SHOW_START")
+            self.assertIn("PRICE_NOT_VERIFIED", ev["_candidate"]["hold_reasons"])
+            self.assertIn("HALL_NOT_VERIFIED", ev["_candidate"]["hold_reasons"])
+            self.assertIn("LIST_DETAIL_PERIOD_CONFLICT_HOLD", ev["_candidate"]["hold_reasons"])
+        again = refresh_plan(body, rr, details, {"kind": KIND, "events": plan["events"]}, NOW)
+        self.assertEqual(again["added"], 0)
+        self.assertEqual(again["changed"], 0)
+        self.assertEqual(again["unchanged"], 2)
+
+    def test_price_review_tier_and_ticket_identity_changes_update_lkg(self):
+        # An unchanged public price (blank pending formal acceptance) cannot
+        # hide changed source-owned REVIEW price/ticket semantics.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_event_id": "2111", "title": "Sample", "url": ROOT + "/2111",
+                "price": "", "published": False, "_candidate": {
+                    "hold_reasons": ["PRICE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE"],
+                    "field_roles": {}, "price_review": {
+                        "decision": "SOURCE_PRICE_ROLE_REVIEW_NOT_FORMAL",
+                        "role": "EVENT_GENERAL_ADMISSION_PRICE_RANGE",
+                        "event_id": "2111", "min_price_ntd": 1500,
+                        "max_price_ntd": 3500, "raw_price_label": "3500-1500 元",
+                        "source_body_sha256": "a" * 64,
+                        "linked_ticket": {"platform": "OPENTIX", "ticket_event_id": "100",
+                                          "ticket_event_url": "https://www.opentix.life/event/100",
+                                          "relation": "DIRECT_OFFICIAL_TPAC_DETAIL_LINK",
+                                          "same_event_relation": "SOURCE_LINKED_NOT_TICKET_DETAIL_ATTESTED"}}}}
+        original = _semantic_event_payload(base)
+        receipt_only = deepcopy(base)
+        receipt_only["_candidate"]["price_review"]["source_body_sha256"] = "b" * 64
+        self.assertEqual(original, _semantic_event_payload(receipt_only))
+        new_tier = deepcopy(base)
+        new_tier["_candidate"]["price_review"]["min_price_ntd"] = 2000
+        self.assertNotEqual(original, _semantic_event_payload(new_tier))
+        new_ticket = deepcopy(base)
+        new_ticket["_candidate"]["price_review"]["linked_ticket"]["ticket_event_id"] = "200"
+        self.assertNotEqual(original, _semantic_event_payload(new_ticket))
+        invalid = deepcopy(base)
+        invalid["_candidate"]["price_review"]["linked_ticket"] = None
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_TICKET_IDENTITY_SCHEMA_HOLD"):
+            _semantic_event_payload(invalid)
+
+    def test_corrupt_prior_event_semantics_isolated_without_batch_abort(self):
+        # A damaged persisted REVIEW record cannot overwrite itself or
+        # prevent an independent valid event from entering isolated LKG.
+        body, rr, details = inputs()
+        corrupt = {"source_event_id": "2111", "_candidate": {
+            "field_roles": {"date": None}, "hold_reasons": []}}
+        old = {"kind": KIND, "events": {"tpac:2111": corrupt}}
+        plan = refresh_plan(body, rr, details, old, NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(plan["events"]["tpac:2111"], corrupt)
+        self.assertIn("TPAC_PRIOR_EVENT_SEMANTIC_HOLD", plan["rejected"]["2111"])
+        self.assertEqual(plan["qualified"], 1)
+        self.assertEqual(plan["added"], 1)
+        self.assertEqual(plan["events"]["tpac:2112"]["source_event_id"], "2112")
+        self.assertFalse(plan["source_coverage_complete"])
+        self.assertEqual(plan["published"], 0)
+
+        only_body, only_rr, only_details = inputs(("2111",))
+        held = refresh_plan(only_body, only_rr, only_details, old, NOW)
+        self.assertEqual(held["decision"], "HOLD_NO_QUALIFIED_DETAILS_PRESERVE_LKG")
+        self.assertEqual(held["events"], old["events"])
+        self.assertEqual(held["published"], 0)
+
+    def test_out_of_range_showtime_hours_fail_closed(self):
+        # The official-looking show label must HOLD before datetime parsing;
+        # 24:00 through 29:59 are invalid, never a REVIEW candidate.
+        body, rr, details = inputs(("2111",))
+        for hour in (24, 25, 29):
+            with self.subTest(hour=hour):
+                raw = detail("2111", show=f"2026-11-21 (六) {hour:02d}:30")
+                details["2111"] = {"body": raw, "receipt": receipt(ROOT + "/2111", raw)}
+                plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+                self.assertEqual(plan["qualified"], 0)
+                self.assertEqual(plan["rejected"]["2111"], "TPAC_SHOW_LABEL_OR_ROLE_HOLD")
+                self.assertEqual(plan["published"], 0)
+        valid = detail("2111", show="2026-11-21 (六) 23:30")
+        details["2111"] = {"body": valid, "receipt": receipt(ROOT + "/2111", valid)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["qualified"], 1)
+        self.assertEqual(plan["published"], 0)
+
+    def test_hidden_showtime_cannot_become_review_event(self):
+        body, rr, details = inputs(("2111",))
+        original = details["2111"]["body"]
+        # The hidden node has a valid-looking earlier date. It must never
+        # override the actual visible event schedule.
+        injected = original.replace(
+            b"<ul><li><p>",
+            b'<ul><li hidden><p>2026-11-20 (\\xe4\\xba\\x94) 12:30</p></li><li><p>',
+        )
+        details["2111"] = {"body": injected, "receipt": receipt(ROOT + "/2111", injected)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["qualified"], 0)
+        self.assertEqual(plan["decision"], "HOLD_NO_QUALIFIED_DETAILS_PRESERVE_LKG")
+        self.assertEqual(plan["rejected"]["2111"], "TPAC_HIDDEN_SHOWTIME_EVIDENCE_HOLD")
+        self.assertEqual(plan["published"], 0)
+
+
+        body, rr, details = inputs()
+        price_html = (
+            '<div class="page-program__aside-ticket">'
+            '<div class="page-program__aside-ticket-price">'
+            '<span>票價</span><strong>3500-1500 元</strong></div>'
+            '<a href="https://www.opentix.life/event/2065059039769808896">購票去</a>'
+            '</div>'
+        ).encode()
+        raw = details["2111"]["body"].replace(b"</main>", price_html + b"</main>")
+        details["2111"] = {"body": raw, "receipt": receipt(ROOT + "/2111", raw)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(plan["qualified"], 2)
+        entry = plan["events"]["tpac:2111"]
+        self.assertIn("PRICE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE", entry["_candidate"]["hold_reasons"])
+        self.assertEqual(entry["_candidate"]["price_review"]["min_price_ntd"], 1500)
+        self.assertEqual(entry["_candidate"]["price_review"]["max_price_ntd"], 3500)
+        self.assertEqual(entry["_candidate"]["field_roles"]["price"]["decision"],
+                         "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE")
+        self.assertEqual(entry["price"], "")
+        self.assertFalse(entry["formal_field_pass"])
+        self.assertFalse(entry["published"])
+        self.assertIn("PRICE_NOT_VERIFIED",
+                      plan["events"]["tpac:2112"]["_candidate"]["hold_reasons"])
+
+    def test_partial_detail_failure_retains_prior_and_stages_good_id(self):
+        body, rr, details = inputs()
+        details["2112"]["receipt"]["http_status"] = 403
+        old = {"kind": KIND, "events": {"tpac:2040": {"preserved": True}}}
+        plan = refresh_plan(body, rr, details, old, NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(plan["qualified"], 1)
+        self.assertFalse(plan["source_coverage_complete"])
+        self.assertIn("2112", plan["rejected"])
+        self.assertIn("tpac:2040", plan["events"])
+        self.assertIn("tpac:2111", plan["events"])
+        self.assertNotIn("tpac:2112", plan["events"])
+
+    def test_full_detail_failure_and_missing_details_never_erase_lkg(self):
+        body, rr, details = inputs()
+        old = {"kind": KIND, "events": {"tpac:2040": {"kept": True}}}
+        for v in details.values():
+            v["receipt"]["http_status"] = 403
+        plan = refresh_plan(body, rr, details, old, NOW)
+        self.assertEqual(plan["decision"], "HOLD_NO_QUALIFIED_DETAILS_PRESERVE_LKG")
+        self.assertEqual(plan["events"], old["events"])
+        self.assertEqual(plan["new_count"], 1)
+        plan = refresh_plan(body, rr, {}, old, NOW)
+        self.assertEqual(plan["events"], old["events"])
+        self.assertEqual(plan["published"], 0)
+
+    def test_zero_or_denied_list_never_erases_lkg(self):
+        old = {"kind": KIND, "events": {"tpac:2040": {"kept": True}}}
+        for body, rr in [
+            (listing(()), receipt(ROOT, listing(()))),
+            (listing(), receipt(ROOT, listing(), status=403)),
+            (listing(), receipt(ROOT, listing(), robots=False)),
+        ]:
+            result = refresh_plan(body, rr, {}, old, NOW)
+            self.assertTrue(result["decision"].startswith("HOLD_LIST_"))
+            self.assertEqual(result["events"], old["events"])
+
+    def test_duplicate_source_identity_and_wrong_title_are_not_promoted(self):
+        body, rr, details = inputs(("2111", "2111"))
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertIn("DUPLICATE_SOURCE_ID", plan["decision"])
+        self.assertEqual(plan["qualified"], 0)
+        body, rr, details = inputs()
+        bad = detail("2112", title="另個活動")
+        details["2112"] = {"body": bad, "receipt": receipt(ROOT + "/2112", bad)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["qualified"], 1)
+        self.assertIn("TPAC_EXACT_ID_TITLE_PARITY_HOLD", plan["rejected"]["2112"])
+
+    def test_show_role_conflict_and_stale_receipt_hold(self):
+        body, rr, details = inputs()
+        bad = detail("2111", show="2026-11-21 開賣 19:30")
+        details["2111"] = {"body": bad, "receipt": receipt(ROOT + "/2111", bad)}
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["qualified"], 1)
+        self.assertIn("TPAC_SHOW_LABEL_OR_ROLE_HOLD", plan["rejected"]["2111"])
+        body, rr, details = inputs()
+        details["2111"]["receipt"]["observed_at"] = "2026-11-04T13:00:00Z"
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertIn("TPAC_SOURCE_STALE_OR_FUTURE_HOLD", plan["rejected"]["2111"])
+
+    def test_source_body_sha_mismatch_does_not_validate(self):
+        body, rr, details = inputs()
+        details["2112"]["body"] += b"\n<!--changed-->"
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        self.assertIn("TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD", plan["rejected"]["2112"])
+
+    def test_hidden_cards_not_counted_as_valid_source(self):
+        card = listing(("2111",))
+        body = b"<main><template>" + card + b"</template></main>"
+        old = {"kind": KIND, "events": {"tpac:2040": {"kept": True}}}
+        plan = refresh_plan(body, receipt(ROOT, body), {}, old, NOW)
+        self.assertRegex(plan["decision"], r"HOLD_LIST_TPAC_(EMPTY_OR_OVER_CAP_LIST|NO_VALID_FIRST_PARTY_CARD)_HOLD")
+        self.assertEqual(plan["events"], old["events"])
+
+    def test_atomic_lkg_cas_success_retry_and_concurrent_stale_rejected(self):
+        body, rr, details = inputs()
+        plan = refresh_plan(body, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            report = write_isolated_plan(plan, root, expected_sha=None)
+            self.assertEqual(report["rows"], 2)
+            self.assertEqual(report["decision"], "ISOLATED_REVIEW_LKG_COMMITTED_NOT_FORMAL")
+            target = root / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                write_isolated_plan(plan, root, expected_sha=None)
+            self.assertEqual(target.read_bytes(), original)
+            again = write_isolated_plan(plan, root, expected_sha=report["sha256"])
+            self.assertEqual(again["sha256"], report["sha256"])
+            self.assertFalse((root / "docs" / "data.json").exists())
+
+
+    def test_event_namespace_real_role_shape_and_two_cycle_cas(self):
+        # Synthetic structure exercises the same code used for sealed native
+        # archive replay; no HTTP and no formal field acceptance.
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        observed = datetime(2026, 11, 8, 14, 54, tzinfo=timezone.utc)
+        names = {"1301": "「親．建築」計畫：高德亮《晚風》",
+                 "2072": "2026北藝夜遊：Beats到天臺"}
+        categories = {"1301": "展覽", "2072": "專題導覽"}
+        periods = {"1301": "2025-07-23 - 2026-12-30",
+                   "2072": "2026-11-10 - 2026-11-12"}
+        raw = "".join(
+            '<a class="card-event" title="連結到' + names[sid] +
+            '" href="/event/' + sid + '"><div class="card-event__text-title">' +
+            names[sid] + '</div><div class="card-event__text-datecate"><p>' +
+            periods[sid] + '</p><p>' + categories[sid] + '</p></div></a>'
+            for sid in names
+        ).encode()
+        details = {}
+        for sid in names:
+            data = event_detail(
+                names[sid], categories[sid],
+                "2025-07-24 - 2026-12-31" if sid == "1301"
+                else "2026-11-11 - 2026-11-13",
+                [] if sid == "1301" else [
+                    "2026-11-11 (三) 19:00", "2026-11-12 (四) 19:00",
+                    "2026-11-13 (五) 19:00"])
+            details[sid] = {"body": data,
+                            "receipt": event_receipt(
+                                "https://tpac.org.taipei/event/" + sid, data)}
+        listing_receipt = event_receipt("https://tpac.org.taipei/event", raw)
+        plan = refresh_event_plan(raw, listing_receipt, details, empty_prior(), observed)
+        self.assertEqual((plan["qualified"], plan["added"]), (2, 2))
+        self.assertEqual(set(plan["events"]), {"tpac:event:1301", "tpac:event:2072"})
+        self.assertEqual(plan["events"]["tpac:event:1301"]["date"], "")
+        self.assertEqual(plan["events"]["tpac:event:2072"]["date"], "2026-11-11 19:00")
+        self.assertIn("LIST_DETAIL_ACTIVITY_PERIOD_CONFLICT_HOLD",
+                      plan["events"]["tpac:event:1301"]["_candidate"]["hold_reasons"])
+        self.assertFalse(plan["events"]["tpac:event:2072"]["formal_field_pass"])
+        with tempfile.TemporaryDirectory() as root:
+            first = write_isolated_plan(plan, root, expected_sha=None)
+            second_plan = refresh_event_plan(
+                raw, listing_receipt, details,
+                {"kind": KIND, "events": plan["events"]}, observed)
+            self.assertEqual((second_plan["added"], second_plan["changed"],
+                              second_plan["unchanged"]), (0, 0, 2))
+            second = write_isolated_plan(second_plan, root, expected_sha=first["sha256"])
+            self.assertEqual(first["sha256"], second["sha256"])
+            self.assertFalse((Path(root) / "docs" / "data.json").exists())
+        details["2072"]["receipt"]["http_status"] = 403
+        partial = refresh_event_plan(raw, listing_receipt, details,
+                                     {"kind": KIND, "events": plan["events"]}, observed)
+        self.assertEqual(partial["qualified"], 1)
+        self.assertIn("2072", partial["rejected"])
+        self.assertIn("tpac:event:2072", partial["events"])
+
+    def test_event_and_program_numeric_ids_do_not_collide(self):
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        observed = datetime(2026, 11, 8, 14, 54, tzinfo=timezone.utc)
+        name = "2026北藝夜遊：Beats到天臺"
+        raw = ('<a class="card-event" title="連結到' + name +
+               '" href="/event/2072"><div class="card-event__text-title">' +
+               name + '</div><div class="card-event__text-datecate"><p>'
+               '2026-11-10 - 2026-11-12</p><p>專題導覽</p></div></a>').encode()
+        data = event_detail(name, "專題導覽", "2026-11-11 - 2026-11-13",
+                            ["2026-11-11 (三) 19:00"])
+        previous = {"kind": KIND, "events": {"tpac:2072": {"legacy_program": True}}}
+        plan = refresh_event_plan(raw, event_receipt("https://tpac.org.taipei/event", raw),
+                                  {"2072": {"body": data, "receipt": event_receipt(
+                                      "https://tpac.org.taipei/event/2072", data)}},
+                                  previous, observed)
+        self.assertEqual(plan["qualified"], 1)
+        self.assertIn("tpac:2072", plan["events"])
+        self.assertIn("tpac:event:2072", plan["events"])
+
+
+    def test_nonqualified_writes_and_foreign_symlink_rejected(self):
+        body, rr, details = inputs()
+        plan = refresh_plan(body, rr, {}, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaisesRegex(ValueError, "UNQUALIFIED"):
+                write_isolated_plan(plan, d)
+            src = Path(d) / "_isolated_review"
+            src.mkdir()
+            (src / "tpac").symlink_to(Path(d), target_is_directory=True)
+            valid = refresh_plan(body, rr, inputs()[2], empty_prior(), NOW)
+            with self.assertRaisesRegex(ValueError, "SYMLINK"):
+                write_isolated_plan(valid, d)
+
+
+    def test_cli_event_manifest_dispatch_cas_and_cross_catalog_hold(self):
+        # One repeatable CLI entrypoint must handle /event without treating
+        # exhibition/guide rows as /program SHOW or altering formal JSON.
+        from scripts.p30_tpac_multi_event_refresh import main as refresh_cli
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        from contextlib import redirect_stdout
+        from io import StringIO
+        observed = datetime(2026, 11, 8, 14, 54, tzinfo=timezone.utc)
+        name = "2026北藝夜遊：Beats到天臺"
+        raw = ('<a class="card-event" title="連結到' + name +
+               '" href="/event/2072"><div class="card-event__text-title">' +
+               name + '</div><div class="card-event__text-datecate"><p>'
+               '2026-11-10 - 2026-11-12</p><p>專題導覽</p></div></a>').encode()
+        detail_raw = event_detail(name, "專題導覽",
+                                  "2026-11-11 - 2026-11-13",
+                                  ["2026-11-11 (三) 19:00"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "list.html").write_bytes(raw)
+            (root / "detail.html").write_bytes(detail_raw)
+            manifest = {
+                "catalog": "event", "list_file": str(root / "list.html"),
+                "list_receipt": event_receipt("https://tpac.org.taipei/event", raw),
+                "details": {"2072": {
+                    "detail_file": str(root / "detail.html"),
+                    "receipt": event_receipt(
+                        "https://tpac.org.taipei/event/2072", detail_raw)}},
+                "prior": empty_prior(), "now": observed.isoformat(),
+            }
+            source = root / "manifest.json"
+            source.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            stage = root / "isolated"
+            with self.assertRaisesRegex(ValueError, "CATALOG_MISMATCH_HOLD"):
+                refresh_cli(["--catalog", "program", "--input", str(source),
+                             "--repo-root", str(stage)])
+            self.assertFalse(stage.exists())
+            with redirect_stdout(StringIO()) as captured:
+                rc = refresh_cli(["--catalog", "event", "--input", str(source),
+                                  "--repo-root", str(stage)])
+            self.assertEqual(rc, 0)
+            result = json.loads(captured.getvalue())
+            self.assertEqual(result["counts"]["qualified"], 1)
+            self.assertEqual(result["published"], 0)
+            target = stage / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
+            saved = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(set(saved["events"]), {"tpac:event:2072"})
+            self.assertFalse(saved["events"]["tpac:event:2072"]["published"])
+            self.assertFalse((stage / "docs" / "data.json").exists())
+            manifest["prior"] = saved
+            source.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                rc = refresh_cli(["--catalog", "event", "--input", str(source),
+                                  "--repo-root", str(stage), "--expected-sha",
+                                  result["result"]["sha256"]])
+            self.assertEqual(rc, 0)
+            self.assertEqual(json.loads(captured.getvalue())["counts"]["unchanged"], 1)
+
+
+    def test_durable_version_diff_rollback_and_no_unverified_location(self):
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["events"]["tpac:2111"]["location"], "")
+        self.assertIn("LOCATION_NOT_EVENT_VERIFIED",
+                      plan["events"]["tpac:2111"]["_candidate"]["hold_reasons"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            changed = json.loads(original)["events"]
+            changed["tpac:2111"]["description"] += " isolated version"
+            second = write_isolated_plan(dict(plan, events=changed), root, first["sha256"])
+            self.assertEqual(second["diff"]["changed"], ["tpac:2111"])
+            self.assertEqual(second["diff"]["removed"], [])
+            archive = root / "_isolated_review/tpac/versions" / (first["sha256"] + ".json")
+            self.assertEqual(archive.read_bytes(), original)
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                restore_isolated_version(root, first["sha256"], first["sha256"])
+            restored = restore_isolated_version(root, first["sha256"], second["sha256"])
+            self.assertEqual(restored["sha256"], first["sha256"])
+            self.assertEqual(target.read_bytes(), original)
+            self.assertTrue((root / "_isolated_review/tpac/versions" /
+                             (second["sha256"] + ".json")).exists())
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_unapproved_expiry_and_tampered_rollback_fail_closed(self):
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            partial = dict(plan, events={"tpac:2111": plan["events"]["tpac:2111"]})
+            with self.assertRaisesRegex(ValueError, "UNAUTHORIZED_REMOVAL"):
+                write_isolated_plan(partial, root, first["sha256"])
+            self.assertEqual(target.read_bytes(), original)
+            repeated = write_isolated_plan(plan, root, first["sha256"])
+            archive = root / "_isolated_review/tpac/versions" / (first["sha256"] + ".json")
+            archive.write_bytes(b"tampered")
+            with self.assertRaisesRegex(ValueError, "ROLLBACK_ARCHIVE_SHA_HOLD"):
+                restore_isolated_version(root, first["sha256"], repeated["sha256"])
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_boolean_rollback_bypass_and_forged_archive_cannot_remove_lkg(self):
+        raw, rr, details = inputs()
+        full = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        partial = dict(full, events={"tpac:2111": full["events"]["tpac:2111"]})
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(full, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            before = target.read_bytes()
+            with self.assertRaisesRegex(ValueError, "ROLLBACK_BOOLEAN_BYPASS_HOLD"):
+                write_isolated_plan(partial, root, first["sha256"],
+                                    allow_archived_rollback=True)
+            with self.assertRaisesRegex(ValueError, "ROLLBACK_ARCHIVE_AUTHORITY_HOLD"):
+                write_isolated_plan(partial, root, first["sha256"],
+                                    rollback_archive_sha="a" * 64)
+            self.assertEqual(target.read_bytes(), before)
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_verified_archived_rollback_may_remove_only_to_exact_old_snapshot(self):
+        raw, rr, details = inputs()
+        old_plan = refresh_plan(raw, rr, {"2111": details["2111"]},
+                                empty_prior(), NOW)
+        full_plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(old_plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            archived_bytes = target.read_bytes()
+            second = write_isolated_plan(full_plan, root, first["sha256"])
+            self.assertEqual(second["diff"]["added"], ["tpac:2112"])
+            restored = restore_isolated_version(root, first["sha256"], second["sha256"])
+            self.assertEqual(restored["diff"]["removed"], ["tpac:2112"])
+            self.assertEqual(target.read_bytes(), archived_bytes)
+            self.assertEqual(restored["sha256"], first["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_noncanonical_archive_cannot_write_then_fail(self):
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            before = target.read_bytes()
+            noncanonical = json.dumps(json.loads(before), ensure_ascii=False,
+                                      indent=2).encode("utf-8")
+            self.assertNotEqual(noncanonical, before)
+            digest = hashlib.sha256(noncanonical).hexdigest()
+            versions = target.parent / "versions"
+            versions.mkdir(exist_ok=True)
+            (versions / (digest + ".json")).write_bytes(noncanonical)
+            with self.assertRaisesRegex(ValueError, "NONCANONICAL_ARCHIVE_HOLD"):
+                restore_isolated_version(root, digest, first["sha256"])
+            self.assertEqual(target.read_bytes(), before)
+
+
+    def test_auto_prior_two_realizable_cycles_without_manifest_state(self):
+        # A fixed caller can replay two separately supplied source snapshots
+        # into the same isolated CAS LKG without manually injecting prior/SHA.
+        # Fixture bytes are NOT independent native GET or formal acceptance.
+        from scripts.p30_tpac_multi_event_refresh import main as refresh_cli
+        from contextlib import redirect_stdout
+        from io import StringIO
+        raw, rr, details = inputs()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "list.html").write_bytes(raw)
+            rows = {}
+            for sid, item in details.items():
+                file = root / (sid + ".html")
+                file.write_bytes(item["body"])
+                rows[sid] = {"detail_file": str(file), "receipt": item["receipt"]}
+            manifest = {"catalog": "program", "list_file": str(root / "list.html"),
+                        "list_receipt": rr, "details": rows, "now": NOW.isoformat()}
+            path = root / "manifest.json"
+            path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+            stage = root / "stage"
+            args = ["--catalog", "program", "--input", str(path),
+                    "--repo-root", str(stage), "--prior-from-lkg"]
+            with redirect_stdout(StringIO()) as out:
+                self.assertEqual(refresh_cli(args), 0)
+            first = json.loads(out.getvalue())
+            self.assertEqual(first["counts"]["added"], 2)
+            self.assertEqual(first["published"], 0)
+            target = stage / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            with redirect_stdout(StringIO()) as out:
+                self.assertEqual(refresh_cli(args), 0)
+            second = json.loads(out.getvalue())
+            self.assertEqual(second["counts"]["unchanged"], 2)
+            self.assertEqual(second["result"]["sha256"], first["result"]["sha256"])
+            self.assertEqual(target.read_bytes(), original)
+            self.assertFalse((stage / "docs/data.json").exists())
+            self.assertFalse((stage / "docs/platform_status.json").exists())
+
+            manifest["prior"] = empty_prior()
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_AMBIGUOUS_HOLD"):
+                refresh_cli(args)
+            del manifest["prior"]
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_AMBIGUOUS_HOLD"):
+                refresh_cli(args + ["--expected-sha", first["result"]["sha256"]])
+            self.assertEqual(target.read_bytes(), original)
+
+    def test_auto_prior_tamper_noncanonical_and_symlink_hold(self):
+        from scripts.p30_tpac_multi_event_refresh import load_isolated_prior
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = write_isolated_plan(plan, root)
+            target = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            original = target.read_bytes()
+            prior, sha = load_isolated_prior(root)
+            self.assertEqual(sha, first["sha256"])
+            self.assertEqual(prior["kind"], KIND)
+            target.write_bytes(json.dumps(prior, indent=2).encode())
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_NONCANONICAL_HOLD"):
+                load_isolated_prior(root)
+            target.write_bytes(b"not json")
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_JSON_HOLD"):
+                load_isolated_prior(root)
+            target.unlink()
+            outside = root / "foreign.json"
+            outside.write_bytes(original)
+            target.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "AUTO_PRIOR_SYMLINK_HOLD"):
+                load_isolated_prior(root)
+            self.assertEqual(outside.read_bytes(), original)
+
+
+
+    def test_noncanonical_prior_cannot_be_archived_or_replaced(self):
+        import pathlib
+        with tempfile.TemporaryDirectory() as root:
+            plan = refresh_plan(*inputs(), empty_prior(), NOW)
+            first = write_isolated_plan(plan, root)
+            target = pathlib.Path(root) / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json"
+            versions = target.parent / "versions"
+            original = target.read_bytes()
+            malformed = original.replace(b'{"events":', b'{  "events":', 1)
+            self.assertNotEqual(malformed, original)
+            target.write_bytes(malformed)
+            before = target.read_bytes()
+            with self.assertRaisesRegex(ValueError, "TPAC_PRIOR_SCHEMA_HOLD"):
+                write_isolated_plan(plan, root, hashlib.sha256(before).hexdigest())
+            self.assertEqual(target.read_bytes(), before)
+            self.assertFalse((versions / (hashlib.sha256(before).hexdigest() + ".json")).exists())
+
+class ReviewRoleDeltaRegressionTests(unittest.TestCase):
+    """REVIEW source role changes are meaningful even when formal fields are blank."""
+
+    def test_venue_and_price_review_changes_are_not_discarded(self):
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        import copy
+        base = {"source_event_id": "2040", "title": "北藝演出", "url": ROOT + "/2040",
+                "date": "2026-11-20 19:30", "location": "", "price": "",
+                "_candidate": {"field_roles": {"venue_space": {
+                    "role": "EVENT_VENUE_SPACE", "value": "藍盒子",
+                    "source_body_sha256": "a" * 64, "observed_at": OBS,
+                    "decision": "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE"}}}}
+        changed = copy.deepcopy(base)
+        changed["_candidate"]["field_roles"]["venue_space"]["value"] = "球劇場"
+        self.assertNotEqual(_semantic_event_payload(base), _semantic_event_payload(changed))
+        receipt_only = copy.deepcopy(base)
+        receipt_only["_candidate"]["field_roles"]["venue_space"]["observed_at"] = "2026-11-17T13:00:00Z"
+        receipt_only["_candidate"]["field_roles"]["venue_space"]["source_body_sha256"] = "b" * 64
+        self.assertEqual(_semantic_event_payload(base), _semantic_event_payload(receipt_only))
+        price = copy.deepcopy(base)
+        price["_candidate"]["field_roles"]["price"] = {
+            "role": "EVENT_GENERAL_ADMISSION_PRICE_RANGE", "min_price_ntd": 1500,
+            "max_price_ntd": 3500, "decision": "REVIEW_REQUIRES_INDEPENDENT_ACCEPTANCE"}
+        self.assertNotEqual(_semantic_event_payload(base), _semantic_event_payload(price))
+        self.assertEqual(base["price"], "")
+
+
+    def test_field_specific_hold_and_authority_transition_updates_review(self):
+        # Identical display values cannot hide a field-level authority/HOLD
+        # transition; observation time and raw receipt SHA remain metadata.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_event_id": "2040", "title": "Source-owned event",
+                "price": "", "_candidate": {"field_roles": {"price": {
+                    "role": "EVENT_GENERAL_ADMISSION_PRICE_RANGE",
+                    "value": None, "decision": "HOLD",
+                    "hold_reason": "TICKET_IDENTITY_UNVERIFIED",
+                    "authority": "SOURCE_REVIEW_ONLY",
+                    "observed_at": OBS, "source_body_sha256": "a" * 64}}}}
+        baseline = _semantic_event_payload(base)
+        for field, value in (("hold_reason", "TICKET_PRICE_CONFLICT"),
+                             ("authority", "INDEPENDENT_REVIEW_REQUIRED"),
+                             ("decision", "REVIEW_NOT_FORMAL")):
+            changed = deepcopy(base)
+            changed["_candidate"]["field_roles"]["price"][field] = value
+            self.assertNotEqual(baseline, _semantic_event_payload(changed))
+        receipt_only = deepcopy(base)
+        receipt_only["_candidate"]["field_roles"]["price"]["observed_at"] = (
+            "2026-11-22T12:00:00Z")
+        receipt_only["_candidate"]["field_roles"]["price"]["source_body_sha256"] = "b" * 64
+        self.assertEqual(baseline, _semantic_event_payload(receipt_only))
+        self.assertEqual(base["price"], "")
+
+    def test_malformed_persisted_review_role_fails_closed(self):
+        # Persisted REVIEW evidence with a scalar role must not crash with
+        # AttributeError or silently be classified as unchanged.
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_event_id": "2040", "title": "北藝演出",
+                "_candidate": {"field_roles": {"venue_space": "invalid"}}}
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_FIELD_ROLE_SCHEMA_HOLD:venue_space"):
+            _semantic_event_payload(base)
+        base["_candidate"]["field_roles"] = {"price": None}
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_FIELD_ROLE_SCHEMA_HOLD:price"):
+            _semantic_event_payload(base)
+        base["_candidate"]["field_roles"] = {"venue_space": {"role": "EVENT_VENUE_SPACE", "value": "藍盒子"}}
+        self.assertIsInstance(_semantic_event_payload(base), tuple)
+
+    def test_list_detail_conflict_resolution_and_reappearance_are_not_discarded(self):
+        """A quality HOLD transition must update REVIEW even with same display date."""
+        body, list_receipt, details = inputs(("2111",))
+        first = refresh_plan(body, list_receipt, details, empty_prior(), NOW)
+        self.assertEqual(first["qualified"], 1)
+        previous = first["events"]["tpac:2111"]
+        self.assertIn("LIST_DETAIL_PERIOD_CONFLICT_HOLD",
+                      previous["_candidate"]["hold_reasons"])
+
+        # Actual showtime/official DETAIL stays identical; only official LIST
+        # period is brought into alignment with the same-event DETAIL.
+        aligned_list = body.replace(
+            b"2026-11-19 - 2026-11-28",
+            b"2026-11-20 - 2026-11-30")
+        self.assertNotEqual(aligned_list, body)
+        aligned_receipt = receipt(ROOT, aligned_list)
+        resolved = refresh_plan(
+            aligned_list, aligned_receipt, details,
+            {"kind": KIND, "events": first["events"]}, NOW)
+        self.assertEqual((resolved["added"], resolved["changed"],
+                          resolved["unchanged"]), (0, 1, 0))
+        current = resolved["events"]["tpac:2111"]
+        self.assertNotIn("LIST_DETAIL_PERIOD_CONFLICT_HOLD",
+                         current["_candidate"]["hold_reasons"])
+        self.assertEqual(current["date"], previous["date"])
+        self.assertEqual(current["title"], previous["title"])
+        self.assertEqual(current["price"], "")
+        self.assertEqual(current["location"], "")
+        self.assertFalse(current["published"])
+        self.assertFalse(current["formal_field_pass"])
+        self.assertFalse(current["golden_accepted"])
+        self.assertEqual(resolved["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+        replay = refresh_plan(
+            aligned_list, aligned_receipt, details,
+            {"kind": KIND, "events": resolved["events"]}, NOW)
+        self.assertEqual((replay["changed"], replay["unchanged"]), (0, 1))
+        self.assertEqual(replay["events"], resolved["events"])
+        regression = refresh_plan(
+            body, list_receipt, details,
+            {"kind": KIND, "events": resolved["events"]}, NOW)
+        self.assertEqual((regression["changed"], regression["unchanged"]), (1, 0))
+        self.assertIn("LIST_DETAIL_PERIOD_CONFLICT_HOLD",
+                      regression["events"]["tpac:2111"]["_candidate"]["hold_reasons"])
+        self.assertEqual(regression["published"], 0)
+
+    def test_hold_reason_order_and_receipt_only_change_do_not_create_deltas(self):
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        import copy
+        body, list_receipt, details = inputs(("2111",))
+        event = refresh_plan(body, list_receipt, details, empty_prior(), NOW)[
+            "events"]["tpac:2111"]
+        shuffled = copy.deepcopy(event)
+        shuffled["_candidate"]["hold_reasons"] = list(
+            reversed(event["_candidate"]["hold_reasons"]))
+        shuffled["_candidate"]["hold_reasons"].append(
+            shuffled["_candidate"]["hold_reasons"][0])
+        shuffled["_candidate"]["source_list_sha256"] = "f" * 64
+        shuffled["_candidate"]["observed_at"] = "2026-11-17T15:00:00+00:00"
+        self.assertEqual(_semantic_event_payload(event),
+                         _semantic_event_payload(shuffled))
+        tampered_hold = copy.deepcopy(event)
+        tampered_hold["_candidate"]["hold_reasons"] = [None]
+        with self.assertRaisesRegex(ValueError, "TPAC_SEMANTIC_HOLD_REASONS_SCHEMA_HOLD"):
+            _semantic_event_payload(tampered_hold)
+
+
+class VenueRoleReviewTests(unittest.TestCase):
+    """Fixture regressions are not first-party native field acceptance."""
+
+    def test_event_owned_venue_and_start_area_stay_review_only(self):
+        raw, list_receipt, details = inputs()
+        sid = "2111"
+        markup = ('<div class="page-program__aside-place">'
+                  '<div class="page-program__aside-place-venue">'
+                  '<h3>場地</h3><p>藍盒子</p>'
+                  '<div>本演出將於一樓小戲台開演</div>'
+                  '</div></div>')
+        body = details[sid]["body"].replace(b"</main>", markup.encode("utf-8") + b"</main>")
+        details[sid] = {"body": body, "receipt": receipt(ROOT + "/" + sid, body)}
+        plan = refresh_plan(raw, list_receipt, details, empty_prior(), NOW)
+        event = plan["events"]["tpac:" + sid]
+        role = event["_candidate"]["field_roles"]["venue_space"]
+        self.assertEqual(role["value"], "藍盒子")
+        self.assertEqual(role["start_area_note"], "本演出將於一樓小戲台開演")
+        self.assertEqual(role["role"], "EVENT_VENUE_SPACE")
+        self.assertEqual(role["source_body_sha256"], hashlib.sha256(body).hexdigest())
+        self.assertEqual(event["location"], "")
+        self.assertFalse(event["formal_field_pass"])
+        self.assertFalse(event["published"])
+        self.assertIn("VENUE_SPACE_REQUIRES_INDEPENDENT_FIELD_ACCEPTANCE",
+                      event["_candidate"]["hold_reasons"])
+
+    def test_venue_wrong_label_duplicate_and_hidden_are_field_holds(self):
+        from bs4 import BeautifulSoup
+        from scripts.p30_tpac_multi_event_refresh import _venue_role_review
+        good = ('<div class="page-program__aside-place">'
+                '<div class="page-program__aside-place-venue">'
+                '<h3>場地</h3><p>藍盒子</p>'
+                '<div>本演出將於一樓小戲台開演</div></div></div>')
+        cases = [
+            (good.replace("場地", "票價"), "TPAC_VENUE_LABEL_OR_ROLE_HOLD"),
+            (good + good, "TPAC_VENUE_EXACT_EVENT_SCOPE_HOLD"),
+            (good.replace('page-program__aside-place-venue"',
+                          'page-program__aside-place-venue" hidden'),
+             "TPAC_VENUE_EXACT_EVENT_SCOPE_HOLD"),
+        ]
+        for markup, reason in cases:
+            with self.subTest(reason=reason):
+                with self.assertRaisesRegex(ValueError, reason):
+                    _venue_role_review(BeautifulSoup(markup, "html.parser"))
+
+
+
+class PersistentInventoryContractTests(unittest.TestCase):
+    """Offline contract: no HTTP, no publication, no mutation of REVIEW LKG."""
+
+    def test_dual_catalog_fairness_cas_and_restart(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, select_pending_details, write_detail_inventory,
+            load_detail_inventory,
+        )
+        rows = {}
+        for kind in ("program", "event"):
+            for sid in ("1301", "2072"):
+                key = f"tpac:{kind}:{sid}"
+                rows[key] = {
+                    "source_namespace": kind, "source_event_id": sid,
+                    "detail_url": f"https://tpac.org.taipei/{kind}/{sid}",
+                    "list_url": f"https://tpac.org.taipei/{kind}",
+                    "list_sha": "a" * 64, "last_observed": OBS,
+                    "status": "PENDING_DETAIL_BUDGET", "attempts": 0,
+                    "last_attempt": None, "reason": "DETAIL_BYTES_NOT_CAPTURED",
+                }
+        inventory = {"kind": INVENTORY_KIND, "items": rows}
+        selected = select_pending_details(inventory)
+        self.assertEqual(len(selected), 2)
+        self.assertEqual([rows[key]["source_namespace"] for key in selected],
+                         ["program", "event"])
+        with tempfile.TemporaryDirectory() as root:
+            first = write_detail_inventory(inventory, root)
+            restored, sha = load_detail_inventory(root)
+            self.assertEqual(sha, first["sha256"])
+            self.assertEqual(restored, inventory)
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                write_detail_inventory(inventory, root, expected_sha=None)
+            self.assertFalse((Path(root) / "docs" / "data.json").exists())
+
+
+    def test_list_reappearance_restores_pending_detail_without_losing_history(self):
+        # SOURCE backlog regression: disappearance must not permanently strand
+        # an ID when the same official catalog lists it again. No GET or publish.
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_detail_inventory, select_pending_details,
+        )
+        first_list = listing(("2111", "2112"))
+        first = build_detail_inventory("program", first_list,
+                                       receipt(ROOT, first_list), NOW)
+        pending = first["items"]["tpac:program:2111"]
+        pending["attempts"] = 2
+        pending["last_attempt"] = OBS
+        pending["reason"] = "PREVIOUS_DETAIL_TRANSIENT_HOLD"
+        verified = first["items"]["tpac:program:2112"]
+        verified["status"] = "REVIEW_DETAIL_PARSED"
+        verified["reason"] = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED"
+
+        missing_list = listing(("2112",))
+        missing = build_detail_inventory("program", missing_list,
+                                         receipt(ROOT, missing_list), NOW, first)
+        self.assertEqual(missing["items"]["tpac:program:2111"]["status"],
+                         "NOT_IN_LATEST_LIST_REVIEW")
+        self.assertNotIn("tpac:program:2111", select_pending_details(missing))
+
+        returned = build_detail_inventory("program", first_list,
+                                          receipt(ROOT, first_list), NOW, missing)
+        recovered = returned["items"]["tpac:program:2111"]
+        self.assertEqual(recovered["status"], "PENDING_DETAIL_BUDGET")
+        self.assertEqual(recovered["reason"], "REAPPEARED_DETAIL_RECHECK_REQUIRED")
+        self.assertEqual(recovered["attempts"], 2)
+        self.assertEqual(recovered["last_attempt"], OBS)
+        self.assertIn("tpac:program:2111", select_pending_details(returned))
+        self.assertEqual(returned["items"]["tpac:program:2112"]["status"],
+                         "REVIEW_DETAIL_PARSED")
+
+    def test_per_event_list_semantic_change_requeues_only_affected_detail(self):
+        # Existing REVIEW detail cannot remain current when its *own* LIST
+        # title/period changes. An unrelated card or decoration is not drift.
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_detail_inventory, select_pending_details,
+        )
+        first_raw = listing(("2111", "2112"))
+        initial = build_detail_inventory("program", first_raw,
+                                         receipt(ROOT, first_raw), NOW)
+        for sid in ("2111", "2112"):
+            row = initial["items"]["tpac:program:" + sid]
+            row["status"] = "REVIEW_DETAIL_PARSED"
+            row["reason"] = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED"
+            row["attempts"] = 3
+            row["last_attempt"] = OBS
+        old_first_sha = initial["items"]["tpac:program:2111"]["list_card_sha256"]
+        old_other_sha = initial["items"]["tpac:program:2112"]["list_card_sha256"]
+
+        changed = first_raw.replace(b"2026-11-19 - 2026-11-28",
+                                    b"2026-11-20 - 2026-11-29", 1)
+        updated = build_detail_inventory("program", changed,
+                                         receipt(ROOT, changed), NOW, initial)
+        moved = updated["items"]["tpac:program:2111"]
+        other = updated["items"]["tpac:program:2112"]
+        self.assertEqual(moved["status"], "PENDING_DETAIL_BUDGET")
+        self.assertEqual(moved["reason"], "LIST_CARD_SEMANTIC_DRIFT_RECHECK_REQUIRED")
+        self.assertNotEqual(moved["list_card_sha256"], old_first_sha)
+        self.assertEqual((moved["attempts"], moved["last_attempt"]), (3, OBS))
+        self.assertEqual(other["status"], "REVIEW_DETAIL_PARSED")
+        self.assertEqual(other["list_card_sha256"], old_other_sha)
+        self.assertEqual(select_pending_details(updated), ["tpac:program:2111"])
+        # Idempotent after the new snapshot is committed; no repeated recapture.
+        replay = build_detail_inventory("program", changed,
+                                        receipt(ROOT, changed), NOW, updated)
+        self.assertEqual(replay, updated)
+
+        # Legacy inventories did not persist a per-card signature. Recheck
+        # rather than silently treating an unproven REVIEW as current.
+        legacy = {"kind": initial["kind"], "items": {
+            key: dict(value) for key, value in initial["items"].items()}}
+        legacy["items"]["tpac:program:2112"].pop("list_card_sha256")
+        migrated = build_detail_inventory("program", first_raw,
+                                           receipt(ROOT, first_raw), NOW, legacy)
+        self.assertEqual(migrated["items"]["tpac:program:2112"]["status"],
+                         "PENDING_DETAIL_BUDGET")
+        self.assertEqual(migrated["items"]["tpac:program:2112"]["reason"],
+                         "LIST_CARD_SEMANTIC_DRIFT_RECHECK_REQUIRED")
+
+    def test_event_list_category_period_drift_requeues_without_get(self):
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_detail_inventory, select_pending_details,
+        )
+        url = "https://tpac.org.taipei/event"
+        raw = ('<a class="card-event" title="連結到官方專題導覽" href="/event/2072">'
+               '<div class="card-event__text-title">官方專題導覽</div>'
+               '<div class="card-event__text-datecate">'
+               '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+               '</div></a>').encode("utf-8")
+        original = build_detail_inventory("event", raw, receipt(url, raw), NOW)
+        original["items"]["tpac:event:2072"]["status"] = "REVIEW_DETAIL_PARSED"
+        original["items"]["tpac:event:2072"]["reason"] = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED"
+
+        # A non-event navigation anchor changes LIST bytes but not owned data.
+        decorated = raw + b'<a href="/about">About</a>'
+        stable = build_detail_inventory("event", decorated,
+                                        receipt(url, decorated), NOW, original)
+        self.assertEqual(stable["items"]["tpac:event:2072"]["status"],
+                         "REVIEW_DETAIL_PARSED")
+        self.assertNotEqual(stable["items"]["tpac:event:2072"]["list_sha"],
+                            original["items"]["tpac:event:2072"]["list_sha"])
+
+        changed = decorated.replace("專題導覽</p>".encode("utf-8"),
+                                    "藝術工作坊</p>".encode("utf-8"))
+        newer = build_detail_inventory("event", changed,
+                                       receipt(url, changed), NOW, stable)
+        self.assertEqual(newer["items"]["tpac:event:2072"]["status"],
+                         "PENDING_DETAIL_BUDGET")
+        self.assertEqual(select_pending_details(newer), ["tpac:event:2072"])
+        self.assertEqual(newer["items"]["tpac:event:2072"]["reason"],
+                         "LIST_CARD_SEMANTIC_DRIFT_RECHECK_REQUIRED")
+
+    def test_real_cli_offline_two_catalog_inventory_restart_and_cas(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            program = listing(("2111", "2112"))
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
+            (root / "program.html").write_bytes(program)
+            (root / "event.html").write_bytes(event)
+            manifest = {"now": NOW.isoformat(), "catalogs": {
+                "program": {"list_file": str(root / "program.html"),
+                            "list_receipt": receipt(ROOT, program), "details": {}},
+                "event": {"list_file": str(root / "event.html"),
+                          "list_receipt": receipt("https://tpac.org.taipei/event", event),
+                          "details": {}}}}
+            # Seed actual REVIEW LKG; inventory CLI must never overwrite it.
+            from scripts.p30_tpac_multi_event_refresh import write_isolated_plan
+            source_raw, source_receipt, source_details = inputs()
+            seeded = refresh_plan(source_raw, source_receipt, source_details, empty_prior(), NOW)
+            write_isolated_plan(seeded, root)
+            lkg_path = root / "_isolated_review/tpac/tpac_multi_event_lkg.json"
+            lkg_before = lkg_path.read_bytes()
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--inventory-input", str(root / "manifest.json"),
+                       "--repo-root", str(root)]
+            first = subprocess.run(command, capture_output=True, text=True, check=True)
+            doc = json.loads(first.stdout)
+            self.assertEqual(doc["counts"]["source_cards"], 3)
+            self.assertEqual(doc["counts"]["pending_detail_budget"], 3)
+            self.assertEqual(doc["counts"]["parse_hold"], 0)
+            self.assertEqual(doc["published"], 0)
+            self.assertEqual(len(doc["next_detail_ids"]), 2)
+            second = subprocess.run(command, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(second.stdout)["inventory"]["sha256"],
+                             doc["inventory"]["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+            self.assertEqual(lkg_path.read_bytes(), lkg_before)
+            # Invalid DETAIL cannot pass solely because its identity exists in LKG.
+            bad_detail = b"<html>invalid detail</html>"
+            (root / "bad-detail.html").write_bytes(bad_detail)
+            manifest["catalogs"]["program"]["details"] = {
+                "2111": {"detail_file": str(root / "bad-detail.html"),
+                         "receipt": receipt(ROOT + "/2111", bad_detail)}}
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            invalid = subprocess.run(command, capture_output=True, text=True, check=True)
+            invalid_doc = json.loads(invalid.stdout)
+            self.assertEqual(invalid_doc["counts"]["parse_hold"], 1)
+            # A legitimate offline PARSE_HOLD transition advances inventory CAS;
+            # a subsequent denied LIST must preserve that latest committed version.
+            self.assertNotEqual(invalid_doc["inventory"]["sha256"], doc["inventory"]["sha256"])
+            self.assertEqual(invalid_doc["diagnostics"]["tpac:program:2111"]["status"], "PARSE_HOLD")
+            self.assertEqual(lkg_path.read_bytes(), lkg_before)
+            manifest["catalogs"]["event"]["list_receipt"]["http_status"] = 403
+            (root / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+            failed = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD", failed.stderr)
+            from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+            _, sha = load_detail_inventory(root)
+            self.assertEqual(sha, invalid_doc["inventory"]["sha256"])
+
+    def test_offline_missing_detail_requeues_prior_review_without_mutating_lkg(self):
+        # A persisted REVIEW row alone cannot prove that the current manifest
+        # contains replayable DETAIL bytes. Requeue it without touching LKG.
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_detail_inventory, write_detail_inventory,
+            offline_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            program = listing(("2111",))
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
+            (root / "program.html").write_bytes(program)
+            (root / "event.html").write_bytes(event)
+            first = build_detail_inventory("program", program,
+                                           receipt(ROOT, program), NOW)
+            row = first["items"]["tpac:program:2111"]
+            row["status"] = "REVIEW_DETAIL_PARSED"
+            row["reason"] = "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED"
+            row["attempts"] = 3
+            row["last_attempt"] = OBS
+            write_detail_inventory(first, root)
+            manifest = {"now": NOW.isoformat(), "catalogs": {
+                "program": {"list_file": str(root / "program.html"),
+                            "list_receipt": receipt(ROOT, program), "details": {}},
+                "event": {"list_file": str(root / "event.html"),
+                          "list_receipt": receipt("https://tpac.org.taipei/event", event),
+                          "details": {}}}}
+            path = root / "manifest.json"
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            result = offline_inventory_cli(path, root)
+            updated, _ = load_detail_inventory(root)
+            row = updated["items"]["tpac:program:2111"]
+            self.assertEqual(row["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(row["reason"], "DETAIL_BYTES_NOT_REPLAYED_HOLD")
+            self.assertEqual(row["attempts"], 3)
+            self.assertEqual(row["last_attempt"], OBS)
+            self.assertEqual(result["counts"]["pending_detail_budget"], 2)
+            self.assertIn("tpac:program:2111", result["next_detail_ids"])
+            # Inventory CAS legitimately creates _isolated_review/tpac; only
+            # the independent REVIEW LKG must remain absent.
+            self.assertTrue((root / "_isolated_review" / "tpac" / "tpac_detail_inventory.json").is_file())
+            self.assertFalse((root / "_isolated_review" / "tpac" / "tpac_multi_event_lkg.json").exists())
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_offline_unreadable_list_preserves_sibling_and_prior_inventory(self):
+        # Real disk replay: one missing catalog LIST must not erase its prior
+        # inventory, nor prevent a readable sibling LIST from being admitted.
+        from scripts.p30_tpac_multi_event_refresh import (
+            offline_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            program = listing(("2111", "2112"))
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
+            program_path, event_path = root / "program.html", root / "event.html"
+            program_path.write_bytes(program)
+            event_path.write_bytes(event)
+            manifest = {"now": NOW.isoformat(), "catalogs": {
+                "program": {"list_file": str(program_path),
+                            "list_receipt": receipt(ROOT, program), "details": {}},
+                "event": {"list_file": str(event_path),
+                          "list_receipt": receipt("https://tpac.org.taipei/event", event),
+                          "details": {}}}}
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            first = offline_inventory_cli(manifest_path, root)
+            prior, prior_sha = load_detail_inventory(root)
+            self.assertIn("tpac:program:2111", prior["items"])
+            program_path.unlink()
+            second = offline_inventory_cli(manifest_path, root)
+            current, current_sha = load_detail_inventory(root)
+            self.assertEqual(second["diagnostics"]["tpac:program:__list__"]["reason"],
+                             "LIST_IO_HOLD")
+            self.assertEqual(current["items"]["tpac:program:2111"],
+                             prior["items"]["tpac:program:2111"])
+            self.assertIn("tpac:event:2072", current["items"])
+            self.assertEqual(second["published"], 0)
+            event_path.unlink()
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_CLI_ALL_LIST_UNAVAILABLE_HOLD"):
+                offline_inventory_cli(manifest_path, root)
+            self.assertEqual(load_detail_inventory(root)[1], current_sha)
+            program_path.write_bytes(program)
+            restored = offline_inventory_cli(manifest_path, root)
+            self.assertEqual(restored["counts"]["source_cards"], 2)
+            self.assertNotIn("tpac:program:__list__", restored["diagnostics"])
+            self.assertEqual(load_detail_inventory(root)[1], restored["inventory"]["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_offline_unreadable_detail_isolated_and_restart_recovery(self):
+        # A missing DETAIL must not abort the other catalog or erase prior rows.
+        from scripts.p30_tpac_multi_event_refresh import offline_inventory_cli, load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            program = listing(("2111", "2112"))
+            event = ('<a class="card-event" title="連結到2026北藝夜遊：Beats到天臺" '
+                     'href="/event/2072"><div class="card-event__text-title">'
+                     '2026北藝夜遊：Beats到天臺</div>'
+                     '<div class="card-event__text-datecate">'
+                     '<p>2026-11-10 - 2026-11-12</p><p>專題導覽</p>'
+                     '</div></a>').encode()
+            (root / "program.html").write_bytes(program)
+            (root / "event.html").write_bytes(event)
+            missing = root / "missing.html"
+            manifest = {"now": NOW.isoformat(), "catalogs": {
+                "program": {"list_file": str(root / "program.html"),
+                            "list_receipt": receipt(ROOT, program),
+                            "details": {"2111": {"detail_file": str(missing),
+                                                  "receipt": receipt(ROOT + "/2111", b"unused")}}},
+                "event": {"list_file": str(root / "event.html"),
+                          "list_receipt": receipt("https://tpac.org.taipei/event", event),
+                          "details": {}}}}
+            path = root / "manifest.json"
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            first = offline_inventory_cli(path, root)
+            self.assertEqual(first["diagnostics"]["tpac:program:2111"]["reason"], "DETAIL_IO_HOLD")
+            self.assertEqual(first["counts"]["pending_detail_budget"], 3)
+            self.assertEqual(first["counts"]["source_cards"], 3)
+            self.assertEqual(first["published"], 0)
+            self.assertEqual(load_detail_inventory(root)[1], first["inventory"]["sha256"])
+            again = offline_inventory_cli(path, root)
+            self.assertEqual(again["inventory"]["sha256"], first["inventory"]["sha256"])
+            missing.write_bytes(b"<html>invalid detail</html>")
+            recovered = offline_inventory_cli(path, root)
+            self.assertEqual(recovered["counts"]["parse_hold"], 1)
+            self.assertEqual(recovered["diagnostics"]["tpac:program:2111"]["status"], "PARSE_HOLD")
+            self.assertEqual(recovered["counts"]["pending_detail_budget"], 2)
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_cross_namespace_url_conflict_fails_closed(self):
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, select_pending_details,
+        )
+        bad = {"kind": INVENTORY_KIND, "items": {
+            "tpac:event:1301": {
+                "source_namespace": "event", "source_event_id": "1301",
+                "detail_url": "https://tpac.org.taipei/program/1301",
+                "status": "PENDING_DETAIL_BUDGET",
+            },
+        }}
+        with self.assertRaisesRegex(ValueError, "IDENTITY_HOLD"):
+            select_pending_details(bad)
+
+
+
+class ArchivedDetailIdentityBindingTests(unittest.TestCase):
+    """OFFLINE same-ID LIST→DETAIL contract; positive/negative and no GET."""
+
+    def archived_receipt(self, url, raw):
+        return {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                "source_url": url,
+                "body_sha256": hashlib.sha256(raw).hexdigest(),
+                "body_bytes": len(raw), "capture_started_at": OBS,
+                "observed_at": None, "http_status": None, "robots_allowed": None}
+
+    def sources(self, catalog, sid):
+        title = "封存測試同一活動"
+        attr = ("連結到" + title) if catalog == "event" else title
+        cls = "card-" + catalog
+        list_raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{attr}">'
+                    f'<div class="{cls}__text-title">{title}</div></a>').encode()
+        detail_raw = (f'<article class="page-{catalog}__article">'
+                      f'<h1>{title}</h1></article>').encode()
+        root = "https://tpac.org.taipei/" + catalog
+        return (list_raw, self.archived_receipt(root, list_raw),
+                detail_raw, self.archived_receipt(root + "/" + sid, detail_raw))
+
+    def test_both_catalog_namespaces_bind_real_html_title_without_publication(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        for catalog, sid in (("program", "2040"), ("event", "1301")):
+            with self.subTest(catalog=catalog):
+                args = self.sources(catalog, sid)
+                result = bind_archived_detail_identity(
+                    catalog, args[0], args[1], sid, args[2], args[3])
+                self.assertEqual(result["identity"], f"tpac:{catalog}:{sid}")
+                self.assertEqual(result["field_roles"]["title"]["role"], "EVENT_TITLE")
+                self.assertEqual(result["detail_body_sha256"], hashlib.sha256(args[2]).hexdigest())
+                self.assertEqual(result["decision"], "ARCHIVED_LIST_DETAIL_IDENTITY_REVIEW_ONLY")
+                self.assertIsNone(result["observed_at"])
+                self.assertEqual(result["accepted_fields"], 0)
+                self.assertEqual(result["source_requests_performed"], 0)
+                self.assertFalse(result["native_get_allowed"])
+                self.assertFalse(result["published"])
+                self.assertEqual(result["release_state"], "HARD_HOLD_NO_PUBLICATION")
+
+    def test_detail_swaps_title_host_id_or_role_fail_without_acceptance(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        args = self.sources("event", "1301")
+        with self.assertRaisesRegex(ValueError, "NOT_IN_SAME_LIST_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "2072", args[2], args[3])
+        with self.assertRaisesRegex(ValueError, "DETAIL_ID_SCOPE_HOLD"):
+            bind_archived_detail_identity("other", args[0], args[1],
+                                          "1301", args[2], args[3])
+        swapped = args[2].replace("封存測試同一活動".encode(),
+                                  "不同的活動標題".encode())
+        with self.assertRaisesRegex(ValueError, "ARCHIVE_BYTES_SHA_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", swapped, args[3])
+        new_receipt = self.archived_receipt("https://tpac.org.taipei/event/1301", swapped)
+        with self.assertRaisesRegex(ValueError, "TITLE_PARITY_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", swapped, new_receipt)
+        wrong_article = args[2].replace(b"page-event__article", b"page-program__article")
+        wrong_receipt = self.archived_receipt(
+            "https://tpac.org.taipei/event/1301", wrong_article)
+        with self.assertRaisesRegex(ValueError, "OWNED_ARTICLE_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", wrong_article, wrong_receipt)
+        copied_receipt = dict(args[3], source_url="https://tpac.org.taipei/event/2072")
+        with self.assertRaisesRegex(ValueError, "ARCHIVE_IDENTITY_URL_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", args[2], copied_receipt)
+        escalated = dict(args[3], http_status=200)
+        with self.assertRaisesRegex(ValueError, "ARCHIVE_AUTHORITY_ESCALATION_HOLD"):
+            bind_archived_detail_identity("event", args[0], args[1],
+                                          "1301", args[2], escalated)
+
+
+
+
+    def test_archive_date_roles_real_dom_value_not_only_source_string(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        scenarios = (
+            ("program", "2040",
+             '<div class="page-program__article-top">2026-11-20 - 2026-11-30</div>',
+             '<div class="page-program__aside-place-showtimes"><h3>場次</h3>'
+             '<ul><li><p>2026-11-21 (六) 19:30</p></li></ul></div>',
+             "EVENT_SHOW_START"),
+            ("event", "1301",
+             '<div class="page-event__article-top-text"><div>展覽</div>'
+             '<div>2026-11-20 - 2026-11-30</div></div>',
+             '', "EXHIBITION_PERIOD"),
+            ("event", "2072",
+             '<div class="page-event__article-top-text"><div>導覽</div>'
+             '<div>2026-11-20 - 2026-11-30</div></div>',
+             '<div class="page-event__aside-place-showtimes"><h3>場次</h3>'
+             '<ul><li><p>2026-11-21 (六) 19:30</p></li></ul></div>',
+             "EVENT_SHOW_START"))
+        for catalog, sid, period, showtimes, expected_role in scenarios:
+            with self.subTest(catalog=catalog, sid=sid):
+                list_raw, list_rec, _, _ = self.sources(catalog, sid)
+                title = "封存測試同一活動"
+                detail_raw = (
+                    f'<main><article class="page-{catalog}__article">'
+                    f'<h1>{title}</h1>{period}</article>{showtimes}</main>'
+                ).encode()
+                receipt = self.archived_receipt(
+                    f"https://tpac.org.taipei/{catalog}/{sid}", detail_raw)
+                row = bind_archived_detail_identity(
+                    catalog, list_raw, list_rec, sid, detail_raw, receipt)
+                roles = row["field_roles"]
+                self.assertTrue(
+                    any(r["role"] == expected_role for r in roles.values()), roles)
+                self.assertEqual(row["accepted_fields"], 0)
+                self.assertFalse(row["formal_field_pass"])
+                self.assertFalse(row["published"])
+                self.assertEqual(row["field_holds"]["date"]["decision"], "HOLD")
+                self.assertEqual(row["field_holds"]["price"]["value"], None)
+                self.assertEqual(row["field_holds"]["venue"]["value"], None)
+                self.assertEqual(row["field_holds"]["date"]["hold_reason"],
+                                 "ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE")
+                for candidate in roles.values():
+                    self.assertEqual(candidate["source_url"], row["detail_url"])
+                    self.assertEqual(candidate["source_body_sha256"],
+                                     hashlib.sha256(detail_raw).hexdigest())
+                    self.assertNotEqual(candidate["decision"], "FIELD_ACCEPTED")
+                if expected_role == "EXHIBITION_PERIOD":
+                    self.assertNotIn("show_start", roles)
+                    self.assertEqual(roles["activity_period"]["value"],
+                                     ["2026-11-20", "2026-11-30"])
+                else:
+                    self.assertEqual(roles["show_start"]["value"],
+                                     "2026-11-21T19:30:00+08:00")
+
+    def test_archived_malformed_show_or_period_never_promotes_date(self):
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        list_raw, list_rec, _, _ = self.sources("program", "2040")
+        for period, show, expected in (
+            ("2026-11-30 - 2026-11-20", "2026-11-21 (六) 19:30", False),
+            ("2026-11-20 - 2026-11-30", "2026-11-21 (日) 19:30", False),
+            ("2026-11-20 - 2026-11-30", "2026-11-21 (六) 25:30", False),
+            ("2026-11-20 - 2026-11-30", "2026-12-21 (一) 19:30", False)):
+            with self.subTest(period=period, show=show):
+                raw = (
+                    '<main><article class="page-program__article">'
+                    '<h1>封存測試同一活動</h1>'
+                    f'<div class="page-program__article-top">{period}</div>'
+                    '</article><div class="page-program__aside-place-showtimes">'
+                    f'<h3>場次</h3><ul><li><p>{show}</p></li></ul></div></main>'
+                ).encode()
+                rec = self.archived_receipt(
+                    "https://tpac.org.taipei/program/2040", raw)
+                row = bind_archived_detail_identity(
+                    "program", list_raw, list_rec, "2040", raw, rec)
+                self.assertNotIn("show_start", row["field_roles"])
+                self.assertEqual(row["field_holds"]["date"]["value"], None)
+                self.assertEqual(row["field_holds"]["date"]["decision"], "HOLD")
+                self.assertEqual(row["accepted_fields"], 0)
+                self.assertEqual(row["field_roles"]["title"]["value"],
+                                 "封存測試同一活動")
+
+    def test_archived_identity_never_promotes_unverified_field_roles(self):
+        # Historical identity parity is not a date/price/venue/description receipt.
+        import inspect
+        from scripts.p30_tpac_multi_event_refresh import bind_archived_detail_identity
+        source = inspect.getsource(bind_archived_detail_identity)
+        self.assertIn("ARCHIVED_FIELD_SEMANTICS_NOT_VERIFIED", source)
+        self.assertIn('"field_holds"', source)
+        self.assertIn('"source_body_sha256"', source)
+        self.assertIn('"accepted_fields": 0', source)
+
+
+class ArchivedProvenanceCliTests(unittest.TestCase):
+    """Archive-only CLI is an evidence inventory, never a LIVE attestation."""
+
+    # Reuse the source-byte fixtures for the real archived CLI→CAS regression.
+    # Previously this class called self.sources() without owning that helper.
+    archived_receipt = ArchivedDetailIdentityBindingTests.archived_receipt
+    sources = ArchivedDetailIdentityBindingTests.sources
+
+    def test_readonly_archive_field_ledger_cli_and_stale_hold(self):
+        # Product Core path: persisted two-catalog CAS -> typed field evidence
+        # without another GET, field acceptance or file publication.
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                list_raw, list_receipt, detail_raw, detail_receipt = self.sources(catalog, sid)
+                lp, dp = root / (catalog + "-list.html"), root / (catalog + "-detail.html")
+                lp.write_bytes(list_raw)
+                dp.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(lp), "list_receipt": list_receipt,
+                    "details": {sid: {"detail_file": str(dp), "receipt": detail_receipt}},
+                }
+            manifest = root / "manifest.json"
+            def replay():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+                return archived_inventory_cli(manifest, root)
+            first = replay()
+            archive = root / "_isolated_archive_replay"
+            _, sha = load_detail_inventory(archive)
+            self.assertEqual(sha, first["inventory"]["sha256"])
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--repo-root", str(root), "--export-archive-fields",
+                       "--expected-sha", sha]
+            result = json.loads(subprocess.check_output(command, text=True))
+            self.assertEqual(result["kind"], "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1")
+            self.assertEqual(result["counts"], {
+                "events": 2, "archived_detail_current": 2, "pending_or_held": 0})
+            self.assertEqual((result["new_official_get"], result["accepted_fields"],
+                              result["published"]), (0, 0, 0))
+            rows = result["records"]
+            for identity, sid in (("tpac:program:2040", "2040"), ("tpac:event:1301", "1301")):
+                title = rows[identity]["fields"]["title"]
+                self.assertEqual(title["event_id"], sid)
+                self.assertEqual(title["role"], "EVENT_TITLE")
+                self.assertEqual(title["decision"], "REVIEW")
+                self.assertEqual(title["value"], "封存測試同一活動")
+                self.assertEqual(title["source_url"],
+                                 "https://tpac.org.taipei/" + rows[identity]["source_namespace"] + "/" + sid)
+                self.assertEqual(title["source_body_sha256"],
+                                 rows[identity]["historical_detail_body_sha256"])
+                self.assertEqual(rows[identity]["fields"]["date"]["decision"], "HOLD")
+                self.assertIsNone(rows[identity]["fields"]["date"]["value"])
+                self.assertEqual(rows[identity]["fields"]["price"]["role"], "UNKNOWN")
+                self.assertEqual(rows[identity]["fields"]["show_start"]["decision"], "HOLD")
+            self.assertEqual(load_detail_inventory(archive)[1], sha)
+            # A missing replay cannot turn old H1/show roles into current values.
+            catalogs["event"]["details"] = {}
+            second = replay()
+            _, new_sha = load_detail_inventory(archive)
+            self.assertNotEqual(new_sha, sha)
+            denied = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_FIELD_EXPORT_CAS_HOLD", denied.stderr)
+            command[-1] = new_sha
+            stale = json.loads(subprocess.check_output(command, text=True))
+            self.assertEqual(stale["counts"], {
+                "events": 2, "archived_detail_current": 1, "pending_or_held": 1})
+            held = stale["records"]["tpac:event:1301"]
+            self.assertFalse(held["archive_evidence_current"])
+            self.assertIsNone(held["fields"]["title"]["value"])
+            self.assertEqual(held["fields"]["title"]["decision"], "HOLD")
+            self.assertEqual(held["fields"]["title"]["role"], "UNKNOWN")
+            self.assertEqual(held["fields"]["title"]["hold_reason"],
+                             "DETAIL_BYTES_NOT_REPLAYED_HOLD")
+            self.assertEqual(held["fields"]["title"]["source_body_sha256"],
+                             rows["tpac:event:1301"]["historical_detail_body_sha256"])
+            self.assertEqual(stale["records"]["tpac:program:2040"],
+                             rows["tpac:program:2040"])
+            conflict = subprocess.run(command + ["--inventory-input", str(manifest)],
+                                      capture_output=True, text=True)
+            self.assertNotEqual(conflict.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_FIELD_EXPORT_MODE_HOLD", conflict.stderr)
+            self.assertEqual(load_detail_inventory(archive)[1], new_sha)
+            self.assertEqual(second["published"], 0)
+            self.assertFalse((root / "docs/data.json").exists())
+            self.assertFalse((root / "_isolated_review").exists())
+
+    def test_bad_one_detail_preserves_other_valid_archive_and_prior_evidence(self):
+        # Real disk CAS: a tampered DETAIL receipt holds only that ID; valid
+        # sibling still reaches REVIEW, and no formal field is accepted.
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                list_raw, list_receipt, detail_raw, detail_receipt = self.sources(catalog, sid)
+                list_path = root / (catalog + "-list.html")
+                detail_path = root / (catalog + "-detail.html")
+                list_path.write_bytes(list_raw)
+                detail_path.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(list_path), "list_receipt": list_receipt,
+                    "details": {sid: {"detail_file": str(detail_path),
+                                      "receipt": detail_receipt}},
+                }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                     encoding="utf-8")
+            first = archived_inventory_cli(manifest_path, root)
+            self.assertEqual(first["counts"]["detail_available"], 2)
+            self.assertEqual(first["accepted_fields"], 0)
+            # Tamper only the event receipt, leaving its bytes unchanged.
+            catalogs["event"]["details"]["1301"]["receipt"]["body_sha256"] = "0" * 64
+            manifest_path.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                     encoding="utf-8")
+            second = archived_inventory_cli(manifest_path, root)
+            self.assertEqual(second["counts"]["detail_available"], 1)
+            self.assertEqual(second["counts"]["archive_identity_hold"], 1)
+            self.assertEqual(second["counts"]["pending_detail_budget"], 1)
+            stored, sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(sha, second["inventory"]["sha256"])
+            valid = stored["items"]["tpac:program:2040"]
+            bad = stored["items"]["tpac:event:1301"]
+            self.assertTrue(valid["archive_field_evidence_current"])
+            self.assertFalse(bad["archive_field_evidence_current"])
+            self.assertEqual(bad["archive_field_hold_reason"],
+                             "DETAIL_VALIDATION_FAILED_HOLD")
+            self.assertEqual(bad["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(bad["archive_field_evidence"]["accepted_fields"], 0)
+            self.assertEqual(second["published"], 0)
+
+    def test_missing_or_unreadable_detail_preserves_sibling_and_recovers(self):
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "_isolated_archive_replay"
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                raw, receipt, detail, detail_receipt = self.sources(catalog, sid)
+                lp, dp = root / (catalog + "-list.html"), root / (catalog + "-detail.html")
+                lp.write_bytes(raw)
+                dp.write_bytes(detail)
+                catalogs[catalog] = {"list_file": str(lp), "list_receipt": receipt,
+                    "details": {sid: {"detail_file": str(dp), "receipt": detail_receipt}}}
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            first = archived_inventory_cli(manifest, root)
+            prior, first_sha = load_detail_inventory(archive)
+            self.assertEqual(first["counts"]["detail_available"], 2)
+            self.assertEqual(first["inventory"]["sha256"], first_sha)
+            identity, sibling = "tpac:event:1301", "tpac:program:2040"
+            target = root / "event-detail.html"
+            original = target.read_bytes()
+            target.unlink()
+            for mode in ("missing", "directory"):
+                if mode == "directory":
+                    target.mkdir()
+                result = archived_inventory_cli(manifest, root)
+                current, sha = load_detail_inventory(archive)
+                self.assertEqual(sha, result["inventory"]["sha256"])
+                self.assertEqual(result["counts"]["detail_available"], 1)
+                self.assertEqual(result["counts"]["archive_identity_hold"], 1)
+                self.assertEqual(result["counts"]["pending_detail_budget"], 1)
+                self.assertEqual(result["diagnostics"][identity]["reason"], "ARCHIVED_DETAIL_IO_HOLD")
+                self.assertEqual(result["diagnostics"][identity]["detail_error"], "DETAIL_FILE_UNREADABLE")
+                self.assertEqual(current["items"][sibling], prior["items"][sibling])
+                row = current["items"][identity]
+                self.assertEqual(row["archive_field_evidence"], prior["items"][identity]["archive_field_evidence"])
+                self.assertFalse(row["archive_field_evidence_current"])
+                self.assertEqual(row["status"], "PENDING_DETAIL_BUDGET")
+                self.assertEqual(result["accepted_fields"], 0)
+                self.assertEqual(result["published"], 0)
+                self.assertNotEqual(sha, first_sha)
+            # A LIST I/O failure still blocks the whole transaction.
+            list_path = root / "event-list.html"
+            list_bytes = list_path.read_bytes()
+            list_path.unlink()
+            with self.assertRaises(OSError):
+                archived_inventory_cli(manifest, root)
+            self.assertEqual(load_detail_inventory(archive)[1], sha)
+            list_path.write_bytes(list_bytes)
+            target.rmdir()
+            target.write_bytes(original)
+            restored = archived_inventory_cli(manifest, root)
+            final, final_sha = load_detail_inventory(archive)
+            self.assertEqual(restored["counts"]["detail_available"], 2)
+            self.assertEqual(final_sha, first_sha)
+            self.assertEqual(final, prior)
+            self.assertFalse((root / "docs/data.json").exists())
+            self.assertFalse((root / "_isolated_review").exists())
+
+    def test_archived_cli_recovers_actual_field_row_as_historical_pending(self):
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "_isolated_archive_replay"
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                raw, receipt, detail, detail_receipt = self.sources(catalog, sid)
+                lp, dp = root / (catalog + "-list.html"), root / (catalog + "-detail.html")
+                lp.write_bytes(raw)
+                dp.write_bytes(detail)
+                catalogs[catalog] = {"list_file": str(lp), "list_receipt": receipt,
+                    "details": {sid: {"detail_file": str(dp), "receipt": detail_receipt}}}
+            manifest = root / "manifest.json"
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--repo-root", str(root)]
+            def replay():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+                return json.loads(subprocess.check_output(
+                    command + ["--inventory-input", str(manifest)], text=True))
+            first = replay()
+            old, old_sha = load_detail_inventory(archive)
+            identity, sibling = "tpac:event:1301", "tpac:program:2040"
+            self.assertEqual(old_sha, first["inventory"]["sha256"])
+            self.assertTrue(old["items"][identity]["archive_field_evidence_current"])
+            catalogs["event"]["details"] = {}
+            second = replay()
+            before, before_sha = load_detail_inventory(archive)
+            self.assertEqual(before_sha, second["inventory"]["sha256"])
+            restore = command + ["--restore-archive-version", old_sha,
+                                 "--restore-identity", identity, "--expected-sha", before_sha]
+            result = json.loads(subprocess.check_output(restore, text=True))
+            after, after_sha = load_detail_inventory(archive)
+            self.assertEqual(result["sha256"], after_sha)
+            self.assertNotEqual(after_sha, before_sha)
+            row = after["items"][identity]
+            self.assertEqual(row["archive_field_evidence"],
+                             old["items"][identity]["archive_field_evidence"])
+            self.assertFalse(row["archive_field_evidence_current"])
+            self.assertEqual(row["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(row["archive_field_hold_reason"], "RESTORED_HISTORICAL_REVIEW_HOLD")
+            self.assertEqual(after["items"][sibling], before["items"][sibling])
+            self.assertEqual(result["accepted_fields"], 0)
+            self.assertEqual(result["published"], 0)
+            denied = subprocess.run(restore, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_INVENTORY_RECOVERY_CAS_HOLD", denied.stderr)
+            conflict = subprocess.run(restore + ["--inventory-input", str(manifest)],
+                                      capture_output=True, text=True)
+            self.assertNotEqual(conflict.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_RECOVERY_CLI_MODE_HOLD", conflict.stderr)
+            self.assertEqual(load_detail_inventory(archive)[1], after_sha)
+            self.assertFalse((root / "_isolated_review").exists())
+            self.assertFalse((root / "docs/data.json").exists())
+
+    def test_archived_real_event_link_prefix_preserves_source_owned_title(self):
+        # Official /event title attrs begin with a navigation prefix, but the
+        # event-owned visible title itself does not contain that prefix.
+        from scripts.p30_tpac_multi_event_refresh import _archived_cards
+        title = "北藝散步導覽"
+        raw = (f'<a class="card-event" href="/event/1301" title="連結到{title}">'
+               f'<div class="card-event__text-title">{title}</div></a>').encode()
+        url = "https://tpac.org.taipei/event"
+        receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                   "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                   "body_bytes": len(raw), "capture_started_at": None,
+                   "observed_at": OBS, "http_status": None, "robots_allowed": None}
+        cards = _archived_cards("event", raw, receipt)
+        self.assertEqual(set(cards), {"1301"})
+        self.assertEqual(cards["1301"]["identity"], "tpac:event:1301")
+        modified = raw.replace(title.encode(), "另一場活動".encode(), 1)
+        forged = dict(receipt, body_sha256=hashlib.sha256(modified).hexdigest(),
+                      body_bytes=len(modified))
+        with self.assertRaisesRegex(ValueError, "TPAC_CATALOG_TITLE_CONFLICT_HOLD"):
+            _archived_cards("event", modified, forged)
+
+    def test_archived_cli_subprocess_cas_restart_and_negative_authority(self):
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bodies = {}
+            catalogs = {}
+            for catalog in ("program", "event"):
+                sid = "2040" if catalog == "program" else "1301"
+                title = "測試封存活動"
+                cls = "card-program" if catalog == "program" else "card-event"
+                text_cls = cls + "__text-title"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{text_cls}">{title}</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                           "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                           "body_bytes": len(raw), "capture_started_at": OBS,
+                           "observed_at": None, "http_status": None, "robots_allowed": None}
+                bodies[catalog] = receipt
+                catalogs[catalog] = {"list_file": str(path), "list_receipt": receipt, "details": {}}
+            manifest = {"mode": "archived", "catalogs": catalogs}
+            path = root / "manifest.json"
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--inventory-input", str(path), "--repo-root", str(root)]
+            first = subprocess.run(command, capture_output=True, text=True, check=True)
+            output = json.loads(first.stdout)
+            self.assertEqual(output["counts"]["source_cards"], 2)
+            self.assertEqual(output["counts"]["pending_detail_budget"], 2)
+            self.assertEqual(output["accepted_fields"], 0)
+            self.assertEqual(output["published"], 0)
+            second = subprocess.run(command, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(second.stdout)["inventory"]["sha256"],
+                             output["inventory"]["sha256"])
+            self.assertFalse((root / "docs/data.json").exists())
+            for field, value in (("observed_at", OBS), ("http_status", 200),
+                                 ("robots_allowed", True)):
+                manifest["catalogs"]["program"]["list_receipt"][field] = value
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                denied = subprocess.run(command, capture_output=True, text=True)
+                self.assertNotEqual(denied.returncode, 0)
+                self.assertIn("TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD", denied.stderr)
+                manifest["catalogs"]["program"]["list_receipt"][field] = None
+            # An archived body without its original capture timestamp cannot
+            # acquire provenance merely by passing the byte hash checks.
+            program_receipt = manifest["catalogs"]["program"]["list_receipt"]
+            original_stamp = program_receipt.pop("capture_started_at")
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            missing_stamp = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(missing_stamp.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD", missing_stamp.stderr)
+            program_receipt["capture_started_at"] = original_stamp
+            manifest["catalogs"]["program"]["list_receipt"]["body_sha256"] = "0" * 64
+            path.write_text(json.dumps(manifest), encoding="utf-8")
+            denied = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_BYTES_SHA_HOLD", denied.stderr)
+
+
+    def test_archived_cli_requires_list_detail_article_title_parity(self):
+        # Same URL and caller-consistent digest must not inflate archive coverage
+        # when the source-owned article H1 disagrees with the sealed LIST card.
+        from scripts.p30_tpac_multi_event_refresh import archived_inventory_cli
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                title = "封存活動"
+                cls = "card-program" if catalog == "program" else "card-event"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<span class="{cls}__text-title">{title}</span></a>').encode()
+                path = root / (catalog + "_list.html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                           "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                           "body_bytes": len(raw), "capture_started_at": OBS,
+                           "observed_at": None, "http_status": None, "robots_allowed": None}
+                catalogs[catalog] = {"list_file": str(path), "list_receipt": receipt,
+                                     "details": {}}
+            manifest = root / "manifest.json"
+            def save():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+            save()
+            self.assertEqual(archived_inventory_cli(manifest, root)["counts"]["detail_available"], 0)
+            for title, expected in (("不同文章", "TPAC_ARCHIVE_LIST_DETAIL_TITLE_PARITY_HOLD"),
+                                    ("封存活動", None)):
+                raw = (f'<article class="page-program__article"><h1>{title}</h1>'
+                       '</article>').encode()
+                detail_path = root / "program_detail.html"
+                detail_path.write_bytes(raw)
+                catalogs["program"]["details"]["2040"] = {
+                    "detail_file": str(detail_path),
+                    "receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                                "source_url": "https://tpac.org.taipei/program/2040",
+                                "body_sha256": hashlib.sha256(raw).hexdigest(),
+                                "body_bytes": len(raw), "capture_started_at": OBS,
+                                "observed_at": None, "http_status": None,
+                                "robots_allowed": None}}
+                save()
+                if expected:
+                    result = archived_inventory_cli(manifest, root)
+                    self.assertEqual(result["counts"]["archive_identity_hold"], 1)
+                    self.assertEqual(result["counts"]["detail_available"], 0)
+                    self.assertEqual(result["diagnostics"]["tpac:program:2040"]["detail_error"], expected)
+                else:
+                    result = archived_inventory_cli(manifest, root)
+                    self.assertEqual(result["counts"]["detail_available"], 1)
+                    self.assertEqual(result["accepted_fields"], 0)
+                    self.assertEqual(result["published"], 0)
+
+    def test_archived_field_evidence_survives_cas_restart_and_missing_replay(self):
+        # The real source-owned archive binding must flow into persisted CAS,
+        # not just return from an isolated parser helper.
+        from scripts.p30_tpac_multi_event_refresh import (
+            archived_inventory_cli, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                raw, rr, detail_raw, dr = self.sources(catalog, sid)
+                list_file = root / (catalog + "_list.html")
+                detail_file = root / (catalog + "_detail.html")
+                list_file.write_bytes(raw)
+                detail_file.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(list_file), "list_receipt": rr,
+                    "details": {sid: {"detail_file": str(detail_file), "receipt": dr}},
+                }
+            manifest = root / "archive_manifest.json"
+            def save():
+                manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                    encoding="utf-8")
+            save()
+            first = archived_inventory_cli(manifest, root)
+            inventory, sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(first["inventory"]["sha256"], sha)
+            self.assertEqual(first["counts"]["detail_available"], 2)
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                evidence = inventory["items"][f"tpac:{catalog}:{sid}"]["archive_field_evidence"]
+                self.assertEqual(evidence["field_roles"]["title"]["role"], "EVENT_TITLE")
+                self.assertEqual(evidence["accepted_fields"], 0)
+                self.assertFalse(evidence["published"])
+                self.assertEqual(evidence["detail_body_sha256"],
+                                 catalogs[catalog]["details"][sid]["receipt"]["body_sha256"])
+            self.assertEqual(archived_inventory_cli(manifest, root)["inventory"]["sha256"], sha)
+            # Missing DETAIL on restart never erases last body-bound review evidence.
+            catalogs["event"]["details"] = {}
+            save()
+            archived_inventory_cli(manifest, root)
+            retained, _ = load_detail_inventory(root / "_isolated_archive_replay")
+            row = retained["items"]["tpac:event:1301"]
+            self.assertEqual(row["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(row["archive_field_evidence"]["detail_body_sha256"],
+                             inventory["items"]["tpac:event:1301"]["archive_field_evidence"]["detail_body_sha256"])
+            self.assertEqual(row["archive_field_evidence"]["accepted_fields"], 0)
+            # A corrupt individual DETAIL must be quarantined, not abort the
+            # entire batch or erase the other catalog's verified evidence.
+            catalogs["event"]["details"] = {
+                "1301": {"detail_file": catalogs["event"]["list_file"],
+                         "receipt": catalogs["program"]["details"]["2040"]["receipt"]}}
+            save()
+            before, before_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            failed = archived_inventory_cli(manifest, root)
+            after, after_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(failed["counts"]["archive_identity_hold"], 1)
+            self.assertEqual(failed["counts"]["detail_available"], 1)
+            self.assertNotEqual(after_sha, before_sha)
+            self.assertEqual(after["items"]["tpac:program:2040"],
+                             before["items"]["tpac:program:2040"])
+            bad = after["items"]["tpac:event:1301"]
+            self.assertEqual(bad["status"], "PENDING_DETAIL_BUDGET")
+            self.assertEqual(bad["reason"], "ARCHIVED_DETAIL_VALIDATION_HOLD")
+            self.assertFalse(bad["archive_field_evidence_current"])
+            self.assertEqual(bad["archive_field_hold_reason"],
+                             "DETAIL_VALIDATION_FAILED_HOLD")
+            self.assertEqual(bad["archive_field_evidence"],
+                             before["items"]["tpac:event:1301"]["archive_field_evidence"])
+            self.assertEqual(failed["accepted_fields"], 0)
+            self.assertEqual(failed["published"], 0)
+            self.assertEqual(archived_inventory_cli(manifest, root)["inventory"]["sha256"],
+                             after_sha)
+
+
+    def test_persisted_archive_field_receipt_tamper_is_rejected_before_cas(self):
+        # JSON canonical form and its CAS hash alone do not establish that
+        # archived FIELD REVIEW has never been promoted to LIVE/accepted.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import (
+            _canonical, archived_inventory_cli, load_detail_inventory,
+            write_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive_root = root / "_isolated_archive_replay"
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                list_raw, list_rec, detail_raw, detail_rec = self.sources(catalog, sid)
+                list_file = root / (catalog + "_list.html")
+                detail_file = root / (catalog + "_detail.html")
+                list_file.write_bytes(list_raw)
+                detail_file.write_bytes(detail_raw)
+                catalogs[catalog] = {
+                    "list_file": str(list_file), "list_receipt": list_rec,
+                    "details": {sid: {"detail_file": str(detail_file),
+                                       "receipt": detail_rec}},
+                }
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps(
+                {"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            initial = archived_inventory_cli(manifest, root)
+            stored, sha = load_detail_inventory(archive_root)
+            self.assertEqual(sha, initial["inventory"]["sha256"])
+            target = archive_root / "_isolated_review/tpac/tpac_detail_inventory.json"
+            original = target.read_bytes()
+            row_key = "tpac:program:2040"
+
+            def mutate(doc, name):
+                row = doc["items"][row_key]
+                evidence = row.get("archive_field_evidence", {})
+                if name == "accepted":
+                    evidence["accepted_fields"] = 1
+                elif name == "published":
+                    evidence["published"] = True
+                elif name == "wrong_url":
+                    evidence["field_roles"]["title"]["source_url"] = (
+                        "https://tpac.org.taipei/program/777")
+                elif name == "accepted_role":
+                    evidence["field_roles"]["title"]["decision"] = "FIELD_ACCEPTED"
+                elif name == "price_value":
+                    evidence["field_holds"]["price"]["value"] = "NT$500"
+                elif name == "title_empty":
+                    evidence["field_roles"]["title"]["value"] = ""
+                elif name == "body_sha":
+                    evidence["detail_body_sha256"] = "0" * 64
+                elif name == "stale_claim_current":
+                    row["status"] = "PENDING_DETAIL_BUDGET"
+                elif name == "bad_flag":
+                    row["archive_field_evidence_current"] = "true"
+                elif name == "orphan_flag":
+                    row.pop("archive_field_evidence")
+                elif name == "bad_timestamp":
+                    evidence["capture_started_at"] = "not-a-date"
+                else:
+                    raise AssertionError(name)
+
+            for bad in ("accepted", "published", "wrong_url", "accepted_role",
+                        "price_value", "title_empty", "body_sha",
+                        "stale_claim_current", "bad_flag", "orphan_flag",
+                        "bad_timestamp"):
+                with self.subTest(tamper=bad):
+                    forged = deepcopy(stored)
+                    mutate(forged, bad)
+                    forged_bytes = _canonical(forged)
+                    target.write_bytes(forged_bytes)
+                    # Reading this perfectly canonical JSON must FAIL.
+                    with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_FIELD_"):
+                        load_detail_inventory(archive_root)
+                    # Replaying fresh manifest must not overwrite the tampered
+                    # LKG silently; the operator must reconcile the corruption.
+                    with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_FIELD_"):
+                        archived_inventory_cli(manifest, root)
+                    self.assertEqual(target.read_bytes(), forged_bytes)
+                    target.write_bytes(original)
+            self.assertEqual(load_detail_inventory(archive_root)[1], sha)
+            # The normal, unchanged re-run is idempotent.
+            self.assertEqual(archived_inventory_cli(
+                manifest, root)["inventory"]["sha256"], sha)
+            self.assertFalse((root / "docs/data.json").exists())
+
+
+    def test_archived_cli_cannot_downgrade_existing_live_inventory(self):
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            live = {"kind": INVENTORY_KIND, "items": {
+                "tpac:program:2040": {
+                    "source_namespace": "program", "source_event_id": "2040",
+                    "list_url": "https://tpac.org.taipei/program",
+                    "detail_url": "https://tpac.org.taipei/program/2040",
+                    "list_sha": "a" * 64, "last_observed": OBS,
+                    "status": "REVIEW_DETAIL_PARSED", "attempts": 0,
+                    "last_attempt": None, "reason": "REVIEW_FIELDS_NOT_FORMALLY_ACCEPTED",
+                },
+            }}
+            before = write_detail_inventory(live, root)["sha256"]
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                title = "封存隔離回歸活動"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{cls}__text-title">{title}</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {
+                    "list_file": str(path), "details": {},
+                    "list_receipt": {
+                        "evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None, "robots_allowed": None,
+                    },
+                }
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            command = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                       "--inventory-input", str(manifest), "--repo-root", str(root)]
+            first = subprocess.run(command, capture_output=True, text=True, check=True)
+            second = subprocess.run(command, capture_output=True, text=True, check=True)
+            self.assertEqual(json.loads(first.stdout)["inventory"]["sha256"],
+                             json.loads(second.stdout)["inventory"]["sha256"])
+            restored, after = load_detail_inventory(root)
+            self.assertEqual(after, before)
+            self.assertEqual(restored, live)
+            archived, archived_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertIsNotNone(archived_sha)
+            self.assertEqual(len(archived["items"]), 2)
+            self.assertEqual(archived["items"]["tpac:program:2040"]["status"],
+                             "PENDING_DETAIL_BUDGET")
+            self.assertFalse((root / "docs" / "data.json").exists())
+
+    def test_archived_cli_rejects_new_list_snapshot_without_mutating_cas(self):
+        # Regression: an immutable archive replay must never replace a sealed
+        # LIST snapshot for the same event ID with different source bytes.
+        import subprocess
+        import sys
+        from scripts.p30_tpac_multi_event_refresh import load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                title = "封存快照不可變驗證"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{cls}__text-title">{title}</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {"list_file": str(path), "details": {},
+                    "list_receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None, "robots_allowed": None}}
+            manifest = root / "archive.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            cmd = [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                   "--inventory-input", str(manifest), "--repo-root", str(root)]
+            first = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            original_sha = json.loads(first.stdout)["inventory"]["sha256"]
+            source = root / "program.html"
+            changed = source.read_bytes().replace("封存快照不可變驗證".encode(), "另一份封存快照驗證".encode())
+            source.write_bytes(changed)
+            receipt = catalogs["program"]["list_receipt"]
+            receipt["body_sha256"] = hashlib.sha256(changed).hexdigest()
+            receipt["body_bytes"] = len(changed)
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            denied = subprocess.run(cmd, capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_SNAPSHOT_DRIFT_HOLD", denied.stderr)
+            _, after_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(after_sha, original_sha)
+
+    def test_archived_cli_rejects_archive_root_symlink_before_any_write(self):
+        # Regression: the archive CAS namespace must not resolve through a
+        # symlink into an unrelated directory, even when receipts are valid.
+        import subprocess
+        import sys
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            foreign = root / "foreign"
+            foreign.mkdir()
+            archive_link = root / "_isolated_archive_replay"
+            try:
+                archive_link.symlink_to(foreign, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlinks unavailable on this host")
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                title = "封存符號連結回歸"
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="{title}">'
+                       f'<div class="{cls}__text-title">{title}</div></a>').encode()
+                source = root / (catalog + ".html")
+                source.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {
+                    "list_file": str(source), "details": {},
+                    "list_receipt": {
+                        "evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None,
+                        "robots_allowed": None,
+                    },
+                }
+            manifest = root / "archive.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-m", "scripts.p30_tpac_multi_event_refresh",
+                 "--inventory-input", str(manifest), "--repo-root", str(root)],
+                capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("TPAC_ARCHIVE_ROOT_SYMLINK_HOLD", result.stderr)
+            self.assertEqual(list(foreign.iterdir()), [])
+            self.assertFalse((root / "docs/data.json").exists())
+
+
+    def test_original_event_archive_observation_without_capture_start(self):
+        # Native /event receipt contains per-body observed_at, not capture_started_at.
+        # Preserve that distinction and reject any fabricated LIVE authority.
+        from scripts.p30_tpac_multi_event_refresh import _archived_body
+        raw = b"<html><body>Original event evidence</body></html>"
+        url = "https://tpac.org.taipei/event/1301"
+        receipt = {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                   "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                   "body_bytes": len(raw), "capture_started_at": None,
+                   "observed_at": "2026-11-08T14:49:08.662855+00:00",
+                   "http_status": None, "robots_allowed": None}
+        self.assertIsNotNone(_archived_body(raw, receipt, url, "event", "1301"))
+        for changes in ({"http_status": 200}, {"robots_allowed": True},
+                        {"capture_started_at": "2026-11-08T14:49:00+00:00"}):
+            bad = dict(receipt, **changes)
+            with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_AUTHORITY_ESCALATION_HOLD"):
+                _archived_body(raw, bad, url, "event", "1301")
+        missing = dict(receipt, observed_at=None)
+        with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD"):
+            _archived_body(raw, missing, url, "event", "1301")
+        program_url = "https://tpac.org.taipei/program/1301"
+        program_receipt = dict(receipt, source_url=program_url)
+        with self.assertRaisesRegex(ValueError, "TPAC_ARCHIVE_CAPTURE_TIMESTAMP_MISSING_HOLD"):
+            _archived_body(raw, program_receipt, program_url, "program", "1301")
+
+
+
+    def test_partial_archived_manifest_requires_raw_detail_replay(self):
+        # Prior archive status alone must not masquerade as replayable DETAIL bytes.
+        from scripts.p30_tpac_multi_event_refresh import archived_inventory_cli, load_detail_inventory
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            catalogs = {}
+            for catalog, sid in (("program", "2040"), ("event", "1301")):
+                cls = "card-" + catalog
+                raw = (f'<a class="{cls}" href="/{catalog}/{sid}" title="封存活動">'
+                       f'<div class="{cls}__text-title">封存活動</div></a>').encode()
+                path = root / (catalog + ".html")
+                path.write_bytes(raw)
+                url = "https://tpac.org.taipei/" + catalog
+                catalogs[catalog] = {"list_file": str(path), "details": {},
+                    "list_receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                        "source_url": url, "body_sha256": hashlib.sha256(raw).hexdigest(),
+                        "body_bytes": len(raw), "capture_started_at": OBS,
+                        "observed_at": None, "http_status": None, "robots_allowed": None}}
+            # Archived DETAIL coverage now requires same-ID, source-owned H1,
+            # not merely a caller-consistent SHA for arbitrary HTML.
+            body = (b'<article class="page-program__article">'
+                    + " <h1>封存活動</h1>".encode("utf-8")
+                    + b"</article>")
+            detail_path = root / "detail.html"
+            detail_path.write_bytes(body)
+            detail_url = "https://tpac.org.taipei/program/2040"
+            catalogs["program"]["details"]["2040"] = {"detail_file": str(detail_path),
+                "receipt": {"evidence_class": "VERIFIED_ARCHIVED_BODY_ONLY",
+                    "source_url": detail_url, "body_sha256": hashlib.sha256(body).hexdigest(),
+                    "body_bytes": len(body), "capture_started_at": OBS,
+                    "observed_at": None, "http_status": None, "robots_allowed": None}}
+            manifest = root / "archive.json"
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            first = archived_inventory_cli(manifest, root)
+            self.assertEqual(first["counts"]["detail_available"], 1)
+            verified_record = catalogs["program"]["details"]["2040"]
+            catalogs["program"]["details"] = {}
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}), encoding="utf-8")
+            second = archived_inventory_cli(manifest, root)
+            saved, second_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertEqual(saved["items"]["tpac:program:2040"]["status"],
+                             "PENDING_DETAIL_BUDGET")
+            self.assertEqual(saved["items"]["tpac:program:2040"]["reason"],
+                             "PRIOR_ARCHIVED_DETAIL_BYTES_NOT_REPLAYED_HOLD")
+            self.assertFalse(saved["items"]["tpac:program:2040"]["archive_field_evidence_current"])
+            self.assertEqual(saved["items"]["tpac:program:2040"]["archive_field_hold_reason"],
+                             "DETAIL_BYTES_NOT_REPLAYED_HOLD")
+            self.assertEqual(second["counts"]["detail_available"], 0)
+            self.assertEqual(second["counts"]["pending_detail_budget"], 2)
+            self.assertEqual(second["counts"]["source_cards"], 2)
+            self.assertNotEqual(first["inventory"]["sha256"], second_sha)
+            self.assertIn("tpac:program:2040", second["next_detail_ids"])
+            # The historical CAS remains auditable, but only a re-supplied
+            # identical raw body/receipt may restore current archive coverage.
+            catalogs["program"]["details"]["2040"] = verified_record
+            manifest.write_text(json.dumps({"mode": "archived", "catalogs": catalogs}),
+                                encoding="utf-8")
+            third = archived_inventory_cli(manifest, root)
+            self.assertEqual(third["counts"]["detail_available"], 1)
+            self.assertEqual(third["counts"]["pending_detail_budget"], 1)
+            self.assertEqual(third["inventory"]["sha256"], first["inventory"]["sha256"])
+            # A tampered body may not promote a forged archive status or mutate CAS.
+            detail_path.write_bytes(b"<html>tampered archive body</html>")
+            tampered = archived_inventory_cli(manifest, root)
+            self.assertEqual(tampered["counts"]["archive_identity_hold"], 1)
+            self.assertEqual(tampered["counts"]["detail_available"], 0)
+            self.assertEqual(tampered["diagnostics"]["tpac:program:2040"]["detail_error"],
+                             "TPAC_ARCHIVE_BYTES_SHA_HOLD")
+            stored_tampered, after_tamper_sha = load_detail_inventory(root / "_isolated_archive_replay")
+            self.assertNotEqual(after_tamper_sha, third["inventory"]["sha256"])
+            self.assertFalse(stored_tampered["items"]["tpac:program:2040"]["archive_field_evidence_current"])
+            self.assertEqual(stored_tampered["items"]["tpac:program:2040"]["archive_field_hold_reason"],
+                             "DETAIL_VALIDATION_FAILED_HOLD")
+            self.assertFalse((root / "docs" / "data.json").exists())
+
+class PersistedHoldSchemaRegressionTests(unittest.TestCase):
+    def test_falsey_malformed_hold_values_fail_closed(self):
+        # A corrupt persisted HOLD field must not be silently normalized to
+        # an empty list, which would hide a LIST/DETAIL quality conflict.
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        for malformed in (None, "", 0, False, {}, ()):
+            with self.subTest(malformed=repr(malformed)):
+                event = {"_candidate": {"field_roles": {},
+                                        "hold_reasons": malformed}}
+                with self.assertRaisesRegex(
+                        ValueError, "TPAC_SEMANTIC_HOLD_REASONS_SCHEMA_HOLD"):
+                    _semantic_event_payload(event)
+
+    def test_absent_and_valid_hold_semantics_remain_stable(self):
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        absent = {"_candidate": {"field_roles": {}}}
+        empty = {"_candidate": {"field_roles": {}, "hold_reasons": []}}
+        self.assertEqual(_semantic_event_payload(absent),
+                         _semantic_event_payload(empty))
+        a = {"_candidate": {"field_roles": {},
+                            "hold_reasons": ["LIST_DETAIL_PERIOD_CONFLICT", "VENUE_HOLD"]}}
+        b = {"_candidate": {"field_roles": {},
+                            "hold_reasons": ["VENUE_HOLD", "LIST_DETAIL_PERIOD_CONFLICT",
+                                             "VENUE_HOLD"]}}
+        self.assertEqual(_semantic_event_payload(a), _semantic_event_payload(b))
+        self.assertNotEqual(_semantic_event_payload(a), _semantic_event_payload(empty))
+
+class EventCoreRoleSemanticRegressionTests(unittest.TestCase):
+    def test_event_owned_core_role_change_is_not_discarded(self):
+        # A /event verified period may change while public display fields
+        # remain empty. The REVIEW LKG must see this as a real source delta.
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        base = {"source_namespace": "event", "date": "", "_candidate": {
+            "field_roles": {"EVENT_ACTIVITY_PERIOD": {
+                "role": "EVENT_ACTIVITY_PERIOD", "value": "2026-11-20 - 2026-11-21",
+                "source_body_sha256": "old", "observed_at": "2026-11-08T00:00:00Z"}}}}
+        import copy
+        changed = copy.deepcopy(base)
+        changed["_candidate"]["field_roles"]["EVENT_ACTIVITY_PERIOD"]["value"] = "2026-11-20 - 2026-11-22"
+        self.assertNotEqual(_semantic_event_payload(base), _semantic_event_payload(changed))
+        receipt_only = copy.deepcopy(base)
+        receipt_only["_candidate"]["field_roles"]["EVENT_ACTIVITY_PERIOD"]["source_body_sha256"] = "new"
+        receipt_only["_candidate"]["field_roles"]["EVENT_ACTIVITY_PERIOD"]["observed_at"] = "2026-11-09T00:00:00Z"
+        self.assertEqual(_semantic_event_payload(base), _semantic_event_payload(receipt_only))
+
+
+class EventPriorLkgIsolationRegressionTests(unittest.TestCase):
+    def test_corrupt_event_lkg_does_not_abort_other_verified_detail(self):
+        # Two independent /event identities: corrupted persisted semantics
+        # must not prevent the second valid archived DETAIL from being staged.
+        from unittest.mock import patch
+        from datetime import datetime, timezone
+        from scripts.p30_tpac_multi_event_refresh import (
+            KIND, refresh_event_plan,
+        )
+        now = datetime(2026, 11, 18, tzinfo=timezone.utc)
+        old_bad = {"source_event_id": "1301", "_candidate": {
+            "field_roles": {"EVENT_ACTIVITY_PERIOD": None}}}
+        prior = {"kind": KIND, "events": {"tpac:event:1301": old_bad}}
+        cards = {sid: {"source_event_id": sid, "title": "隔離活動" + sid}
+                 for sid in ("1301", "2072")}
+        def inspect(card, body, receipt, clock):
+            sid = card["source_event_id"]
+            import hashlib
+            return {
+                "identity": "tpac:event:" + sid, "source_event_id": sid,
+                "url": "https://tpac.org.taipei/event/" + sid,
+                "detail_body_sha256": hashlib.sha256(body).hexdigest(),
+                "decision": "SOURCE_OWNED_PARTIAL_FIELDS_REQUIRE_INDEPENDENT_ACCEPTANCE",
+                "verified_core_roles": {"EVENT_ACTIVITY_PERIOD": "2026-11-20 - 2026-11-21"},
+                "observed_at": "2026-11-18T00:00:00+00:00",
+                "title": card["title"], "activity_kind": "展覽",
+                "held_fields": ["FORMAL_FIELD_HOLD"],
+                "list_period": "2026-11-20 - 2026-11-21",
+                "detail_period": "2026-11-20 - 2026-11-21",
+            }
+        pairs = {sid: {"body": b"sealed archive detail", "receipt": {}}
+                 for sid in cards}
+        with patch("scripts.p30_tpac_catalog_topology.discover_catalog",
+                   return_value=cards), patch(
+                   "scripts.p30_tpac_event_detail_review.inspect_event_detail",
+                   side_effect=inspect):
+            report = refresh_event_plan(b"sealed archive list", {}, pairs, prior, now)
+        self.assertEqual(report["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        self.assertEqual(report["qualified"], 1)
+        self.assertEqual(report["added"], 1)
+        self.assertEqual(report["changed"], 0)
+        self.assertEqual(report["retained_previous"], 1)
+        self.assertFalse(report["source_coverage_complete"])
+        self.assertIn("TPAC_PRIOR_EVENT_SEMANTIC_HOLD", report["rejected"]["1301"])
+        self.assertEqual(report["events"]["tpac:event:1301"], old_bad)
+        self.assertIn("tpac:event:2072", report["events"])
+        self.assertFalse(report["events"]["tpac:event:2072"]["published"])
+
+    def test_all_corrupt_event_lkg_preserves_original_snapshot(self):
+        from unittest.mock import patch
+        from datetime import datetime, timezone
+        from scripts.p30_tpac_multi_event_refresh import KIND, refresh_event_plan
+        bad = {"_candidate": {"field_roles": {"EVENT_ACTIVITY_PERIOD": None}}}
+        prior = {"kind": KIND, "events": {"tpac:event:1301": bad}}
+        card = {"source_event_id": "1301", "title": "封存活動"}
+        import hashlib
+        body = b"archived detail"
+        review = {"identity": "tpac:event:1301", "source_event_id": "1301",
+                  "url": "https://tpac.org.taipei/event/1301",
+                  "detail_body_sha256": hashlib.sha256(body).hexdigest(),
+                  "decision": "SOURCE_OWNED_PARTIAL_FIELDS_REQUIRE_INDEPENDENT_ACCEPTANCE",
+                  "verified_core_roles": {}, "observed_at": "2026-11-18T00:00:00+00:00",
+                  "title": "封存活動", "activity_kind": "展覽",
+                  "held_fields": [], "list_period": "", "detail_period": ""}
+        with patch("scripts.p30_tpac_catalog_topology.discover_catalog",
+                   return_value={"1301": card}), patch(
+                   "scripts.p30_tpac_event_detail_review.inspect_event_detail",
+                   return_value=review):
+            result = refresh_event_plan(b"archive", {},
+                                        {"1301": {"body": body, "receipt": {}}},
+                                        prior, datetime(2026, 11, 18, tzinfo=timezone.utc))
+        self.assertEqual(result["decision"], "HOLD_NO_QUALIFIED_EVENT_DETAILS_PRESERVE_LKG")
+        self.assertEqual(result["events"], prior["events"])
+        self.assertEqual(result["qualified"], 0)
+        self.assertEqual(result["added"], 0)
+        self.assertEqual(result["changed"], 0)
+
+class EventPeriodSemanticDriftRegressionTests(unittest.TestCase):
+    def test_changed_list_period_is_not_receipt_only(self):
+        # Source-owned LIST period drift must be retained as a semantic change,
+        # even when DETAIL and accepted core roles are otherwise identical.
+        import copy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        prior = {
+            "source_namespace": "event", "identity": "tpac:event:1301",
+            "source_event_id": "1301",
+            "_candidate": {
+                "field_roles": {"EVENT_ACTIVITY_PERIOD": {
+                    "role": "EVENT_ACTIVITY_PERIOD", "value": "2026-11-20 - 2026-11-21"}},
+                "hold_reasons": ["LIST_DETAIL_PERIOD_CONFLICT_HOLD"],
+                "list_period": "2026-11-19 - 2026-11-21",
+                "detail_period": "2026-11-20 - 2026-11-21",
+                "observed_at": "2026-11-08T00:00:00Z",
+            },
+        }
+        drift = copy.deepcopy(prior)
+        drift["_candidate"]["list_period"] = "2026-11-18 - 2026-11-21"
+        self.assertNotEqual(_semantic_event_payload(prior),
+                            _semantic_event_payload(drift))
+        receipt_only = copy.deepcopy(prior)
+        receipt_only["_candidate"]["observed_at"] = "2026-11-09T00:00:00Z"
+        self.assertEqual(_semantic_event_payload(prior),
+                         _semantic_event_payload(receipt_only))
+
+    def test_changed_detail_period_is_not_receipt_only(self):
+        import copy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+        prior = {"source_event_id": "2072", "_candidate": {
+            "field_roles": {}, "hold_reasons": ["FIELD_REVIEW_HOLD"],
+            "list_period": "2026-11-20 - 2026-11-21",
+            "detail_period": "2026-11-20 - 2026-11-21"}}
+        changed = copy.deepcopy(prior)
+        changed["_candidate"]["detail_period"] = "2026-11-20 - 2026-11-22"
+        self.assertNotEqual(_semantic_event_payload(prior),
+                            _semantic_event_payload(changed))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class ArchivedInventoryVersionRecoveryTests(unittest.TestCase):
+    def test_real_disk_cas_versions_restart_and_corruption_hold(self):
+        # The previous complete inventory survives restart, while a corrupt
+        # version cannot be loaded or silently replace the current CAS.
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+            read_detail_inventory_version,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            initial = {"kind": INVENTORY_KIND, "items": {}}
+            first = write_detail_inventory(initial, root)
+            row = {"source_namespace": "program", "source_event_id": "2040",
+                   "detail_url": "https://tpac.org.taipei/program/2040",
+                   "status": "PENDING_DETAIL_BUDGET", "attempts": 0}
+            second_document = {"kind": INVENTORY_KIND,
+                               "items": {"tpac:program:2040": row}}
+            second = write_detail_inventory(second_document, root, first["sha256"])
+            saved, saved_sha = read_detail_inventory_version(root, first["sha256"])
+            self.assertEqual(saved, initial)
+            self.assertEqual(saved_sha, first["sha256"])
+            current, current_sha = load_detail_inventory(root)
+            self.assertEqual(current, second_document)
+            self.assertEqual(current_sha, second["sha256"])
+            # A second unchanged replay is idempotent.
+            repeat = write_detail_inventory(second_document, root, second["sha256"])
+            self.assertEqual(repeat["sha256"], second["sha256"])
+            history = root / "_isolated_review" / "tpac" / "inventory_versions"
+            self.assertEqual(len(list(history.glob("*.json"))), 1)
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_VERSION_SHA_HOLD"):
+                read_detail_inventory_version(root, "../escape")
+            predecessor = history / (first["sha256"] + ".json")
+            predecessor.write_bytes(b"corrupted")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_HISTORY_CORRUPT_HOLD"):
+                read_detail_inventory_version(root, first["sha256"])
+            # Bad historical evidence cannot contaminate the current snapshot.
+            current_again, current_again_sha = load_detail_inventory(root)
+            self.assertEqual(current_again, second_document)
+            self.assertEqual(current_again_sha, second["sha256"])
+            # Replaying the valid current version is still safe and idempotent;
+            # recovery of the corrupted predecessor remains explicitly denied.
+            self.assertEqual(write_detail_inventory(second_document, root,
+                             second["sha256"])["sha256"], second["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
+
+    def test_history_link_failure_keeps_current_cas_and_no_partial_version(self):
+        # Simulate failure at the atomic history publication boundary.
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            initial = {"kind": INVENTORY_KIND, "items": {}}
+            first = write_detail_inventory(initial, root)
+            changed = {"kind": INVENTORY_KIND, "items": {
+                "tpac:event:1301": {
+                    "source_namespace": "event", "source_event_id": "1301",
+                    "detail_url": "https://tpac.org.taipei/event/1301",
+                    "status": "PENDING_DETAIL_BUDGET", "attempts": 0,
+                }
+            }}
+            with patch("scripts.p30_tpac_multi_event_refresh.os.link",
+                       side_effect=OSError("simulated crash before publication")):
+                with self.assertRaisesRegex(OSError, "simulated crash"):
+                    write_detail_inventory(changed, root, first["sha256"])
+            self.assertEqual(load_detail_inventory(root), (initial, first["sha256"]))
+            history = root / "_isolated_review" / "tpac" / "inventory_versions"
+            self.assertEqual(list(history.glob("*.json")), [])
+            self.assertEqual(list(history.glob(".history-*")), [])
+            second = write_detail_inventory(changed, root, first["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
+            self.assertTrue((history / (first["sha256"] + ".json")).is_file())
+
+    def test_recover_one_historical_review_row_preserves_other_events(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+            restore_detail_inventory_row,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            def row(sid, reason):
+                return {"source_namespace": "event", "source_event_id": sid,
+                        "detail_url": "https://tpac.org.taipei/event/" + sid,
+                        "status": "PENDING_DETAIL_BUDGET", "attempts": 0,
+                        "reason": reason}
+            identity = "tpac:event:1301"
+            other = "tpac:event:2072"
+            first_doc = {"kind": INVENTORY_KIND, "items": {
+                identity: row("1301", "OLD_REVIEW"),
+                other: row("2072", "OTHER_VALID")}}
+            first = write_detail_inventory(first_doc, root)
+            second_doc = {"kind": INVENTORY_KIND, "items": {
+                identity: row("1301", "NEW_UNWANTED_REVIEW"),
+                other: row("2072", "OTHER_VALID")}}
+            second = write_detail_inventory(second_doc, root, first["sha256"])
+            restored = restore_detail_inventory_row(root, first["sha256"],
+                                                    identity, second["sha256"])
+            actual, actual_sha = load_detail_inventory(root)
+            self.assertEqual(actual_sha, restored["sha256"])
+            self.assertEqual(actual["items"][identity], first_doc["items"][identity])
+            self.assertEqual(actual["items"][other], second_doc["items"][other])
+            self.assertEqual(restored["decision"],
+                             "ISOLATED_HISTORICAL_ROW_REVIEW_HOLD_NO_PUBLICATION")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_RECOVERY_CAS_HOLD"):
+                restore_detail_inventory_row(root, first["sha256"], identity,
+                                             second["sha256"])
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_RECOVERY_IDENTITY_HOLD"):
+                restore_detail_inventory_row(root, first["sha256"], "../1301",
+                                             actual_sha)
+            self.assertEqual(load_detail_inventory(root)[1], actual_sha)
+
+    def test_recovery_rejects_source_drift_and_corrupted_version(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+            restore_detail_inventory_row,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            identity = "tpac:event:1301"
+            original = {"source_namespace": "event", "source_event_id": "1301",
+                        "detail_url": "https://tpac.org.taipei/event/1301",
+                        "status": "PENDING_DETAIL_BUDGET", "attempts": 0}
+            first = write_detail_inventory(
+                {"kind": INVENTORY_KIND, "items": {identity: original}}, root)
+            # Source identity is guarded on every CAS write, before recovery.
+            # Exercise the real rejection instead of attempting to persist an
+            # invalid source URL that the existing validator correctly blocks.
+            drift = dict(original, detail_url="https://tpac.org.taipei/event/9999")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_ROW_IDENTITY_HOLD"):
+                write_detail_inventory(
+                    {"kind": INVENTORY_KIND, "items": {identity: drift}},
+                    root, first["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], first["sha256"])
+            # Advance to a valid second version so the corrupted historical
+            # version is tested against an actual recoverable CAS transition.
+            second = write_detail_inventory(
+                {"kind": INVENTORY_KIND, "items": {
+                    identity: dict(original, reason="NEW_REVIEW")}},
+                root, first["sha256"])
+            history = root / "_isolated_review" / "tpac" / "inventory_versions"
+            (history / (first["sha256"] + ".json")).write_bytes(b"corrupt")
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_HISTORY_CORRUPT_HOLD"):
+                restore_detail_inventory_row(root, first["sha256"], identity,
+                                             second["sha256"])
+            self.assertEqual(load_detail_inventory(root)[1], second["sha256"])
+
+    def test_stale_cas_cannot_create_history_or_change_snapshot(self):
+        import tempfile
+        from pathlib import Path
+        from scripts.p30_tpac_multi_event_refresh import (
+            INVENTORY_KIND, write_detail_inventory, load_detail_inventory,
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            document = {"kind": INVENTORY_KIND, "items": {}}
+            first = write_detail_inventory(document, root)
+            with self.assertRaisesRegex(ValueError, "TPAC_INVENTORY_CAS_HOLD"):
+                write_detail_inventory(document, root, "0" * 64)
+            self.assertEqual(load_detail_inventory(root)[1], first["sha256"])
+            self.assertFalse((root / "_isolated_review" / "tpac" /
+                              "inventory_versions").exists())
+
+
+
+class CrossCatalogIdentitySemanticRegressionTests(unittest.TestCase):
+    def test_same_display_values_but_identity_or_review_authority_changes(self):
+        # Cross-source identity/authority drift must update LKG even when
+        # public display fields remain unchanged; receipts alone must not.
+        from copy import deepcopy
+        from scripts.p30_tpac_multi_event_refresh import _semantic_event_payload
+
+        baseline = {
+            "source_event_id": "1301", "url": "https://tpac.org.taipei/event/1301",
+            "title": "Source-owned event", "source_namespace": "event",
+            "identity": "tpac:event:1301",
+            "_candidate": {"scope": "ARCHIVED_SOURCE_REPLAY_REVIEW_ONLY",
+                           "decision": "REVIEW", "identity": "tpac:event:1301",
+                           "field_roles": {}, "hold_reasons": []},
+        }
+        original = _semantic_event_payload(baseline)
+        for field, value in (("identity", "tpac:1301"),
+                             ("source_namespace", "program")):
+            changed = deepcopy(baseline)
+            changed[field] = value
+            self.assertNotEqual(original, _semantic_event_payload(changed))
+        for field, value in (("scope", "SOURCE_REVIEW_ONLY"),
+                             ("decision", "HOLD"),
+                             ("identity", "tpac:1301")):
+            changed = deepcopy(baseline)
+            changed["_candidate"][field] = value
+            self.assertNotEqual(original, _semantic_event_payload(changed))
+        unchanged = deepcopy(baseline)
+        unchanged["_candidate"]["observed_at"] = "2026-11-22T12:00:00Z"
+        unchanged["_candidate"]["source_detail_sha256"] = "a" * 64
+        self.assertEqual(original, _semantic_event_payload(unchanged))
+
+
+class CrossCatalogLkgAdmissionTests(unittest.TestCase):
+    def test_program_alias_cannot_poison_isolated_lkg(self):
+        # Keep legacy programme rows without optional namespace metadata valid,
+        # but reject forged cross-catalog identities before any CAS file write.
+        raw, rr, details = inputs()
+        plan = refresh_plan(raw, rr, details, empty_prior(), NOW)
+        self.assertEqual(plan["decision"], "REVIEW_SNAPSHOT_READY_NOT_FORMAL")
+        key = next(iter(plan["events"]))
+        with tempfile.TemporaryDirectory() as temp:
+            for field, value in (("source_namespace", "other"),
+                                 ("source_namespace", "event"),
+                                 ("identity", "tpac:event:2111")):
+                import copy
+                changed = copy.deepcopy(plan)
+                changed["events"][key][field] = value
+                with self.assertRaisesRegex(ValueError, "TPAC_REVIEW_ROW_AUTHORITY_HOLD"):
+                    write_isolated_plan(changed, temp)
+                self.assertFalse((Path(temp) / "_isolated_review" / "tpac" /
+                                  "tpac_multi_event_lkg.json").exists())
+            import copy
+            changed = copy.deepcopy(plan)
+            changed["events"][key]["_candidate"]["identity"] = "tpac:event:2111"
+            with self.assertRaisesRegex(ValueError, "TPAC_REVIEW_ROW_AUTHORITY_HOLD"):
+                write_isolated_plan(changed, temp)
+            accepted = write_isolated_plan(plan, temp)
+            self.assertRegex(accepted["sha256"], r"^[0-9a-f]{64}$")
+
+
+class TestCrashSafeLockUnavailable(unittest.TestCase):
+    def test_missing_fcntl_fails_closed_without_creating_lock(self):
+        import builtins
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from scripts.p30_tpac_multi_event_refresh import _isolated_writer_lock
+
+        real_import = builtins.__import__
+
+        def deny_fcntl(name, *args, **kwargs):
+            if name == "fcntl":
+                raise ImportError("simulated unsupported platform")
+            return real_import(name, *args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as directory:
+            lock = Path(directory) / ".write.lock"
+            with patch("builtins.__import__", side_effect=deny_fcntl):
+                with self.assertRaisesRegex(ValueError, "TPAC_CONCURRENT_WRITER_HOLD"):
+                    with _isolated_writer_lock(lock, "TPAC_CONCURRENT_WRITER_HOLD"):
+                        self.fail("unsafe lock acquired")
+            self.assertFalse(lock.exists())
+            lock.write_bytes(b"LEGACY_SENTINEL")
+            with patch("builtins.__import__", side_effect=deny_fcntl):
+                with self.assertRaisesRegex(ValueError, "TPAC_CONCURRENT_WRITER_HOLD"):
+                    with _isolated_writer_lock(lock, "TPAC_CONCURRENT_WRITER_HOLD"):
+                        self.fail("unsafe legacy lock acquired")
+            self.assertEqual(lock.read_bytes(), b"LEGACY_SENTINEL")
+
+
+class ArchivedFieldCandidateDeltaTests(unittest.TestCase):
+    """Fixed isolated candidate path: semantic transitions, no publication."""
+
+    def _ledger(self, decision="HOLD", value=None, sha="a" * 64,
+                current=False, receipt="b" * 64):
+        identity = "tpac:program:2040"
+        field = {"value": value, "role": "SHOW_START" if decision == "REVIEW" else "UNKNOWN",
+                 "event_id": "2040", "source_url": "https://tpac.org.taipei/program/2040",
+                 "observed_at": "2026-11-22T00:00:00Z", "source_body_sha256": receipt,
+                 "decision": decision,
+                 "hold_reason": ("ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"
+                                 if decision == "REVIEW" else "ARCHIVED_FIELD_ROLE_NOT_VERIFIED_HOLD")}
+        return {"kind": "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1",
+                "source_scope": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+                "release_state": "HARD_HOLD_NO_PUBLICATION",
+                "inventory_sha256": sha, "accepted_fields": 0, "published": 0,
+                "records": {identity: {"identity": identity, "source_namespace": "program",
+                                      "event_id": "2040", "detail_source_url": field["source_url"],
+                                      "archive_evidence_current": current,
+                                      "fields": {"show_start": field}}}}
+
+    def test_hold_to_review_and_review_to_hold_without_sibling_loss(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        old = self._ledger()
+        new = self._ledger("REVIEW", "2026-11-28 19:30", "c" * 64, True)
+        result = build_archived_field_candidate_delta(old, new)
+        key = "tpac:program:2040"
+        self.assertEqual(result["changed"][key]["show_start"]["transition"], "HOLD_TO_REVIEW")
+        self.assertEqual(result["candidates"][key]["fields"]["show_start"]["decision"],
+                         "REVIEW_ONLY_NOT_ACCEPTED")
+        self.assertEqual((result["accepted_fields"], result["published"]), (0, 0))
+        reverse = build_archived_field_candidate_delta(new, self._ledger(sha="d" * 64))
+        self.assertEqual(reverse["changed"][key]["show_start"]["transition"], "REVIEW_TO_HOLD")
+        self.assertEqual(reverse["candidates"][key]["fields"], {})
+
+    def test_receipt_only_does_not_churn_but_semantic_value_does(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        old = self._ledger("REVIEW", "A", current=True)
+        receipt_only = self._ledger("REVIEW", "A", "c" * 64, True, "d" * 64)
+        self.assertEqual(build_archived_field_candidate_delta(old, receipt_only)["changed"], {})
+        updated = self._ledger("REVIEW", "B", "e" * 64, True)
+        self.assertEqual(build_archived_field_candidate_delta(old, updated)["counts"]["changed_events"], 1)
+
+    def test_field_provenance_and_hold_reason_survive_candidate_cas_and_restart(self):
+        # Durable Quality Gate inputs must not lose source-owned field proof
+        # when the field ledger is compacted into REVIEW/HOLD candidates.
+        import copy
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_archived_field_candidate_delta, write_archived_field_candidate_snapshot,
+            load_archived_field_candidate_snapshot)
+        old = self._ledger()
+        current = self._ledger("REVIEW", "2026-11-28 19:30", sha="c" * 64,
+                               current=True, receipt="d" * 64)
+        identity = "tpac:program:2040"
+        current["records"][identity]["fields"]["price"] = {
+            "value": None, "role": "UNKNOWN", "event_id": "2040",
+            "source_url": "https://tpac.org.taipei/program/2040",
+            "observed_at": "2026-11-22T00:00:00Z",
+            "source_body_sha256": "d" * 64, "decision": "HOLD",
+            "hold_reason": "PRICE_UNVERIFIED_HOLD"}
+        delta = build_archived_field_candidate_delta(old, current)
+        candidate = delta["candidates"][identity]
+        expected = current["records"][identity]["fields"]["show_start"]
+        review = candidate["fields"]["show_start"]
+        self.assertEqual(review["decision"], "REVIEW_ONLY_NOT_ACCEPTED")
+        for key in ("value", "role", "event_id", "source_url",
+                    "observed_at", "source_body_sha256", "hold_reason"):
+            self.assertEqual(review[key], expected[key])
+        self.assertEqual(candidate["detail_source_url"], expected["source_url"])
+        held = candidate["held_fields"]["price"]
+        self.assertEqual(held["decision"], "HOLD")
+        self.assertIsNone(held["value"])
+        self.assertEqual(held["event_id"], "2040")
+        self.assertEqual(held["source_body_sha256"], "d" * 64)
+        self.assertEqual(held["hold_reason"], "PRICE_UNVERIFIED_HOLD")
+        self.assertTrue(candidate["source_current"])
+        self.assertEqual((delta["accepted_fields"], delta["published"]), (0, 0))
+        with tempfile.TemporaryDirectory() as temp:
+            persisted = write_archived_field_candidate_snapshot(delta, temp)
+            restarted = load_archived_field_candidate_snapshot(temp, persisted["sha256"])
+            self.assertEqual(restarted["candidates"][identity], candidate)
+            self.assertEqual((restarted["accepted_fields"], restarted["published"]), (0, 0))
+            # A forged source reference or forged HOLD authority must not
+            # replace the exact, previously validated REVIEW LKG.
+            for tamper in ("review_url", "held_event", "held_value", "held_reason"):
+                forged = copy.deepcopy(delta)
+                row = forged["candidates"][identity]
+                if tamper == "review_url":
+                    row["fields"]["show_start"]["source_url"] = "https://invalid.example/999"
+                elif tamper == "held_event":
+                    row["held_fields"]["price"]["event_id"] = "999"
+                elif tamper == "held_value":
+                    row["held_fields"]["price"]["value"] = "1900"
+                else:
+                    row["held_fields"]["price"]["hold_reason"] = None
+                with self.subTest(tamper=tamper):
+                    with self.assertRaisesRegex(ValueError, "TPAC_CANDIDATE_SNAPSHOT_FIELD_HOLD"):
+                        write_archived_field_candidate_snapshot(forged, temp, persisted["sha256"])
+                    self.assertEqual(
+                        load_archived_field_candidate_snapshot(temp, persisted["sha256"]),
+                        restarted)
+
+    def test_source_currentness_transition_is_semantic_but_sha_only_is_not(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        old = self._ledger("HOLD", current=False)
+        current = self._ledger("HOLD", sha="c" * 64, current=True,
+                               receipt="d" * 64)
+        key = "tpac:program:2040"
+        delta = build_archived_field_candidate_delta(old, current)
+        self.assertEqual(delta["changed"][key]["__source_currentness__"]["transition"],
+                         "STALE_TO_CURRENT")
+        self.assertEqual(delta["candidates"][key]["fields"], {})
+        reverse = build_archived_field_candidate_delta(current, self._ledger(
+            "HOLD", sha="e" * 64, current=False))
+        self.assertEqual(reverse["changed"][key]["__source_currentness__"]["transition"],
+                         "CURRENT_TO_STALE")
+        same = self._ledger("HOLD", sha="f" * 64, current=True, receipt="a" * 64)
+        self.assertEqual(build_archived_field_candidate_delta(current, same)["changed"], {})
+        self.assertEqual((delta["accepted_fields"], delta["published"]), (0, 0))
+
+    def test_missing_review_field_withdraws_candidate_without_sibling_loss(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        import copy
+        prior = self._ledger("REVIEW", "2026-11-28 19:30", current=True)
+        key = "tpac:program:2040"
+        prior["records"][key]["fields"]["title"] = copy.deepcopy(
+            prior["records"][key]["fields"]["show_start"])
+        prior["records"][key]["fields"]["title"]["value"] = "Still present"
+        current = copy.deepcopy(prior)
+        current["inventory_sha256"] = "c" * 64
+        del current["records"][key]["fields"]["show_start"]
+        result = build_archived_field_candidate_delta(prior, current)
+        self.assertEqual(result["changed"][key]["show_start"]["transition"],
+                         "REVIEW_TO_ABSENT")
+        self.assertEqual(result["changed"][key]["show_start"]["current_decision"], "HOLD")
+        self.assertNotIn("show_start", result["candidates"][key]["fields"])
+        self.assertEqual(result["candidates"][key]["fields"]["title"]["value"],
+                         "Still present")
+        self.assertEqual((result["accepted_fields"], result["published"]), (0, 0))
+
+    def test_empty_and_stale_review_fail_closed(self):
+        from scripts.p30_tpac_multi_event_refresh import build_archived_field_candidate_delta
+        prior = self._ledger()
+        current = self._ledger("REVIEW", "A", current=False)
+        with self.assertRaisesRegex(ValueError, "STALE_REVIEW"):
+            build_archived_field_candidate_delta(prior, current)
+        empty = self._ledger()
+        empty["records"] = {}
+        with self.assertRaisesRegex(ValueError, "EMPTY_OR_SCHEMA"):
+            build_archived_field_candidate_delta(prior, empty)
+        with self.assertRaisesRegex(ValueError, "DESTRUCTIVE_REMOVAL"):
+            build_archived_field_candidate_delta(prior, {"kind": prior["kind"],
+                "source_scope": prior["source_scope"], "release_state": prior["release_state"],
+                "accepted_fields": 0, "published": 0,
+                "records": {"tpac:event:999": {"identity": "tpac:event:999"}}})
+
+
+
+class ArchivedFieldCandidateSnapshotPersistenceTests(unittest.TestCase):
+    def _delta(self, title="Current"):
+        return {"kind": "TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1",
+                "release_state": "HARD_HOLD_NO_PUBLICATION",
+                "accepted_fields": 0, "published": 0,
+                "current_inventory_sha256": "a" * 64, "changed": {},
+                "candidates": {
+                    "tpac:program:2040": {
+                        "identity": "tpac:program:2040",
+                        "source_namespace": "program", "event_id": "2040",
+                        "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY",
+                        "fields": {"title": {"value": title, "role": "TITLE",
+                                             "decision": "REVIEW_ONLY_NOT_ACCEPTED"}}},
+                    "tpac:event:2072": {
+                        "identity": "tpac:event:2072",
+                        "source_namespace": "event", "event_id": "2072",
+                        "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY",
+                        "fields": {"show_start": {"value": "2026-11-28 19:30",
+                                                  "role": "SHOW_START",
+                                                  "decision": "REVIEW_ONLY_NOT_ACCEPTED"}}}}}
+
+    def test_candidate_snapshot_cas_restart_and_sibling_preservation(self):
+        from scripts.p30_tpac_multi_event_refresh import write_archived_field_candidate_snapshot
+        with tempfile.TemporaryDirectory() as td:
+            first = write_archived_field_candidate_snapshot(self._delta(), td)
+            target = Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json"
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), first["sha256"])
+            updated = self._delta("Updated")
+            updated["candidates"]["tpac:event:2072"]["fields"] = {}
+            second = write_archived_field_candidate_snapshot(updated, td, first["sha256"])
+            saved = json.loads(target.read_bytes())
+            self.assertEqual(saved["candidates"]["tpac:program:2040"]["fields"]["title"]["value"], "Updated")
+            self.assertEqual(saved["candidates"]["tpac:event:2072"]["fields"], {})
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                write_archived_field_candidate_snapshot(self._delta("Stale"), td, first["sha256"])
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), second["sha256"])
+            with self.assertRaisesRegex(ValueError, "REMOVAL_HOLD"):
+                reduced = self._delta()
+                del reduced["candidates"]["tpac:event:2072"]
+                write_archived_field_candidate_snapshot(reduced, td, second["sha256"])
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), second["sha256"])
+
+    def test_prior_candidate_corruption_and_source_swap_fail_closed(self):
+        # Existing canonical bytes must still prove field provenance and
+        # stable source identity before an update can replace the LKG.
+        from scripts.p30_tpac_multi_event_refresh import (
+            write_archived_field_candidate_snapshot, _canonical)
+        with tempfile.TemporaryDirectory() as td:
+            first = write_archived_field_candidate_snapshot(self._delta(), td)
+            target = Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json"
+            prior = json.loads(target.read_bytes())
+            prior["candidates"]["tpac:event:2072"]["fields"]["show_start"]["decision"] = "ACCEPTED"
+            raw = _canonical(prior)
+            target.write_bytes(raw)
+            tampered_sha = hashlib.sha256(raw).hexdigest()
+            with self.assertRaisesRegex(ValueError, "PRIOR_CORRUPT_OR_REMOVAL_HOLD"):
+                write_archived_field_candidate_snapshot(self._delta("New"), td, tampered_sha)
+            self.assertEqual(target.read_bytes(), raw)
+
+        with tempfile.TemporaryDirectory() as td:
+            first = write_archived_field_candidate_snapshot(self._delta(), td)
+            target = Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json"
+            changed = self._delta("New")
+            changed["candidates"]["tpac:event:2072"]["source_namespace"] = "program"
+            with self.assertRaisesRegex(ValueError, "PRIOR_SOURCE_IDENTITY_HOLD"):
+                write_archived_field_candidate_snapshot(changed, td, first["sha256"])
+            self.assertEqual(hashlib.sha256(target.read_bytes()).hexdigest(), first["sha256"])
+
+    def test_candidate_snapshot_rejects_published_and_empty_without_write(self):
+        from scripts.p30_tpac_multi_event_refresh import write_archived_field_candidate_snapshot
+        with tempfile.TemporaryDirectory() as td:
+            bad = self._delta()
+            bad["published"] = 1
+            with self.assertRaisesRegex(ValueError, "AUTHORITY_HOLD"):
+                write_archived_field_candidate_snapshot(bad, td)
+            empty = self._delta()
+            empty["candidates"] = {}
+            with self.assertRaisesRegex(ValueError, "AUTHORITY_HOLD"):
+                write_archived_field_candidate_snapshot(empty, td)
+            self.assertFalse((Path(td) / "_isolated_archive_replay" / "field_candidate_lkg.json").exists())
+
+
+class ArchivedFieldCandidateCliIntegrationTests(unittest.TestCase):
+    def test_explicit_archive_diff_commits_only_isolated_candidate_snapshot(self):
+        # Exercise the actual CLI route, not an isolated writer unit test.
+        from unittest.mock import patch
+        from scripts.p30_tpac_multi_event_refresh import main
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_archived_field_candidate_delta, build_archived_field_review_export)
+        import io
+        from contextlib import redirect_stdout
+
+        prior_sha, current_sha = "a" * 64, "b" * 64
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            archive = root / "_isolated_archive_replay"
+            archive.mkdir()
+            old_inventory = {"kind": "TPAC_DUAL_CATALOG_PENDING_DETAIL_V1", "items": {}}
+            current_inventory = {"kind": "TPAC_DUAL_CATALOG_PENDING_DETAIL_V1", "items": {}}
+            identity = "tpac:program:2040"
+            row = {"identity": identity, "source_namespace": "program",
+                   "event_id": "2040", "detail_source_url": "https://tpac.org.taipei/program/2040",
+                   "archive_evidence_current": True,
+                   "fields": {"title": {"value": "Archived title", "role": "TITLE",
+                                        "decision": "REVIEW", "event_id": "2040",
+                                        "source_url": "https://tpac.org.taipei/program/2040",
+                                        "hold_reason": "ARCHIVED_FIELD_REQUIRES_INDEPENDENT_ACCEPTANCE"}}}
+            old_ledger = {"kind": "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1",
+                          "source_scope": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+                          "release_state": "HARD_HOLD_NO_PUBLICATION",
+                          "inventory_sha256": prior_sha, "accepted_fields": 0, "published": 0,
+                          "records": {identity: {**row, "fields": {
+                              "title": {**row["fields"]["title"], "value": None,
+                                        "role": "UNKNOWN", "decision": "HOLD"}}}}}
+            new_ledger = {**old_ledger, "inventory_sha256": current_sha,
+                          "records": {identity: row}}
+            def export(_inventory, sha):
+                return old_ledger if sha == prior_sha else new_ledger
+            with (patch("scripts.p30_tpac_multi_event_refresh.load_detail_inventory",
+                        return_value=(current_inventory, current_sha)),
+                  patch("scripts.p30_tpac_multi_event_refresh.read_detail_inventory_version",
+                        return_value=(old_inventory, prior_sha)),
+                  patch("scripts.p30_tpac_multi_event_refresh.build_archived_field_review_export",
+                        side_effect=export)):
+                args = ["--repo-root", str(root), "--export-archive-fields",
+                        "--expected-sha", current_sha,
+                        "--diff-prior-archive-sha", prior_sha,
+                        "--commit-archive-field-candidates"]
+                out = io.StringIO()
+                with redirect_stdout(out):
+                    self.assertEqual(main(args), 0)
+                result = json.loads(out.getvalue())
+                target = archive / "field_candidate_lkg.json"
+                saved = json.loads(target.read_bytes())
+                self.assertEqual(saved["candidates"][identity]["fields"]["title"]["value"],
+                                 "Archived title")
+                self.assertEqual(result["result"]["sha256"],
+                                 hashlib.sha256(target.read_bytes()).hexdigest())
+                self.assertEqual((saved["accepted_fields"], saved["published"]), (0, 0))
+                with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                    main(args)
+                self.assertEqual(result["result"]["sha256"],
+                                 hashlib.sha256(target.read_bytes()).hexdigest())
+                with self.assertRaisesRegex(ValueError, "REQUIRES_PRIOR_VERSION"):
+                    main(["--repo-root", str(root), "--export-archive-fields",
+                          "--expected-sha", current_sha,
+                          "--commit-archive-field-candidates"])
+                with self.assertRaisesRegex(ValueError, "MODE_HOLD"):
+                    main(["--repo-root", str(root), "--candidate-expected-sha", prior_sha])
+
+
+class ArchivedCandidateCurrentnessPersistenceTests(unittest.TestCase):
+    def test_stale_candidate_currentness_survives_snapshot_restart(self):
+        # A stale source must remain explicitly stale after persistence;
+        # receipt-only SHA changes cannot make the candidate current.
+        from scripts.p30_tpac_multi_event_refresh import (
+            build_archived_field_candidate_delta,
+            write_archived_field_candidate_snapshot,
+            load_archived_field_candidate_snapshot)
+        identity = "tpac:program:2040"
+        row = {"identity": identity, "source_namespace": "program",
+               "event_id": "2040", "detail_source_url": "https://tpac.org.taipei/program/2040",
+               "archive_evidence_current": False,
+               "fields": {"title": {"decision": "HOLD", "value": None,
+                                    "role": "UNKNOWN", "hold_reason": "SOURCE_STALE",
+                                    "event_id": "2040",
+                                    "source_url": "https://tpac.org.taipei/program/2040"}}}
+        ledger = {"kind": "TPAC_ISOLATED_FIELD_EVIDENCE_LEDGER_V1",
+                  "source_scope": "ARCHIVED_OFFLINE_REVIEW_ONLY",
+                  "release_state": "HARD_HOLD_NO_PUBLICATION",
+                  "inventory_sha256": "a" * 64, "accepted_fields": 0,
+                  "published": 0, "records": {identity: row}}
+        delta = build_archived_field_candidate_delta(
+            {**ledger, "records": {}}, ledger)
+        self.assertIs(delta["candidates"][identity]["source_current"], False)
+        self.assertEqual(delta["candidates"][identity]["fields"], {})
+        with tempfile.TemporaryDirectory() as td:
+            committed = write_archived_field_candidate_snapshot(delta, td)
+            saved = json.loads((Path(td) / "_isolated_archive_replay" /
+                                "field_candidate_lkg.json").read_text())
+            self.assertIs(saved["candidates"][identity]["source_current"], False)
+            self.assertEqual(saved["accepted_fields"], 0)
+            self.assertEqual(saved["published"], 0)
+
+
+class ArchivedCandidateRestartReadTests(unittest.TestCase):
+    def test_restart_cli_read_exact_snapshot_and_stale_cas(self):
+        import io
+        from contextlib import redirect_stdout
+        from scripts.p30_tpac_multi_event_refresh import (
+            main, write_archived_field_candidate_snapshot)
+        with tempfile.TemporaryDirectory() as td:
+            identity = "tpac:program:2040"
+            delta = {
+                "kind": "TPAC_ISOLATED_FIELD_CANDIDATE_DELTA_V1",
+                "current_inventory_sha256": "a" * 64,
+                "changed": {identity: {"title": {"transition": "HOLD_TO_REVIEW"}}},
+                "candidates": {identity: {
+                    "identity": identity, "source_namespace": "program",
+                    "event_id": "2040", "decision": "ISOLATED_REVIEW_CANDIDATE_ONLY",
+                    "fields": {"title": {"value": "Original", "role": "TITLE",
+                                         "decision": "REVIEW_ONLY_NOT_ACCEPTED"}}}},
+                "accepted_fields": 0, "published": 0,
+                "release_state": "HARD_HOLD_NO_PUBLICATION"}
+            committed = write_archived_field_candidate_snapshot(delta, td)
+            args = ["--repo-root", td, "--read-archive-field-candidates",
+                    "--expected-sha", committed["sha256"]]
+            out = io.StringIO()
+            with redirect_stdout(out):
+                self.assertEqual(main(args), 0)
+            recovered = json.loads(out.getvalue())
+            self.assertEqual(recovered["candidates"][identity]["fields"]["title"]["value"], "Original")
+            self.assertEqual((recovered["accepted_fields"], recovered["published"]), (0, 0))
+            delta["candidates"][identity]["fields"]["title"]["value"] = "Updated"
+            next_commit = write_archived_field_candidate_snapshot(delta, td, committed["sha256"])
+            with self.assertRaisesRegex(ValueError, "CAS_HOLD"):
+                main(args)
+            args[-1] = next_commit["sha256"]
+            with redirect_stdout(io.StringIO()):
+                self.assertEqual(main(args), 0)
+            with self.assertRaisesRegex(ValueError, "MODE_HOLD"):
+                main(args + ["--export-archive-fields"])
+
+
+class DualCatalogAtomicOfflineProductTests(unittest.TestCase):
+    """One normal CLI transaction processes both catalogs without a native request."""
+
+    def test_two_catalogs_one_cas_and_failed_detail_preserves_sibling(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from scripts.p30_tpac_multi_event_refresh import main, load_isolated_prior
+        from test_p30_tpac_event_detail_review import (
+            detail as event_detail, receipt as event_receipt,
+        )
+        name = "2026北藝夜遊：Beats到天臺"
+        event_list = ('<a class="card-event" title="連結到' + name +
+                      '" href="/event/2072"><div class="card-event__text-title">' +
+                      name + '</div><div class="card-event__text-datecate"><p>'
+                      '2026-11-10 - 2026-11-12</p><p>專題導覽</p></div></a>').encode()
+        event_body = event_detail(name, "專題導覽",
+                                  "2026-11-11 - 2026-11-13",
+                                  ["2026-11-11 (三) 19:00"])
+        program_list = listing(("2111",))
+        program_body = detail("2111")
+        observed = "2026-11-08T14:54:00+00:00"
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            isolated = root / "isolated"
+            manifests = {}
+            for catalog, list_body, body, sid, list_receipt, detail_receipt in (
+                ("program", program_list, program_body, "2111",
+                 receipt(ROOT, program_list),
+                 receipt(ROOT + "/2111", program_body)),
+                ("event", event_list, event_body, "2072",
+                 event_receipt("https://tpac.org.taipei/event", event_list),
+                 event_receipt("https://tpac.org.taipei/event/2072", event_body)),
+            ):
+                listing_file = root / (catalog + "_list.html")
+                detail_file = root / (catalog + "_detail.html")
+                listing_file.write_bytes(list_body)
+                detail_file.write_bytes(body)
+                manifest = {"catalog": catalog, "list_file": str(listing_file),
+                            "list_receipt": list_receipt,
+                            "details": {sid: {"detail_file": str(detail_file),
+                                              "receipt": detail_receipt}},
+                            "now": observed}
+                manifest_file = root / (catalog + ".json")
+                manifest_file.write_text(json.dumps(manifest, ensure_ascii=False),
+                                         encoding="utf-8")
+                manifests[catalog] = str(manifest_file)
+            dual = root / "dual.json"
+            dual.write_text(json.dumps(manifests), encoding="utf-8")
+            argv = ["--dual-input", str(dual), "--prior-from-lkg",
+                    "--repo-root", str(isolated)]
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            result = json.loads(captured.getvalue())
+            self.assertEqual(result["qualified"], 2)
+            self.assertEqual(result["published"], 0)
+            snapshot, sha = load_isolated_prior(isolated)
+            self.assertEqual(sha, result["result"]["sha256"])
+            self.assertEqual(set(snapshot["events"]), {"tpac:2111", "tpac:event:2072"})
+            # Independent source receipt failures must HOLD only their own
+            # catalog, retaining the exact sibling LKG without inventing GETs.
+            program_path = Path(manifests["program"])
+            event_path = Path(manifests["event"])
+            original_program = json.loads(program_path.read_text(encoding="utf-8"))
+            original_event = json.loads(event_path.read_text(encoding="utf-8"))
+            stale_program = json.loads(json.dumps(original_program))
+            stale_program["list_receipt"]["observed_at"] = "2026-11-01T14:54:00+00:00"
+            program_path.write_text(json.dumps(stale_program), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            stale_result = json.loads(captured.getvalue())
+            self.assertEqual(stale_result["qualified"], 1)
+            self.assertEqual(stale_result["catalog_decisions"]["program"],
+                             "HOLD_PROGRAM_SOURCE_RECEIPT")
+            # The planner's returned stale LIST HOLD must carry the exact
+            # source reason, not merely a successful sibling's qualification.
+            self.assertEqual(stale_result["rejected"]["program:program"],
+                             "TPAC_SOURCE_STALE_OR_FUTURE_HOLD")
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            program_path.write_text(json.dumps(original_program), encoding="utf-8")
+
+            denied_event = json.loads(json.dumps(original_event))
+            denied_event["list_receipt"]["robots_allowed"] = False
+            event_path.write_text(json.dumps(denied_event), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            denied_result = json.loads(captured.getvalue())
+            self.assertEqual(denied_result["qualified"], 1)
+            self.assertEqual(denied_result["catalog_decisions"]["event"],
+                             "HOLD_EVENT_SOURCE_RECEIPT")
+            # Returned (not raised) receipt HOLD must retain its exact cause.
+            self.assertEqual(denied_result["rejected"]["event:event"],
+                             "TPAC_RECEIPT_STATUS_URL_ROBOTS_SHA_HOLD")
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            # Event's native planner uses HOLD_EVENT_LIST_ (not HOLD_LIST_).
+            # A stale event receipt must be normalized identically, while
+            # the healthy programme still advances and CAS retains siblings.
+            stale_event = json.loads(json.dumps(original_event))
+            stale_event["list_receipt"]["observed_at"] = "2026-11-01T14:54:00+00:00"
+            event_path.write_text(json.dumps(stale_event), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            event_stale_result = json.loads(captured.getvalue())
+            self.assertEqual(event_stale_result["qualified"], 1)
+            self.assertEqual(event_stale_result["catalog_decisions"]["event"],
+                             "HOLD_EVENT_SOURCE_RECEIPT")
+            self.assertEqual(event_stale_result["rejected"]["event:event"],
+                             "TPAC_SOURCE_STALE_OR_FUTURE_HOLD")
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            event_path.write_text(json.dumps(denied_event), encoding="utf-8")
+            # Both source receipts denied: do not commit a zero-event snapshot.
+            program_path.write_text(json.dumps(stale_program), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 49)
+            self.assertEqual(json.loads(captured.getvalue())["qualified"], 0)
+            self.assertEqual(load_isolated_prior(isolated), (snapshot, sha))
+            program_path.write_text(json.dumps(original_program), encoding="utf-8")
+            event_path.write_text(json.dumps(original_event), encoding="utf-8")
+            # A different valid capture clock per catalog must not abort the
+            # shared CAS or promote stale source evidence to a new observation.
+            event_manifest_path = Path(manifests["event"])
+            event_manifest = json.loads(event_manifest_path.read_text(encoding="utf-8"))
+            event_manifest["now"] = "2026-11-08T15:54:00+00:00"
+            event_manifest_path.write_text(
+                json.dumps(event_manifest, ensure_ascii=False), encoding="utf-8")
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            independently_timed = json.loads(captured.getvalue())
+            self.assertEqual(independently_timed["qualified"], 2)
+            self.assertEqual(independently_timed["published"], 0)
+            self.assertEqual(load_isolated_prior(isolated)[0], snapshot)
+            self.assertEqual(load_isolated_prior(isolated)[1], sha)
+            # One missing DETAIL cannot delete either sibling or prior evidence.
+            (root / "event_detail.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            degraded = json.loads(captured.getvalue())
+            self.assertEqual(degraded["qualified"], 1)
+            self.assertIn("event:2072", degraded["rejected"])
+            retained, new_sha = load_isolated_prior(isolated)
+            self.assertEqual(retained, snapshot)
+            self.assertEqual(new_sha, sha)
+            # All missing DETAILs: fail closed, do not write an empty LKG.
+            (root / "program_detail.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 49)
+            self.assertEqual(json.loads(captured.getvalue())["qualified"], 0)
+            self.assertEqual(load_isolated_prior(isolated)[1], sha)
+            # Repair both DETAIL files, then remove only the event LIST.
+            # The healthy programme must still commit a genuine changed show.
+            next_program = detail("2111", show="2026-11-22 (日) 13:00")
+            (root / "program_detail.html").write_bytes(next_program)
+            (root / "event_detail.html").write_bytes(event_body)
+            program_manifest_path = Path(manifests["program"])
+            program_manifest = json.loads(program_manifest_path.read_text(encoding="utf-8"))
+            program_manifest["details"]["2111"]["receipt"] = receipt(
+                ROOT + "/2111", next_program)
+            program_manifest_path.write_text(
+                json.dumps(program_manifest, ensure_ascii=False), encoding="utf-8")
+            (root / "event_list.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            event_list_failed = json.loads(captured.getvalue())
+            self.assertEqual(event_list_failed["qualified"], 1)
+            self.assertEqual(event_list_failed["catalog_decisions"]["event"],
+                             "HOLD_EVENT_LIST_IO")
+            advanced, advanced_sha = load_isolated_prior(isolated)
+            self.assertNotEqual(advanced_sha, sha)
+            self.assertEqual(advanced["events"]["tpac:event:2072"],
+                             snapshot["events"]["tpac:event:2072"])
+            self.assertEqual(advanced["events"]["tpac:2111"]["date"],
+                             "2026-11-22 13:00")
+            # The inverse case must also isolate only the failed LIST.
+            (root / "event_list.html").write_bytes(event_list)
+            (root / "program_list.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 0)
+            program_list_failed = json.loads(captured.getvalue())
+            self.assertEqual(program_list_failed["qualified"], 1)
+            self.assertEqual(program_list_failed["catalog_decisions"]["program"],
+                             "HOLD_PROGRAM_LIST_IO")
+            self.assertEqual(load_isolated_prior(isolated)[1], advanced_sha)
+            # Neither LIST is usable: no empty snapshot, no data removal.
+            (root / "event_list.html").unlink()
+            with redirect_stdout(StringIO()) as captured:
+                self.assertEqual(main(argv), 49)
+            both_failed = json.loads(captured.getvalue())
+            self.assertEqual(both_failed["qualified"], 0)
+            self.assertEqual(both_failed["catalog_decisions"],
+                             {"program": "HOLD_PROGRAM_LIST_IO",
+                              "event": "HOLD_EVENT_LIST_IO"})
+            self.assertEqual(load_isolated_prior(isolated)[1], advanced_sha)
+            # Invalid LIST schema remains a hard manifest failure.
+            program_manifest["list_file"] = None
+            program_manifest_path.write_text(
+                json.dumps(program_manifest, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "TPAC_DUAL_CATALOG_LIST_SCHEMA_HOLD"):
+                main(argv)
+            self.assertEqual(load_isolated_prior(isolated)[1], advanced_sha)
+            self.assertFalse((isolated / "docs" / "data.json").exists())
+
+    def test_dual_cli_requires_explicit_isolated_prior_and_both_catalogs(self):
+        from scripts.p30_tpac_multi_event_refresh import main
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = root / "dual.json"
+            manifest.write_text(json.dumps({"program": "missing.json",
+                                            "event": "missing.json"}))
+            with self.assertRaisesRegex(ValueError, "DUAL_CATALOG_CLI_MODE_HOLD"):
+                main(["--dual-input", str(manifest), "--repo-root", str(root)])
+            with self.assertRaisesRegex(ValueError, "DUAL_CATALOG_CLI_MODE_HOLD"):
+                main(["--dual-input", str(manifest), "--prior-from-lkg",
+                      "--expected-sha", "a" * 64, "--repo-root", str(root)])
